@@ -1,0 +1,10 @@
+@use "sass:math";
+
+@function rem($pixels, $base: 16px) {
+  @return math.div($pixels, $base) * 1rem;
+}
+
+@mixin grid($columns: 12) {
+  display: grid;
+  grid-template-columns: repeat($columns, 1fr);
+}

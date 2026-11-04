@@ -1,0 +1,39 @@
+[package]
+name = "callgraph"
+version = "0.1.0"
+edition = "2024"
+description = "PHP projekt-gráf elemző (callgraph Rust-port), JSONL kimenettel"
+
+[lib]
+name = "callgraph"
+path = "src/lib.rs"
+
+[[bin]]
+name = "callgraph"
+path = "src/main.rs"
+
+[dependencies]
+mago-syntax = "=1.59.0"
+mago-allocator = "=1.59.0"
+mago-database = "=1.59.0"
+mago-span = "=1.59.0"
+jsonc-parser = "=0.34.0"
+oxc_allocator = "=0.157.0"
+oxc_ast = "=0.157.0"
+oxc_syntax = "=0.157.0"
+oxc_ast_visit = "=0.157.0"
+oxc_parser = "=0.157.0"
+oxc_span = "=0.157.0"
+pulldown-cmark = "=0.13.0"
+raffia = "=0.13.0"
+rayon = "1"
+regex = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+opt-level = 3

@@ -1,0 +1,14 @@
+@use "tokens" as t;
+
+@mixin button($color: t.$brand, $radius: 4px) {
+  color: white;
+  background: $color;
+  border-radius: $radius;
+  @content;
+}
+
+@mixin respond($size) {
+  @media (min-width: map-get(t.$breakpoints, $size)) {
+    @content;
+  }
+}

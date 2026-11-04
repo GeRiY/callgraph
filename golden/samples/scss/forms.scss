@@ -1,0 +1,8 @@
+@use "mixins" as m;
+
+// Form controls use the shared mixin.
+.field {
+  /* Keep labels aligned with inputs. */
+  @include m.button(#444, 2px);
+  &--invalid { border-color: red; }
+}

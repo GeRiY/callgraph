@@ -1,0 +1,57 @@
+class CallGraphVisitor extends PhpParser\NodeVisitorAbstract  L317-1399
+  __construct()  L376-380
+  buildCallerName()  L426-433
+  enterNode()  L435-462
+  collectComments()  L470-493
+  cleanPlainComment()  L496-514
+  handleNamespace()  L516-519
+  handleUse()  L521-529
+  handleContainer()  L532-590
+  handleTraitUse()  L593-602
+  handleProperty()  L608-630
+  handleClassConst()  L633-647
+  handleEnumCase()  L650-661
+  handleClassConstFetch()  L668-692
+  handleStaticPropertyFetch()  L699-720
+  handleClassMethod()  L722-778
+  extractMethodBody()  L786-802
+  extractLines()  L810-828
+  handleAssign()  L838-891
+  handleAssignOp()  L897-920
+  handleStaticCall()  L922-946
+  handleMethodCall()  L952-1017
+  handleNew()  L1020-1041
+  stmtsRange()  L1044-1051
+  exprToShortString()  L1054-1058
+  handleIf()  L1065-1088
+  handleMatch()  L1091-1109
+  handleSwitch()  L1115-1150
+  handleStringLiteral()  L1157-1169
+  handleFuncCall()  L1171-1192
+  leaveNode()  L1194-1217
+  resolveClassName()  L1240-1269
+  categorizeNamespace()  L1271-1293
+  categorizeResolvedType()  L1305-1344
+  resolveTrackableType()  L1352-1364
+  resolveTypedExpr()  L1375-1398
+top-level függvények / konstansok:
+  L83  define('PHP_AST_HOME', getenv('PHP_AST_HOME') ?
+  L85  function logError(string $context, string $message, array $extra = [])
+  L100  function reportError(string $context, string $message, array $extra = [])
+  L129  function isNativePhp(string $name)
+  L140  function cleanDocComment(?\PhpParser\Comment\Doc $doc)
+  L169  function typeToString($type)
+  L195  function defaultToString(Node $expr)
+  L222  function formatParam(Node\Param $p)
+  L240  const FRAMEWORK_PACKAGE_MAP = [
+  L250  const FRAMEWORK_KNOWN_SHORT_NAMES = [
+  L265  function findComposerJson(string $startDir)
+  L290  function detectFramework(string $forFileDir)
+  L1407  function analyzeFile(string $realPath, string $displayPath)
+  L1441  define('CACHE_DIR', __DIR__ . '/cache');
+  L1451  function analyzeFileCached(string $realPath, string $displayPath)
+  L1499  function collectPhpFiles(array $paths)
+  L1526  const IGNORE_DIRS = ['vendor', 'node_modules', '.git', 'cache', 'runtime', 'storage', 'tmp', '.idea', '.junie'];
+  L1535  function loadGitignoreDirs(string $projectRoot)
+  L1561  function collectPhpFilesInDir(string $dir)
+  L1607  function analyzeAll(array $paths)

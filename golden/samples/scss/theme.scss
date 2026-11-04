@@ -1,0 +1,27 @@
+@use "tokens" as t;
+@use "mixins" as m;
+@use "placeholders";
+
+@function tint($color, $amount) {
+  @return mix(white, $color, $amount);
+}
+
+@debug t.$brand;
+@warn "Theme tokens are experimental";
+
+.card {
+  @extend %card-surface;
+  color: tint(t.$brand, 20%);
+
+  &__title {
+    font-size: 1.25rem;
+  }
+
+  @include m.button($color: t.$brand) {
+    cursor: pointer;
+  }
+
+  @include m.respond(tablet) {
+    padding: map-get(t.$spacing, lg);
+  }
+}

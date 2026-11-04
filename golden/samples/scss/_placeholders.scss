@@ -1,0 +1,9 @@
+%card-surface {
+  padding: 16px;
+  border: 1px solid #ddd;
+}
+
+%visually-hidden {
+  position: absolute;
+  clip: rect(0 0 0 0);
+}

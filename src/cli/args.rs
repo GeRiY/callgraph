@@ -1,0 +1,415 @@
+//! Parancssori argumentumok: elemzés (`callgraph [--lang <id,...>] [--cache <fájl>] [--no-cache] <fájl|mappa> [...]`)
+//! és cache-takarítás (`callgraph prune [--cache <fájl>] [--dry-run]`).
+
+use std::path::PathBuf;
+
+use crate::error::{Result, CallgraphError};
+use crate::lang::LanguageRegistry;
+
+const USAGE: &str = "callgraph [--lang <id,...>] [--cache <fájl>] [--no-cache] <fájl|mappa> [...] | callgraph prune [--cache <fájl>] [--dry-run]";
+const PRUNE_USAGE: &str = "callgraph prune [<mappa|fájl> ...] [--cache <fájl>] [--dry-run]";
+const CALLERS_USAGE: &str = "callgraph callers <minta> [--depth N] [--project <mappa>]";
+const SHOW_USAGE: &str = "callgraph show [--project <gyökér>] [--label <név>] [--format <f>] [--body|--lines <n>-<m>|--strings <minta>|--const <minta>] [--grep <minta>] [--category <kat,...>] [--depth N] [--guess] [--full] <út[::m]>...";
+
+/// A feldolgozott parancssori argumentumok — alparancsonként egy változat (Command minta bemenete).
+#[derive(Debug, PartialEq)]
+pub enum CliArgs {
+    /// Elemzendő fájlok és mappák; `cache`: explicit cache-fájl (`None` = alapértelmezett), `no_cache`: kikapcsolva.
+    Analyze {
+        paths: Vec<PathBuf>,
+        lang: Option<Vec<String>>,
+        cache: Option<PathBuf>,
+        no_cache: bool,
+    },
+    /// Cache-takarítás, opcionális cache-útvonallal és írás nélküli móddal.
+    Prune {
+        paths: Vec<PathBuf>,
+        cache: Option<PathBuf>,
+        dry_run: bool,
+    },
+    /// Projekt-szintű fordított hívó-keresés.
+    Callers {
+        pattern: String,
+        depth: usize,
+        project: Option<PathBuf>,
+    },
+    /// Egy vagy több fájl gráfjának lekérdezése.
+    Show {
+        paths: Vec<PathBuf>,
+        project: Option<PathBuf>,
+        label: Option<String>,
+        format: String,
+        full: bool,
+        limit: Option<usize>,
+        lines: Option<String>,
+        strings: Option<String>,
+        const_filter: Option<String>,
+        body: bool,
+        grep: Option<String>,
+        category: Option<Vec<String>>,
+        depth: usize,
+        guess: bool,
+    },
+}
+
+impl CliArgs {
+    /// A program neve nélküli argumentumlistából állít elő parancsot.
+    pub fn parse<I: IntoIterator<Item = String>>(args: I) -> Result<Self> {
+        let args: Vec<String> = args.into_iter().collect();
+        if args.first().is_some_and(|a| a == "prune") {
+            return Self::parse_prune(&args[1..]);
+        }
+        if args.first().is_some_and(|a| a == "callers") {
+            return Self::parse_callers(&args[1..]);
+        }
+        if args.first().is_some_and(|a| a == "show") {
+            return Self::parse_show(&args[1..]);
+        }
+        Self::parse_analyze(args)
+    }
+
+    fn parse_show(args: &[String]) -> Result<Self> {
+        let mut paths = Vec::new();
+        let mut project = None;
+        let mut label = None;
+        let mut format = "outline".to_owned();
+        let mut full = false;
+        let mut limit = None;
+        let mut lines = None;
+        let mut strings = None;
+        let mut const_filter = None;
+        let mut body = false;
+        let mut grep = None;
+        let mut category = None;
+        let mut depth = 1;
+        let mut guess = false;
+        let mut i = 0;
+        while i < args.len() {
+            match args[i].as_str() {
+                x if x.starts_with("CALLGRAPH_OUT_LIMIT=") => {
+                    limit = x.split_once('=').and_then(|(_, v)| v.parse().ok());
+                    i += 1;
+                }
+                "--full" => {
+                    full = true;
+                    i += 1;
+                }
+                "--body" => {
+                    body = true;
+                    i += 1;
+                }
+                "--guess" => {
+                    guess = true;
+                    i += 1;
+                }
+                "--grep" if i + 1 < args.len() => {
+                    grep = Some(args[i + 1].clone());
+                    i += 2;
+                }
+                x if x.starts_with("--grep=") => {
+                    grep = Some(x[7..].to_owned());
+                    i += 1;
+                }
+                "--category" if i + 1 < args.len() => {
+                    category = Some(args[i + 1].split(',').map(str::to_owned).collect());
+                    i += 2;
+                }
+                x if x.starts_with("--category=") => {
+                    category = Some(x[11..].split(',').map(str::to_owned).collect());
+                    i += 1;
+                }
+                "--depth" if i + 1 < args.len() => {
+                    depth = args[i + 1]
+                        .parse()
+                        .map_err(|_| CallgraphError::Usage(SHOW_USAGE.into()))?;
+                    i += 2;
+                }
+                x if x.starts_with("--depth=") => {
+                    depth = x[8..]
+                        .parse()
+                        .map_err(|_| CallgraphError::Usage(SHOW_USAGE.into()))?;
+                    i += 1;
+                }
+                "--lines" if i + 1 < args.len() => {
+                    lines = Some(args[i + 1].clone());
+                    i += 2;
+                }
+                x if x.starts_with("--lines=") => {
+                    lines = Some(x[8..].to_owned());
+                    i += 1;
+                }
+                "--strings" if i + 1 < args.len() => {
+                    strings = Some(args[i + 1].clone());
+                    i += 2;
+                }
+                x if x.starts_with("--strings=") => {
+                    strings = Some(x[10..].to_owned());
+                    i += 1;
+                }
+                "--const" if i + 1 < args.len() => {
+                    const_filter = Some(args[i + 1].clone());
+                    i += 2;
+                }
+                x if x.starts_with("--const=") => {
+                    const_filter = Some(x[8..].to_owned());
+                    i += 1;
+                }
+                "--project" if i + 1 < args.len() => {
+                    project = Some(PathBuf::from(&args[i + 1]));
+                    i += 2;
+                }
+                x if x.starts_with("--project=") => {
+                    project = Some(PathBuf::from(&x[10..]));
+                    i += 1;
+                }
+                "--label" if i + 1 < args.len() => {
+                    label = Some(args[i + 1].clone());
+                    i += 2;
+                }
+                x if x.starts_with("--label=") => {
+                    label = Some(x[8..].to_owned());
+                    i += 1;
+                }
+                "--format" if i + 1 < args.len() => {
+                    format = args[i + 1].clone();
+                    i += 2;
+                }
+                x if x.starts_with("--format=") => {
+                    format = x[9..].to_owned();
+                    i += 1;
+                }
+                x if !x.starts_with('-') => {
+                    paths.push(PathBuf::from(x));
+                    i += 1;
+                }
+                _ => return Err(CallgraphError::Usage(SHOW_USAGE.into())),
+            }
+        }
+        if paths.is_empty() {
+            return Err(CallgraphError::Usage(SHOW_USAGE.into()));
+        }
+        Ok(Self::Show {
+            paths,
+            project,
+            label,
+            format,
+            full,
+            limit,
+            lines,
+            strings,
+            const_filter,
+            body,
+            grep,
+            category,
+            depth,
+            guess,
+        })
+    }
+
+    fn parse_callers(args: &[String]) -> Result<Self> {
+        let Some(pattern) = args.first().filter(|value| !value.starts_with('-')) else {
+            return Err(CallgraphError::Usage(CALLERS_USAGE.into()));
+        };
+        let mut depth = 1;
+        let mut project = None;
+        let mut i = 1;
+        while i < args.len() {
+            match args[i].as_str() {
+                "--depth" if i + 1 < args.len() => {
+                    depth = args[i + 1]
+                        .parse()
+                        .map_err(|_| CallgraphError::Usage(CALLERS_USAGE.into()))?;
+                    i += 2;
+                }
+                value if value.starts_with("--depth=") => {
+                    depth = value[8..]
+                        .parse()
+                        .map_err(|_| CallgraphError::Usage(CALLERS_USAGE.into()))?;
+                    i += 1;
+                }
+                "--project" if i + 1 < args.len() => {
+                    project = Some(PathBuf::from(&args[i + 1]));
+                    i += 2;
+                }
+                value if value.starts_with("--project=") => {
+                    project = Some(PathBuf::from(&value[10..]));
+                    i += 1;
+                }
+                _ => return Err(CallgraphError::Usage(CALLERS_USAGE.into())),
+            }
+        }
+        if depth == 0 {
+            return Err(CallgraphError::Usage(CALLERS_USAGE.into()));
+        }
+        Ok(Self::Callers {
+            pattern: pattern.clone(),
+            depth,
+            project,
+        })
+    }
+
+    fn parse_analyze(args: Vec<String>) -> Result<Self> {
+        let mut paths = Vec::new();
+        let mut lang = None;
+        let mut cache = None;
+        let mut no_cache = false;
+        let mut it = args.into_iter();
+        while let Some(arg) = it.next() {
+            if arg == "--no-cache" {
+                no_cache = true;
+            } else if arg == "--lang" {
+                let value = it
+                    .next()
+                    .ok_or_else(|| CallgraphError::Usage(format!("a --lang értéket vár; {USAGE}")))?;
+                lang = Some(parse_lang(&value)?);
+            } else if let Some(value) = arg.strip_prefix("--lang=") {
+                lang = Some(parse_lang(value)?);
+            } else if arg == "--cache" {
+                let value = it
+                    .next()
+                    .ok_or_else(|| CallgraphError::Usage(format!("a --cache értéket vár; {USAGE}")))?;
+                cache = Some(PathBuf::from(value));
+            } else if let Some(value) = arg.strip_prefix("--cache=") {
+                cache = Some(PathBuf::from(value));
+            } else {
+                paths.push(PathBuf::from(arg));
+            }
+        }
+        if paths.is_empty() {
+            return Err(CallgraphError::Usage(USAGE.into()));
+        }
+        Ok(Self::Analyze {
+            paths,
+            lang,
+            cache,
+            no_cache,
+        })
+    }
+
+    fn parse_prune(args: &[String]) -> Result<Self> {
+        let mut paths = Vec::new();
+        let mut cache = None;
+        let mut dry_run = false;
+        let mut i = 0;
+        while i < args.len() {
+            match args[i].as_str() {
+                "--cache" if cache.is_none() && i + 1 < args.len() => {
+                    i += 1;
+                    cache = Some(PathBuf::from(&args[i]));
+                }
+                "--dry-run" if !dry_run => dry_run = true,
+                value if value.starts_with("--cache=") && cache.is_none() => {
+                    cache = Some(PathBuf::from(&value[8..]));
+                }
+                value if !value.starts_with('-') => paths.push(PathBuf::from(value)),
+                _ => return Err(CallgraphError::Usage(PRUNE_USAGE.into())),
+            }
+            i += 1;
+        }
+        Ok(Self::Prune {
+            paths,
+            cache,
+            dry_run,
+        })
+    }
+}
+
+fn parse_lang(value: &str) -> Result<Vec<String>> {
+    let available = LanguageRegistry::with_defaults().language_ids();
+    let ids: Vec<String> = value.split(',').map(str::trim).map(str::to_owned).collect();
+    if ids.iter().any(String::is_empty) {
+        return Err(CallgraphError::Usage(format!(
+            "üres --lang id; lehetséges id-k: {}; {USAGE}",
+            available.join(", ")
+        )));
+    }
+    if let Some(unknown) = ids
+        .iter()
+        .find(|id| !available.iter().any(|known| known == id))
+    {
+        return Err(CallgraphError::Usage(format!(
+            "ismeretlen nyelv-id: {unknown}; lehetséges id-k: {}; {USAGE}",
+            available.join(", ")
+        )));
+    }
+    Ok(ids)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse(a: &[&str]) -> Result<CliArgs> {
+        CliArgs::parse(a.iter().map(|s| s.to_string()))
+    }
+
+    #[test]
+    fn requires_at_least_one_path_for_analysis() {
+        assert!(parse(&[]).is_err());
+        assert!(parse(&["--no-cache"]).is_err());
+        assert_eq!(
+            parse(&["a"]).unwrap(),
+            CliArgs::Analyze {
+                paths: vec![PathBuf::from("a")],
+                lang: None,
+                cache: None,
+                no_cache: false
+            }
+        );
+    }
+
+    #[test]
+    fn parses_cache_flags() {
+        let a = parse(&["--cache", "c.jsonl", "x", "--no-cache"]).unwrap();
+        assert_eq!(
+            a,
+            CliArgs::Analyze {
+                paths: vec![PathBuf::from("x")],
+                lang: None,
+                cache: Some(PathBuf::from("c.jsonl")),
+                no_cache: true
+            }
+        );
+        assert!(parse(&["x", "--cache"]).is_err());
+        assert!(matches!(
+            parse(&["--cache=d.jsonl", "y"]).unwrap(),
+            CliArgs::Analyze { cache: Some(_), .. }
+        ));
+    }
+
+    #[test]
+    fn parses_and_validates_language_filter() {
+        assert_eq!(
+            parse(&["--lang", "php, css", "src"]).unwrap(),
+            CliArgs::Analyze {
+                paths: vec![PathBuf::from("src")],
+                lang: Some(vec!["php".into(), "css".into()]),
+                cache: None,
+                no_cache: false,
+            }
+        );
+        assert!(parse(&["--lang=wat", "src"]).is_err());
+        assert!(parse(&["--lang", "php,", "src"]).is_err());
+    }
+
+    #[test]
+    fn parses_prune() {
+        assert_eq!(
+            parse(&["prune"]).unwrap(),
+            CliArgs::Prune {
+                paths: vec![],
+                cache: None,
+                dry_run: false
+            }
+        );
+        assert_eq!(
+            parse(&["prune", "--cache", "c.jsonl", "--dry-run"]).unwrap(),
+            CliArgs::Prune {
+                paths: vec![],
+                cache: Some(PathBuf::from("c.jsonl")),
+                dry_run: true
+            }
+        );
+        assert!(parse(&["prune", "--bogus"]).is_err());
+    }
+}

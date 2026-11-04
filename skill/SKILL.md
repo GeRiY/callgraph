@@ -1,0 +1,100 @@
+---
+name: callgraph
+description: PHP / JS / TS / Vue kódbázis token-hatékony feltérképezése AST-elemzéssel, a fájl beolvasása NÉLKÜL — kategorizált hívás-gráf (osztály/komponens, metódus/függvény sortartománnyal), metódus-törzs, "hol hívják" keresés, hatáselemzés (--depth), string- és konstans-keresés, vezérlési ágak, framework-nézetek (routes, validation, events…). Használd PHP-, .vue-, .js-, .ts-fájl megértéséhez, hívási kapcsolatok, "ki hívja / hol használják" kérdésekhez — ez legyen az ELSŐ lépés a teljes Read/Grep helyett. NE használd nem kód fájlra (md, json, css, sima szöveg), vagy ha a pontos fájlszöveg kell egy már ismert sávban (akkor --lines vagy célzott Read).
+---
+
+# callgraph — kód-térkép Read nélkül
+
+`bash <skill>/callgraph.sh …` (a `<skill>` ennek a skillnek a mappája, pl. `~/.claude/skills/callgraph`).
+Minden célra (PHP, JS / TS / Vue, CSS / SCSS, JSON, MD) a natív `callgraph` bináris (`callgraph show`) dolgozik; a kimenet közös
+szerkezetű: container (osztály / komponens / modul) → metódusok sortartománnyal → hívások kategóriánként.
+
+## 0. lépés — projekt regisztrálása (egyszer, projektenként)
+
+```bash
+bash <skill>/projects.sh add myapp /abszolút/út/a/projekt/gyökeréhez
+bash <skill>/projects.sh list
+```
+
+Utána `--project myapp` mellett a gyökérhez képesti rövid út adható meg. `--project` nélkül az aktuális
+mappa a gyökér.
+
+## Gyors parancsok
+
+```bash
+CG=<skill>/callgraph.sh
+bash $CG --project myapp app/Http/Controllers/X.php                  # outline: osztály, metódusok sortartománnyal, hívások kategóriánként
+bash $CG --project myapp app/Http/Controllers/X.php::store           # csak egy metódus (több ::szelektor, több fájl is)
+bash $CG --project myapp app/Http/Controllers/X.php::store --body    # a metódus forrása sorszámozva, docblockkal
+bash $CG --project myapp app/Http/Controllers/X.php --lines 30-60    # tetszőleges sáv sorszámozva (view, procedurális fájl)
+bash $CG --project myapp app --strings 'Order not found'             # string-literál (hibaüzenet, kulcs) helye
+bash $CG --project myapp app --const STATUS_ACTIVE                   # konstans-hivatkozás és -definíció
+bash $CG --project myapp app --grep 'Order::cancel'                  # hol hívják: fájl, metódus, sortartomány
+bash $CG --project myapp app --grep 'Order::cancel' --depth 3        # hatáselemzés: a hívók hívói
+bash $CG --project myapp app --grep 'Order::cancel' --depth 3 --guess # + a csak név szerinti egyezések („?”)
+bash $CG --project myapp app --grep 'Order::cancel' --body           # a talált hívó metódusok forrása
+bash $CG --project myapp app --category model_use,orm_relation       # szűrés hívás-kategóriára
+```
+
+## Melyik `--format` mire való
+
+| Formátum | Mit ad |
+|---|---|
+| `outline` (alap) | szerkezet + hívások kategóriánként |
+| `api` | publikus szerződés + docblock, implementáció nélkül |
+| `flow` | if/match/switch ágak sortartománnyal (feltétel → mit hív); `::metódus`-sal szűkíthető |
+| `summary` | mappa: fájlonként 1 sor |
+| `hotspots` | top 20 metódus be-/kifok és ciklomatikus szám szerint |
+| `coverage` | dokumentálatlan publikus metódusok |
+| `stats` | kategória-statisztika |
+| `mermaid` / `dot` | vizualizációhoz (öröklési és hívási élek) |
+| `json` / `jsonl` | nyers gráf (nem korlátos); a `jsonl` az callgraph natív kimenete |
+
+**Framework-nézetek** (`--format …`): `routes`, `middleware`, `validation`, `jobs`, `events`, `providers`,
+`magic`, `di`, `views`. Mappára futtasd (pl. `bash $CG --project myapp routes --format routes`).
+
+## JS / TS / Vue
+
+Ugyanazok a kapcsolók. A „metódusok”: `setup` (a `<script setup>` top-level kódja), `template` (komponensek,
+eseménykezelők, `$t()` / `route()`), függvények, `computed`, `watch@L<n>` / `onMounted@L<n>` hookok,
+composable belső függvényei (`useX.belso`), Options API `methods` / `computed.x`. Props = properties,
+emits = `emit:<név>`. Kereshető kulcsok a `--grep`-hez:
+
+```bash
+bash $CG --project myapp resources/js --grep 'useForm.js::submit'     # <fájl>::<export>, import-feloldással, @/ aliasszal
+bash $CG --project myapp resources/js --grep 'route::orders.show'     # route-használat
+bash $CG --project myapp resources/js --grep 'i18n::orders.title'     # fordítási kulcs helye
+bash $CG --project myapp resources/js --grep 'vue::emit:save'         # ki emitál 'save'-et
+bash $CG --project myapp resources/js --grep 'Atoms/AtomButton.vue'   # hol használják a komponenst
+```
+
+## Kimenet-korlát
+
+400 sor fölött a mappás outline `summary`-ra, az egyfájlos outline metódus-indexre, a `--grep` találatonként
+1 sorra vált; a `--body` / `--lines` / `--strings` / `--depth` 400 sornál megáll. Szűkíts (`::név`, `--grep`,
+almappa); a `--full` kikapcsolja a korlátot, csak indokolt esetben. A küszöb: `CALLGRAPH_OUT_LIMIT`. Elöl álló `KULCS=érték` argumentum környezeti változóként él tovább
+(pl. `bash $CG CALLGRAPH_OUT_LIMIT=100 …`).
+
+## Ha hibázik — visszajelzés
+
+Minden hibaüzenet mellé `[error-id: xxxxxxxx]` jár. Ha az eredmény hibás, hiányos vagy félrevezető:
+
+```bash
+bash <skill>/feedback.sh add <error_id> "<mit vártál, mi történt>"
+bash <skill>/feedback.sh add --note "<észrevétel>"     # error-id nélkül
+bash <skill>/feedback.sh list --open
+```
+
+A kerülőút (célzott Read, Grep) ettől még használható, de a visszajelzés ne maradjon el.
+
+## Adat és cache
+
+Minden adat a projekt saját `.callgraph/` mappájába kerül (cache, index; a mappa magától létrejön,
+`*`-os `.gitignore`-ral, így a verziókezelésbe nem kerül). A projekten kívül semmi nem íródik. Ha a mappa
+nem írható, cache nélkül fut. Takarítás: `callgraph prune` (lásd README).
+
+## Korlát
+
+Statikus elemzés: dinamikus hívás (`$this->$method()`, `obj[key]()`), magic method és futásidőben összeállított
+osztálynév / regisztrált komponens nem oldható fel. A `--depth` alapból csak a biztos (feloldott) hívókat követi;
+a név szerinti egyezést a `--guess` mutatja „?” jellel. A pontos vezérlési logikához a `--body` kell.

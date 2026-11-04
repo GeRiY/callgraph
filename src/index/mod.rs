@@ -1,0 +1,9 @@
+//! Projekt-szintű szimbólum- és fordított hívó-index.
+
+mod query;
+mod record;
+mod store;
+
+pub use query::CallerRow;
+pub(crate) use query::{CallerIndex, FileGraphRecord};
+pub(crate) use store::IndexStore;

@@ -1,0 +1,23 @@
+# build
+/target/
+/dist/
+/work/
+# helyi, gép- és projektfüggő anyagok (nem publikusak)
+/briefs/
+/baseline/
+/baseline-*/
+/tools/forbidden.local
+/golden/ref*.jsonl
+/golden/corpus*.txt
+/golden/query/
+/golden/query-js/
+/golden/codex-*
+/golden/BRIEF-*.md
+/*.out
+/*.err
+/BRIEF-*.md
+.callgraph/
+.DS_Store
+/spike/
+/tools/local.env
+/.claude/
