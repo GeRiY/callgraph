@@ -56,5 +56,5 @@ belül a feladatok **párhuzamosan** futnak (claude2 és codex egyszerre), mert 
 ## Lemez
 Minden munkapéldány saját `target/`-je ~300–800 MB. Beolvasztás (vagy elvetés) után a `work/<kód>/target` törlendő; a forrás, a brief és a jelentés marad.
 
-## Docker-buildek (felhasználó, 2026-11-04)
-A Linux/Windows build-konténerek egymás után futnak (`tools/build-all.sh`), és minden lépés után a build-image és a cargo-volume törlődik (`tools/docker-build-lib.sh`), hogy ne foglalják a helyet.
+## Build
+A több platformos build (macOS / Linux / Windows) a GitHub Actions-ben fut (`.github/workflows/release.yml`); helyben csak `cargo build --release` és a `tools/build-skill.sh` (a natív platformra).

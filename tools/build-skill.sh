@@ -3,7 +3,7 @@
 # Használat: bash tools/build-skill.sh
 #   - A skill fájljai a skill/ mappából jönnek (SKILL.md, README.md, callgraph.sh, lib.sh, install.sh, projects.sh, feedback.sh, extras/).
 #   - Binárisok: ha van dist/bin/<os>-<arch>/callgraph[.exe] (pl. a CI-ből), azok mennek a csomagba;
-#     különben macOS-en a két mac-target (+ a dist/linux-build, dist/windows-build előre fordított binárisai), máshol a natív build.
+#     különben helyben: macOS-en a két mac-target, máshol a natív build (a teljes, több platformos csomagot a GitHub Actions készíti).
 #   - Tiltólista (gép-/projektfüggő szöveg a csomagban): tools/forbidden.local (nem verziózott, egy regex), különben '/Users/|/home/'.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -39,12 +39,6 @@ else
         cp "$CARGO_TARGET_DIR/$triple/release/callgraph" "$PKG/bin/$dir/callgraph"
         [[ "$(uname -s)" == Darwin ]] && codesign -s - -f "$PKG/bin/$dir/callgraph" 2>/dev/null || true
     done
-    for f in "$DIST"/linux-build/callgraph-* ; do
-        [[ -f "$f" ]] || continue; dir="${f##*/callgraph-}"; mkdir -p "$PKG/bin/$dir"; cp "$f" "$PKG/bin/$dir/callgraph"
-    done
-    if [[ -f "$DIST/windows-build/callgraph-windows-x86_64.exe" ]]; then
-        mkdir -p "$PKG/bin/windows-x86_64"; cp "$DIST/windows-build/callgraph-windows-x86_64.exe" "$PKG/bin/windows-x86_64/callgraph.exe"
-    fi
 fi
 chmod +x "$PKG"/*.sh "$PKG"/bin/*/callgraph* "$PKG"/extras/hooks/* "$PKG"/extras/tools/* 2>/dev/null || true
 

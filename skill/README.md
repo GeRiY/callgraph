@@ -22,7 +22,7 @@ A használat leírása a `SKILL.md`-ben van.
 - Linux: `linux-aarch64` és `linux-x86_64` statikus (musl) bináris — bármely disztribúción fut, külső függőség nélkül (a burokhoz `bash` és `jq` kell).
 - Forrásból (Rust 1.85+): `cargo build --release`, majd a `target/release/callgraph` másolata a
   `bin/<os>-<arch>/callgraph` helyre (`<os>` = `uname -s` kisbetűvel, `<arch>` = `uname -m`).
-- Windows: Git Bash kell (a `uname` `MINGW64_NT-…` értékét a burok `windows`-ra normalizálja); a csomag `bin/windows-x86_64/callgraph.exe` binárist tartalmaz (mingw-w64 cross-build, `tools/build-windows.sh`).
+- Windows: Git Bash kell (a `uname` `MINGW64_NT-…` értékét a burok `windows`-ra normalizálja); a csomag `bin/windows-x86_64/callgraph.exe` binárist tartalmaz.
 - Külső függőség nincs (se PHP, se Node): az elemzést az `callgraph` végzi; a burokhoz `bash` és `jq` kell.
 
 ## Környezeti változók
