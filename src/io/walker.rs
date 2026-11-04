@@ -187,19 +187,21 @@ mod tests {
         let files = FileWalker::for_registry(&LanguageRegistry::with_defaults())
             .collect(std::slice::from_ref(&temp.0), &mut |w| warnings.push(w));
         assert!(warnings.is_empty());
-        let names: Vec<_> = files
+        // a bejárás a fájlrendszer saját sorrendjét követi (APFS ≠ ext4), ezért a tartalmat rendezve vetjük össze
+        let mut names: Vec<_> = files
             .iter()
             .map(|path| path.strip_prefix(temp.0.canonicalize().unwrap()).unwrap())
             .collect();
+        names.sort();
         assert_eq!(
             names,
             // paritás az ast_graph.php-val: a gyökér saját `generated/` bejegyzésére a gyökér .gitignore-ja még nem hat
             // (a keresés a gyökér szülőjétől indul), az `a/generated` viszont kimarad
             [
-                PathBuf::from("generated/f.php"),
-                PathBuf::from("z/f.php"),
                 PathBuf::from("a/f.php"),
-                PathBuf::from("root.php")
+                PathBuf::from("generated/f.php"),
+                PathBuf::from("root.php"),
+                PathBuf::from("z/f.php")
             ]
         );
     }
