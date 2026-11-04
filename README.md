@@ -17,3 +17,7 @@ bash tools/build-skill.sh      # dist/callgraph-<verzió>.tar.gz (a skill-csomag
 
 A több platformos csomagot (macOS arm64 / x86_64, Linux arm64 / x86_64 musl, Windows x86_64) a GitHub Actions
 készíti (`.github/workflows/release.yml`); `v*` tagnél GitHub Release-be teszi.
+
+## Licenc
+
+MIT — lásd [`LICENSE`](LICENSE).

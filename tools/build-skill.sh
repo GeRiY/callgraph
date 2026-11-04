@@ -18,6 +18,7 @@ rm -rf "$PKG"; rm -f "$DIST/$NAME"-*.tar.gz
 mkdir -p "$PKG/bin"
 cp skill/SKILL.md skill/README.md skill/callgraph.sh skill/lib.sh skill/install.sh skill/projects.sh skill/feedback.sh "$PKG/"
 cp -R skill/extras "$PKG/extras"
+cp LICENSE "$PKG/LICENSE"
 
 if [[ -d "$DIST/bin" ]]; then
     cp -R "$DIST/bin/." "$PKG/bin/"
