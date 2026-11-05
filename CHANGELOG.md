@@ -5,6 +5,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-11-06
+
 ### Changed
 - **Faster queries on big projects:** callgraph now keeps a compact project map in `.callgraph/` in just three
   files, however big the project is: a short list of all files, one file with every file's full analysis, and one
@@ -142,6 +144,7 @@ First release.
 - Built-in update: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Prebuilt packages for macOS (arm64, x86_64), Linux (x86_64, ARM64, static musl) and Windows.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.2.0...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.3.0...develop
+[0.3.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.3.0
 [0.2.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.2.0
 [0.1.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.1.0
