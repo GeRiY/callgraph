@@ -15,9 +15,9 @@
 #   bash ~/.claude/skills/callgraph/projects.sh resolve <alias>          a gyökér-útvonal (ismeretlen aliasra error-id-s hiba)
 #   bash ~/.claude/skills/callgraph/projects.sh get <alias> <kulcs>      projektenkénti beállítás (pl. phpstan_level; üres, ha nincs)
 #   bash ~/.claude/skills/callgraph/projects.sh set-config <alias> [--phpstan-level N] [--phpstan-config <út>]
-#     Projektenkénti alapértelmezés analyze.sh-hoz (PHPStan szint/config) —
-#     utána "bash analyze.sh --project <alias> ..." ezt használja, ha a
-#     hívó nem ad meg explicit --level/--config-ot.
+#     Projektenkénti PHPStan-beállítás (szint / config) tárolása a projects.json-ban;
+#     a "get <alias> phpstan_level" / "get <alias> phpstan_config" adja vissza
+#     (pl. egy PHPStan-futtató szkriptnek).
 
 # A logika a `callgraph project` alparancsban él (jq nélkül); ez csak a súgót írja ki és továbbít.
 
