@@ -5,6 +5,7 @@ use std::collections::{HashMap, HashSet};
 use regex::RegexBuilder;
 use serde::Serialize;
 
+use super::hierarchy::{TypeHierarchy, ViaMatcher, normalize, same_type, split_target};
 use super::record::{FileStamp, IndexRecord};
 use crate::error::{CallgraphError, Result};
 
@@ -17,6 +18,9 @@ pub struct CallerRow {
     pub line: u32,
     pub target: String,
     pub level: usize,
+    /// Interfészen / trait-en / szülő- vagy leszármazott-típuson át illesztett hívásnál a hívás típusának rövid neve.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub via: Option<String>,
     #[serde(skip)]
     pub(crate) guessed: bool,
 }
@@ -26,6 +30,8 @@ struct Edge {
     row: CallerRow,
     lookup: String,
     caller_key: String,
+    /// A hívó metódus típusa normalizálva (`app::caller`) — a hierarchián át keresett szülő-hívásokhoz.
+    caller_type: Option<String>,
     guessable: bool,
 }
 
@@ -33,6 +39,9 @@ struct Edge {
 pub(crate) struct CallerIndex {
     edges: Vec<Edge>,
     reverse: HashMap<String, Vec<Edge>>,
+    /// A `Típus::metódus` alakú (feloldott) hívások metódusnév (kisbetű) szerint: (a cél típusa, az él indexe).
+    by_method: HashMap<String, Vec<(String, usize)>>,
+    hierarchy: TypeHierarchy,
 }
 
 impl CallerIndex {
@@ -44,6 +53,8 @@ impl CallerIndex {
         )
     }
     pub fn from_records(records: impl IntoIterator<Item = IndexRecord>) -> Self {
+        let records: Vec<IndexRecord> = records.into_iter().collect();
+        let hierarchy = TypeHierarchy::from_graphs(records.iter().map(|record| &record.graph));
         let mut edges = Vec::new();
         for record in records {
             let namespace = record.graph.namespace.as_deref().unwrap_or("");
@@ -56,6 +67,10 @@ impl CallerIndex {
                     target.clone()
                 };
                 let caller_key = symbol_key(namespace, call.container.as_deref(), &caller);
+                let caller_type = call
+                    .container
+                    .as_deref()
+                    .map(|container| normalize(&symbol_key(namespace, None, container)));
                 edges.push(Edge {
                     row: CallerRow {
                         file: record.path.clone(),
@@ -64,24 +79,63 @@ impl CallerIndex {
                         line: call.line,
                         target,
                         level: 0,
+                        via: None,
                         guessed: false,
                     },
                     lookup,
                     caller_key,
+                    caller_type,
                     guessable: call.resolved.is_none() && call.category == "external_call",
                 });
             }
         }
         let mut reverse: HashMap<String, Vec<Edge>> = HashMap::new();
-        for edge in &edges {
+        let mut by_method: HashMap<String, Vec<(String, usize)>> = HashMap::new();
+        for (at, edge) in edges.iter().enumerate() {
             if !edge.guessable || edge.row.target.contains('\\') || edge.row.target.contains("::") {
                 reverse
                     .entry(edge.lookup.clone())
                     .or_default()
                     .push(edge.clone());
+                if let Some((ty, method)) = split_target(&edge.lookup) {
+                    by_method.entry(method).or_default().push((ty, at));
+                }
             }
         }
-        Self { edges, reverse }
+        Self {
+            edges,
+            reverse,
+            by_method,
+            hierarchy,
+        }
+    }
+
+    /// Az él hívó metódusának hívói: a pontos kulcsra, és a hívó típusának rokon típusain (interfész, szülő,
+    /// trait, felül nem definiáló leszármazott) át hívott azonos nevű metódusra (`via` jelöléssel).
+    fn parent_edges(&self, edge: &Edge) -> Vec<Edge> {
+        let mut out: Vec<Edge> = self
+            .reverse
+            .get(&edge.caller_key)
+            .cloned()
+            .unwrap_or_default();
+        let Some(caller_type) = edge.caller_type.as_deref() else {
+            return out;
+        };
+        let method = edge.row.caller.to_ascii_lowercase();
+        let Some(candidates) = self.by_method.get(&method) else {
+            return out;
+        };
+        for (key, label) in self.hierarchy.related(caller_type, &method) {
+            for (ty, at) in candidates {
+                let parent = &self.edges[*at];
+                if same_type(ty, &key) && parent.lookup != edge.caller_key {
+                    let mut parent = parent.clone();
+                    parent.row.via = Some(label.clone());
+                    out.push(parent);
+                }
+            }
+        }
+        out
     }
 
     pub fn callers(&self, pattern: &str, depth: usize) -> Result<Vec<CallerRow>> {
@@ -110,6 +164,17 @@ impl CallerIndex {
             .filter(|edge| matcher.is_match(&edge.row.target))
             .cloned()
             .collect();
+        if let Some(via) = ViaMatcher::new(&self.hierarchy, pattern, &matcher) {
+            front.extend(self.edges.iter().filter_map(|edge| {
+                if matcher.is_match(&edge.row.target) {
+                    return None;
+                }
+                let label = via.via(&edge.row.target)?;
+                let mut edge = edge.clone();
+                edge.row.via = Some(label.to_owned());
+                Some(edge)
+            }));
+        }
         if guess {
             let names: HashSet<_> = self
                 .edges
@@ -143,9 +208,7 @@ impl CallerIndex {
                 let mut row = edge.row.clone();
                 row.level = level;
                 result.push(row);
-                if let Some(parents) = self.reverse.get(&edge.caller_key) {
-                    next.extend(parents.iter().cloned());
-                }
+                next.extend(self.parent_edges(&edge));
             }
             front = next;
         }
@@ -196,9 +259,7 @@ impl CallerIndex {
             let mut next = Vec::new();
             let mut guessed = Vec::new();
             for edge in front {
-                if let Some(parents) = self.reverse.get(&edge.caller_key) {
-                    next.extend(parents.iter().cloned());
-                }
+                next.extend(self.parent_edges(&edge));
                 let name = edge
                     .row
                     .caller

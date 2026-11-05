@@ -12,8 +12,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   offers the update; it never updates on its own. Opt out with `CALLGRAPH_UPDATE_CHECK=0`; off in CI.
 - **Bug reporting via GitHub:** bilingual issue forms (bug report, idea / feedback), a private security report link and
   `SECURITY.md`. Error messages now point to the bug form; `feedback.sh show <error-id>` prints the details to paste.
+- **See how something is called:** "where is it called" results (`--grep`, and every level of `--depth`) now show the
+  call's own source line next to its line number, e.g. `L25 │ $this->repo->find($id)` — no extra `--body` call needed
+  just to see the arguments.
+- **Calls through interfaces and traits:** searching a class method (`--grep 'PlaylistResolver::getPlayables'`) also
+  finds the calls made through its interface, abstract parent or trait (and, the other way round, through subclasses
+  that don't override it). These are marked, e.g. `L14 via Resolver │ …`; `--depth` follows them to the next level, and
+  `callers` adds a `"via"` field. Works where the call's receiver type is known (PHP: typed properties and other
+  resolved receivers; Rust: `Type::method` calls); JS/TS interfaces and Swift protocols are not tracked yet.
 
 ### Changed
+- **Shorter result lists:** when the project root would repeat on many lines (`--grep`, `--depth`, `--strings`,
+  `--const`, folder outlines, framework views…), the first line is now `root: /abs/path/to/project` and every path after
+  it is relative to that root. Outputs with a single path, and the machine formats (`json`, `mermaid`, `dot`, `callers`),
+  are unchanged.
 - Version lookup for `update` / `update --check` uses the `releases/latest` redirect instead of the GitHub API, so the
   API rate limit (HTTP 403) no longer applies.
 - The project page moved to the `gh-pages` branch (https://geriy.github.io/callgraph/); page edits no longer touch `main`.

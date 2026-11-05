@@ -23,6 +23,8 @@ mod summary;
 #[cfg(test)]
 mod tests;
 
+pub(crate) use outline::{call_lines, method_calls};
+
 use crate::error::{CallgraphError, Result};
 use crate::i18n::Lang;
 use crate::query::QueryResult;
@@ -54,6 +56,8 @@ impl FormatterRegistry {
     pub fn with_defaults() -> Self {
         let mut registry = Self::default();
         registry.register("outline", Box::new(outline::Outline));
+        // a `--grep` nézete (nem a --format listában): outline + a hívások helye és forrássora
+        registry.register("grep-outline", Box::new(outline::GrepOutline));
         registry.register("api", Box::new(api::Api));
         registry.register("stats", Box::new(stats::Stats));
         registry.register("summary", Box::new(summary::Summary));

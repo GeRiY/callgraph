@@ -22,10 +22,15 @@ Usage:
                                                 for large files, when you care about one specific method
                                                 (combinable with any --format)
   bash ~/.claude/skills/callgraph/callgraph.sh <file|dir> --grep <pattern>       only calls whose target matches the pattern
-                                                (only the methods/files containing a matching call — "where is it called")
+                                                (only the methods/files containing a matching call — "where is it called");
+                                                each call with its source line: "L25 │ $this->repo->find($id)";
+                                                "via Resolver" = called through an interface / trait / parent type
+                                                (a Type::method pattern also finds those calls)
   bash ~/.claude/skills/callgraph/callgraph.sh <dir> --grep <pattern> --depth N [--guess]
                                                 callers of callers up to N levels (impact analysis); --guess: also the
                                                 unresolved, name-only matches ("?")
+  Paths: when several would repeat the project root, the first line is "root: /abs/project" and every path after it is
+  relative to that root (usable as-is in the next call with the same --project).
   bash ~/.claude/skills/callgraph/callgraph.sh <file>::<method> [...] --body   source of the method(s), line-numbered, with docblock
   bash ~/.claude/skills/callgraph/callgraph.sh <dir> --grep <pattern> --body    source of the caller methods found
   bash ~/.claude/skills/callgraph/callgraph.sh <file> --lines <n>-<m>           any line range, line-numbered (e.g. a view file)

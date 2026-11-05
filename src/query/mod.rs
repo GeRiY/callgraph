@@ -19,7 +19,8 @@ mod filter;
 pub mod format;
 mod limit;
 mod selector;
+pub(crate) mod snippet;
 
-pub use engine::{QueryEngine, QueryResult};
+pub use engine::{QueryEngine, QueryResult, ViaCall};
 pub use limit::OutputLimit;
 pub use selector::{Selector, SelectorSet};
