@@ -3,7 +3,8 @@
 use super::{QueryEngine, QueryResult};
 use crate::error::Result;
 use crate::index::{CallerIndex, FileGraphRecord};
-use crate::query::format::FormatterRegistry;
+use crate::query::format::{FormatterRegistry, call_lines, method_calls};
+use crate::query::snippet::{self, SourceLines};
 use crate::{t, tf};
 use std::path::Path;
 
@@ -17,8 +18,10 @@ impl QueryEngine {
         full: bool,
         limit: Option<usize>,
     ) -> Result<String> {
+        let lang = crate::i18n::lang();
+        let source = SourceLines::default();
         if depth <= 1 {
-            let text = FormatterRegistry::format("outline", rows)?;
+            let text = FormatterRegistry::format("grep-outline", rows)?;
             if rows.is_empty() {
                 // Nincs találat: csak a záró tipp marad (nincs fejléc-elválasztó).
                 return Ok(text.trim_start_matches("\n---\n").to_owned());
@@ -26,14 +29,19 @@ impl QueryEngine {
             let max = limit.unwrap_or_else(|| crate::query::OutputLimit::from_env(full).limit);
             if !full && text.lines().count() > max {
                 let mut lines = tf!(
-                    "⚠ --grep outline would be {} lines — showing 1 line per match instead (file  caller  L<line>  ← target). Narrow it down, or --full.\n\n",
-                    "⚠ A --grep outline {} sor lenne — helyette találatonként 1 sor (fájl  hívó  L<sor>  ← cél). Szűkíts, vagy --full.\n\n",
+                    "⚠ --grep outline would be {} lines — showing 1 line per match instead (file  caller  L<line>  ← target │ call line). Narrow it down, or --full.\n\n",
+                    "⚠ A --grep outline {} sor lenne — helyette találatonként 1 sor (fájl  hívó  L<sor>  ← cél │ a hívás sora). Szűkíts, vagy --full.\n\n",
                     text.lines().count()
                 );
                 for row in rows {
                     for call in &row.graph.calls {
+                        let code = source.get(&row.graph.file, call.line);
+                        let marks =
+                            snippet::call_line(lang, call.line, row.via_of(call), code.as_deref());
+                        // `L12 via X │ kód` → `L12  ← cél via X │ kód`
+                        let rest = marks.strip_prefix(&format!("L{}", call.line)).unwrap_or("");
                         lines.push_str(&format!(
-                            "{}  {}::{}  L{}  ← {}\n",
+                            "{}  {}::{}  L{}  ← {}{rest}\n",
                             row.graph.file,
                             call.container.as_deref().unwrap_or("__top__"),
                             call.caller.as_deref().unwrap_or("__top__"),
@@ -72,6 +80,7 @@ impl QueryEngine {
                     line: call.line,
                     target: call.resolved.clone().unwrap_or_else(|| call.target.clone()),
                     level: 1,
+                    via: row.via_of(call).map(str::to_owned),
                     guessed: false,
                 })
             })
@@ -94,30 +103,29 @@ impl QueryEngine {
             ));
             let mut direct = rows
                 .iter()
-                .flat_map(|row| {
-                    row.graph
-                        .methods
-                        .iter()
-                        .map(move |method| (row.graph.file.clone(), method.clone()))
-                })
+                .flat_map(|row| row.graph.methods.iter().map(move |method| (row, method)))
                 .collect::<Vec<_>>();
-            direct.sort_by(|(left_file, left), (right_file, right)| {
-                left_file
-                    .cmp(right_file)
+            direct.sort_by(|(left_row, left), (right_row, right)| {
+                left_row
+                    .graph
+                    .file
+                    .cmp(&right_row.graph.file)
                     .then_with(|| left.line.cmp(&right.line))
             });
             if level == 1 {
-                for (file, method) in &direct {
+                for (row, method) in &direct {
                     writeln!(
                         output,
                         "  {}  {}::{}()  L{}-{}",
-                        file,
+                        row.graph.file,
                         method.container.as_deref().unwrap_or("__top__"),
                         method.name,
                         method.line,
                         method.end_line.unwrap_or(method.line)
                     )
                     .unwrap();
+                    let calls = method_calls(&row.graph, method);
+                    call_lines(&mut output, row, &calls, &source, lang, "    ");
                 }
             }
             let mut level_callers = callers
@@ -165,6 +173,13 @@ impl QueryEngine {
                     } else {
                         String::new()
                     }
+                )
+                .unwrap();
+                let code = source.get(&caller.file, caller.line);
+                writeln!(
+                    output,
+                    "    {}",
+                    snippet::call_line(lang, caller.line, caller.via.as_deref(), code.as_deref())
                 )
                 .unwrap();
             }

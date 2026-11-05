@@ -24,8 +24,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   Claude Desktop, Cursor, VS Code or any MCP client can use callgraph. Tools: `outline`, `method_body`, `find_callers`,
   `search`, `framework_view`, `projects` — the same compact text and output cap as the CLI. Read-only, no network,
   paths confined to the project root. The skill / CLI usage is unchanged. Setup recipes: `docs/MCP.md`.
+- **See how something is called:** "where is it called" results (`--grep`, and every level of `--depth`) now show the
+  call's own source line next to its line number, e.g. `L25 │ $this->repo->find($id)` — no extra `--body` call needed
+  just to see the arguments.
+- **Calls through interfaces and traits:** searching a class method (`--grep 'PlaylistResolver::getPlayables'`) also
+  finds the calls made through its interface, abstract parent or trait (and, the other way round, through subclasses
+  that don't override it). These are marked, e.g. `L14 via Resolver │ …`; `--depth` follows them to the next level, and
+  `callers` adds a `"via"` field. Works where the call's receiver type is known (PHP: typed properties and other
+  resolved receivers; Rust: `Type::method` calls); JS/TS interfaces and Swift protocols are not tracked yet.
 
 ### Changed
+- **Shorter result lists:** when the project root would repeat on many lines (`--grep`, `--depth`, `--strings`,
+  `--const`, folder outlines, framework views…), the first line is now `root: /abs/path/to/project` and every path after
+  it is relative to that root. Outputs with a single path, and the machine formats (`json`, `mermaid`, `dot`, `callers`),
+  are unchanged.
 - The committed / packaged default `SKILL.md` is now English (generated from `skill-i18n/SKILL.en.md`).
 - Version lookup for `update` / `update --check` uses the `releases/latest` redirect instead of the GitHub API, so the
   API rate limit (HTTP 403) no longer applies.

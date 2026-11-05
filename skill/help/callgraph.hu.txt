@@ -22,10 +22,15 @@ Használat:
                                                 nagy fájloknál, ha egy konkrét metódus érdekel
                                                 (bármelyik --format-tal kombinálható)
   bash ~/.claude/skills/callgraph/callgraph.sh <fájl|mappa> --grep <minta>       csak a mintára illeszkedő célú hívások
-                                                (csak az illeszkedő hívást tartalmazó metódusok/fájlok — "hol hívják")
+                                                (csak az illeszkedő hívást tartalmazó metódusok/fájlok — "hol hívják");
+                                                minden hívás a forrássorával: "L25 │ $this->repo->find($id)";
+                                                "via Resolver" = interfészen / trait-en / szülő-típuson át hívva
+                                                (a Típus::metódus minta ezeket a hívásokat is megtalálja)
   bash ~/.claude/skills/callgraph/callgraph.sh <mappa> --grep <minta> --depth N [--guess]
                                                 hívók hívói N szintig (hatáselemzés); --guess: a feloldatlan,
                                                 csak név szerinti egyezéseket is ("?")
+  Utak: ha a projekt-gyökér többször ismétlődne, az első sor "gyökér: /abs/projekt", utána minden út ehhez relatív
+  (a következő hívásban ugyanazzal a --project-tel változatlanul használható).
   bash ~/.claude/skills/callgraph/callgraph.sh <fájl>::<metódus> [...] --body   a metódus(ok) forrása sorszámozva, docblockkal
   bash ~/.claude/skills/callgraph/callgraph.sh <mappa> --grep <minta> --body    a talált hívó metódusok forrása
   bash ~/.claude/skills/callgraph/callgraph.sh <fájl> --lines <n>-<m>           tetszőleges sáv sorszámozva (pl. view-fájl)

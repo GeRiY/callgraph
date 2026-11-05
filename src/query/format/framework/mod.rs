@@ -171,10 +171,7 @@ mod tests {
     ];
 
     fn render_empty(lang: Lang) -> Vec<(&'static str, String)> {
-        let row = QueryResult {
-            graph: FileGraphBuilder::new("app/views/x.php").build(),
-            methods: None,
-        };
+        let row = QueryResult::new(FileGraphBuilder::new("app/views/x.php").build(), None);
         let mut registry = FormatterRegistry::default().in_lang(lang);
         register(&mut registry);
         VIEWS

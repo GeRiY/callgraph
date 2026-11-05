@@ -89,7 +89,7 @@ impl Command for ShowCommand {
                 Ok(value) => value,
                 Err(error) => return Self::report(_err, error),
             };
-            write!(out, "{text}")?;
+            write!(out, "{}", engine.relativize(&text))?;
             return Ok(0);
         }
         let text = match self.render(&rows) {
@@ -118,7 +118,17 @@ impl Command for ShowCommand {
         } else {
             limiter.method_index_for(&self.format, text, index)
         };
-        write!(out, "{text}")?;
+        // A gépi formátumok (json, mermaid, dot) útjai abszolútak maradnak; a szövegesekben a gyökér egyszer áll.
+        let machine = matches!(self.format.as_str(), "json" | "jsonl" | "mermaid" | "dot")
+            && !self.body
+            && self.lines.is_none()
+            && self.strings.is_none()
+            && self.const_filter.is_none();
+        if machine {
+            write!(out, "{text}")?;
+        } else {
+            write!(out, "{}", engine.relativize(&text))?;
+        }
         Ok(0)
     }
 }

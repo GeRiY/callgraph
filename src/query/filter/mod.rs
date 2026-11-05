@@ -2,4 +2,4 @@
 
 mod call;
 
-pub(crate) use call::FilterChain;
+pub(crate) use call::{FilterChain, pattern_regex};
