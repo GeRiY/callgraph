@@ -12,7 +12,7 @@
 #   bash ~/.claude/skills/callgraph/callgraph.sh <fájl> --format stats      kategória-statisztika
 #   bash ~/.claude/skills/callgraph/callgraph.sh <fájl> --format mermaid    Mermaid flowchart (vizualizációhoz)
 #   bash ~/.claude/skills/callgraph/callgraph.sh <fájl> --format dot        Graphviz DOT (vizualizációhoz)
-#   bash ~/.claude/skills/callgraph/callgraph.sh <fájl> --format json       nyers kategorizált JSON (ast_graph.php kimenete)
+#   bash ~/.claude/skills/callgraph/callgraph.sh <fájl> --format json       nyers kategorizált JSON (a callgraph elemző kimenete)
 #   bash ~/.claude/skills/callgraph/callgraph.sh <fájl>[::metódus] --format flow  if/match/switch ágak sortartománnyal (feltétel → mit hív)
 #   bash ~/.claude/skills/callgraph/callgraph.sh <mappa> --format summary   fájlonként 1 sor (osztály, metódusszám, docblock)
 #   bash ~/.claude/skills/callgraph/callgraph.sh <mappa> --format coverage  dokumentálatlan publikus metódusok
