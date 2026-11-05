@@ -39,10 +39,11 @@ jobs:
           cargo test --release --target ${{ matrix.target }}
       - name: build
         shell: bash
-        env:
-          # a binárisba ne égjen be a runner útvonala
-          RUSTFLAGS: --remap-path-prefix=${{ github.workspace }}=callgraph
-        run: cargo build --release --locked --target ${{ matrix.target }}
+        # a binárisba ne égjen be a runner útvonala (home: cargo registry; workspace: a mi forrásunk — az utolsó egyező nyer)
+        run: |
+          home="$HOME"; [[ "$RUNNER_OS" == Windows ]] && home="$USERPROFILE"
+          export RUSTFLAGS="--remap-path-prefix=$home=~ --remap-path-prefix=$GITHUB_WORKSPACE=callgraph"
+          cargo build --release --locked --target ${{ matrix.target }}
       - name: bináris összegyűjtése
         shell: bash
         run: |
