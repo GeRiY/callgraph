@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>callgraph — Code map for AI coding agents</title>
+<meta name="description" content="Show AI agents a file's structure, call graph and callers without reading it. PHP, JS/TS, Vue, Rust, Swift. Free, MIT, one binary.">
+<meta name="keywords" content="callgraph, call graph, code map, AI coding agent, Claude Code skill, token efficient, static analysis, AST, PHP, Laravel, JavaScript, TypeScript, Vue, Rust, Swift, SwiftUI, impact analysis, who calls this">
+<link rel="canonical" href="https://geriy.github.io/callgraph/">
+<link rel="alternate" hreflang="en" href="https://geriy.github.io/callgraph/">
+<link rel="alternate" hreflang="hu" href="https://geriy.github.io/callgraph/hu/">
+<link rel="alternate" hreflang="x-default" href="https://geriy.github.io/callgraph/">
+<meta name="author" content="Gergő Makra">
+<meta name="robots" content="index,follow">
+<meta name="theme-color" content="#0c152a">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/style.css">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="callgraph">
+<meta property="og:title" content="callgraph — a token-efficient code map for AI coding agents">
+<meta property="og:description" content="Structure, categorized call graph, method bodies, “who calls this?” and impact analysis — without reading whole files. PHP, JS/TS, Vue, Rust, Swift/SwiftUI.">
+<meta property="og:url" content="https://geriy.github.io/callgraph/">
+<meta property="og:image" content="https://geriy.github.io/callgraph/assets/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="callgraph terminal output: class outline with line ranges and categorized calls">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="hu_HU">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="callgraph — a token-efficient code map for AI coding agents">
+<meta name="twitter:description" content="Structure, call graph, method bodies and impact analysis without reading whole files.">
+<meta name="twitter:image" content="https://geriy.github.io/callgraph/assets/og-image.png">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"callgraph","applicationCategory":"DeveloperApplication",
+"operatingSystem":"macOS, Linux, Windows","softwareVersion":"0.1.0","license":"https://opensource.org/licenses/MIT",
+"url":"https://geriy.github.io/callgraph/","downloadUrl":"https://github.com/GeRiY/callgraph/releases/latest",
+"codeRepository":"https://github.com/GeRiY/callgraph","author":{"@type":"Person","name":"Gergő Makra","url":"https://www.linkedin.com/in/gergomakra/","sameAs":["https://www.linkedin.com/in/gergomakra/"]},"inLanguage":["en","hu"],
+"description":"A token-efficient code map for AI coding agents: structure, categorized call graph, method bodies, who-calls-this and impact analysis without reading whole files. Supports PHP, JavaScript, TypeScript, Vue, Rust, Swift/SwiftUI, CSS/SCSS, JSON and Markdown.",
+"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}
+</script>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[
+{"@type":"Question","name":"What is callgraph?","acceptedAnswer":{"@type":"Answer","text":"A command-line code map for AI coding agents. It parses a file or folder and answers what is in it, which method lives on which lines, what it calls, who calls it and what is affected by a change — in a few dozen lines instead of the whole file."}},
+{"@type":"Question","name":"Which languages are supported?","acceptedAnswer":{"@type":"Answer","text":"PHP (with Laravel and Yii awareness), JavaScript, TypeScript, Vue single-file components, Rust, Swift and SwiftUI, CSS, SCSS, JSON and Markdown."}},
+{"@type":"Question","name":"Do I need PHP, Node or Rust installed?","acceptedAnswer":{"@type":"Answer","text":"No. callgraph is a single static binary. The only runtime requirement is bash."}},
+{"@type":"Question","name":"Does it work without Claude Code?","acceptedAnswer":{"@type":"Answer","text":"Yes. It is a Claude Code skill, but the commands work from any terminal or script."}},
+{"@type":"Question","name":"How do I update it?","acceptedAnswer":{"@type":"Answer","text":"Run callgraph.sh update. It downloads the newest release from GitHub and keeps your projects and settings."}}]}
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="wrap">
+<header class="top">
+  <a class="brand" href="./"><img src="assets/favicon.svg" alt="" width="32" height="32">callgraph</a>
+  <nav class="links" aria-label="Main">
+    <a href="#features">Features</a><a href="#languages">Languages</a><a href="#install">Install</a>
+    <a href="#usage">Usage</a><a href="#faq">FAQ</a>
+    <a href="https://github.com/GeRiY/callgraph">GitHub</a><a href="hu/" hreflang="hu" lang="hu">Magyar</a>
+  </nav>
+</header>
+
+<main id="main">
+<section class="hero" aria-labelledby="title">
+  <div>
+    <h1 id="title">Understand code without reading it.</h1>
+    <p class="lead"><b>callgraph</b> is a token-efficient code map for AI coding agents. It shows the structure,
+      a categorized call graph, single method bodies, <i>“who calls this?”</i> and impact analysis —
+      in a few dozen lines instead of whole files.</p>
+    <div class="cta">
+      <a class="btn primary" href="#install">Install in one line</a>
+      <a class="btn" href="https://github.com/GeRiY/callgraph/releases/latest">Download v0.1.0</a>
+      <a class="btn" href="https://github.com/GeRiY/callgraph">View on GitHub</a>
+    </div>
+  </div>
+  <div class="term" role="img" aria-label="Example: outline of a PHP model and its callers">
+    <div class="dots" aria-hidden="true"><i style="background:#ff6467"></i><i style="background:#ffb900"></i><i style="background:#00c950"></i></div>
+<pre><span class="c">$ callgraph.sh --project shop app/Models/Order.php</span>
+class Order extends Model  <span class="d">L7-23</span>
+  constants (1):
+    STATUS_OPEN = 'open'
+  saveTranslations()  <span class="d">L13-20</span>
+    <span class="k">external_call  </span>   create, info
+    <span class="k">global_helper  </span>   logger
+    <span class="k">internal_helper</span>   translations
+  translations()  <span class="d">L22-22</span>
+    <span class="k">orm_relation   </span>   hasMany
+
+<span class="c">$ callgraph.sh app --grep saveTranslations --depth 2</span>
+== level 1 — directly calls: /saveTranslations/
+  app/Models/Order.php  Caller::run()  <span class="d">L25-25</span>
+== level 2 — calls the previous level
+  (no more callers)</pre>
+  </div>
+</section>
+
+<section id="features" aria-labelledby="h-features">
+  <h2 id="h-features">Why agents (and people) like it</h2>
+  <p class="sub">Every answer comes from the syntax tree, so it is exact, compact and cheap to read.</p>
+  <div class="grid">
+    <div class="card"><h3>Fewer tokens, faster answers</h3><p>An outline is a few dozen lines. Your agent reads the map first, then only the exact lines it needs.</p></div>
+    <div class="card"><h3>Categorized call graph</h3><p>Every call is labelled — ORM relation, model use, framework, native, internal helper, SwiftUI view or modifier — so intent is visible at a glance.</p></div>
+    <div class="card"><h3>“Who calls this?”</h3><p><code>--grep</code> finds every caller across the project; <code>--depth N</code> follows callers of callers for impact analysis.</p></div>
+    <div class="card"><h3>Surgical reads</h3><p><code>file::method --body</code> prints just that method, line-numbered. <code>--lines 30-60</code> prints any range.</p></div>
+    <div class="card"><h3>Framework views</h3><p>Laravel / Yii aware: routes, middleware, validation, jobs, events, providers, DI, views — one command each.</p></div>
+    <div class="card"><h3>One static binary</h3><p>No PHP, Node or Rust needed. macOS, Linux and Windows. Fast, cached and incremental.</p></div>
+    <div class="card"><h3>English or Hungarian</h3><p>All output and help in English by default — switch with <code>callgraph.sh set-lang hu</code>.</p></div>
+    <div class="card"><h3>Self-updating</h3><p><code>callgraph.sh update</code> fetches the newest release from GitHub and keeps your settings.</p></div>
+  </div>
+</section>
+
+<section id="languages" aria-labelledby="h-lang">
+  <h2 id="h-lang">Supported languages</h2>
+  <p class="sub">One shared output format for every language.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th scope="col">Language</th><th scope="col">Files</th><th scope="col">What you get</th></tr></thead>
+    <tbody>
+      <tr><td>PHP</td><td><code>.php</code></td><td>classes, traits, enums, methods, properties, constants, calls with type tracking, Laravel / Yii detection</td></tr>
+      <tr><td>JavaScript / TypeScript</td><td><code>.js .mjs .cjs .jsx .ts .tsx</code></td><td>modules, functions, classes, imports with alias resolution</td></tr>
+      <tr><td>Vue</td><td><code>.vue</code></td><td>props, emits, setup, template components and handlers, computed, watch, hooks</td></tr>
+      <tr><td>Rust</td><td><code>.rs</code></td><td>modules, structs, enums, traits, impl blocks, functions, use trees, macro calls, framework detection (axum, actix-web, tokio…)</td></tr>
+      <tr><td>Swift / SwiftUI</td><td><code>.swift</code></td><td>classes, structs, protocols, actors, extensions, View components, property wrappers, SwiftUI views and modifiers</td></tr>
+      <tr><td>CSS / SCSS</td><td><code>.css .scss</code></td><td>rule blocks, mixins, functions, variables, imports</td></tr>
+      <tr><td>JSON / Markdown</td><td><code>.json .md</code></td><td>key paths; heading sections and links</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="install" aria-labelledby="h-install">
+  <h2 id="h-install">Install</h2>
+  <p class="sub">The package contains the Claude Code skill and the binary for your platform. Only <code>bash</code> is required.</p>
+  <div class="tabs" role="tablist" aria-label="Platform">
+    <button role="tab" id="t-unix" aria-controls="p-unix" aria-selected="true">macOS / Linux</button>
+    <button role="tab" id="t-win" aria-controls="p-win" aria-selected="false" tabindex="-1">Windows</button>
+  </div>
+  <div class="panel" id="p-unix" role="tabpanel" aria-labelledby="t-unix">
+<pre class="code"><code>p="$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)" && t="$(mktemp -d)" \
+  && curl -fsSL -o "$t/cg.zip" "https://github.com/GeRiY/callgraph/releases/latest/download/callgraph-$p.zip" \
+  && mkdir -p ~/.claude/skills && unzip -qo "$t/cg.zip" -d ~/.claude/skills \
+  && bash ~/.claude/skills/callgraph/install.sh && rm -rf "$t"</code></pre>
+  </div>
+  <div class="panel" id="p-win" role="tabpanel" aria-labelledby="t-win" hidden>
+    <p>Download <a href="https://github.com/GeRiY/callgraph/releases/latest/download/callgraph-windows-x86_64.zip">callgraph-windows-x86_64.zip</a>,
+      unzip it, copy the <code>callgraph</code> folder to <code>%USERPROFILE%\.claude\skills\</code>, then run in Git Bash:</p>
+<pre class="code"><code>bash ~/.claude/skills/callgraph/install.sh</code></pre>
+  </div>
+  <p>Then register your project once and restart Claude Code:</p>
+<pre class="code"><code>bash ~/.claude/skills/callgraph/projects.sh add shop /absolute/path/to/shop</code></pre>
+  <p class="sub" style="margin-top:14px">All downloads (macOS Apple Silicon &amp; Intel, Linux x86_64 &amp; ARM64, Windows):
+    <a href="https://github.com/GeRiY/callgraph/releases/latest">latest release</a>.</p>
+</section>
+
+<section id="usage" aria-labelledby="h-usage">
+  <h2 id="h-usage">Usage</h2>
+  <p class="sub">Your agent uses the skill automatically. The same commands work from any terminal.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th scope="col">Task</th><th scope="col">Command</th></tr></thead>
+    <tbody>
+      <tr><td>Outline of a file or folder</td><td><code>callgraph.sh &lt;file|dir&gt;</code></td></tr>
+      <tr><td>One method only</td><td><code>callgraph.sh &lt;file&gt;::&lt;method&gt;</code></td></tr>
+      <tr><td>Method source, line-numbered</td><td><code>callgraph.sh &lt;file&gt;::&lt;method&gt; --body</code></td></tr>
+      <tr><td>Where is it called?</td><td><code>callgraph.sh &lt;dir&gt; --grep &lt;pattern&gt;</code></td></tr>
+      <tr><td>Impact analysis</td><td><code>callgraph.sh &lt;dir&gt; --grep &lt;pattern&gt; --depth 3</code></td></tr>
+      <tr><td>String / constant usages</td><td><code>--strings &lt;pattern&gt;</code> · <code>--const &lt;pattern&gt;</code></td></tr>
+      <tr><td>Branches with line ranges</td><td><code>--format flow</code></td></tr>
+      <tr><td>Public API only</td><td><code>--format api</code></td></tr>
+      <tr><td>Where to look first</td><td><code>--format hotspots</code></td></tr>
+      <tr><td>Diagrams</td><td><code>--format mermaid</code> · <code>--format dot</code></td></tr>
+      <tr><td>Laravel views</td><td><code>--format routes</code> · <code>validation</code> · <code>events</code> · <code>jobs</code></td></tr>
+    </tbody>
+  </table></div>
+  <h3 style="margin-top:22px">Update and language</h3>
+<pre class="code"><code>callgraph.sh update --check     # is there a newer release?
+callgraph.sh update             # download and install it (settings are kept)
+callgraph.sh set-lang hu        # Hungarian output (back: set-lang en)</code></pre>
+</section>
+
+<section id="faq" aria-labelledby="h-faq">
+  <h2 id="h-faq">FAQ</h2>
+  <details><summary>What is callgraph?</summary><p>A command-line code map for AI coding agents. It parses a file or folder and answers what is in it, which method lives on which lines, what it calls, who calls it and what is affected by a change — in a few dozen lines instead of the whole file.</p></details>
+  <details><summary>Do I need PHP, Node or Rust installed?</summary><p>No. callgraph is a single static binary. The only runtime requirement is bash.</p></details>
+  <details><summary>Does it work without Claude Code?</summary><p>Yes. It ships as a Claude Code skill, but every command works from any terminal or script.</p></details>
+  <details><summary>Is my code sent anywhere?</summary><p>No. Everything runs locally; the only network call is the optional <code>update</code> check against GitHub Releases.</p></details>
+  <details><summary>How much does it cost?</summary><p>Nothing. callgraph is open source under the MIT license.</p></details>
+</section>
+</main>
+
+<footer>
+  <div>callgraph · made by <a href="https://www.linkedin.com/in/gergomakra/" rel="author me">Gergő Makra</a> · MIT license · <a href="https://github.com/GeRiY/callgraph">GitHub</a> ·
+    <a href="https://github.com/GeRiY/callgraph/releases/latest">Releases</a> · <a href="hu/" hreflang="hu" lang="hu">Magyar</a></div>
+</footer>
+</div>
+<script>
+// platform-fülek (billentyűzettel is): a kiválasztott panel látszik
+document.querySelectorAll('[role=tablist]').forEach(function (list) {
+  var tabs = Array.prototype.slice.call(list.querySelectorAll('[role=tab]'));
+  function select(t) {
+    tabs.forEach(function (x) {
+      var on = x === t; x.setAttribute('aria-selected', on); x.tabIndex = on ? 0 : -1;
+      document.getElementById(x.getAttribute('aria-controls')).hidden = !on;
+    });
+    t.focus();
+  }
+  tabs.forEach(function (t, i) {
+    t.addEventListener('click', function () { select(t); });
+    t.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowRight') select(tabs[(i + 1) % tabs.length]);
+      if (e.key === 'ArrowLeft') select(tabs[(i - 1 + tabs.length) % tabs.length]);
+    });
+  });
+  if (/Win/.test(navigator.platform || '')) select(tabs[tabs.length - 1]);
+});
+</script>
+</body>
+</html>

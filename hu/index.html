@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>callgraph — kód-térkép AI kódoló agenteknek</title>
+<meta name="description" content="Szerkezet, hívás-gráf és hívók AI agenteknek a fájl beolvasása nélkül. PHP, JS/TS, Vue, Rust, Swift. Ingyenes, MIT, egy bináris.">
+<meta name="keywords" content="callgraph, hívás-gráf, kód-térkép, AI agent, Claude Code skill, token-hatékony, statikus elemzés, AST, PHP, Laravel, JavaScript, TypeScript, Vue, Rust, Swift, SwiftUI, hatáselemzés, ki hívja">
+<link rel="canonical" href="https://geriy.github.io/callgraph/hu/">
+<link rel="alternate" hreflang="en" href="https://geriy.github.io/callgraph/">
+<link rel="alternate" hreflang="hu" href="https://geriy.github.io/callgraph/hu/">
+<link rel="alternate" hreflang="x-default" href="https://geriy.github.io/callgraph/">
+<meta name="author" content="Makra Gergő">
+<meta name="robots" content="index,follow">
+<meta name="theme-color" content="#0c152a">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/style.css">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="callgraph">
+<meta property="og:title" content="callgraph — token-hatékony kód-térkép AI kódoló agenteknek">
+<meta property="og:description" content="Szerkezet, kategorizált hívás-gráf, metódus-törzs, „ki hívja?” és hatáselemzés — a teljes fájlok beolvasása nélkül. PHP, JS/TS, Vue, Rust, Swift/SwiftUI.">
+<meta property="og:url" content="https://geriy.github.io/callgraph/hu/">
+<meta property="og:image" content="https://geriy.github.io/callgraph/assets/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="callgraph terminál-kimenet: osztály-outline sortartománnyal és kategorizált hívásokkal">
+<meta property="og:locale" content="hu_HU">
+<meta property="og:locale:alternate" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="callgraph — token-hatékony kód-térkép AI kódoló agenteknek">
+<meta name="twitter:description" content="Szerkezet, hívás-gráf, metódus-törzs és hatáselemzés a teljes fájlok beolvasása nélkül.">
+<meta name="twitter:image" content="https://geriy.github.io/callgraph/assets/og-image.png">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"callgraph","applicationCategory":"DeveloperApplication",
+"operatingSystem":"macOS, Linux, Windows","softwareVersion":"0.1.0","license":"https://opensource.org/licenses/MIT",
+"url":"https://geriy.github.io/callgraph/hu/","downloadUrl":"https://github.com/GeRiY/callgraph/releases/latest",
+"codeRepository":"https://github.com/GeRiY/callgraph","author":{"@type":"Person","name":"Makra Gergő","url":"https://www.linkedin.com/in/gergomakra/","sameAs":["https://www.linkedin.com/in/gergomakra/"]},"inLanguage":["hu","en"],
+"description":"Token-hatékony kód-térkép AI kódoló agenteknek: szerkezet, kategorizált hívás-gráf, metódus-törzs, ki hívja és hatáselemzés a teljes fájlok beolvasása nélkül. PHP, JavaScript, TypeScript, Vue, Rust, Swift/SwiftUI, CSS/SCSS, JSON és Markdown.",
+"offers":{"@type":"Offer","price":"0","priceCurrency":"HUF"}}
+</script>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[
+{"@type":"Question","name":"Mi a callgraph?","acceptedAnswer":{"@type":"Answer","text":"Parancssori kód-térkép AI kódoló agenteknek. Elemzi a fájlt vagy mappát, és megmondja, mi van benne, melyik metódus melyik sorokon él, mit hív, ki hívja, és mit érint egy változtatás — pár tucat sorban a teljes fájl helyett."}},
+{"@type":"Question","name":"Milyen nyelveket támogat?","acceptedAnswer":{"@type":"Answer","text":"PHP (Laravel- és Yii-ismerettel), JavaScript, TypeScript, Vue, Rust, Swift és SwiftUI, CSS, SCSS, JSON és Markdown."}},
+{"@type":"Question","name":"Kell hozzá PHP, Node vagy Rust?","acceptedAnswer":{"@type":"Answer","text":"Nem. A callgraph egyetlen statikus bináris, futtatáshoz csak bash kell."}},
+{"@type":"Question","name":"Működik Claude Code nélkül is?","acceptedAnswer":{"@type":"Answer","text":"Igen. Claude Code skillként érkezik, de minden parancs bármilyen terminálból vagy szkriptből használható."}},
+{"@type":"Question","name":"Hogyan frissíthető?","acceptedAnswer":{"@type":"Answer","text":"A callgraph.sh update letölti a legfrissebb kiadást a GitHubról, a projektek és a beállítások megmaradnak."}}]}
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Ugrás a tartalomra</a>
+<div class="wrap">
+<header class="top">
+  <a class="brand" href="./"><img src="../assets/favicon.svg" alt="" width="32" height="32">callgraph</a>
+  <nav class="links" aria-label="Fő navigáció">
+    <a href="#features">Előnyök</a><a href="#languages">Nyelvek</a><a href="#install">Telepítés</a>
+    <a href="#usage">Használat</a><a href="#faq">GYIK</a>
+    <a href="https://github.com/GeRiY/callgraph">GitHub</a><a href="../" hreflang="en" lang="en">English</a>
+  </nav>
+</header>
+
+<main id="main">
+<section class="hero" aria-labelledby="title">
+  <div>
+    <h1 id="title">Értsd meg a kódot, olvasás nélkül.</h1>
+    <p class="lead">A <b>callgraph</b> token-hatékony kód-térkép AI kódoló agenteknek. Megmutatja a szerkezetet,
+      a kategorizált hívás-gráfot, egy-egy metódus törzsét, hogy <i>„ki hívja?”</i>, és a hatáselemzést —
+      pár tucat sorban, a teljes fájlok helyett.</p>
+    <div class="cta">
+      <a class="btn primary" href="#install">Telepítés egy sorral</a>
+      <a class="btn" href="https://github.com/GeRiY/callgraph/releases/latest">Letöltés: v0.1.0</a>
+      <a class="btn" href="https://github.com/GeRiY/callgraph">Megnézem a GitHubon</a>
+    </div>
+  </div>
+  <div class="term" role="img" aria-label="Példa: egy PHP-modell outline-ja és hívói">
+    <div class="dots" aria-hidden="true"><i style="background:#ff6467"></i><i style="background:#ffb900"></i><i style="background:#00c950"></i></div>
+<pre><span class="c">$ callgraph.sh --project shop app/Models/Order.php</span>
+class Order extends Model  <span class="d">L7-23</span>
+  constants (1):
+    STATUS_OPEN = 'open'
+  saveTranslations()  <span class="d">L13-20</span>
+    <span class="k">external_call  </span>   create, info
+    <span class="k">global_helper  </span>   logger
+    <span class="k">internal_helper</span>   translations
+  translations()  <span class="d">L22-22</span>
+    <span class="k">orm_relation   </span>   hasMany
+
+<span class="c">$ callgraph.sh app --grep saveTranslations --depth 2</span>
+== 1. szint — közvetlenül hívja: /saveTranslations/
+  app/Models/Order.php  Caller::run()  <span class="d">L25-25</span>
+== 2. szint — az előző szintet hívja
+  (nincs további hívó)</pre>
+  </div>
+</section>
+
+<section id="features" aria-labelledby="h-features">
+  <h2 id="h-features">Miért szeretik az agentek (és az emberek)</h2>
+  <p class="sub">Minden válasz a szintaxisfából jön, ezért pontos, tömör és olcsón olvasható.</p>
+  <div class="grid">
+    <div class="card"><h3>Kevesebb token, gyorsabb válasz</h3><p>Egy outline pár tucat sor. Az agent előbb a térképet olvassa, utána csak a szükséges sorokat.</p></div>
+    <div class="card"><h3>Kategorizált hívás-gráf</h3><p>Minden hívás címkét kap — ORM-reláció, modell, framework, natív, belső segéd, SwiftUI view vagy modifier —, így a szándék első ránézésre látszik.</p></div>
+    <div class="card"><h3>„Ki hívja?”</h3><p>A <code>--grep</code> megtalál minden hívót a projektben; a <code>--depth N</code> a hívók hívóit is bejárja hatáselemzéshez.</p></div>
+    <div class="card"><h3>Célzott olvasás</h3><p>A <code>fájl::metódus --body</code> csak azt a metódust írja ki, sorszámozva. A <code>--lines 30-60</code> bármely sávot.</p></div>
+    <div class="card"><h3>Framework-nézetek</h3><p>Laravel / Yii ismeret: routes, middleware, validation, jobs, events, providers, DI, views — mind egy-egy parancs.</p></div>
+    <div class="card"><h3>Egyetlen bináris</h3><p>Nem kell PHP, Node vagy Rust. macOS, Linux és Windows. Gyors, cache-elt, inkrementális.</p></div>
+    <div class="card"><h3>Angolul vagy magyarul</h3><p>Minden kimenet és súgó alapból angol — magyarra: <code>callgraph.sh set-lang hu</code>.</p></div>
+    <div class="card"><h3>Magától frissül</h3><p>A <code>callgraph.sh update</code> letölti a legújabb kiadást a GitHubról, a beállítások megmaradnak.</p></div>
+  </div>
+</section>
+
+<section id="languages" aria-labelledby="h-lang">
+  <h2 id="h-lang">Támogatott nyelvek</h2>
+  <p class="sub">Minden nyelvnek ugyanaz a kimeneti formája.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th scope="col">Nyelv</th><th scope="col">Fájlok</th><th scope="col">Mit kapsz</th></tr></thead>
+    <tbody>
+      <tr><td>PHP</td><td><code>.php</code></td><td>osztályok, traitek, enumok, metódusok, property-k, konstansok, hívások típuskövetéssel, Laravel / Yii felismerés</td></tr>
+      <tr><td>JavaScript / TypeScript</td><td><code>.js .mjs .cjs .jsx .ts .tsx</code></td><td>modulok, függvények, osztályok, importok alias-feloldással</td></tr>
+      <tr><td>Vue</td><td><code>.vue</code></td><td>props, emits, setup, template-komponensek és eseménykezelők, computed, watch, hookok</td></tr>
+      <tr><td>Rust</td><td><code>.rs</code></td><td>modulok, structok, enumok, traitek, impl-blokkok, függvények, use-fák, makróhívások, framework-felismerés (axum, actix-web, tokio…)</td></tr>
+      <tr><td>Swift / SwiftUI</td><td><code>.swift</code></td><td>osztályok, structok, protokollok, actorok, extensionök, View-komponensek, property wrapperek, SwiftUI view-k és modifierek</td></tr>
+      <tr><td>CSS / SCSS</td><td><code>.css .scss</code></td><td>szabály-blokkok, mixinek, függvények, változók, importok</td></tr>
+      <tr><td>JSON / Markdown</td><td><code>.json .md</code></td><td>kulcs-útvonalak; címsor-szakaszok és linkek</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="install" aria-labelledby="h-install">
+  <h2 id="h-install">Telepítés</h2>
+  <p class="sub">A csomagban a Claude Code skill és a géped binárisa van. Csak <code>bash</code> kell hozzá.</p>
+  <div class="tabs" role="tablist" aria-label="Platform">
+    <button role="tab" id="t-unix" aria-controls="p-unix" aria-selected="true">macOS / Linux</button>
+    <button role="tab" id="t-win" aria-controls="p-win" aria-selected="false" tabindex="-1">Windows</button>
+  </div>
+  <div class="panel" id="p-unix" role="tabpanel" aria-labelledby="t-unix">
+<pre class="code"><code>p="$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)" && t="$(mktemp -d)" \
+  && curl -fsSL -o "$t/cg.zip" "https://github.com/GeRiY/callgraph/releases/latest/download/callgraph-$p.zip" \
+  && mkdir -p ~/.claude/skills && unzip -qo "$t/cg.zip" -d ~/.claude/skills \
+  && bash ~/.claude/skills/callgraph/install.sh && rm -rf "$t"</code></pre>
+  </div>
+  <div class="panel" id="p-win" role="tabpanel" aria-labelledby="t-win" hidden>
+    <p>Töltsd le a <a href="https://github.com/GeRiY/callgraph/releases/latest/download/callgraph-windows-x86_64.zip">callgraph-windows-x86_64.zip</a>-et,
+      csomagold ki, a <code>callgraph</code> mappát másold a <code>%USERPROFILE%\.claude\skills\</code> alá, majd Git Bashben:</p>
+<pre class="code"><code>bash ~/.claude/skills/callgraph/install.sh</code></pre>
+  </div>
+  <p>Utána egyszer regisztráld a projektet, és indítsd újra a Claude Code-ot:</p>
+<pre class="code"><code>bash ~/.claude/skills/callgraph/projects.sh add shop /abszolút/út/a/shophoz</code></pre>
+  <p class="sub" style="margin-top:14px">Minden letöltés (macOS Apple Silicon és Intel, Linux x86_64 és ARM64, Windows):
+    <a href="https://github.com/GeRiY/callgraph/releases/latest">legfrissebb kiadás</a>.</p>
+</section>
+
+<section id="usage" aria-labelledby="h-usage">
+  <h2 id="h-usage">Használat</h2>
+  <p class="sub">Az agent magától használja a skillt. Ugyanezek a parancsok bármelyik terminálból működnek.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th scope="col">Feladat</th><th scope="col">Parancs</th></tr></thead>
+    <tbody>
+      <tr><td>Fájl vagy mappa outline-ja</td><td><code>callgraph.sh &lt;fájl|mappa&gt;</code></td></tr>
+      <tr><td>Csak egy metódus</td><td><code>callgraph.sh &lt;fájl&gt;::&lt;metódus&gt;</code></td></tr>
+      <tr><td>Metódus forrása sorszámozva</td><td><code>callgraph.sh &lt;fájl&gt;::&lt;metódus&gt; --body</code></td></tr>
+      <tr><td>Hol hívják?</td><td><code>callgraph.sh &lt;mappa&gt; --grep &lt;minta&gt;</code></td></tr>
+      <tr><td>Hatáselemzés</td><td><code>callgraph.sh &lt;mappa&gt; --grep &lt;minta&gt; --depth 3</code></td></tr>
+      <tr><td>String / konstans helye</td><td><code>--strings &lt;minta&gt;</code> · <code>--const &lt;minta&gt;</code></td></tr>
+      <tr><td>Ágak sortartománnyal</td><td><code>--format flow</code></td></tr>
+      <tr><td>Csak a publikus felület</td><td><code>--format api</code></td></tr>
+      <tr><td>Hol nézz körül elsőként</td><td><code>--format hotspots</code></td></tr>
+      <tr><td>Diagramok</td><td><code>--format mermaid</code> · <code>--format dot</code></td></tr>
+      <tr><td>Laravel-nézetek</td><td><code>--format routes</code> · <code>validation</code> · <code>events</code> · <code>jobs</code></td></tr>
+    </tbody>
+  </table></div>
+  <h3 style="margin-top:22px">Frissítés és nyelv</h3>
+<pre class="code"><code>callgraph.sh update --check     # van újabb kiadás?
+callgraph.sh update             # letöltés és telepítés (a beállítások megmaradnak)
+callgraph.sh set-lang hu        # magyar kimenet (vissza: set-lang en)</code></pre>
+</section>
+
+<section id="faq" aria-labelledby="h-faq">
+  <h2 id="h-faq">Gyakori kérdések</h2>
+  <details><summary>Mi a callgraph?</summary><p>Parancssori kód-térkép AI kódoló agenteknek. Elemzi a fájlt vagy mappát, és megmondja, mi van benne, melyik metódus melyik sorokon él, mit hív, ki hívja, és mit érint egy változtatás — pár tucat sorban a teljes fájl helyett.</p></details>
+  <details><summary>Kell hozzá PHP, Node vagy Rust?</summary><p>Nem. A callgraph egyetlen statikus bináris, futtatáshoz csak bash kell.</p></details>
+  <details><summary>Működik Claude Code nélkül is?</summary><p>Igen. Claude Code skillként érkezik, de minden parancs bármilyen terminálból vagy szkriptből használható.</p></details>
+  <details><summary>Elküldi valahova a kódomat?</summary><p>Nem. Minden helyben fut; az egyetlen hálózati hívás az opcionális <code>update</code>-ellenőrzés a GitHub Release-ek felé.</p></details>
+  <details><summary>Mennyibe kerül?</summary><p>Semmibe. A callgraph nyílt forrású, MIT licenccel.</p></details>
+</section>
+</main>
+
+<footer>
+  <div>callgraph · készítette: <a href="https://www.linkedin.com/in/gergomakra/" rel="author me">Makra Gergő</a> · MIT licenc · <a href="https://github.com/GeRiY/callgraph">GitHub</a> ·
+    <a href="https://github.com/GeRiY/callgraph/releases/latest">Kiadások</a> · <a href="../" hreflang="en" lang="en">English</a></div>
+</footer>
+</div>
+<script>
+// platform-fülek (billentyűzettel is): a kiválasztott panel látszik
+document.querySelectorAll('[role=tablist]').forEach(function (list) {
+  var tabs = Array.prototype.slice.call(list.querySelectorAll('[role=tab]'));
+  function select(t) {
+    tabs.forEach(function (x) {
+      var on = x === t; x.setAttribute('aria-selected', on); x.tabIndex = on ? 0 : -1;
+      document.getElementById(x.getAttribute('aria-controls')).hidden = !on;
+    });
+    t.focus();
+  }
+  tabs.forEach(function (t, i) {
+    t.addEventListener('click', function () { select(t); });
+    t.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowRight') select(tabs[(i + 1) % tabs.length]);
+      if (e.key === 'ArrowLeft') select(tabs[(i - 1 + tabs.length) % tabs.length]);
+    });
+  });
+  if (/Win/.test(navigator.platform || '')) select(tabs[tabs.length - 1]);
+});
+</script>
+</body>
+</html>
