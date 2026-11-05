@@ -256,6 +256,10 @@ Refaktornál a kimenetnek bájtra azonosnak kell maradnia (`tools/identity_check
 A sérülékenységeket privátban jelezd, a
 [GitHub Security Advisories](https://github.com/GeRiY/callgraph/security/advisories/new) oldalon, ne nyilvános issue-ban.
 
+## Szerző
+
+Készítette és karbantartja: **Makra Gergő** — [LinkedIn](https://www.linkedin.com/in/gergomakra/).
+
 ## Licenc
 
 [MIT](LICENSE)
