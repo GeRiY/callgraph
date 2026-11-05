@@ -1,10 +1,12 @@
-//! A GitHub Releases API (`/repos/<owner>/<repo>/releases/latest`) válaszának a frissítéshez szükséges része.
+//! Egy kiadás (tag, verzió, assetek) és a GitHub Releases API (`/repos/<owner>/<repo>/releases/latest`)
+//! válaszának a frissítéshez szükséges része. Az API csak tartalék / tükör; az alapértelmezett forrás a
+//! `releases/latest` webes átirányítása (`update::source`).
 
 use serde::Deserialize;
 
 use super::version::Version;
 
-/// A legutóbbi kiadás lekérdezésének alapértelmezett címe (felülírható: `CALLGRAPH_UPDATE_API`).
+/// A legutóbbi kiadás az API-ból (tartalék, ha az átirányítás nem működik; a `CALLGRAPH_UPDATE_API` ezt írja felül).
 pub(crate) const DEFAULT_API: &str = "https://api.github.com/repos/GeRiY/callgraph/releases/latest";
 
 /// Egy release-asset: a fájlnév és a letöltési cím.
@@ -49,15 +51,22 @@ impl Release {
     pub(crate) fn from_json(body: &[u8]) -> Result<Self, ReleaseError> {
         let raw: RawRelease =
             serde_json::from_slice(body).map_err(|e| ReleaseError::Json(e.to_string()))?;
-        let version = Version::parse(&raw.tag_name)
-            .ok_or_else(|| ReleaseError::BadTag(raw.tag_name.clone()))?;
-        if raw.draft || raw.prerelease || version.is_prerelease() {
+        if raw.draft || raw.prerelease {
             return Err(ReleaseError::NotStable(raw.tag_name));
         }
+        Self::stable(raw.tag_name, raw.assets)
+    }
+
+    /// Kiadás egy tagből: a nem semver tag és az előzetes verzió (`v1.0.0-rc.1`) hiba.
+    pub(crate) fn stable(tag: String, assets: Vec<Asset>) -> Result<Self, ReleaseError> {
+        let version = Version::parse(&tag).ok_or_else(|| ReleaseError::BadTag(tag.clone()))?;
+        if version.is_prerelease() {
+            return Err(ReleaseError::NotStable(tag));
+        }
         Ok(Self {
-            tag: raw.tag_name,
+            tag,
             version,
-            assets: raw.assets,
+            assets,
         })
     }
 

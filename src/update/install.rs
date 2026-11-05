@@ -1,5 +1,5 @@
 //! A release zip (`callgraph/…`) telepítése a skill-mappába: a skill-fájlok és a `bin/` felülírása, a felhasználói
-//! adatok (`projects.json`, `errors.jsonl`, `feedback.jsonl`, `lang`) és a zipben nem szereplő fájlok érintetlenek.
+//! adatok (`projects.json`, `errors.jsonl`, `feedback.jsonl`, `lang`, `update-check.json`) és a zipben nem szereplő fájlok érintetlenek.
 //!
 //! Menete: ellenőrzés (zip, biztonságos utak, benne a platform binárisa) → kicsomagolás egy ideiglenes mappába a
 //! skill-mappán belül → átnevezés a helyére. A futó bináris cseréje: Unixon átnevezés fölé; Windowson előbb a futót
@@ -17,7 +17,13 @@ use super::target::{InstallTarget, stale_path};
 const ROOT: &str = "callgraph";
 
 /// Felhasználói adat a skill-mappában — a zip akkor sem írhatja felül, ha (tévedésből) benne van.
-const USER_DATA: [&str; 4] = ["projects.json", "errors.jsonl", "feedback.jsonl", "lang"];
+const USER_DATA: [&str; 5] = [
+    "projects.json",
+    "errors.jsonl",
+    "feedback.jsonl",
+    "lang",
+    super::check::STATE_FILE,
+];
 
 /// Miért nem telepíthető a csomag.
 #[derive(Debug)]

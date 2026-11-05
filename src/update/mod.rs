@@ -1,21 +1,29 @@
 //! Beépített frissítés a GitHub Releases-ből (`callgraph self-update [--check] [--force] [--from <zip>]`):
 //! a legutóbbi kiadás lekérdezése és összevetése a saját verzióval, a platform zipjének letöltése és telepítése
-//! a skill-mappába. A parancs: `cli::commands::SelfUpdateCommand`.
+//! a skill-mappába. A parancs: `cli::commands::SelfUpdateCommand`. A `wrap` utáni automatikus, háttérben futó
+//! ellenőrzés: `check`.
 
+pub(crate) mod check;
 mod fetch;
 mod install;
 mod platform;
 mod release;
+mod source;
 mod target;
 mod version;
 
 #[cfg(test)]
 pub(crate) mod tests;
 
-pub(crate) use fetch::{API_LIMIT, ASSET_LIMIT, FetchError, Fetcher, HttpFetcher};
+pub(crate) use fetch::{
+    ASSET_LIMIT, BACKGROUND_TIMEOUT, FOREGROUND_TIMEOUT, FetchError, Fetcher, HttpFetcher,
+};
 pub(crate) use install::{InstallError, Installer};
 pub(crate) use platform::Platform;
-pub(crate) use release::{DEFAULT_API, Release, ReleaseError};
+pub(crate) use release::{Release, ReleaseError};
+#[cfg(test)]
+pub(crate) use source::{ApiSource, RedirectSource};
+pub(crate) use source::{ReleaseSource, SourceError, default_source};
 pub(crate) use target::InstallTarget;
 pub(crate) use version::Version;
 

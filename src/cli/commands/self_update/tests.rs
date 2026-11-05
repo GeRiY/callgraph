@@ -4,12 +4,15 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use super::*;
+use crate::update::check::CheckState;
 use crate::update::tests::{fake_skill, read, release_zip, target_of, test_platform};
+use crate::update::{ApiSource, FetchError, RedirectSource};
 
 const API: &str = "https://example.invalid/releases/latest";
 const ASSET: &str = "https://example.invalid/download/callgraph-linux-x86_64.zip";
+const WEB: &str = "https://example.invalid/o/callgraph/releases/latest";
 
-/// URL → válasz; ami nincs benne, az 404.
+/// URL → válasz; ami nincs benne, az 404. Az átirányítás célja a `redirect:<url>` kulcs alatti szöveg.
 struct FakeFetcher(HashMap<String, std::result::Result<Vec<u8>, FetchError>>);
 
 impl Fetcher for FakeFetcher {
@@ -18,6 +21,11 @@ impl Fetcher for FakeFetcher {
             .get(url)
             .cloned()
             .unwrap_or(Err(FetchError::NotFound))
+    }
+
+    fn redirect(&self, url: &str) -> std::result::Result<String, FetchError> {
+        self.get(&format!("redirect:{url}"), 0)
+            .map(|b| String::from_utf8(b).unwrap())
     }
 }
 
@@ -38,12 +46,26 @@ fn home(skill: &Path) -> SkillHome {
     )
 }
 
-/// A parancs futtatása: (kilépési kód, stdout, stderr).
-fn run(
+type Responses<'a> = Vec<(&'a str, std::result::Result<Vec<u8>, FetchError>)>;
+
+/// A parancs futtatása az API-forrással: (kilépési kód, stdout, stderr).
+fn run(args: &[&str], skill: &Path, responses: Responses, in_skill: bool) -> (i32, String, String) {
+    run_with(
+        args,
+        skill,
+        responses,
+        in_skill,
+        Box::new(ApiSource::new(API)),
+    )
+}
+
+/// A parancs futtatása a megadott kiadás-forrással.
+fn run_with(
     args: &[&str],
     skill: &Path,
-    responses: Vec<(&str, std::result::Result<Vec<u8>, FetchError>)>,
+    responses: Responses,
     in_skill: bool,
+    source: Box<dyn ReleaseSource>,
 ) -> (i32, String, String) {
     let env = UpdateEnv {
         fetcher: Box::new(FakeFetcher(
@@ -52,7 +74,7 @@ fn run(
                 .map(|(u, r)| (u.to_owned(), r))
                 .collect(),
         )),
-        api: API.to_owned(),
+        source,
         target: in_skill.then(|| target_of(skill)),
         platform: test_platform(),
         current: Version::parse("0.1.0").unwrap(),
@@ -178,6 +200,64 @@ fn installs_from_local_zip_and_refuses_outside_a_skill_dir() {
     assert_eq!(read(skill.join("bin/linux-x86_64/callgraph")), "LOCAL");
 
     let (code, _, _) = run(&["--check", "--from", zip], &skill, vec![], true);
+    assert_eq!(code, 1);
+    let _ = std::fs::remove_dir_all(skill);
+}
+
+#[test]
+fn redirect_source_finds_and_installs_the_latest_release() {
+    let skill = fake_skill("cmd-redirect");
+    let tag = "https://example.invalid/o/callgraph/releases/tag/v0.2.0";
+    let zip =
+        "https://example.invalid/o/callgraph/releases/download/v0.2.0/callgraph-linux-x86_64.zip";
+    let redirect_key = format!("redirect:{WEB}");
+    let source = || Box::new(RedirectSource::new(WEB, &test_platform()));
+    let responses = || {
+        vec![
+            (redirect_key.as_str(), Ok(tag.as_bytes().to_vec())),
+            (zip, Ok(release_zip(b"WEB"))),
+        ]
+    };
+    let (code, out, _) = run_with(&["--check"], &skill, responses(), true, source());
+    assert_eq!(code, 0);
+    assert!(out.contains("0.1.0 → 0.2.0"), "{out}");
+    let (code, out, err) = run_with(&[], &skill, responses(), true, source());
+    assert_eq!(code, 0, "{err}");
+    assert!(out.contains("0.1.0 → 0.2.0"), "{out}");
+    assert_eq!(read(skill.join("bin/linux-x86_64/callgraph")), "WEB");
+
+    // nincs kiadás (404): ugyanaz a barátságos üzenet, mint eddig
+    let (code, out, _) = run_with(&["--check"], &skill, vec![], true, source());
+    assert_eq!(code, 0);
+    assert!(out.contains(WEB) && out.contains("0.1.0"), "{out}");
+    let _ = std::fs::remove_dir_all(skill);
+}
+
+#[test]
+fn background_check_records_latest_silently() {
+    let skill = fake_skill("cmd-background");
+    let args = ["--check", "--background"];
+    let (code, out, err) = run(&args, &skill, vec![(API, Ok(release_json("v0.2.0")))], true);
+    assert_eq!((code, out.as_str(), err.as_str()), (0, "", ""));
+    let state = CheckState::load(&skill.join("update-check.json"));
+    assert_eq!(state.latest.as_deref(), Some("0.2.0"));
+    assert!(state.checked_at > 0);
+
+    // hálózati hiba: csendes, a latest marad, nincs hibanapló-sor
+    let errors = read(skill.join("errors.jsonl"));
+    let (code, out, err) = run(
+        &args,
+        &skill,
+        vec![(API, Err(FetchError::Status(403)))],
+        true,
+    );
+    assert_eq!((code, out.as_str(), err.as_str()), (0, "", ""));
+    let state = CheckState::load(&skill.join("update-check.json"));
+    assert_eq!(state.latest.as_deref(), Some("0.2.0"));
+    assert_eq!(read(skill.join("errors.jsonl")), errors);
+
+    // --background csak --check-kel
+    let (code, _, _) = run(&["--background"], &skill, vec![], true);
     assert_eq!(code, 1);
     let _ = std::fs::remove_dir_all(skill);
 }
