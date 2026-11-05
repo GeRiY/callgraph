@@ -1,0 +1,19 @@
+projects.sh — project aliases for the callgraph skill
+
+The registry (projects.json) is an alias => absolute project root path map.
+It lets you call callgraph.sh with a short path relative to the project
+instead of the full absolute path:
+  bash ~/.claude/skills/callgraph/callgraph.sh --project myapp app/Models/Order.php
+instead of:
+  bash ~/.claude/skills/callgraph/callgraph.sh /path/to/myapp/app/Models/Order.php
+
+Usage:
+  bash ~/.claude/skills/callgraph/projects.sh add <alias> <absolute_path>
+  bash ~/.claude/skills/callgraph/projects.sh list
+  bash ~/.claude/skills/callgraph/projects.sh remove <alias>
+  bash ~/.claude/skills/callgraph/projects.sh resolve <alias>          the root path (an unknown alias gives an error with an error-id)
+  bash ~/.claude/skills/callgraph/projects.sh get <alias> <key>        per-project setting (e.g. phpstan_level; empty if not set)
+  bash ~/.claude/skills/callgraph/projects.sh set-config <alias> [--phpstan-level N] [--phpstan-config <path>]
+    Stores per-project PHPStan settings (level / config) in projects.json;
+    "get <alias> phpstan_level" / "get <alias> phpstan_config" returns them
+    (e.g. for a script that runs PHPStan).

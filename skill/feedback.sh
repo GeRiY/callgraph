@@ -1,31 +1,7 @@
 #!/usr/bin/env bash
-# feedback.sh — visszajelzés a callgraph skillről (hibáról vagy általános
-# észrevételről), agent-eknek.
-#
-# Hiba esetén a callgraph.sh / projects.sh
-# minden hiba-üzenet mellé kiír egy "[error-id: xxxxxxxx]"
-# azonosítót — a hiba kontextusa (forrás script, üzenet, paraméterek) már
-# el van tárolva mellette az errors.jsonl-ben, ehhez CSAK az ID-t és egy
-# leírást kell megadni:
-#
-#   bash ~/.claude/skills/callgraph/feedback.sh add <error_id> "<mit vártál, mi történt valójában>"
-#
-# Ha nincs konkrét error-id (csak egy általános ötlet/észrevétel az
-# eszközről), a --note kapcsolóval önmagában is rögzíthető:
-#
-#   bash ~/.claude/skills/callgraph/feedback.sh add --note "<észrevétel>"
-#
-# Minden feedback-bejegyzés saját ID-t kap (az "elmentve" válasz kiírja) —
-# ezzel jelölhető megoldottnak, ha valaki (a fejlesztő) már kezelte:
-#
-#   bash ~/.claude/skills/callgraph/feedback.sh resolve <feedback_id>
-#
-# Egyéb parancsok:
-#   bash ~/.claude/skills/callgraph/feedback.sh list                minden feedback, állapottal és a kapcsolódó hibával
-#   bash ~/.claude/skills/callgraph/feedback.sh list --open          csak a még nem megoldott bejegyzések
-#   bash ~/.claude/skills/callgraph/feedback.sh show <error_id>      egy konkrét hiba teljes részlete + a rá érkezett feedback-ek
-
-# A logika a `callgraph feedback` alparancsban él (jq nélkül); ez csak a súgót írja ki és továbbít.
+# feedback.sh — feedback on the callgraph skill (about an error-id or a general note), for agents;
+# forwards to `callgraph feedback`.
+# Help: skill/help/feedback.en.txt and skill/help/feedback.hu.txt (`feedback.sh --help`).
 
 set -euo pipefail
 

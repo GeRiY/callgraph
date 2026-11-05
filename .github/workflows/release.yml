@@ -64,6 +64,7 @@ jobs:
           mkdir -p $p/bin
           cp skill/SKILL.md skill/README.md skill/TELEPITES.md skill/*.sh LICENSE $p/
           cp -R skill/extras $p/extras
+          cp -R skill/help $p/help
           cp -R out/${{ matrix.dir }} $p/bin/
       - uses: actions/upload-artifact@v4
         with:
