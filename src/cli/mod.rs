@@ -68,6 +68,7 @@ pub fn build_command(args: CliArgs) -> Result<Box<dyn Command>> {
             depth,
             guess,
         ))),
+        CliArgs::Version => Ok(Box::new(commands::VersionCommand)),
         CliArgs::Skill { command, args } => {
             let home = crate::skill::SkillHome::from_env();
             Ok(match command.as_str() {
@@ -75,6 +76,7 @@ pub fn build_command(args: CliArgs) -> Result<Box<dyn Command>> {
                 "feedback" => Box::new(commands::FeedbackCommand::new(args, home)),
                 "error" => Box::new(commands::ErrorCommand::new(args, home)),
                 "set-lang" => Box::new(commands::LangCommand::new(args, home)),
+                "self-update" => Box::new(commands::SelfUpdateCommand::new(args, home)),
                 _ => Box::new(commands::WrapCommand::new(args, home)),
             })
         }

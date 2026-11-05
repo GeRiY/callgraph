@@ -36,6 +36,9 @@ syn = { version = "=2.0.119", default-features = false, features = ["full", "par
 thiserror = "2"
 tree-sitter = "=0.27.1"
 tree-sitter-swift = "=0.7.4"
+# self-update: pure-Rust HTTPS (rustls, no OpenSSL) and zip (deflate only)
+ureq = { version = "=3.5.1", default-features = false, features = ["rustls"] }
+zip = { version = "=9.3.0", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 
 [profile.release]
 lto = true
