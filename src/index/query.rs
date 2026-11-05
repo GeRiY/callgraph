@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 use regex::RegexBuilder;
 use serde::Serialize;
 
-use super::record::IndexRecord;
+use super::record::{FileStamp, IndexRecord};
 use crate::error::{CallgraphError, Result};
 
 /// A `callers` JSONL-kimenetének egy sora.
@@ -40,7 +40,7 @@ impl CallerIndex {
         Self::from_records(
             graphs
                 .into_iter()
-                .map(|record| IndexRecord::new(record.path, 0, record.graph)),
+                .map(|record| IndexRecord::new(record.path, FileStamp::default(), record.graph)),
         )
     }
     pub fn from_records(records: impl IntoIterator<Item = IndexRecord>) -> Self {

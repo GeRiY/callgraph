@@ -66,6 +66,34 @@ fn creates_project_index_and_updates_changed_file() {
     assert_eq!(second[0]["caller"], "second");
 }
 
+/// Durva mtime-felbontású fájlrendszeren (pl. Docker bind mount) két gyors írás azonos mtime-ot kaphat:
+/// a méret-eltérésből akkor is észre kell venni a változást.
+#[test]
+fn reindexes_changed_file_with_identical_mtime() {
+    let project = TempDir::new();
+    let source = project.0.join("graph.php");
+    fs::write(
+        &source,
+        "<?php\nnamespace App;\nclass Order { function saveTranslations() {} }\nclass Caller { function a() { Order::saveTranslations(); } }",
+    )
+    .unwrap();
+    let mtime = fs::metadata(&source).unwrap().modified().unwrap();
+    assert_eq!(run(&project, 1)[0]["caller"], "a");
+    fs::write(
+        &source,
+        "<?php\nnamespace App;\nclass Order { function saveTranslations() {} }\nclass Caller { function longer() { Order::saveTranslations(); } }",
+    )
+    .unwrap();
+    fs::File::options()
+        .write(true)
+        .open(&source)
+        .unwrap()
+        .set_modified(mtime)
+        .unwrap();
+    assert_eq!(fs::metadata(&source).unwrap().modified().unwrap(), mtime);
+    assert_eq!(run(&project, 1)[0]["caller"], "longer");
+}
+
 #[test]
 fn depth_follows_callers_inside_the_project() {
     let project = TempDir::new();

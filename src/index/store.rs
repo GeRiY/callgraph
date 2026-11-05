@@ -1,4 +1,4 @@
-//! Projekt-index Repository: mtime-alapú, fájlonkénti JSONL rekordok.
+//! Projekt-index Repository: mtime- és méret-alapú, fájlonkénti JSONL rekordok.
 
 use std::collections::HashMap;
 use std::fs;
@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use crate::error::Result;
 use crate::model::FileGraph;
 
-use super::record::IndexRecord;
+use super::record::{FileStamp, IndexRecord};
 
 /// A `.callgraph/index.jsonl` tárolója.
 #[derive(Debug)]
@@ -27,10 +27,10 @@ impl IndexStore {
         Self { path, records }
     }
 
-    pub fn get(&self, path: &Path, mtime: u128) -> Option<FileGraph> {
+    pub fn get(&self, path: &Path, stamp: FileStamp) -> Option<FileGraph> {
         self.records
             .get(path.to_str()?)
-            .filter(|record| record.mtime == mtime)
+            .filter(|record| record.stamp() == stamp)
             .map(|record| record.graph.clone())
     }
 
@@ -39,10 +39,10 @@ impl IndexStore {
             .is_some_and(|key| self.records.contains_key(key))
     }
 
-    pub fn put(&mut self, path: &Path, mtime: u128, graph: FileGraph) {
+    pub fn put(&mut self, path: &Path, stamp: FileStamp, graph: FileGraph) {
         let key = path.to_string_lossy().into_owned();
         self.records
-            .insert(key.clone(), IndexRecord::new(key, mtime, graph));
+            .insert(key.clone(), IndexRecord::new(key, stamp, graph));
     }
 
     pub fn retain_paths(&mut self, paths: &[PathBuf]) {

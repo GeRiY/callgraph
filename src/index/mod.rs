@@ -6,4 +6,5 @@ mod store;
 
 pub use query::CallerRow;
 pub(crate) use query::{CallerIndex, FileGraphRecord};
+pub(crate) use record::FileStamp;
 pub(crate) use store::IndexStore;
