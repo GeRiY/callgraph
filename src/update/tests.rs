@@ -120,7 +120,9 @@ fn rejects_bad_packages_without_touching_the_skill() {
     let skill = fake_skill("reject");
     let target = target_of(&skill);
     let installer = Installer::new(test_platform());
-    let cases: Vec<(Vec<u8>, fn(&InstallError) -> bool)> = vec![
+    /// Egy hibás csomag és a várt hibafajta ellenőrzője.
+    type Case = (Vec<u8>, fn(&InstallError) -> bool);
+    let cases: Vec<Case> = vec![
         (b"not a zip".to_vec(), |e| {
             matches!(e, InstallError::NotZip(_))
         }),
