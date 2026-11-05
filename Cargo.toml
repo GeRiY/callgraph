@@ -32,6 +32,8 @@ regex = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 thiserror = "2"
+tree-sitter = "=0.27.1"
+tree-sitter-swift = "=0.7.4"
 
 [profile.release]
 lto = true

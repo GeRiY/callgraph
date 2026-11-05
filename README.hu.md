@@ -2,7 +2,7 @@
 
 [English](README.md) | **Magyar**
 
-Token-hatékony kód-térkép agenteknek (Claude Code skill): PHP, JS / TS / Vue, CSS / SCSS, JSON és Markdown fájlok
+Token-hatékony kód-térkép agenteknek (Claude Code skill): PHP, JS / TS / Vue, Swift / SwiftUI, CSS / SCSS, JSON és Markdown fájlok
 szerkezete, kategorizált hívás-gráfja, metódus-törzse, „ki hívja” keresése és hatáselemzése — a fájl beolvasása nélkül.
 Az elemző egy önálló Rust-bináris (`callgraph`); a `skill/callgraph.sh` vékony burok fölötte.
 
