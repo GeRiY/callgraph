@@ -58,9 +58,10 @@ impl QueryEngine {
             }
             let graph = self.load(&mut cache, &abs)?;
             let methods = methods.map(|names| {
+                // névegyezés: egy név több metódusra is illeszkedhet (Rust: több impl, PHP/Swift: túlterhelés),
+                // ezért a hiányt név szerint nézzük, nem darabszámra
                 let found = graph.methods.iter().filter(|m| names.iter().any(|n| n == &m.name)).map(|m| m.name.clone()).collect::<Vec<_>>();
-                if found.len() != names.len() {
-                    let missing = names.into_iter().find(|n| !found.contains(n)).unwrap();
+                if let Some(missing) = names.iter().find(|n| !found.contains(n)) {
                     return Err(CallgraphError::Usage(tf!(
                         "No such method: {}::{} (see --format outline for the file's full list)",
                         "Nincs ilyen metódus: {}::{} (lásd: --format outline a fájl teljes listájához)",

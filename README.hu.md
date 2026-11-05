@@ -79,6 +79,7 @@ $ callgraph.sh --project shop app --grep saveTranslations --depth 2
 | Nyelv | Kiterjesztések | Mit kapsz |
 |---|---|---|
 | PHP | `.php` | osztályok, traitek, enumok, metódusok, property-k, konstansok, hívások típuskövetéssel, framework-felismerés (Laravel, Yii) |
+| Rust | `.rs` | modulok, structok, enumok, traitek, `impl`-blokkok, függvények láthatósággal / `async`-kal, mezők, konstansok, `use`-fák, útvonal- / metódus- / makróhívások, `if` / `match` ágak, framework-felismerés a `Cargo.toml`-ból (axum, actix-web, tokio, serde, …) |
 | JavaScript / TypeScript | `.js` `.mjs` `.cjs` `.jsx` `.ts` `.tsx` | modulok, függvények, osztályok, importok alias-feloldással (`jsconfig` / `tsconfig`) |
 | Vue | `.vue` | props, emits, `setup`, template-komponensek és eseménykezelők, `computed`, `watch`, életciklus-hookok, Options API |
 | CSS / SCSS | `.css` `.scss` | szabály-blokkok, mixinek, függvények, változók, `@use` / `@import` |
@@ -199,20 +200,20 @@ bash ~/.claude/skills/callgraph/feedback.sh list --open
 ```
 fájlok ─► FileWalker ─► LanguageRegistry ─► Language::analyze ─► FileGraph ─► JSONL cache / projektindex ─► lekérdező formátumok
           (.gitignore,    (kiterjesztés      (mago · oxc · raffia ·   (egy közös
-           vendor, …)      szerint)           pulldown-cmark)          séma)
+           vendor, …)      szerint)           pulldown-cmark · syn)    séma)
 ```
 
 - Minden nyelv egy modul a `src/lang/<nyelv>/` alatt, ami az AST-jét egy közös `FileGraph` sémára képezi le; a
   lekérdező réteg (`src/query/`) nem tudja, melyik nyelvből jött egy fájl.
 - Parserek: [mago](https://github.com/carthage-software/mago) (PHP), [oxc](https://github.com/oxc-project/oxc)
   (JS / TS / Vue), [raffia](https://github.com/g-plane/raffia) (CSS / SCSS),
-  [pulldown-cmark](https://github.com/pulldown-cmark/pulldown-cmark) (Markdown).
+  [pulldown-cmark](https://github.com/pulldown-cmark/pulldown-cmark) (Markdown), [syn](https://github.com/dtolnay/syn) (Rust).
 - Az eredmények fájlonként JSONL-be cache-elődnek (mtime-alapon); a „ki hívja?” egy inkrementális projektindexet
   (mtime + méret) használ a `.callgraph/` alatt.
 
 Felépítés és kódolási szabályok: [`ARCHITECTURE.md`](ARCHITECTURE.md) · lekérdező réteg: [`docs/QUERY.md`](docs/QUERY.md) ·
 nyelvenkénti leképezés: [`docs/LANG-JS.md`](docs/LANG-JS.md), [`docs/LANG-CSS.md`](docs/LANG-CSS.md),
-[`docs/LANG-DOC.md`](docs/LANG-DOC.md).
+[`docs/LANG-DOC.md`](docs/LANG-DOC.md), [`docs/LANG-RUST.md`](docs/LANG-RUST.md).
 
 ## Fejlesztés
 

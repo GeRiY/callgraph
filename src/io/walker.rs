@@ -132,6 +132,11 @@ impl FileWalker {
 
     fn ignore_dirs_for(&self, dir: &Path) -> Vec<String> {
         let mut ignored = self.skip_dirs.clone();
+        // Cargo-csomag: a `target/` build-kimenet (generált .rs fájlokkal). Csak Cargo.toml mellett,
+        // hogy a PHP / JS projektek `target` nevű mappáit ne érintse.
+        if dir.join("Cargo.toml").is_file() {
+            ignored.push("target".to_owned());
+        }
         // The reference starts at dirname($dir), then walks upward to the
         // nearest .gitignore. Patterns are compared as whole entry names.
         let mut project_root = dir.parent();
@@ -230,5 +235,34 @@ mod tests {
         let files = FileWalker::for_registry(&LanguageRegistry::with_defaults())
             .collect(std::slice::from_ref(&temp.0), &mut |_| {});
         assert_eq!(files, [temp.0.join("dir/f.php").canonicalize().unwrap()]);
+    }
+
+    #[test]
+    fn skips_cargo_target_only_next_to_cargo_toml() {
+        let temp = TempDir::new();
+        // Cargo-csomag: a target/ kimarad
+        fs::create_dir_all(temp.0.join("crate/src")).unwrap();
+        fs::create_dir_all(temp.0.join("crate/target/debug/build")).unwrap();
+        fs::write(temp.0.join("crate/Cargo.toml"), "[package]\nname = \"x\"\n").unwrap();
+        fs::write(temp.0.join("crate/src/lib.rs"), "pub fn a() {}").unwrap();
+        fs::write(temp.0.join("crate/target/debug/build/out.rs"), "fn g() {}").unwrap();
+        // nem Cargo-projekt: a target/ marad
+        fs::create_dir_all(temp.0.join("web/target")).unwrap();
+        fs::write(temp.0.join("web/target/page.php"), "<?php").unwrap();
+
+        let root = temp.0.canonicalize().unwrap();
+        let mut files: Vec<PathBuf> = FileWalker::for_registry(&LanguageRegistry::with_defaults())
+            .collect(std::slice::from_ref(&temp.0), &mut |_| {})
+            .into_iter()
+            .map(|f| f.strip_prefix(&root).unwrap().to_path_buf())
+            .collect();
+        files.sort();
+        assert_eq!(
+            files,
+            [
+                PathBuf::from("crate/src/lib.rs"),
+                PathBuf::from("web/target/page.php")
+            ]
+        );
     }
 }
