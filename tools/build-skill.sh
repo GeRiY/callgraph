@@ -27,6 +27,8 @@ else
     # helyi build: a binárisokba ne égjen be a gép útvonala
     export CARGO_TARGET_DIR="$ROOT/target/pkg"
     export RUSTFLAGS="--remap-path-prefix=$ROOT=callgraph --remap-path-prefix=$HOME=~"
+    # a C-kódos crate-ek (tree-sitter, ring) assert()-jei a __FILE__-lal a teljes utat égetnék be
+    export CFLAGS="${CFLAGS:-} -ffile-prefix-map=$ROOT=callgraph -ffile-prefix-map=$HOME=~ -ffile-prefix-map=${CARGO_HOME:-$HOME/.cargo}=~/.cargo"
     host="$(rustc -vV | sed -n 's/^host: //p')"
     pairs=("$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)=$host")
     [[ "$(uname -s)" == Darwin ]] && pairs=("darwin-arm64=aarch64-apple-darwin" "darwin-x86_64=x86_64-apple-darwin")

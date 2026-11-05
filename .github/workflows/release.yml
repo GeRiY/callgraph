@@ -49,6 +49,13 @@ jobs:
         run: |
           home="$HOME"; [[ "$RUNNER_OS" == Windows ]] && home="$USERPROFILE"
           export RUSTFLAGS="--remap-path-prefix=$home=~ --remap-path-prefix=$GITHUB_WORKSPACE=callgraph"
+          # a C-kódos crate-ek (tree-sitter, ring) assert()-jei a __FILE__-lal a teljes forrásutat égetnék be:
+          # gcc/clang-on átírjuk, MSVC-n (nincs file-prefix-map) NDEBUG-gal kivesszük az assert-eket
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            export CFLAGS="/DNDEBUG"
+          else
+            export CFLAGS="-ffile-prefix-map=$home=~ -ffile-prefix-map=$GITHUB_WORKSPACE=callgraph"
+          fi
           cargo build --release --locked --target ${{ matrix.target }}
       - name: bináris összegyűjtése
         shell: bash
