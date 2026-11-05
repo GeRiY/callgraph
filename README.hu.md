@@ -245,6 +245,10 @@ Helyi toolchainnel a szokásos `cargo build --release` / `cargo test --release` 
 ([`.github/workflows/release.yml`](.github/workflows/release.yml)) minden pushnál buildel és tesztel macOS-re
 (arm64, x86_64), Linuxra (arm64, x86_64, statikus musl) és Windowsra, `v*` tagnél pedig GitHub Release-t készít.
 
+### Hibajelentés és visszajelzés
+
+Hibát találtál, vagy ötleted van? [Nyiss egy issue-t](https://github.com/GeRiY/callgraph/issues/new/choose) — a hibajelentő űrlap kéri a `callgraph --version` kimenetét, a parancsot és a kimenetet (az `[error-id: …]` sorral).
+
 ### Közreműködés
 
 Issue-kat és pull requesteket szívesen fogadunk. PR előtt futtasd a `bash tools/dev.sh check`-et.
@@ -254,7 +258,7 @@ Refaktornál a kimenetnek bájtra azonosnak kell maradnia (`tools/identity_check
 ### Biztonság
 
 A sérülékenységeket privátban jelezd, a
-[GitHub Security Advisories](https://github.com/GeRiY/callgraph/security/advisories/new) oldalon, ne nyilvános issue-ban.
+[GitHub Security Advisories](https://github.com/GeRiY/callgraph/security/advisories/new) oldalon, ne nyilvános issue-ban — lásd [`SECURITY.md`](SECURITY.md).
 
 ## Szerző
 

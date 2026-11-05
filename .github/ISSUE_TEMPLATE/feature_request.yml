@@ -1,0 +1,17 @@
+name: "💡 Idea or feedback / Ötlet vagy észrevétel"
+description: "A new feature, a missing language or framework, or any feedback. · Új funkció, hiányzó nyelv vagy framework, bármilyen észrevétel."
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: "Your idea or feedback · Az ötleted vagy észrevételed"
+      description: "What would help you or your agent? · Mi segítene neked vagy az agentednek?"
+    validations:
+      required: true
+  - type: textarea
+    id: example
+    attributes:
+      label: "Example (optional) · Példa (nem kötelező)"
+      description: "A command, a code snippet or the output you would like to see · Egy parancs, kódrészlet vagy a kimenet, amit látni szeretnél"
+      render: text
