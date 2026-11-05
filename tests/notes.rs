@@ -183,7 +183,13 @@ fn notes_round_trip_through_the_binary() {
     // --notes: keresés a mintára (kis- és nagybetű mindegy), a horgony és az idő látszik
     let found = p.show(&["src", "--notes", "n\\+1"]);
     assert_eq!(found.lines().count(), 1, "{found}");
-    assert!(found.contains("src/shop.php::Shop::run  "), "{found}");
+    // az út a platform elválasztójával jön (Windowson `src\shop.php`)
+    assert!(
+        found
+            .replace('\\', "/")
+            .contains("src/shop.php::Shop::run  "),
+        "{found}"
+    );
     assert!(found.contains("  📝 Slow: N+1 query"), "{found}");
     assert!(time_re().is_match(&found), "{found}");
     let all = p.show(&[".", "--notes", ""]);
