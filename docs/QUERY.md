@@ -34,7 +34,7 @@ A szkript `CALLGRAPH_LANG=hu`-val futtat: a golden a régi, magyar skill kimenet
 
 ### R6e: `--grep`, `--category`, `--depth`, `--guess`
 | `--grep <minta>` / `--category <k,...>` | `src/query/filter/` (Specification) + `QueryEngine::query_filtered` | 400 sor fölött találatonként 1 sor (`⚠ A --grep outline N sor lenne …`) |
-| `--depth N` / `--guess` | `QueryEngine::grep_text` + `index::CallerIndex` | a csak név szerinti egyezést „?” jelöli; `--guess` nélkül a szint végén „(+N feloldatlan …)” |
+| `--depth N` / `--guess` | `QueryEngine::grep_text` + `index::CallerIndex` (a `graph::ProjectGraph`-ból) | a csak név szerinti egyezést „?” jelöli; `--guess` nélkül a szint végén „(+N feloldatlan …)” |
 Ismert maradék (99%+ FileGraph-eltérés, halasztva): a grep-outline sorszáma és néhány feloldatlan hívó a calls-mezőből.
 0.2.0 (szándékos eltérés a régi skilltől): a `--grep` a `grep-outline` formázóval fut — metódusonként a találat-hívások
 helye és forrássora (`L25 │ kód`, `query/snippet.rs`, metódusonként ≤ 5 sor); a `--depth` szintjein is. Rokon típuson át
@@ -64,6 +64,7 @@ az callgraph a szándékolt `later\(` mintát használja (így a `sp_jobs` golde
 - Az callgraph csak abszolút gyökeret (`--project <út>`) és címkét (`--label <alias>`) kap; projektnevet maga nem old fel.
 - A bináris: `CALLGRAPH_BIN`, vagy `bin/<os>-<arch>/callgraph`, vagy `bin/callgraph`.
 - A `show` a projekt `.callgraph/` tárolóját az `ensure()`-rel hozza létre (`*`-os `.gitignore`), olvas és ír is a cache-be; ha a tároló nem írható, cache nélkül fut.
+- A `--grep`, `--depth`, `--strings`, `--const` (és a `callers`) a perzisztens projekt-gráfból (`.callgraph/index.jsonl`) olvas: `docs/PROJECT-GRAPH.md`; `CALLGRAPH_NO_GRAPH=1` a fájlonkénti út (azonos kimenet).
 - Mérés a burkon át: `CALLGRAPH_MAP=golden/query/cases.tsv bash tools/query_check.sh "CALLGRAPH_BIN=… PHP_AST_HOME=… CALLGRAPH_REGISTRY=… CALLGRAPH_LEGACY=… bash skill/callgraph.sh"` → 39/51 AZONOS
   (a hibaesetek is); a maradék a FileGraph 99%+ eltérése (G1d) és a szándékos `jobs`-javítás.
 - Az élő `~/.claude/skills/callgraph/callgraph.sh` NINCS lecserélve — az átállás a felhasználó döntése.

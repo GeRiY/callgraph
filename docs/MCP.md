@@ -31,8 +31,11 @@ ugyanaz a tömör kimenet, amit a `callgraph show` kiír (ez a token-hatékony r
 
 ## Biztonság
 
-- **Csak olvas.** Forrásfájlt nem ír; egyetlen mellékhatás a CLI-vel közös elemzési cache a projekt `.callgraph/`
-  mappájában (ha írható).
+- **Csak olvas.** Forrásfájlt nem ír; egyetlen mellékhatás a CLI-vel közös elemzési cache és projekt-gráf a projekt
+  `.callgraph/` mappájában (ha írható).
+- **Projekt-gráf a memóriában:** a szerver a betöltött projekt-gráfot (`docs/PROJECT-GRAPH.md`) és a hívó-indexet
+  kérésről kérésre megtartja; kérésenként csak a változott fájlok frissülnek, egy közben szerkesztett fájl a következő
+  kérésben már látszik.
 - **Útvonal-őr:** minden út a projekt-gyökérhez (alias vagy munkakönyvtár) képest oldódik fel; a gyökérből kilépő út
   (`..`, gyökéren kívüli abszolút út, kifelé mutató symlink) hibát ad. A `::` az útban nem megengedett (a metódus
   külön paraméter).
