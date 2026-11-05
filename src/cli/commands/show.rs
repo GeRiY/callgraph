@@ -74,9 +74,10 @@ impl Command for ShowCommand {
             Ok(value) => value,
             Err(error) => return Self::report(_err, error),
         };
-        // minden lekérdezés a perzisztens projekt-gráfból olvas (crate::graph: a shardok a fájlonkénti cache is)
-        let engine =
-            QueryEngine::new(self.project.as_deref(), self.label.clone()).use_project_graph(true);
+        // minden lekérdezés a perzisztens projekt-gráfból olvas (crate::graph: a pack a fájlonkénti cache is)
+        let engine = QueryEngine::new(self.project.as_deref(), self.label.clone())
+            .use_project_graph(true)
+            .use_slim_rows(self.slim_rows());
         let mut rows =
             match engine.query_filtered(&selectors, self.grep.as_deref(), self.category.as_deref())
             {
@@ -204,6 +205,17 @@ impl ShowCommand {
             }
             Err(error) => Self::report(err, error),
         }
+    }
+
+    /// A sorok elég-e a szűkített tényekből (`facts.bin`): a `--grep` (a `--grep … --body` kivételével) és a
+    /// `--strings` / `--const` csak azok mezőit olvassa; minden más nézet a teljes rekordot kapja.
+    fn slim_rows(&self) -> bool {
+        if self.grep.is_some() {
+            return !(self.body && self.depth <= 1);
+        }
+        !self.body
+            && self.lines.is_none()
+            && (self.strings.is_some() || self.const_filter.is_some())
     }
 
     fn report(err: &mut dyn Write, error: crate::error::CallgraphError) -> Result<i32> {

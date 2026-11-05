@@ -56,6 +56,8 @@ pub struct QueryEngine {
     analyzer: Analyzer,
     /// A gráfok a perzisztens projekt-gráfból jönnek (`use_project_graph`), nem fájlonként a cache-ből.
     graph: bool,
+    /// A sorok a szűkített tényekből (`facts.bin`) jönnek a teljes rekordok helyett (`use_slim_rows`).
+    slim: bool,
 }
 
 impl QueryEngine {
@@ -79,9 +81,17 @@ impl QueryEngine {
             label,
             analyzer: Analyzer::with_defaults(),
             graph: false,
+            slim: false,
         }
     }
-    /// A lekérdezés a projekt-gráfból olvasson: a változatlan fájlok gráfja a shardjukból jön (forrás-elemzés
+    /// A sorok a projekt-gráf szűkített tényeiből jöjjenek (`facts.bin`: egyetlen fájl a teljes hatókörre) — a
+    /// `--grep` / `--depth` / `--strings` / `--const` csak ezek mezőit olvassa (`FileFacts::slim`); az egyfájlos
+    /// nézetek (outline, `--body` …) a teljes rekordot kapják.
+    pub fn use_slim_rows(mut self, on: bool) -> Self {
+        self.slim = on;
+        self
+    }
+    /// A lekérdezés a projekt-gráfból olvasson: a változatlan fájlok gráfja a tárolóból jön (forrás-elemzés
     /// nélkül), a hívó-index a teljes projektre kész. `CALLGRAPH_NO_GRAPH=1` kikapcsolja (gráf nélküli út: minden
     /// fájl elemezve; a kimenet azonos — a tesztek ezzel vetik össze a kettőt).
     pub fn use_project_graph(mut self, on: bool) -> Self {
@@ -103,8 +113,8 @@ impl QueryEngine {
     pub fn query(&self, selectors: &SelectorSet) -> Result<Vec<QueryResult>> {
         let files = self.files(selectors)?;
         let mut out = Vec::new();
-        // a projekt-gráfból: a kiválasztott fájlok bélyege ellenőrizve (csak a változottak elemződnek), a shardjaik
-        // betöltve (párhuzamosan)
+        // a projekt-gráfból: a kiválasztott fájlok bélyege ellenőrizve (csak a változottak elemződnek), utána a
+        // szűkített tényeik (`facts.bin`) vagy a teljes rekordjaik (`graph.pack`), egyetlen fájl-olvasással
         let shared = self.project_graph();
         let mut project = shared.as_ref().map(crate::graph::lock);
         if let Some(graph) = project.as_deref_mut() {
@@ -112,7 +122,11 @@ impl QueryEngine {
             // hiányzó fájlnál a régi úton jön a „nem található” hiba
             if paths.iter().all(|path| path.is_file()) {
                 graph.refresh(&paths, false, &self.analyzer)?;
-                graph.load(&paths, &self.analyzer)?;
+                if self.slim {
+                    graph.load_facts(&paths, &self.analyzer)?;
+                } else {
+                    graph.load_full(&paths, &self.analyzer)?;
+                }
                 let _ = graph.save();
             }
         }
@@ -123,7 +137,14 @@ impl QueryEngine {
             }
             let stored = project
                 .as_deref()
-                .and_then(|graph| graph.graph(&abs.to_string_lossy()))
+                .and_then(|graph| {
+                    let key = abs.to_string_lossy();
+                    if self.slim {
+                        graph.slim_graph(&key)
+                    } else {
+                        graph.graph(&key)
+                    }
+                })
                 .cloned();
             let graph = match stored {
                 Some(graph) => graph,
