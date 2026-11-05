@@ -57,4 +57,4 @@ belül a feladatok **párhuzamosan** futnak (claude2 és codex egyszerre), mert 
 Minden munkapéldány saját `target/`-je ~300–800 MB. Beolvasztás (vagy elvetés) után a `work/<kód>/target` törlendő; a forrás, a brief és a jelentés marad.
 
 ## Build
-A több platformos build (macOS / Linux / Windows) a GitHub Actions-ben fut (`.github/workflows/release.yml`); helyben csak `cargo build --release` és a `tools/build-skill.sh` (a natív platformra).
+A több platformos build (macOS / Linux / Windows) a GitHub Actions-ben fut (`.github/workflows/release.yml`); helyben a `tools/dev.sh` (Docker: `build`, `test`, `check`, `skill`, `shell`), vagy helyi toolchainnel `cargo build --release` és a `tools/build-skill.sh` (a natív platformra).
