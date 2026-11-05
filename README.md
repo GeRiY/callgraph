@@ -255,6 +255,10 @@ Refactors must keep the output byte-identical (`tools/identity_check.sh`).
 Please report vulnerabilities privately through
 [GitHub Security Advisories](https://github.com/GeRiY/callgraph/security/advisories/new), not in public issues.
 
+## Author
+
+Created and maintained by **Gergő Makra** — [LinkedIn](https://www.linkedin.com/in/gergomakra/).
+
 ## License
 
 [MIT](LICENSE)
