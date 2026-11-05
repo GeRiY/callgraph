@@ -44,6 +44,11 @@ impl SkillHome {
         self.dir.join("feedback.jsonl")
     }
 
+    /// A kiválasztott nyelv (`en` / `hu`) — a `callgraph lang <en|hu>` írja.
+    pub fn lang_file(&self) -> PathBuf {
+        self.dir.join("lang")
+    }
+
     pub fn registry_file(&self) -> &Path {
         &self.registry
     }
