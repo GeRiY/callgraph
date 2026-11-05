@@ -9,8 +9,9 @@ pub(crate) trait CallFilter {
 struct RegexSpec(Regex);
 impl CallFilter for RegexSpec {
     fn matches(&self, call: &Call) -> bool {
-        self.0
-            .is_match(call.resolved.as_deref().unwrap_or(&call.target))
+        let target = call.resolved.as_deref().unwrap_or(&call.target);
+        // `?::név` (feloldatlan fogadó): a `Típus::név` minta név szerint illeszkedik rá
+        self.0.is_match(target) || crate::index::uncertain_match(&self.0, target)
     }
 }
 

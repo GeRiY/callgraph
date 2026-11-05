@@ -50,6 +50,106 @@ pub fn expr_calls(exp: &str) -> Vec<ExprCall> {
     out
 }
 
+/// A kifejezés string-literáljai (`'…'`, `"…"`, és a `` `…${x}…` `` sablon statikus részei `${…}`-vel):
+/// (a literál kezdő bájt-offsetje a kifejezésben, az érték). Az üres / csak whitespace érték kimarad.
+pub fn expr_strings(exp: &str) -> Vec<(usize, String)> {
+    let chars: Vec<(usize, char)> = exp.char_indices().collect();
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < chars.len() {
+        let (start, c) = chars[i];
+        match c {
+            '\'' | '"' => {
+                let (value, next) = quoted(&chars, i + 1, c);
+                if !value.trim().is_empty() {
+                    out.push((start, value));
+                }
+                i = next;
+            }
+            '`' => {
+                let (value, next) = backtick(&chars, i + 1);
+                if !value.replace("${…}", "").trim().is_empty() {
+                    out.push((start, value));
+                }
+                i = next;
+            }
+            _ => i += 1,
+        }
+    }
+    out
+}
+
+/// Egy `'…'` / `"…"` literál a nyitó idézőjel utántól: (érték, a záró utáni index).
+fn quoted(chars: &[(usize, char)], mut i: usize, quote: char) -> (String, usize) {
+    let mut value = String::new();
+    while i < chars.len() {
+        match chars[i].1 {
+            '\\' if i + 1 < chars.len() => {
+                value.push(unescape(chars[i + 1].1));
+                i += 2;
+            }
+            c if c == quote => return (value, i + 1),
+            c => {
+                value.push(c);
+                i += 1;
+            }
+        }
+    }
+    (value, i)
+}
+
+/// Egy `` `…` `` sablon a nyitó utántól: a statikus részek, a `${…}` helyén `${…}` (a beágyazott
+/// kifejezés kapcsos zárójelei párosítva). (érték, a záró utáni index).
+fn backtick(chars: &[(usize, char)], mut i: usize) -> (String, usize) {
+    let mut value = String::new();
+    while i < chars.len() {
+        match chars[i].1 {
+            '\\' if i + 1 < chars.len() => {
+                value.push(unescape(chars[i + 1].1));
+                i += 2;
+            }
+            '`' => return (value, i + 1),
+            '$' if chars.get(i + 1).is_some_and(|c| c.1 == '{') => {
+                value.push_str("${…}");
+                i = skip_braces(chars, i + 1);
+            }
+            c => {
+                value.push(c);
+                i += 1;
+            }
+        }
+    }
+    (value, i)
+}
+
+/// A `{` indextől a párja utánig (a beágyazott kapcsos zárójelekkel).
+fn skip_braces(chars: &[(usize, char)], mut i: usize) -> usize {
+    let mut depth = 0usize;
+    while i < chars.len() {
+        match chars[i].1 {
+            '{' => depth += 1,
+            '}' => {
+                depth = depth.saturating_sub(1);
+                if depth == 0 {
+                    return i + 1;
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    i
+}
+
+fn unescape(c: char) -> char {
+    match c {
+        'n' => '\n',
+        't' => '\t',
+        'r' => '\r',
+        other => other,
+    }
+}
+
 /// A régi `pascal()`: `(^|-)(\w)` → nagybetű.
 pub fn pascal(tag: &str) -> String {
     let chars: Vec<char> = tag.chars().collect();
@@ -83,6 +183,16 @@ mod tests {
         assert_eq!(names, ["foo.bar", "a.b", "x.y.z"]);
         assert_eq!(c[0].literal.as_deref(), Some("x"));
         assert_eq!(c[0].quoted.as_deref(), Some("'x'"));
+    }
+
+    #[test]
+    fn string_literals_in_expressions() {
+        let exp =
+            r#"ok ? 'Saved \'all\'' : "Failed" + ` total ${n + {a:1}.a} items` + ' ' + `${x}`"#;
+        let found = expr_strings(exp);
+        let values: Vec<_> = found.iter().map(|(_, v)| v.as_str()).collect();
+        assert_eq!(values, ["Saved 'all'", "Failed", " total ${…} items"]);
+        assert_eq!(found[0].0, 5);
     }
 
     #[test]

@@ -7,6 +7,7 @@ use oxc_span::Span;
 
 use super::MethodInfo;
 use crate::lang::js::LineIndex;
+use crate::lang::js::methods::is_options_api;
 
 /// Egy felvett metódus és a függvény-csomópont kulcsa (a bejárás ezzel azonosítja).
 pub(super) struct Collected {
@@ -169,7 +170,8 @@ impl<'l> Collector<'l> {
                     return;
                 };
                 match unparen(expr) {
-                    Expression::ObjectExpression(o) => self.options_api(o),
+                    Expression::ObjectExpression(o) if is_options_api(o) => self.options_api(o),
+                    Expression::ObjectExpression(o) => self.object_methods("", o, 0),
                     Expression::CallExpression(c) => {
                         if let Some(Expression::ObjectExpression(o)) =
                             c.arguments.first().and_then(|a| a.as_expression())
@@ -237,6 +239,30 @@ impl<'l> Collector<'l> {
                     .and_then(fn_of)
             {
                 self.add(id.name.as_str(), f.span(), at, None);
+            } else if let Expression::ObjectExpression(o) = unparen(init) {
+                self.object_methods(id.name.as_str(), o, 0);
+            }
+        }
+    }
+
+    /// Objektum-literál függvény-értékű kulcsai (mint a `methods` passzban): `<előtag>.<kulcs>`.
+    fn object_methods(&mut self, prefix: &str, o: &ObjectExpression, depth: u8) {
+        for p in &o.properties {
+            let ObjectPropertyKind::ObjectProperty(p) = p else {
+                continue;
+            };
+            let Some(k) = key_name(&p.key) else { continue };
+            let name = if prefix.is_empty() {
+                k
+            } else {
+                format!("{prefix}.{k}")
+            };
+            if let Some(f) = fn_of(&p.value) {
+                self.add(&name, f.span(), p.span, None);
+            } else if depth == 0
+                && let Expression::ObjectExpression(inner) = unparen(&p.value)
+            {
+                self.object_methods(&name, inner, depth + 1);
             }
         }
     }

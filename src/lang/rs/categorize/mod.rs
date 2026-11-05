@@ -72,6 +72,11 @@ impl Verdict {
     }
 }
 
+/// Gyakori std-metódusnév (`unwrap`, `iter`, `len`…): ismeretlen fogadónál `native_rust`.
+pub(crate) fn is_std_method(name: &str) -> bool {
+    data::STD_METHODS.contains(&name)
+}
+
 type CallRule = dyn for<'a> Rule<CallInput<'a>, Output = Verdict> + Send + Sync;
 
 /// A szabálylánc (a sorrend a prioritás); tartalék: `external_call` (ismeretlen fogadójú metódus).

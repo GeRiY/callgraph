@@ -91,8 +91,7 @@ fn write_container(
         .constants
         .iter()
         .filter(|c| {
-            c.container.as_deref() == Some(&container.name)
-                && c.visibility.as_deref() == Some("public")
+            c.container.as_deref() == Some(&container.name) && is_public(c.visibility.as_deref())
         })
         .collect();
     if !constants.is_empty() {
@@ -123,7 +122,9 @@ fn write_container(
         .iter()
         // a JS/Vue-propnak a régi motorban nincs visibility-je, így a jq `== "public"` kihagyja
         .filter(|p| {
-            !p.js && p.container.as_deref() == Some(&container.name) && p.visibility == "public"
+            !p.js
+                && p.container.as_deref() == Some(&container.name)
+                && is_public(Some(p.visibility.as_str()))
         })
         .collect();
     if !properties.is_empty() {
@@ -150,8 +151,7 @@ fn write_container(
         .methods
         .iter()
         .filter(|m| {
-            m.container.as_deref() == Some(&container.name)
-                && m.visibility.as_deref() == Some("public")
+            m.container.as_deref() == Some(&container.name) && is_public(m.visibility.as_deref())
         })
         .collect();
     if methods.is_empty() {
@@ -180,6 +180,12 @@ fn write_container(
         }
     }
     out.push_str("---\n");
+}
+
+/// Publikus elem: `public` (PHP / JS / Swift) vagy Rust `pub` (a `pub(crate)` / `pub(super)` nem).
+/// A Rust trait-implementációk metódusai is `pub`-ok (a trait-en át hívhatók), így ezek is listázódnak.
+fn is_public(visibility: Option<&str>) -> bool {
+    matches!(visibility, Some("public" | "pub"))
 }
 
 fn join_non_empty(values: &Option<Vec<String>>, label: &str) -> String {
