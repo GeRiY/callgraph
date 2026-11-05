@@ -1,4 +1,4 @@
-//! Közös hiba-típus: minden réteg ezt adja vissza, a CLI a stderr-re írja.
+//! Közös hiba-típus: minden réteg ezt adja vissza, a CLI a stderr-re írja (a szöveg a beállított nyelven).
 
 use std::path::PathBuf;
 
@@ -8,24 +8,55 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum CallgraphError {
     /// A fájl nem olvasható.
-    #[error("{}: nem olvasható: {source}", path.display())]
+    #[error("{}", read_msg(path, source))]
     Read {
         path: PathBuf,
         #[source]
         source: std::io::Error,
     },
     /// A kimenet írása nem sikerült.
-    #[error("kimenet írása sikertelen: {0}")]
+    #[error("{}", write_msg(.0))]
     Write(#[from] std::io::Error),
     /// A JSON-szerializálás nem sikerült.
-    #[error("JSON-hiba: {0}")]
+    #[error("{}", json_msg(.0))]
     Json(#[from] serde_json::Error),
     /// Nincs a kiterjesztést kezelő regisztrált nyelv.
-    #[error("{}: nincs hozzá regisztrált nyelv", .0.display())]
+    #[error("{}", unsupported_msg(.0))]
     Unsupported(PathBuf),
     /// Hibás parancssori használat.
-    #[error("használat: {0}")]
+    #[error("{}", usage_msg(.0))]
     Usage(String),
+}
+
+fn read_msg(path: &std::path::Path, source: &std::io::Error) -> String {
+    crate::tf!(
+        "{}: cannot be read: {source}",
+        "{}: nem olvasható: {source}",
+        path.display()
+    )
+}
+
+fn write_msg(e: &std::io::Error) -> String {
+    crate::tf!(
+        "writing output failed: {e}",
+        "kimenet írása sikertelen: {e}"
+    )
+}
+
+fn json_msg(e: &serde_json::Error) -> String {
+    crate::tf!("JSON error: {e}", "JSON-hiba: {e}")
+}
+
+fn unsupported_msg(path: &std::path::Path) -> String {
+    crate::tf!(
+        "{}: no language registered for it",
+        "{}: nincs hozzá regisztrált nyelv",
+        path.display()
+    )
+}
+
+fn usage_msg(message: &str) -> String {
+    crate::tf!("usage: {message}", "használat: {message}")
 }
 
 /// A crate eredmény-típusa.

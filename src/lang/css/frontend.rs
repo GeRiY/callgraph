@@ -39,7 +39,8 @@ impl Language for CssFrontend {
         let parse_error = parser.parse::<Stylesheet>().err().map(|e| format!("{e:?}"));
         let mut result = CssScanner::new(&file.path_string(), &text).scan();
         if let Some(error) = parse_error {
-            result.warnings.push(format!(
+            result.warnings.push(crate::tf!(
+                "{}: CSS syntax error: {error}",
                 "{}: CSS szintaktikai hiba: {error}",
                 file.path.display()
             ));

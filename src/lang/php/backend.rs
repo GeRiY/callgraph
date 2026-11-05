@@ -31,12 +31,12 @@ impl<P: PhpParser> PhpBackend<P> {
     pub fn analyze_source(&self, path: &str, source: &[u8]) -> Analysis {
         self.parser.parse(path, source, |parsed| {
             let mut ctx = AnalysisContext::new(path);
-            ctx.warnings.extend(
-                parsed
-                    .errors()
-                    .iter()
-                    .map(|e| format!("{path}: szintaktikai hiba: {e}")),
-            );
+            ctx.warnings.extend(parsed.errors().iter().map(|e| {
+                crate::tf!(
+                    "{path}: syntax error: {e}",
+                    "{path}: szintaktikai hiba: {e}"
+                )
+            }));
             let mut builder = FileGraphBuilder::new(path);
             let dir = Path::new(path)
                 .parent()

@@ -8,7 +8,20 @@ use crate::error::Result;
 use crate::skill::{ProjectRegistry, SkillFailure, SkillHome, finish};
 
 const SOURCE: &str = "callgraph.sh";
-const USAGE: &str = "Használat: bash ~/.claude/skills/callgraph/callgraph.sh <fájl|mappa>[::metódusnév] [...] [--project alias] [--format outline|api|stats|mermaid|dot|json]";
+fn usage() -> &'static str {
+    crate::t!(
+        "Usage: bash ~/.claude/skills/callgraph/callgraph.sh <file|dir>[::method] [...] [--project alias] [--format outline|api|stats|mermaid|dot|json]",
+        "Használat: bash ~/.claude/skills/callgraph/callgraph.sh <fájl|mappa>[::metódusnév] [...] [--project alias] [--format outline|api|stats|mermaid|dot|json]"
+    )
+}
+
+/// A `show` „nincs meg” hibáinak eleje mindkét nyelven (a query-motor szövegei): ezek `not_found` kontextust kapnak.
+const NOT_FOUND_PREFIXES: [&str; 4] = [
+    "Not found",
+    "No such method",
+    "Nem található",
+    "Nincs ilyen metódus",
+];
 
 pub struct WrapCommand {
     args: Vec<String>,
@@ -75,13 +88,14 @@ impl WrapCommand {
         let depth_ok = p.depth.starts_with(|c: char| ('1'..='9').contains(&c))
             && p.depth.chars().all(|c| c.is_ascii_digit());
         if !depth_ok {
-            return Err(SkillFailure::usage(format!(
+            return Err(SkillFailure::usage(crate::tf!(
+                "--depth must be a positive integer (got: {}).",
                 "A --depth pozitív egész (kaptam: {}).",
                 p.depth
             )));
         }
         if p.targets.is_empty() {
-            return Err(SkillFailure::usage(USAGE));
+            return Err(SkillFailure::usage(usage()));
         }
         let root = match &p.project {
             None => std::env::current_dir()?.display().to_string(),
@@ -115,7 +129,7 @@ impl WrapCommand {
         let message = String::from_utf8_lossy(&captured)
             .trim_end_matches('\n')
             .to_owned();
-        if message.starts_with("Nem található") || message.starts_with("Nincs ilyen metódus") {
+        if NOT_FOUND_PREFIXES.iter().any(|p| message.starts_with(p)) {
             Err(SkillFailure::not_found(message))
         } else {
             Err(SkillFailure::usage(message))
@@ -125,12 +139,14 @@ impl WrapCommand {
     fn resolve(&self, alias: &str) -> std::result::Result<String, SkillFailure> {
         let file = self.home.registry_file();
         if !file.is_file() {
-            return Err(SkillFailure::usage(format!(
+            return Err(SkillFailure::usage(crate::tf!(
+                "No projects.json — register a project first: bash ~/.claude/skills/callgraph/projects.sh add {alias} <absolute_path>",
                 "Nincs projects.json — regisztrálj előbb: bash ~/.claude/skills/callgraph/projects.sh add {alias} <abszolút_útvonal>"
             )));
         }
         ProjectRegistry::load(file)?.root(alias).ok_or_else(|| {
-            SkillFailure::usage(format!(
+            SkillFailure::usage(crate::tf!(
+                "Unknown project alias: {alias} (see: bash ~/.claude/skills/callgraph/projects.sh list)",
                 "Ismeretlen projekt-alias: {alias} (lásd: bash ~/.claude/skills/callgraph/projects.sh list)"
             ))
         })

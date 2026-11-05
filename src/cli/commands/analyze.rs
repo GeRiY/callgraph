@@ -145,7 +145,8 @@ impl Command for AnalyzeCommand {
                     && let Some(language) = self.analyzer.registry().for_path(path)
                     && !language_ids.contains(language.id())
                 {
-                    note(format!(
+                    note(crate::tf!(
+                        "{}: skipped because of the --lang filter (language: {})",
                         "{}: kihagyva a --lang szűrő miatt (nyelv: {})",
                         path.display(),
                         language.id()
@@ -269,7 +270,7 @@ mod tests {
         assert!(
             String::from_utf8(err)
                 .unwrap()
-                .contains("--lang szűrő miatt")
+                .contains("because of the --lang filter")
         );
         assert!(out.is_empty());
         fs::remove_file(path).unwrap();

@@ -58,8 +58,13 @@ impl Command for PruneCommand {
         }
         writeln!(
             out,
-            "{} bejegyzés maradt / {} dobódott",
-            total.kept, total.dropped
+            "{}",
+            crate::tf!(
+                "{} entries kept / {} dropped",
+                "{} bejegyzés maradt / {} dobódott",
+                total.kept,
+                total.dropped
+            )
         )?;
         Ok(0)
     }

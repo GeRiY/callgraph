@@ -6,10 +6,33 @@ use std::path::PathBuf;
 use crate::error::{CallgraphError, Result};
 use crate::lang::LanguageRegistry;
 
-const USAGE: &str = "callgraph [--lang <id,...>] [--cache <fájl>] [--no-cache] <fájl|mappa> [...] | callgraph prune [--cache <fájl>] [--dry-run]";
-const PRUNE_USAGE: &str = "callgraph prune [<mappa|fájl> ...] [--cache <fájl>] [--dry-run]";
-const CALLERS_USAGE: &str = "callgraph callers <minta> [--depth N] [--project <mappa>]";
-const SHOW_USAGE: &str = "callgraph show [--project <gyökér>] [--label <név>] [--format <f>] [--body|--lines <n>-<m>|--strings <minta>|--const <minta>] [--grep <minta>] [--category <kat,...>] [--depth N] [--guess] [--full] <út[::m]>...";
+fn usage() -> &'static str {
+    crate::t!(
+        "callgraph [--lang <id,...>] [--cache <file>] [--no-cache] <file|dir> [...] | callgraph prune [--cache <file>] [--dry-run] | callgraph lang [en|hu]",
+        "callgraph [--lang <id,...>] [--cache <fájl>] [--no-cache] <fájl|mappa> [...] | callgraph prune [--cache <fájl>] [--dry-run] | callgraph lang [en|hu]"
+    )
+}
+
+fn prune_usage() -> &'static str {
+    crate::t!(
+        "callgraph prune [<dir|file> ...] [--cache <file>] [--dry-run]",
+        "callgraph prune [<mappa|fájl> ...] [--cache <fájl>] [--dry-run]"
+    )
+}
+
+fn callers_usage() -> &'static str {
+    crate::t!(
+        "callgraph callers <pattern> [--depth N] [--project <dir>]",
+        "callgraph callers <minta> [--depth N] [--project <mappa>]"
+    )
+}
+
+fn show_usage() -> &'static str {
+    crate::t!(
+        "callgraph show [--project <root>] [--label <name>] [--format <f>] [--body|--lines <n>-<m>|--strings <pattern>|--const <pattern>] [--grep <pattern>] [--category <cat,...>] [--depth N] [--guess] [--full] <path[::m]>...",
+        "callgraph show [--project <gyökér>] [--label <név>] [--format <f>] [--body|--lines <n>-<m>|--strings <minta>|--const <minta>] [--grep <minta>] [--category <kat,...>] [--depth N] [--guess] [--full] <út[::m]>..."
+    )
+}
 
 /// A feldolgozott parancssori argumentumok — alparancsonként egy változat (Command minta bemenete).
 #[derive(Debug, PartialEq)]
@@ -135,13 +158,13 @@ impl CliArgs {
                 "--depth" if i + 1 < args.len() => {
                     depth = args[i + 1]
                         .parse()
-                        .map_err(|_| CallgraphError::Usage(SHOW_USAGE.into()))?;
+                        .map_err(|_| CallgraphError::Usage(show_usage().into()))?;
                     i += 2;
                 }
                 x if x.starts_with("--depth=") => {
                     depth = x[8..]
                         .parse()
-                        .map_err(|_| CallgraphError::Usage(SHOW_USAGE.into()))?;
+                        .map_err(|_| CallgraphError::Usage(show_usage().into()))?;
                     i += 1;
                 }
                 "--lines" if i + 1 < args.len() => {
@@ -196,11 +219,11 @@ impl CliArgs {
                     paths.push(PathBuf::from(x));
                     i += 1;
                 }
-                _ => return Err(CallgraphError::Usage(SHOW_USAGE.into())),
+                _ => return Err(CallgraphError::Usage(show_usage().into())),
             }
         }
         if paths.is_empty() {
-            return Err(CallgraphError::Usage(SHOW_USAGE.into()));
+            return Err(CallgraphError::Usage(show_usage().into()));
         }
         Ok(Self::Show {
             paths,
@@ -222,7 +245,7 @@ impl CliArgs {
 
     fn parse_callers(args: &[String]) -> Result<Self> {
         let Some(pattern) = args.first().filter(|value| !value.starts_with('-')) else {
-            return Err(CallgraphError::Usage(CALLERS_USAGE.into()));
+            return Err(CallgraphError::Usage(callers_usage().into()));
         };
         let mut depth = 1;
         let mut project = None;
@@ -232,13 +255,13 @@ impl CliArgs {
                 "--depth" if i + 1 < args.len() => {
                     depth = args[i + 1]
                         .parse()
-                        .map_err(|_| CallgraphError::Usage(CALLERS_USAGE.into()))?;
+                        .map_err(|_| CallgraphError::Usage(callers_usage().into()))?;
                     i += 2;
                 }
                 value if value.starts_with("--depth=") => {
                     depth = value[8..]
                         .parse()
-                        .map_err(|_| CallgraphError::Usage(CALLERS_USAGE.into()))?;
+                        .map_err(|_| CallgraphError::Usage(callers_usage().into()))?;
                     i += 1;
                 }
                 "--project" if i + 1 < args.len() => {
@@ -249,11 +272,11 @@ impl CliArgs {
                     project = Some(PathBuf::from(&value[10..]));
                     i += 1;
                 }
-                _ => return Err(CallgraphError::Usage(CALLERS_USAGE.into())),
+                _ => return Err(CallgraphError::Usage(callers_usage().into())),
             }
         }
         if depth == 0 {
-            return Err(CallgraphError::Usage(CALLERS_USAGE.into()));
+            return Err(CallgraphError::Usage(callers_usage().into()));
         }
         Ok(Self::Callers {
             pattern: pattern.clone(),
@@ -273,14 +296,22 @@ impl CliArgs {
                 no_cache = true;
             } else if arg == "--lang" {
                 let value = it.next().ok_or_else(|| {
-                    CallgraphError::Usage(format!("a --lang értéket vár; {USAGE}"))
+                    CallgraphError::Usage(crate::tf!(
+                        "--lang expects a value; {}",
+                        "a --lang értéket vár; {}",
+                        usage()
+                    ))
                 })?;
                 lang = Some(parse_lang(&value)?);
             } else if let Some(value) = arg.strip_prefix("--lang=") {
                 lang = Some(parse_lang(value)?);
             } else if arg == "--cache" {
                 let value = it.next().ok_or_else(|| {
-                    CallgraphError::Usage(format!("a --cache értéket vár; {USAGE}"))
+                    CallgraphError::Usage(crate::tf!(
+                        "--cache expects a value; {}",
+                        "a --cache értéket vár; {}",
+                        usage()
+                    ))
                 })?;
                 cache = Some(PathBuf::from(value));
             } else if let Some(value) = arg.strip_prefix("--cache=") {
@@ -290,7 +321,7 @@ impl CliArgs {
             }
         }
         if paths.is_empty() {
-            return Err(CallgraphError::Usage(USAGE.into()));
+            return Err(CallgraphError::Usage(usage().into()));
         }
         Ok(Self::Analyze {
             paths,
@@ -316,7 +347,7 @@ impl CliArgs {
                     cache = Some(PathBuf::from(&value[8..]));
                 }
                 value if !value.starts_with('-') => paths.push(PathBuf::from(value)),
-                _ => return Err(CallgraphError::Usage(PRUNE_USAGE.into())),
+                _ => return Err(CallgraphError::Usage(prune_usage().into())),
             }
             i += 1;
         }
@@ -332,18 +363,22 @@ fn parse_lang(value: &str) -> Result<Vec<String>> {
     let available = LanguageRegistry::with_defaults().language_ids();
     let ids: Vec<String> = value.split(',').map(str::trim).map(str::to_owned).collect();
     if ids.iter().any(String::is_empty) {
-        return Err(CallgraphError::Usage(format!(
-            "üres --lang id; lehetséges id-k: {}; {USAGE}",
-            available.join(", ")
+        return Err(CallgraphError::Usage(crate::tf!(
+            "empty --lang id; available ids: {}; {}",
+            "üres --lang id; lehetséges id-k: {}; {}",
+            available.join(", "),
+            usage()
         )));
     }
     if let Some(unknown) = ids
         .iter()
         .find(|id| !available.iter().any(|known| known == id))
     {
-        return Err(CallgraphError::Usage(format!(
-            "ismeretlen nyelv-id: {unknown}; lehetséges id-k: {}; {USAGE}",
-            available.join(", ")
+        return Err(CallgraphError::Usage(crate::tf!(
+            "unknown language id: {unknown}; available ids: {}; {}",
+            "ismeretlen nyelv-id: {unknown}; lehetséges id-k: {}; {}",
+            available.join(", "),
+            usage()
         )));
     }
     Ok(ids)

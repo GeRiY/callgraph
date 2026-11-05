@@ -82,7 +82,8 @@ impl ProjectStore {
 fn outside(path: &Path) -> crate::error::CallgraphError {
     io::Error::new(
         io::ErrorKind::PermissionDenied,
-        format!(
+        crate::tf!(
+            "{}: not a regular directory/file inside the project root",
             "{}: nem a projekt gyökerén belüli közönséges mappa/fájl",
             path.display()
         ),

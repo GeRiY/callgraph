@@ -31,7 +31,8 @@ impl Language for ScssFrontend {
         let error = parser.parse::<Stylesheet>().err().map(|e| format!("{e:?}"));
         let mut result = ScssScanner::new(&file.path_string(), &text).scan();
         if let Some(error) = error {
-            result.warnings.push(format!(
+            result.warnings.push(crate::tf!(
+                "{}: SCSS syntax error: {error}",
                 "{}: SCSS szintaktikai hiba: {error}",
                 file.path.display()
             ));

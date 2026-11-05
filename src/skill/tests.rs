@@ -104,7 +104,7 @@ fn fail_logs_and_prints_feedback_line() {
     assert_eq!(
         text,
         format!(
-            "lásd: bash /S/x.sh\n[error-id: {id}]  visszajelzés: bash /S/feedback.sh add {id} \"<mit vártál, mi történt>\"\n"
+            "lásd: bash /S/x.sh\n[error-id: {id}]  feedback: bash /S/feedback.sh add {id} \"<what you expected, what happened>\"\n"
         )
     );
     let line = std::fs::read_to_string(home.errors_file()).unwrap();
@@ -128,13 +128,13 @@ fn feedback_add_resolve_list_show() {
     let all = store.list(false, &errors);
     assert_eq!(all.len(), 7);
     assert!(
-        all[0].ends_with(&format!("id:{a}  [NYITOTT]  error:{eid}")),
+        all[0].ends_with(&format!("id:{a}  [OPEN]  error:{eid}")),
         "{}",
         all[0]
     );
-    assert_eq!(all[2], "  hiba: (callgraph.sh/not_found) Nem található: x");
+    assert_eq!(all[2], "  error: (callgraph.sh/not_found) Nem található: x");
     assert!(
-        all[4].contains("[MEGOLDVA 20") && all[4].ends_with("(nincs error)"),
+        all[4].contains("[RESOLVED 20") && all[4].ends_with("(no error)"),
         "{}",
         all[4]
     );

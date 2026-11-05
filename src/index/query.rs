@@ -97,7 +97,12 @@ impl CallerIndex {
         let matcher = RegexBuilder::new(pattern)
             .case_insensitive(true)
             .build()
-            .map_err(|error| CallgraphError::Usage(format!("hibás minta: {error}")))?;
+            .map_err(|error| {
+                CallgraphError::Usage(crate::tf!(
+                    "invalid pattern: {error}",
+                    "hibás minta: {error}"
+                ))
+            })?;
         let mut result = Vec::new();
         let mut front: Vec<Edge> = self
             .edges
