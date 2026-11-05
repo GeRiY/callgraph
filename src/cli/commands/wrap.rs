@@ -65,7 +65,7 @@ fn parse(args: &[String]) -> Parsed {
                 let v = value();
                 p.forward.extend([a.clone(), v]);
             }
-            "--body" | "--full" | "--guess" => p.forward.push(a.clone()),
+            "--body" | "--doc" | "--raw" | "--full" | "--guess" => p.forward.push(a.clone()),
             _ => p.targets.push(a.clone()),
         }
     }

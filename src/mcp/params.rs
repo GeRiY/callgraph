@@ -60,16 +60,46 @@ pub(crate) struct OutlineParams {
     pub full: bool,
 }
 
+/// Egy név vagy névlista: az LLM-kliensek gyakran sima stringet küldenek tömb helyett (`"method": "parse"`).
+/// A séma `anyOf` string | string-tömb.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(untagged)]
+pub(crate) enum OneOrMany {
+    One(String),
+    Many(Vec<String>),
+}
+
+impl Default for OneOrMany {
+    fn default() -> Self {
+        Self::Many(Vec::new())
+    }
+}
+
+impl OneOrMany {
+    pub(crate) fn into_vec(self) -> Vec<String> {
+        match self {
+            Self::One(name) => vec![name],
+            Self::Many(names) => names,
+        }
+    }
+}
+
 /// `method_body`: egy vagy több metódus forrása sorszámozva.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, JsonSchema)]
 pub(crate) struct MethodBodyParams {
     /// File path, relative to the project root.
     pub path: String,
-    /// Method/function names (one or more).
-    pub method: Vec<String>,
+    /// Method/function name, or an array of names.
+    pub method: OneOrMany,
     /// Registered project alias; default: the server's working directory.
     #[serde(default)]
     pub project: Option<String>,
+    /// Also include the docblock / doc comments above each method.
+    #[serde(default)]
+    pub doc: bool,
+    /// Exact, unfiltered source (docblock, blank and comment lines kept).
+    #[serde(default)]
+    pub raw: bool,
     /// Disable the 400-line output cap.
     #[serde(default)]
     pub full: bool,
@@ -156,5 +186,32 @@ impl FrameworkView {
             Self::Di => "di",
             Self::Views => "views",
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn method_accepts_a_string_or_an_array() {
+        let one: MethodBodyParams =
+            serde_json::from_value(serde_json::json!({"path": "a.rs", "method": "parse"})).unwrap();
+        assert_eq!(one.method.into_vec(), vec!["parse".to_owned()]);
+        let many: MethodBodyParams = serde_json::from_value(
+            serde_json::json!({"path": "a.rs", "method": ["a", "b"], "doc": true}),
+        )
+        .unwrap();
+        assert!(many.doc && !many.raw);
+        assert_eq!(many.method.into_vec(), vec!["a".to_owned(), "b".to_owned()]);
+        let wrong = serde_json::json!({"path": "a.rs", "method": 3});
+        assert!(serde_json::from_value::<MethodBodyParams>(wrong).is_err());
+    }
+
+    #[test]
+    fn method_schema_allows_string_and_array() {
+        let schema = serde_json::to_string(&schemars::schema_for!(MethodBodyParams)).unwrap();
+        assert!(schema.contains("anyOf"), "{schema}");
+        assert!(schema.contains("\"array\""), "{schema}");
     }
 }
