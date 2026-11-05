@@ -1,9 +1,9 @@
-# Build + teszt minden push / PR-en; `v*` tagnél a négy platform binárisaiból skill-csomag és GitHub Release.
+# Build + teszt a main- és develop-pushoknál és PR-en; `v*` tagnél a négy platform binárisaiból skill-csomag és GitHub Release.
 name: build
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
     tags: ["v*"]
   pull_request:
 
