@@ -26,11 +26,13 @@ oxc_ast_visit = "=0.157.0"
 oxc_parser = "=0.157.0"
 oxc_span = "=0.157.0"
 pulldown-cmark = "=0.13.0"
+proc-macro2 = { version = "=1.0.107", default-features = false, features = ["span-locations"] }
 raffia = "=0.13.0"
 rayon = "1"
 regex = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
+syn = { version = "=2.0.119", default-features = false, features = ["full", "parsing", "printing", "visit"] }
 thiserror = "2"
 
 [profile.release]

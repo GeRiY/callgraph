@@ -79,6 +79,7 @@ $ callgraph.sh --project shop app --grep saveTranslations --depth 2
 | Language | Extensions | What you get |
 |---|---|---|
 | PHP | `.php` | classes, traits, enums, methods, properties, constants, calls with type tracking, framework detection (Laravel, Yii) |
+| Rust | `.rs` | modules, structs, enums, traits, `impl` blocks, functions with visibility / `async`, fields, consts, `use` trees, path / method / macro calls, `if` / `match` flow, framework detection from `Cargo.toml` (axum, actix-web, tokio, serde, …) |
 | JavaScript / TypeScript | `.js` `.mjs` `.cjs` `.jsx` `.ts` `.tsx` | modules, functions, classes, imports with alias resolution (`jsconfig` / `tsconfig`) |
 | Vue | `.vue` | props, emits, `setup`, template components and event handlers, `computed`, `watch`, lifecycle hooks, Options API |
 | CSS / SCSS | `.css` `.scss` | rule blocks, mixins, functions, variables, `@use` / `@import` |
@@ -198,20 +199,20 @@ bash ~/.claude/skills/callgraph/feedback.sh list --open
 ```
 files ─► FileWalker ─► LanguageRegistry ─► Language::analyze ─► FileGraph ─► JSONL cache / project index ─► query formats
          (.gitignore,    (by extension)     (mago · oxc · raffia ·   (one shared
-          vendor, …)                         pulldown-cmark)          schema)
+          vendor, …)                         pulldown-cmark · syn)    schema)
 ```
 
 - Every language is a module under `src/lang/<language>/` that maps its AST into one shared `FileGraph` schema; the
   query layer (`src/query/`) never needs to know which language a file was.
 - Parsers: [mago](https://github.com/carthage-software/mago) (PHP), [oxc](https://github.com/oxc-project/oxc)
   (JS / TS / Vue), [raffia](https://github.com/g-plane/raffia) (CSS / SCSS),
-  [pulldown-cmark](https://github.com/pulldown-cmark/pulldown-cmark) (Markdown).
+  [pulldown-cmark](https://github.com/pulldown-cmark/pulldown-cmark) (Markdown), [syn](https://github.com/dtolnay/syn) (Rust).
 - Results are cached per file in JSONL (keyed by mtime); "who calls this?" uses an incremental project index (mtime + size) under
   `.callgraph/`.
 
 Design and coding rules: [`ARCHITECTURE.md`](ARCHITECTURE.md) · query layer: [`docs/QUERY.md`](docs/QUERY.md) ·
 per-language mapping: [`docs/LANG-JS.md`](docs/LANG-JS.md), [`docs/LANG-CSS.md`](docs/LANG-CSS.md),
-[`docs/LANG-DOC.md`](docs/LANG-DOC.md) (the detailed docs are currently in Hungarian).
+[`docs/LANG-DOC.md`](docs/LANG-DOC.md), [`docs/LANG-RUST.md`](docs/LANG-RUST.md) (the detailed docs are currently in Hungarian).
 
 ## Development
 

@@ -1,12 +1,12 @@
 ---
 name: callgraph
-description: PHP / JS / TS / Vue kódbázis token-hatékony feltérképezése AST-elemzéssel, a fájl beolvasása NÉLKÜL — kategorizált hívás-gráf (osztály/komponens, metódus/függvény sortartománnyal), metódus-törzs, "hol hívják" keresés, hatáselemzés (--depth), string- és konstans-keresés, vezérlési ágak, framework-nézetek (routes, validation, events…). Használd PHP-, .vue-, .js-, .ts-fájl megértéséhez, hívási kapcsolatok, "ki hívja / hol használják" kérdésekhez — ez legyen az ELSŐ lépés a teljes Read/Grep helyett. NE használd nem kód fájlra (md, json, css, sima szöveg), vagy ha a pontos fájlszöveg kell egy már ismert sávban (akkor --lines vagy célzott Read).
+description: PHP / Rust / JS / TS / Vue kódbázis token-hatékony feltérképezése AST-elemzéssel, a fájl beolvasása NÉLKÜL — kategorizált hívás-gráf (osztály/komponens, metódus/függvény sortartománnyal), metódus-törzs, "hol hívják" keresés, hatáselemzés (--depth), string- és konstans-keresés, vezérlési ágak, framework-nézetek (routes, validation, events…). Használd PHP-, .rs-, .vue-, .js-, .ts-fájl megértéséhez, hívási kapcsolatok, "ki hívja / hol használják" kérdésekhez — ez legyen az ELSŐ lépés a teljes Read/Grep helyett. NE használd nem kód fájlra (md, json, css, sima szöveg), vagy ha a pontos fájlszöveg kell egy már ismert sávban (akkor --lines vagy célzott Read).
 ---
 
 # callgraph — kód-térkép Read nélkül
 
 `bash <skill>/callgraph.sh …` (a `<skill>` ennek a skillnek a mappája, pl. `~/.claude/skills/callgraph`).
-Minden célra (PHP, JS / TS / Vue, CSS / SCSS, JSON, MD) a natív `callgraph` bináris (`callgraph show`) dolgozik; a kimenet közös
+Minden célra (PHP, Rust, JS / TS / Vue, CSS / SCSS, JSON, MD) a natív `callgraph` bináris (`callgraph show`) dolgozik; a kimenet közös
 szerkezetű: container (osztály / komponens / modul) → metódusok sortartománnyal → hívások kategóriánként.
 
 ## 0. lépés — projekt regisztrálása (egyszer, projektenként)
@@ -66,6 +66,18 @@ bash $CG --project myapp resources/js --grep 'route::orders.show'     # route-ha
 bash $CG --project myapp resources/js --grep 'i18n::orders.title'     # fordítási kulcs helye
 bash $CG --project myapp resources/js --grep 'vue::emit:save'         # ki emitál 'save'-et
 bash $CG --project myapp resources/js --grep 'Atoms/AtomButton.vue'   # hol használják a komponenst
+```
+
+## Rust
+
+Container = a fájl-modul (`module`), `struct` / `enum` / `trait` / inline `mod`; az `impl` blokkok metódusai a típushoz
+kerülnek (`implements` = a traitek). Kategóriák: `internal_helper` (saját), `module_use` (a crate más modulja, `resolved`
+= `modul::fn` / `Típus::fn`), `native_rust` (std), `framework_use` (axum, actix-web, tokio, serde…), `package_use`
+(más crate), `macro_use` (makró; a törzse nincs kibontva), `external_call` (ismeretlen fogadó).
+
+```bash
+bash $CG --project myapp src/api/users.rs                            # outline: struct/impl/trait, fn-ek sortartománnyal
+bash $CG --project myapp src --grep 'Repo::find'                      # ki hívja (crate-belső: Típus::fn / modul::fn)
 ```
 
 ## Kimenet-korlát
