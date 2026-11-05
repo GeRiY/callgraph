@@ -37,11 +37,13 @@ Language (of the terminal output and the help: en = English, default; hu = Hunga
   bash ~/.claude/skills/callgraph/callgraph.sh set-lang <en|hu>         save the language (to the skill dir's lang file)
   CALLGRAPH_LANG=<en|hu> bash ~/.claude/skills/callgraph/callgraph.sh …   for one run (overrides the saved one)
 
-Update (from GitHub Releases; projects.json, lang, errors.jsonl, feedback.jsonl are kept):
+Update (from GitHub Releases; projects.json, lang, errors.jsonl, feedback.jsonl, update-check.json are kept):
   bash ~/.claude/skills/callgraph/callgraph.sh update --check         is there a newer release? (changes nothing)
   bash ~/.claude/skills/callgraph/callgraph.sh update                 download and install the newer release
   bash ~/.claude/skills/callgraph/callgraph.sh update --force         reinstall even if up to date
   bash ~/.claude/skills/callgraph/callgraph.sh update --from <zip>    install from a local zip / URL (callgraph-<os>-<arch>.zip)
+  Automatic check: at most once a day, in the background; a newer release adds one "ℹ callgraph X is available" line
+  to the end of the output. Off: CALLGRAPH_UPDATE_CHECK=0 (also off when CI is set or outside a skill installation).
 
 Output limit: above 400 lines the directory outline switches to summary, the single-file one to a method index;
 

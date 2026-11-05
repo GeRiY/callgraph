@@ -35,9 +35,15 @@ lekérdezés: `set-lang` argumentum nélkül) — a skill-mappa `lang` fájljáb
 
 `bash callgraph.sh update --check` megnézi, van-e újabb kiadás a GitHub Releases-en; `bash callgraph.sh update` letölti a
 platform csomagját (`callgraph-<os>-<arch>.zip`) és a skill-mappába telepíti: a skill-fájlok és a `bin/` frissülnek, a
-`projects.json`, a `lang`, az `errors.jsonl`, a `feedback.jsonl` és a csomagban nem szereplő fájlok érintetlenek.
+`projects.json`, a `lang`, az `errors.jsonl`, a `feedback.jsonl`, az `update-check.json` és a csomagban nem szereplő fájlok érintetlenek.
 `--force`: újratelepítés akkor is, ha naprakész; `--from <zip|URL>`: helyi zipből / tükörről. A verzió: `callgraph --version`.
 Csak skill-telepítésben fut (a bináris a `<skill>/bin/<os>-<arch>/` alatt); egy `target/release/callgraph`-ot nem ír felül.
+A legutóbbi kiadást a `github.com/GeRiY/callgraph/releases/latest` átirányításából olvassa ki (nincs API-korlát; tartalék: a GitHub API).
+
+Automatikus ellenőrzés: a `callgraph.sh` naponta legfeljebb egyszer, várakozás nélkül egy háttérfolyamatot indít, ami
+megnézi a legutóbbi kiadást (állapot: `update-check.json` a skill-mappában); ha újabb van, a kimenet végére egy sor
+kerül (`ℹ callgraph X is available … — update: bash …/callgraph.sh update`), verziónként legfeljebb naponta egyszer.
+Kikapcsolás: `CALLGRAPH_UPDATE_CHECK=0`; `CI` mellett és skill-telepítésen kívül magától nem fut.
 
 ## Környezeti változók
 
@@ -48,7 +54,8 @@ Csak skill-telepítésben fut (a bináris a `<skill>/bin/<os>-<arch>/` alatt); e
 | `CALLGRAPH_OUT_LIMIT` | a kimenet-korlát sorszáma (alapból 400) |
 | `PHP_AST_HOME` | a hibaüzenetekben mutatott skill-út, ha a skill máshová van linkelve |
 | `CALLGRAPH_LANG` | a terminál-kimenet és a súgó nyelve (`en` / `hu`; pl. `hu_HU.UTF-8` is jó) — felülírja az elmentett beállítást |
-| `CALLGRAPH_UPDATE_API` | az `update` kiadás-lekérdezésének címe (alapból `https://api.github.com/repos/GeRiY/callgraph/releases/latest`; tükör / teszt, `file://` is lehet) |
+| `CALLGRAPH_UPDATE_API` | API-formátumú (`releases/latest` JSON) kiadás-forrás az `update`-hez és az automatikus ellenőrzéshez (alapból a `github.com/…/releases/latest` átirányítása, tartalékként az API; tükör / teszt, `file://` is lehet) |
+| `CALLGRAPH_UPDATE_CHECK` | `0` / `off` / `false`: kikapcsolja az automatikus, napi frissítés-ellenőrzést (a `CI` beállítása is kikapcsolja) |
 
 Az érték elöl álló argumentumként is megadható: `bash callgraph.sh CALLGRAPH_OUT_LIMIT=100 …`.
 
