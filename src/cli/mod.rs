@@ -69,6 +69,9 @@ pub fn build_command(args: CliArgs) -> Result<Box<dyn Command>> {
             guess,
         ))),
         CliArgs::Version => Ok(Box::new(commands::VersionCommand)),
+        CliArgs::Mcp => Ok(Box::new(commands::McpCommand::new(
+            crate::skill::SkillHome::from_env(),
+        ))),
         CliArgs::Skill { command, args } => {
             let home = crate::skill::SkillHome::from_env();
             Ok(match command.as_str() {

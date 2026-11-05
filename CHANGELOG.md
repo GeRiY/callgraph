@@ -12,6 +12,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   offers the update; it never updates on its own. Opt out with `CALLGRAPH_UPDATE_CHECK=0`; off in CI.
 - **Bug reporting via GitHub:** bilingual issue forms (bug report, idea / feedback), a private security report link and
   `SECURITY.md`. Error messages now point to the bug form; `feedback.sh show <error-id>` prints the details to paste.
+- **MCP server mode:** `callgraph mcp` runs a Model Context Protocol server on stdio (official Rust SDK `rmcp`), so
+  Claude Desktop, Cursor, VS Code or any MCP client can use callgraph. Tools: `outline`, `method_body`, `find_callers`,
+  `search`, `framework_view`, `projects` — the same compact text and output cap as the CLI. Read-only, no network,
+  paths confined to the project root. The skill / CLI usage is unchanged. Setup recipes: `docs/MCP.md`.
 
 ### Changed
 - Version lookup for `update` / `update --check` uses the `releases/latest` redirect instead of the GitHub API, so the

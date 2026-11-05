@@ -8,8 +8,8 @@ use crate::lang::LanguageRegistry;
 
 fn usage() -> &'static str {
     crate::t!(
-        "callgraph [--lang <id,...>] [--cache <file>] [--no-cache] <file|dir> [...] | callgraph prune [--cache <file>] [--dry-run] | callgraph set-lang [en|hu] | callgraph self-update [--check] | callgraph --version",
-        "callgraph [--lang <id,...>] [--cache <fájl>] [--no-cache] <fájl|mappa> [...] | callgraph prune [--cache <fájl>] [--dry-run] | callgraph set-lang [en|hu] | callgraph self-update [--check] | callgraph --version"
+        "callgraph [--lang <id,...>] [--cache <file>] [--no-cache] <file|dir> [...] | callgraph prune [--cache <file>] [--dry-run] | callgraph set-lang [en|hu] | callgraph self-update [--check] | callgraph mcp | callgraph --version",
+        "callgraph [--lang <id,...>] [--cache <fájl>] [--no-cache] <fájl|mappa> [...] | callgraph prune [--cache <fájl>] [--dry-run] | callgraph set-lang [en|hu] | callgraph self-update [--check] | callgraph mcp | callgraph --version"
     )
 }
 
@@ -75,6 +75,8 @@ pub enum CliArgs {
     },
     /// `--version` / `-V`: a verzió és a platform.
     Version,
+    /// `mcp`: MCP-szerver stdio-n (argumentum nélkül).
+    Mcp,
     /// Skill-parancs (`project`, `feedback`, `wrap`, `error`, `set-lang`, `self-update`) nyers argumentumokkal.
     Skill { command: String, args: Vec<String> },
 }
@@ -85,6 +87,18 @@ impl CliArgs {
         let args: Vec<String> = args.into_iter().collect();
         if args.len() == 1 && matches!(args[0].as_str(), "--version" | "-V") {
             return Ok(Self::Version);
+        }
+        if args.first().is_some_and(|a| a == "mcp") {
+            if args.len() > 1 {
+                return Err(CallgraphError::Usage(
+                    crate::t!(
+                        "callgraph mcp (MCP server on stdio, no arguments)",
+                        "callgraph mcp (MCP-szerver stdio-n, argumentum nélkül)"
+                    )
+                    .into(),
+                ));
+            }
+            return Ok(Self::Mcp);
         }
         if args.first().is_some_and(|a| a == "prune") {
             return Self::parse_prune(&args[1..]);
@@ -471,6 +485,8 @@ mod tests {
     fn parses_version_and_self_update() {
         assert_eq!(parse(&["--version"]).unwrap(), CliArgs::Version);
         assert_eq!(parse(&["-V"]).unwrap(), CliArgs::Version);
+        assert_eq!(parse(&["mcp"]).unwrap(), CliArgs::Mcp);
+        assert!(parse(&["mcp", "x"]).is_err());
         assert_eq!(
             parse(&["self-update", "--check"]).unwrap(),
             CliArgs::Skill {
