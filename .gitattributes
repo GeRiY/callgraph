@@ -1,0 +1,4 @@
+# Windows checkout (core.autocrlf) must not turn these into CRLF: the skill files are read byte-for-byte
+# (SKILL.md generation, include_str! tests), and bash scripts with CRLF break under Git Bash.
+*.md  text eol=lf
+*.sh  text eol=lf

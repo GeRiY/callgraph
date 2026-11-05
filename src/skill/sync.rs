@@ -16,6 +16,9 @@ pub fn render_skill_md(source: &str, lang: Lang) -> String {
         "<!-- generated from skill-i18n/SKILL.{}.md by callgraph set-lang / skill-sync; edit the sources -->\n",
         lang.code()
     );
+    // a Windowson CRLF-esre mentett forrás is működjön (a frontmatter-keresés és a kimenet LF)
+    let source = source.replace("\r\n", "\n");
+    let source = source.as_str();
     let split = source
         .strip_prefix("---\n")
         .and_then(|rest| rest.find("\n---\n"))
@@ -130,6 +133,11 @@ mod tests {
             "---\nname: x\n---\n<!-- generated from skill-i18n/SKILL.hu.md by callgraph set-lang / skill-sync; edit the sources -->\n\n# body\n"
         );
         assert!(render_skill_md("# no frontmatter\n", Lang::En).starts_with("<!-- generated"));
+        assert_eq!(
+            render_skill_md("---\r\nname: x\r\n---\r\n\r\n# body\r\n", Lang::Hu),
+            out,
+            "CRLF source"
+        );
     }
 
     #[test]
