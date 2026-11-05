@@ -104,7 +104,8 @@ impl JsonlCacheStore {
         version: &str,
     ) -> Result<()> {
         if !path.is_absolute() {
-            return Err(CallgraphError::Usage(format!(
+            return Err(CallgraphError::Usage(crate::tf!(
+                "the cache key must be an absolute path: {}",
                 "a cache-kulcs abszolút út kell legyen: {}",
                 path.display()
             )));

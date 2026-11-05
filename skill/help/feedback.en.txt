@@ -1,0 +1,25 @@
+feedback.sh — feedback on the callgraph skill (about an error or a general
+observation), for agents.
+
+On an error, callgraph.sh / projects.sh print an
+"[error-id: xxxxxxxx]" identifier next to every error message — the
+error's context (source script, message, parameters) is already
+stored with it in errors.jsonl, so you ONLY need to give the ID and a
+description:
+
+  bash ~/.claude/skills/callgraph/feedback.sh add <error_id> "<what you expected, what actually happened>"
+
+If there is no specific error-id (just a general idea/observation about
+the tool), it can be recorded on its own with the --note switch:
+
+  bash ~/.claude/skills/callgraph/feedback.sh add --note "<observation>"
+
+Every feedback entry gets its own ID (printed by the "saved" reply) —
+use it to mark the entry resolved once someone (the developer) has handled it:
+
+  bash ~/.claude/skills/callgraph/feedback.sh resolve <feedback_id>
+
+Other commands:
+  bash ~/.claude/skills/callgraph/feedback.sh list                all feedback, with status and the related error
+  bash ~/.claude/skills/callgraph/feedback.sh list --open          only the entries not yet resolved
+  bash ~/.claude/skills/callgraph/feedback.sh show <error_id>      full details of one error + the feedback it received

@@ -149,7 +149,7 @@ pub(super) fn ordered_graph(graph: &FileGraph) -> OrderedGraph<'_> {
 pub struct Json;
 
 impl Formatter for Json {
-    fn format(&self, rows: &[QueryResult]) -> String {
+    fn format(&self, rows: &[QueryResult], _lang: crate::i18n::Lang) -> String {
         let graphs: Vec<_> = rows.iter().map(|r| ordered_graph(&r.graph)).collect();
         let mut text = serde_json::to_string_pretty(&graphs).unwrap_or_default();
         text.push('\n');
@@ -160,7 +160,7 @@ impl Formatter for Json {
 pub struct Jsonl;
 
 impl Formatter for Jsonl {
-    fn format(&self, rows: &[QueryResult]) -> String {
+    fn format(&self, rows: &[QueryResult], _lang: crate::i18n::Lang) -> String {
         rows.iter()
             .map(|r| serde_json::to_string(&ordered_graph(&r.graph)).unwrap_or_default() + "\n")
             .collect()

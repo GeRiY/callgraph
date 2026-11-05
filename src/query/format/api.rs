@@ -1,5 +1,6 @@
 //! A publikus szerződés és a docblock-kivonat formázója.
 
+use crate::i18n::Lang;
 use crate::query::QueryResult;
 use std::fmt::Write as _;
 
@@ -8,7 +9,7 @@ use super::Formatter;
 pub struct Api;
 
 impl Formatter for Api {
-    fn format(&self, rows: &[QueryResult]) -> String {
+    fn format(&self, rows: &[QueryResult], lang: Lang) -> String {
         let mut out = String::new();
         for row in rows {
             writeln!(
@@ -24,7 +25,10 @@ impl Formatter for Api {
             .unwrap();
             out.push('\n');
             if row.graph.containers.is_empty() {
-                out.push_str("(procedurális fájl — nincs class/interface/trait; --format outline mutatja a top-level hívásokat)\n\n");
+                out.push_str(lang.pick(
+                    "(procedural file — no class/interface/trait; --format outline shows the top-level calls)\n\n",
+                    "(procedurális fájl — nincs class/interface/trait; --format outline mutatja a top-level hívásokat)\n\n",
+                ));
                 let mut groups = std::collections::BTreeMap::<String, Vec<String>>::new();
                 for call in row
                     .graph
@@ -46,15 +50,23 @@ impl Formatter for Api {
                 continue;
             }
             for container in &row.graph.containers {
-                write_container(&mut out, row, container);
+                write_container(&mut out, row, container, lang);
             }
         }
-        out.push_str("💡 a metódusok törzs-logikájához: Read a fenti L<n> sortól — ne a teljes fájlt. Hívás-gráfhoz: --format outline.\n");
+        out.push_str(lang.pick(
+            "💡 for the method bodies' logic: Read from the L<n> line above — not the whole file. For the call graph: --format outline.\n",
+            "💡 a metódusok törzs-logikájához: Read a fenti L<n> sortól — ne a teljes fájlt. Hívás-gráfhoz: --format outline.\n",
+        ));
         out
     }
 }
 
-fn write_container(out: &mut String, row: &QueryResult, container: &crate::model::Container) {
+fn write_container(
+    out: &mut String,
+    row: &QueryResult,
+    container: &crate::model::Container,
+    lang: Lang,
+) {
     let extends = join_non_empty(&container.extends, "extends");
     let implements = join_non_empty(&container.implements, "implements");
     let traits = join_non_empty(&container.traits, "uses");
@@ -84,7 +96,12 @@ fn write_container(out: &mut String, row: &QueryResult, container: &crate::model
         })
         .collect();
     if !constants.is_empty() {
-        writeln!(out, "  publikus konstansok ({}):", constants.len()).unwrap();
+        let n = constants.len();
+        out.push_str(&ltf!(
+            lang,
+            "  public constants ({n}):\n",
+            "  publikus konstansok ({n}):\n"
+        ));
         for constant in constants {
             writeln!(
                 out,
@@ -110,7 +127,12 @@ fn write_container(out: &mut String, row: &QueryResult, container: &crate::model
         })
         .collect();
     if !properties.is_empty() {
-        writeln!(out, "  publikus property-k ({}):", properties.len()).unwrap();
+        let n = properties.len();
+        out.push_str(&ltf!(
+            lang,
+            "  public properties ({n}):\n",
+            "  publikus property-k ({n}):\n"
+        ));
         for property in properties {
             writeln!(
                 out,
@@ -133,9 +155,14 @@ fn write_container(out: &mut String, row: &QueryResult, container: &crate::model
         })
         .collect();
     if methods.is_empty() {
-        out.push_str("  (nincs publikus metódus)\n");
+        out.push_str(lang.pick("  (no public methods)\n", "  (nincs publikus metódus)\n"));
     } else {
-        writeln!(out, "  publikus felület ({}):", methods.len()).unwrap();
+        let n = methods.len();
+        out.push_str(&ltf!(
+            lang,
+            "  public API ({n}):\n",
+            "  publikus felület ({n}):\n"
+        ));
         methods.sort_by_key(|m| m.line);
         for method in methods {
             write!(out, "    {}({})", method.name, method.params.join(", ")).unwrap();

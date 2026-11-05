@@ -12,11 +12,44 @@ LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # PHP_AST_HOME: a hibaüzenetekben / súgóban MEGJELENÍTETT skill-út (felülbírálható, pl. symlinkelt telepítésnél).
 PHP_AST_HOME="${PHP_AST_HOME:-$LIB_DIR}"
 
-# A hívó script fejléc-kommentjét (a shebang utáni "#" sorokat) nyomtatja ki — ez a súgó.
+# Egy nyelvi érték normalizálása, mint a binárisban (Lang::parse): trim, a "_" / "-" / "." előtti rész, kisbetűsen;
+# "en" / "hu" → kiírja, minden más → semmit (nem érvényes).
+_lang_code() {
+    local v="$1"
+    v="${v#"${v%%[![:space:]]*}"}"; v="${v%"${v##*[![:space:]]}"}"
+    v="${v%%[_.-]*}"
+    v="$(printf '%s' "$v" | tr '[:upper:]' '[:lower:]')"
+    case "$v" in en|hu) printf '%s\n' "$v" ;; esac
+}
+
+# A terminál-szövegek nyelve (en / hu), ugyanúgy, mint a binárisban: CALLGRAPH_LANG › <skill-mappa>/lang › en.
+ui_lang() {
+    local code=""
+    [[ -n "${CALLGRAPH_LANG:-}" ]] && code="$(_lang_code "$CALLGRAPH_LANG")"
+    if [[ -z "$code" && -r "$LIB_DIR/lang" ]]; then
+        code="$(_lang_code "$(cat "$LIB_DIR/lang" 2>/dev/null)")"
+    fi
+    printf '%s\n' "${code:-en}"
+}
+
+# Egyszeri kétnyelvű üzenet: msg "english" "magyar" → az aktuális nyelvű sor (stdout).
+msg() {
+    if [[ "$(ui_lang)" == hu ]]; then printf '%s\n' "$2"; else printf '%s\n' "$1"; fi
+}
+
+# A súgó: <script-mappa>/help/<script>.<nyelv>.txt (tartalék: .en.txt, végül a script fejléc-kommentje),
+# a ~/.claude/skills/callgraph út helyén a megjelenített skill-úttal.
 print_help() {
-    local script="$1"
-    awk 'NR==1{next} /^#/{sub(/^# ?/,""); print; next} {exit}' "$script" \
-        | sed "s|~/.claude/skills/callgraph|$PHP_AST_HOME|g"
+    local script="$1" name dir f=""
+    name="$(basename "$script" .sh)"; dir="$(cd "$(dirname "$script")" && pwd)"
+    for f in "$dir/help/$name.$(ui_lang).txt" "$dir/help/$name.en.txt" ""; do
+        [[ -z "$f" || -r "$f" ]] && break
+    done
+    if [[ -n "$f" ]]; then
+        cat "$f"
+    else
+        awk 'NR==1{next} /^#/{sub(/^# ?/,""); print; next} {exit}' "$script"
+    fi | sed "s|~/.claude/skills/callgraph|$PHP_AST_HOME|g"
 }
 
 # A callgraph bináris: env-ből, vagy a skill bin/ mappájából platform szerint (bin/<os>-<arch>/callgraph), vagy bin/callgraph.
@@ -29,6 +62,7 @@ callgraph_bin() {
     for c in "$LIB_DIR/bin/$os-$arch/callgraph" "$LIB_DIR/bin/$os-$arch/callgraph.exe" "$LIB_DIR/bin/callgraph" "$LIB_DIR/bin/callgraph.exe"; do
         [[ -x "$c" ]] && { echo "$c"; return; }
     done
+    return 0   # nincs bináris: üres kimenet (set -e mellett se lépjen ki csendben a hívó)
 }
 
 # A bináris egy alparancsának futtatása (exec): a skill-mappát és a megjelenített utat a bináris env-ből kapja.
@@ -36,7 +70,8 @@ run_callgraph() {
     local bin
     bin="$(callgraph_bin)"
     if [[ -z "$bin" ]]; then
-        echo "Nem található a callgraph bináris (CALLGRAPH_BIN, vagy $LIB_DIR/bin/<os>-<arch>/callgraph)." >&2
+        msg "callgraph binary not found (CALLGRAPH_BIN, or $LIB_DIR/bin/<os>-<arch>/callgraph)." \
+            "Nem található a callgraph bináris (CALLGRAPH_BIN, vagy $LIB_DIR/bin/<os>-<arch>/callgraph)." >&2
         exit 1
     fi
     CALLGRAPH_SKILL_DIR="$LIB_DIR" PHP_AST_HOME="$PHP_AST_HOME" exec "$bin" "$@"

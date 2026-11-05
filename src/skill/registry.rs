@@ -19,7 +19,8 @@ impl ProjectRegistry {
             Ok(text) => match serde_json::from_str::<Value>(&text) {
                 Ok(Value::Object(map)) => map,
                 _ => {
-                    return Err(CallgraphError::Usage(format!(
+                    return Err(CallgraphError::Usage(crate::tf!(
+                        "projects.json is not a valid JSON object: {}",
                         "A projects.json nem érvényes JSON-objektum: {}",
                         file.display()
                     )));

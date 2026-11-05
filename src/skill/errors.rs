@@ -80,10 +80,14 @@ pub fn fail(
     let message = home.localize(message);
     let id = ErrorLog::new(home.errors_file()).log(source, context, &message);
     writeln!(err, "{message}")?;
+    let feedback = home.script("feedback.sh");
     writeln!(
         err,
-        "[error-id: {id}]  visszajelzés: {} add {id} \"<mit vártál, mi történt>\"",
-        home.script("feedback.sh")
+        "{}",
+        crate::tf!(
+            "[error-id: {id}]  feedback: {feedback} add {id} \"<what you expected, what happened>\"",
+            "[error-id: {id}]  visszajelzés: {feedback} add {id} \"<mit vártál, mi történt>\""
+        )
     )?;
     Ok(1)
 }

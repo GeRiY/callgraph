@@ -1,4 +1,4 @@
-//! `callgraph lang [en|hu]` — a terminál-kimenet nyelve: argumentum nélkül kiírja az aktuálisat (és honnan jön),
+//! `callgraph set-lang [en|hu]` — a terminál-kimenet nyelve: argumentum nélkül kiírja az aktuálisat (és honnan jön),
 //! argumentummal elmenti a skill-mappa `lang` fájljába. A `CALLGRAPH_LANG` környezeti változó mindkettőt felülírja.
 
 use std::io::Write;
@@ -9,7 +9,7 @@ use crate::i18n::{self, Lang, LangSource};
 use crate::skill::{SkillFailure, SkillHome, finish};
 use crate::{t, tf};
 
-const SOURCE: &str = "callgraph lang";
+const SOURCE: &str = "callgraph set-lang";
 
 pub struct LangCommand {
     args: Vec<String>,
@@ -44,8 +44,8 @@ impl LangCommand {
             out,
             "{}",
             t!(
-                "Change: callgraph lang <en|hu>  (or for one run: CALLGRAPH_LANG=<en|hu>)",
-                "Váltás: callgraph lang <en|hu>  (vagy egy futásra: CALLGRAPH_LANG=<en|hu>)"
+                "Change: callgraph set-lang <en|hu>  (or for one run: CALLGRAPH_LANG=<en|hu>)",
+                "Váltás: callgraph set-lang <en|hu>  (vagy egy futásra: CALLGRAPH_LANG=<en|hu>)"
             )
         )?;
         Ok(())
@@ -92,8 +92,8 @@ impl Command for LangCommand {
             [] => self.show(out),
             [value] => self.set(value, out),
             _ => Err(SkillFailure::usage(t!(
-                "usage: callgraph lang [en|hu]",
-                "használat: callgraph lang [en|hu]"
+                "usage: callgraph set-lang [en|hu]",
+                "használat: callgraph set-lang [en|hu]"
             ))),
         };
         finish(&self.home, SOURCE, result, err)

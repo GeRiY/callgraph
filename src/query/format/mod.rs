@@ -20,19 +20,34 @@ mod stats;
 mod strings;
 mod summary;
 
+#[cfg(test)]
+mod tests;
+
 use crate::error::{CallgraphError, Result};
+use crate::i18n::Lang;
 use crate::query::QueryResult;
 
+/// Egy kimeneti formátum; a szövegeit a kapott nyelven írja.
 pub trait Formatter: Send + Sync {
-    fn format(&self, rows: &[QueryResult]) -> String;
+    fn format(&self, rows: &[QueryResult], lang: Lang) -> String;
 }
 
 /// A callgraph hibaüzenetében felsorolt formátumok (paritás miatt fix szöveg).
 const KNOWN: &str = "outline|api|stats|mermaid|dot|json|hotspots|flow|summary|coverage|events|routes|middleware|validation|jobs|providers|magic|di|views";
 
-#[derive(Default)]
 pub struct FormatterRegistry {
     formatters: Vec<(&'static str, Box<dyn Formatter>)>,
+    lang: Lang,
+}
+
+/// Üres registry a futás nyelvével.
+impl Default for FormatterRegistry {
+    fn default() -> Self {
+        Self {
+            formatters: Vec::new(),
+            lang: crate::i18n::lang(),
+        }
+    }
 }
 
 impl FormatterRegistry {
@@ -55,6 +70,12 @@ impl FormatterRegistry {
         registry
     }
 
+    /// A kimenet nyelve (alapból a futásé).
+    pub fn in_lang(mut self, lang: Lang) -> Self {
+        self.lang = lang;
+        self
+    }
+
     pub fn register(&mut self, name: &'static str, formatter: Box<dyn Formatter>) {
         self.formatters.push((name, formatter));
     }
@@ -65,19 +86,18 @@ impl FormatterRegistry {
 
     pub fn render(&self, name: &str, rows: &[QueryResult]) -> Result<String> {
         match self.formatters.iter().find(|(n, _)| *n == name) {
-            Some((_, formatter)) => Ok(formatter.format(rows)),
-            None => Err(CallgraphError::Usage(format!(
+            Some((_, formatter)) => Ok(formatter.format(rows, self.lang)),
+            None => Err(CallgraphError::Usage(ltf!(
+                self.lang,
+                "Unknown format: {name} ({KNOWN})",
                 "Ismeretlen formátum: {name} ({KNOWN})"
             ))),
         }
     }
 
-    /// Rövidítés az alapértelmezett összeállításra.
-    pub fn format(name: &str, rows: &[QueryResult]) -> Result<String> {
-        Self::with_defaults().render(name, rows)
-    }
-
-    pub fn format_with(
+    /// Mint a `render`, plusz a paraméteres formátumok (`lines` tartománnyal, `strings` / `const` szűrővel).
+    pub fn render_with(
+        &self,
         name: &str,
         rows: &[QueryResult],
         range: Option<(u32, u32)>,
@@ -93,8 +113,23 @@ impl FormatterRegistry {
             "const" => Box::new(constants::Constants {
                 filter: filter.unwrap_or_default().to_owned(),
             }),
-            _ => return Self::format(name, rows),
+            _ => return self.render(name, rows),
         };
-        Ok(formatter.format(rows))
+        Ok(formatter.format(rows, self.lang))
+    }
+
+    /// Rövidítés az alapértelmezett összeállításra.
+    pub fn format(name: &str, rows: &[QueryResult]) -> Result<String> {
+        Self::with_defaults().render(name, rows)
+    }
+
+    /// Rövidítés az alapértelmezett összeállításra, a paraméteres formátumokkal együtt.
+    pub fn format_with(
+        name: &str,
+        rows: &[QueryResult],
+        range: Option<(u32, u32)>,
+        filter: Option<&str>,
+    ) -> Result<String> {
+        Self::with_defaults().render_with(name, rows, range, filter)
     }
 }

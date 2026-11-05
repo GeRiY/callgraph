@@ -21,7 +21,7 @@ fn symbol(ns: &str, container: Option<&str>, name: &str) -> String {
 pub struct Hotspots;
 
 impl Formatter for Hotspots {
-    fn format(&self, rows: &[QueryResult]) -> String {
+    fn format(&self, rows: &[QueryResult], _lang: crate::i18n::Lang) -> String {
         let mut own = HashSet::new();
         let mut degrees: BTreeMap<String, Degree> = BTreeMap::new();
         let mut cyclomatic: BTreeMap<String, usize> = BTreeMap::new();

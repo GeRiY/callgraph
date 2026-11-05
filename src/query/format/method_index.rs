@@ -7,7 +7,7 @@ use super::Formatter;
 
 pub struct MethodIndex;
 impl Formatter for MethodIndex {
-    fn format(&self, rows: &[QueryResult]) -> String {
+    fn format(&self, rows: &[QueryResult], lang: crate::i18n::Lang) -> String {
         let mut s = String::new();
         for r in rows {
             writeln!(s, "FILE  {}", r.graph.file).unwrap();
@@ -23,11 +23,12 @@ impl Formatter for MethodIndex {
                 for m in methods {
                     writeln!(
                         s,
-                        "  {}()  L{}-{}  [{}]  hívás: {}",
+                        "  {}()  L{}-{}  [{}]  {} {}",
                         m.name,
                         m.line,
                         m.end_line.unwrap_or(m.line),
                         m.visibility.as_deref().unwrap_or("public"),
+                        lang.pick("calls:", "hívás:"),
                         r.graph
                             .calls
                             .iter()

@@ -15,6 +15,10 @@ if [[ -z "$TEMPLATE" ]]; then
     exit 2
 fi
 
+# A golden kimenet a régi (magyar) callgraph skillé: a szöveges kimenet nyelvét magyarra rögzítjük, hogy a paritás
+# magyar–magyar összevetés maradjon (a bináris alapból angolul ír).
+export CALLGRAPH_LANG=hu
+
 lookup_map() {
     local wanted="$1"
     [[ -f "$MAP" ]] || return 1

@@ -1,0 +1,43 @@
+callgraph.sh — thin wrapper over callgraph (Rust); compact, token-efficient PHP / JS / TS / Vue file context for agents,
+(callgraph parses PHP, .vue/.js/.ts files and CSS/SCSS/JSON/MD into one schema;
+ on Vue: props, emits (emit:<name>), template (components, event handlers), setup, hooks;
+ searchable keys: route::<name>, i18n::<key>, vue::emit:<name>, <file>::<export>)
+WITHOUT reading the file (methods + call graph, categorized).
+
+Usage:
+  bash ~/.claude/skills/callgraph/callgraph.sh <file>                    outline (default) — see below
+  bash ~/.claude/skills/callgraph/callgraph.sh <file> --format outline    same, explicit
+  bash ~/.claude/skills/callgraph/callgraph.sh <file> --format api        public contract + docblock, WITHOUT the call graph
+  bash ~/.claude/skills/callgraph/callgraph.sh <file> --format stats      category statistics
+  bash ~/.claude/skills/callgraph/callgraph.sh <file> --format mermaid    Mermaid flowchart (for visualization)
+  bash ~/.claude/skills/callgraph/callgraph.sh <file> --format dot        Graphviz DOT (for visualization)
+  bash ~/.claude/skills/callgraph/callgraph.sh <file> --format json       raw categorized JSON (the callgraph parser's output)
+  bash ~/.claude/skills/callgraph/callgraph.sh <file>[::method] --format flow  if/match/switch branches with line ranges (condition → what it calls)
+  bash ~/.claude/skills/callgraph/callgraph.sh <dir> --format summary   one line per file (class, method count, docblock)
+  bash ~/.claude/skills/callgraph/callgraph.sh <dir> --format coverage  undocumented public methods
+  bash ~/.claude/skills/callgraph/callgraph.sh <dir> --format hotspots  top 20 methods by degree (in/out) — where to look first
+  bash ~/.claude/skills/callgraph/callgraph.sh <dir|file1 file2 ...> --format outline
+                                                several files/dirs — outlines one after another
+  bash ~/.claude/skills/callgraph/callgraph.sh <file>::<methodname>       ONLY one method — the most compact form
+                                                for large files, when you care about one specific method
+                                                (combinable with any --format)
+  bash ~/.claude/skills/callgraph/callgraph.sh <file|dir> --grep <pattern>       only calls whose target matches the pattern
+                                                (only the methods/files containing a matching call — "where is it called")
+  bash ~/.claude/skills/callgraph/callgraph.sh <dir> --grep <pattern> --depth N [--guess]
+                                                callers of callers up to N levels (impact analysis); --guess: also the
+                                                unresolved, name-only matches ("?")
+  bash ~/.claude/skills/callgraph/callgraph.sh <file>::<method> [...] --body   source of the method(s), line-numbered, with docblock
+  bash ~/.claude/skills/callgraph/callgraph.sh <dir> --grep <pattern> --body    source of the caller methods found
+  bash ~/.claude/skills/callgraph/callgraph.sh <file> --lines <n>-<m>           any line range, line-numbered (e.g. a view file)
+  bash ~/.claude/skills/callgraph/callgraph.sh <dir|file> --strings <pattern>   where string literals (error message, key) occur
+  bash ~/.claude/skills/callgraph/callgraph.sh <dir|file> --const <pattern>     class constant references and definitions
+
+Language (of the terminal output and the help: en = English, default; hu = Hungarian):
+  bash ~/.claude/skills/callgraph/callgraph.sh set-lang                 the current language and where it comes from
+  bash ~/.claude/skills/callgraph/callgraph.sh set-lang <en|hu>         save the language (to the skill dir's lang file)
+  CALLGRAPH_LANG=<en|hu> bash ~/.claude/skills/callgraph/callgraph.sh …   for one run (overrides the saved one)
+
+Output limit: above 400 lines the directory outline switches to summary, the single-file one to a method index;
+
+Engine: the logic (project alias resolution, `show`, error ids) lives in the `callgraph wrap` subcommand;
+this wrapper only prints the help and forwards.

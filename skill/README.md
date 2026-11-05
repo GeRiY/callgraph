@@ -6,7 +6,7 @@ A használat leírása a `SKILL.md`-ben van.
 
 ## Csomag
 
-`SKILL.md`, `README.md`, `TELEPITES.md` (lépésenkénti telepítés), `install.sh`, `callgraph.sh`, `lib.sh`, `projects.sh`, `feedback.sh`, `extras/`,
+`SKILL.md`, `README.md`, `TELEPITES.md` (lépésenkénti telepítés), `install.sh`, `callgraph.sh`, `lib.sh`, `projects.sh`, `feedback.sh`, `extras/`, `help/` (a scriptek súgója angolul és magyarul),
 `bin/<os>-<arch>/callgraph`.
 
 ## Telepítés
@@ -25,6 +25,12 @@ A használat leírása a `SKILL.md`-ben van.
 - Windows: Git Bash kell (a `uname` `MINGW64_NT-…` értékét a burok `windows`-ra normalizálja); a csomag `bin/windows-x86_64/callgraph.exe` binárist tartalmaz.
 - Külső függőség nincs (se PHP, se Node): az elemzést, a projekt-aliasokat és a feedbacket a `callgraph` végzi; a burokhoz csak `bash` kell.
 
+## Nyelv
+
+A terminál-kimenet és a súgó angol (alapértelmezés) vagy magyar. Váltás: `bash callgraph.sh set-lang hu` (vissza: `set-lang en`,
+lekérdezés: `lang`) — a skill-mappa `lang` fájljába menti, frissítéskor megmarad. Egy futásra: `CALLGRAPH_LANG=hu bash callgraph.sh …`
+(a környezeti változó erősebb az elmentett beállításnál).
+
 ## Környezeti változók
 
 | Változó | Hatás |
@@ -33,13 +39,14 @@ A használat leírása a `SKILL.md`-ben van.
 | `CALLGRAPH_REGISTRY` | a projekt-alias fájl (alapból a skill `projects.json`-ja) |
 | `CALLGRAPH_OUT_LIMIT` | a kimenet-korlát sorszáma (alapból 400) |
 | `PHP_AST_HOME` | a hibaüzenetekben mutatott skill-út, ha a skill máshová van linkelve |
+| `CALLGRAPH_LANG` | a terminál-kimenet és a súgó nyelve (`en` / `hu`; pl. `hu_HU.UTF-8` is jó) — felülírja az elmentett beállítást |
 
 Az érték elöl álló argumentumként is megadható: `bash callgraph.sh CALLGRAPH_OUT_LIMIT=100 …`.
 
 ## Közvetlen `callgraph`-parancsok
 
 ```bash
-callgraph <fájl|mappa>...                    # elemzés → fájlonként egy JSONL-sor (jq-val szűrd)
+callgraph <fájl|mappa>...                    # elemzés → JSONL, fájlonként egy sor
 callgraph show --project <gyökér> [kapcsolók] <fájl|mappa>[::metódus]   # a lekérdező mag
 callgraph wrap [--project alias] [kapcsolók] <fájl|mappa>[::metódus]   # amit a callgraph.sh hív (alias + error-id)
 callgraph project add|list|remove|resolve|get|set-config …              # amit a projects.sh hív

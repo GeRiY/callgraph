@@ -74,7 +74,11 @@ impl Command for ShowCommand {
             return Self::report(
                 _err,
                 crate::error::CallgraphError::Usage(
-                    "A --depth csak --grep-pel együtt értelmezett.".into(),
+                    crate::t!(
+                        "--depth is only meaningful together with --grep.",
+                        "A --depth csak --grep-pel együtt értelmezett.",
+                    )
+                    .into(),
                 ),
             );
         }

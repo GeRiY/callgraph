@@ -82,22 +82,36 @@ impl FeedbackStore {
                 continue;
             }
             let state = if resolved {
-                format!("  [MEGOLDVA {}]", f["resolved_at"].as_str().unwrap_or(""))
+                crate::tf!(
+                    "  [RESOLVED {}]",
+                    "  [MEGOLDVA {}]",
+                    f["resolved_at"].as_str().unwrap_or("")
+                )
             } else {
-                "  [NYITOTT]".to_owned()
+                crate::t!("  [OPEN]", "  [NYITOTT]").to_owned()
             };
             let error_id = f["error_id"].as_str().filter(|e| !e.is_empty());
-            let link = error_id.map_or("  (nincs error)".to_owned(), |e| format!("  error:{e}"));
+            let link = error_id.map_or(
+                crate::t!("  (no error)", "  (nincs error)").to_owned(),
+                |e| format!("  error:{e}"),
+            );
             lines.push(format!(
                 "[{}]  id:{}{state}{link}",
                 text_of(&f["ts"]),
                 text_of(&f["id"])
             ));
-            lines.push(format!("  leírás: {}", text_of(&f["description"])));
+            lines.push(crate::tf!(
+                "  description: {}",
+                "  leírás: {}",
+                text_of(&f["description"])
+            ));
             if let Some(e) = error_id.and_then(|e| index.get(e)) {
-                lines.push(format!(
+                lines.push(crate::tf!(
+                    "  error: ({}/{}) {}",
                     "  hiba: ({}/{}) {}",
-                    e.source, e.context, e.message
+                    e.source,
+                    e.context,
+                    e.message
                 ));
             }
             lines.push(String::new());

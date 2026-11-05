@@ -36,36 +36,50 @@ impl FeedbackCommand {
                     (self.arg(1), self.arg(2))
                 };
                 if description.is_empty() {
-                    return Err(SkillFailure::usage(format!(
+                    return Err(SkillFailure::usage(crate::tf!(
+                        "Usage: {S} add <error_id> \"<description>\"  OR  {S} add --note \"<description>\"",
                         "Használat: {S} add <error_id> \"<leírás>\"  VAGY  {S} add --note \"<leírás>\""
                     )));
                 }
                 if !error_id.is_empty() && errors.raw_matching(error_id).is_empty() {
                     writeln!(
                         err,
-                        "figyelem: nincs '{error_id}' azonosítójú naplózott hiba — a leírás így is, kapcsolat nélkül, elmentve"
+                        "{}",
+                        crate::tf!(
+                            "warning: no logged error with id '{error_id}' — the description is saved anyway, unlinked",
+                            "figyelem: nincs '{error_id}' azonosítójú naplózott hiba — a leírás így is, kapcsolat nélkül, elmentve"
+                        )
                     )?;
                 }
                 let id = store.add(Some(error_id).filter(|e| !e.is_empty()), description)?;
-                writeln!(out, "elmentve  [feedback-id: {id}]")?;
+                writeln!(
+                    out,
+                    "{}",
+                    crate::tf!(
+                        "saved  [feedback-id: {id}]",
+                        "elmentve  [feedback-id: {id}]"
+                    )
+                )?;
             }
             "resolve" => {
                 let id = self.arg(1);
                 if id.is_empty() {
-                    return Err(SkillFailure::usage(format!(
+                    return Err(SkillFailure::usage(crate::tf!(
+                        "Usage: {S} resolve <feedback_id>",
                         "Használat: {S} resolve <feedback_id>"
                     )));
                 }
                 if !store.resolve(id)? {
-                    return Err(SkillFailure::not_found(format!(
+                    return Err(SkillFailure::not_found(crate::tf!(
+                        "No feedback entry with id '{id}' (see: {S} list)",
                         "Nincs '{id}' azonosítójú feedback-bejegyzés (lásd: {S} list)"
                     )));
                 }
-                writeln!(out, "megoldva: {id}")?;
+                writeln!(out, "{}", crate::tf!("resolved: {id}", "megoldva: {id}"))?;
             }
             "list" => {
                 if !store.exists() {
-                    writeln!(out, "(nincs feedback)")?;
+                    writeln!(out, "{}", crate::t!("(no feedback)", "(nincs feedback)"))?;
                     return Ok(());
                 }
                 for line in store.list(self.arg(1) == "--open", &errors) {
@@ -75,25 +89,31 @@ impl FeedbackCommand {
             "show" => {
                 let id = self.arg(1);
                 if id.is_empty() {
-                    return Err(SkillFailure::usage(format!(
+                    return Err(SkillFailure::usage(crate::tf!(
+                        "Usage: {S} show <error_id>",
                         "Használat: {S} show <error_id>"
                     )));
                 }
                 if errors.exists() {
-                    writeln!(out, "-- hiba --")?;
+                    writeln!(out, "{}", crate::t!("-- error --", "-- hiba --"))?;
                     for line in errors.raw_matching(id) {
                         writeln!(out, "{line}")?;
                     }
                 }
                 if store.exists() {
-                    writeln!(out, "-- kapcsolódó feedback --")?;
+                    writeln!(
+                        out,
+                        "{}",
+                        crate::t!("-- related feedback --", "-- kapcsolódó feedback --")
+                    )?;
                     for line in store.raw_for_error(id) {
                         writeln!(out, "{line}")?;
                     }
                 }
             }
             _ => {
-                return Err(SkillFailure::usage(format!(
+                return Err(SkillFailure::usage(crate::tf!(
+                    "Usage: {S} add <error_id> \"<description>\" | add --note \"<description>\" | resolve <feedback_id> | list [--open] | show <error_id>",
                     "Használat: {S} add <error_id> \"<leírás>\" | add --note \"<leírás>\" | resolve <feedback_id> | list [--open] | show <error_id>"
                 )));
             }

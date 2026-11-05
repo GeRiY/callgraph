@@ -1,48 +1,18 @@
 #!/usr/bin/env bash
-# callgraph.sh — vékony burok az callgraph (Rust) fölött; tömör, token-hatékony PHP / JS / TS / Vue fájl-kontextus agentek számára,
-# (a PHP-t, a .vue/.js/.ts fájlokat és a CSS/SCSS/JSON/MD-t az callgraph elemzi, egy sémában;
-#  Vue-n: props, emits (emit:<név>), template (komponensek, eseménykezelők), setup, hookok;
-#  kereshető kulcsok: route::<név>, i18n::<kulcs>, vue::emit:<név>, <fájl>::<export>)
-# a fájl beolvasása NÉLKÜL (metódusok + hívás-gráf, kategorizálva).
-#
-# Használat:
-#   bash ~/.claude/skills/callgraph/callgraph.sh <fájl>                    outline (alapértelmezett) — lásd lent
-#   bash ~/.claude/skills/callgraph/callgraph.sh <fájl> --format outline    ua., explicit
-#   bash ~/.claude/skills/callgraph/callgraph.sh <fájl> --format api        publikus szerződés + docblock, hívás-gráf NÉLKÜL
-#   bash ~/.claude/skills/callgraph/callgraph.sh <fájl> --format stats      kategória-statisztika
-#   bash ~/.claude/skills/callgraph/callgraph.sh <fájl> --format mermaid    Mermaid flowchart (vizualizációhoz)
-#   bash ~/.claude/skills/callgraph/callgraph.sh <fájl> --format dot        Graphviz DOT (vizualizációhoz)
-#   bash ~/.claude/skills/callgraph/callgraph.sh <fájl> --format json       nyers kategorizált JSON (a callgraph elemző kimenete)
-#   bash ~/.claude/skills/callgraph/callgraph.sh <fájl>[::metódus] --format flow  if/match/switch ágak sortartománnyal (feltétel → mit hív)
-#   bash ~/.claude/skills/callgraph/callgraph.sh <mappa> --format summary   fájlonként 1 sor (osztály, metódusszám, docblock)
-#   bash ~/.claude/skills/callgraph/callgraph.sh <mappa> --format coverage  dokumentálatlan publikus metódusok
-#   bash ~/.claude/skills/callgraph/callgraph.sh <mappa> --format hotspots  Top 20 metódus fokszám szerint (in/out) — hol nézz körül elsőként
-#   bash ~/.claude/skills/callgraph/callgraph.sh <mappa|fájl1 fájl2 ...> --format outline
-#                                                 több fájl/mappa — outline-ok egymás után
-#   bash ~/.claude/skills/callgraph/callgraph.sh <fájl>::<metódusnév>       CSAK egy metódus — a legtömörebb forma
-#                                                 nagy fájloknál, ha egy konkrét metódus érdekel
-#                                                 (bármelyik --format-tal kombinálható)
-#   bash ~/.claude/skills/callgraph/callgraph.sh <fájl|mappa> --grep <minta>       csak a mintára illeszkedő célú hívások
-#                                                 (csak az illeszkedő hívást tartalmazó metódusok/fájlok — "hol hívják")
-#   bash ~/.claude/skills/callgraph/callgraph.sh <mappa> --grep <minta> --depth N [--guess]
-#                                                 hívók hívói N szintig (hatáselemzés); --guess: a feloldatlan,
-#                                                 csak név szerinti egyezéseket is ("?")
-#   bash ~/.claude/skills/callgraph/callgraph.sh <fájl>::<metódus> [...] --body   a metódus(ok) forrása sorszámozva, docblockkal
-#   bash ~/.claude/skills/callgraph/callgraph.sh <mappa> --grep <minta> --body    a talált hívó metódusok forrása
-#   bash ~/.claude/skills/callgraph/callgraph.sh <fájl> --lines <n>-<m>           tetszőleges sáv sorszámozva (pl. view-fájl)
-#   bash ~/.claude/skills/callgraph/callgraph.sh <mappa|fájl> --strings <minta>   string-literálok (hibaüzenet, kulcs) helye
-#   bash ~/.claude/skills/callgraph/callgraph.sh <mappa|fájl> --const <minta>     osztálykonstans-hivatkozások és -definíciók
-#
-# Kimenet-korlát: 400 sor fölött a mappás outline summary-ra, az egyfájlos metódus-indexre vált;
-#
-# Motor: a logika (projekt-alias feloldása, `show`, hibák error-id-ja) a `callgraph wrap` alparancsban él;
-# ez a burok csak a súgót írja ki és továbbít.
+# callgraph.sh — thin wrapper over the callgraph binary (`callgraph wrap`): compact PHP / JS / TS / Vue file context
+# (outline, call graph, method bodies, "where is it called") without reading the file.
+# `callgraph.sh set-lang [en|hu]` shows / sets the output language (forwarded to `callgraph set-lang`).
+# Help: skill/help/callgraph.en.txt and skill/help/callgraph.hu.txt (`callgraph.sh --help`).
 
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib.sh"
 
+if [[ "${1:-}" == set-lang ]]; then
+    shift
+    run_callgraph set-lang "$@"
+fi
 for a in "$@"; do
     case "$a" in --help|-h|help) print_help "${BASH_SOURCE[0]}"; exit 0 ;; esac
 done

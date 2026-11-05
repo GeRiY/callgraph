@@ -60,7 +60,11 @@ impl FileWalker {
         let mut visited = HashSet::new();
         for input in inputs {
             let Ok(real) = std::fs::canonicalize(input) else {
-                warn(format!("Nem található: {}", input.display()));
+                warn(crate::tf!(
+                    "Not found: {}",
+                    "Nem található: {}",
+                    input.display()
+                ));
                 continue;
             };
             if real.is_dir() {
@@ -89,7 +93,13 @@ impl FileWalker {
         let ignored = self.ignore_dirs_for(dir);
         let entries = match std::fs::read_dir(dir) {
             Ok(e) => e,
-            Err(e) => return warn(format!("{}: nem olvasható mappa: {e}", dir.display())),
+            Err(e) => {
+                return warn(crate::tf!(
+                    "{}: directory cannot be read: {e}",
+                    "{}: nem olvasható mappa: {e}",
+                    dir.display()
+                ));
+            }
         };
         let paths: Vec<PathBuf> = entries.filter_map(|e| e.ok().map(|e| e.path())).collect();
         for path in paths {

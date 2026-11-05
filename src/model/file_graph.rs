@@ -84,7 +84,10 @@ impl<'de> Deserialize<'de> for Imports {
         impl<'de> Visitor<'de> for ImportsVisitor {
             type Value = Imports;
             fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                f.write_str("alias => teljes név objektum")
+                f.write_str(crate::t!(
+                    "an alias => full name object",
+                    "alias => teljes név objektum"
+                ))
             }
             fn visit_seq<A: SeqAccess<'de>>(self, _: A) -> Result<Imports, A::Error> {
                 Ok(Imports::default())

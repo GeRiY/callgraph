@@ -65,8 +65,11 @@ impl JsFrontend {
         let allocator = Allocator::default();
         let parsed = parse_program(&allocator, src, source_type_for(path, vue_lang));
         if let Some(first) = parsed.errors.first() {
-            out.warnings
-                .push(format!("{}: JS szintaktikai hiba: {first}", path.display()));
+            out.warnings.push(crate::tf!(
+                "{}: JS syntax error: {first}",
+                "{}: JS szintaktikai hiba: {first}",
+                path.display()
+            ));
         }
         let ctx = PassContext {
             path,
