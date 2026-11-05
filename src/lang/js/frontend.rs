@@ -254,6 +254,62 @@ mod tests {
     }
 
     #[test]
+    fn classes_and_interfaces_record_extends_and_implements() {
+        let a = run(
+            "/p/x.ts",
+            "interface A {}\nexport interface B extends A, ns.C {}\nclass D extends Base implements B, A {}\n",
+        );
+        let find = |name: &str| {
+            a.graph
+                .containers
+                .iter()
+                .find(|c| c.name == name)
+                .unwrap_or_else(|| panic!("{name}: {:?}", a.graph.containers))
+        };
+        assert_eq!((find("A").kind.as_str(), find("A").line), ("interface", 1));
+        assert_eq!(find("B").kind, "interface");
+        assert_eq!(
+            find("B").extends,
+            Some(vec!["A".to_string(), "ns.C".to_string()])
+        );
+        assert_eq!(find("D").extends, Some(vec!["Base".to_string()]));
+        assert_eq!(
+            find("D").implements,
+            Some(vec!["B".to_string(), "A".to_string()])
+        );
+    }
+
+    #[test]
+    fn vue_script_setup_ts_resolves_typed_receivers_and_keeps_template_calls() {
+        let a = run(
+            "/p/Player.vue",
+            "<template><button @click=\"svc.load()\">x</button></template>\n<script setup lang=\"ts\">\nimport { Svc } from './svc'\nconst svc = new Svc()\nfunction go(): void { svc.load() }\n</script>\n",
+        );
+        let go = a
+            .graph
+            .calls
+            .iter()
+            .find(|c| c.caller.as_deref() == Some("go"))
+            .unwrap_or_else(|| panic!("{:?}", a.graph.calls));
+        assert_eq!(
+            (
+                go.target.as_str(),
+                go.category.as_str(),
+                go.resolved.as_deref()
+            ),
+            ("load", "module_use", Some("Svc::load"))
+        );
+        assert!(
+            a.graph
+                .calls
+                .iter()
+                .any(|c| c.caller.as_deref() == Some("template") && c.target.ends_with("load")),
+            "{:?}",
+            a.graph.calls
+        );
+    }
+
+    #[test]
     fn syntax_error_is_warning() {
         assert_eq!(run("/p/x.js", "const = ;").warnings.len(), 1);
     }
