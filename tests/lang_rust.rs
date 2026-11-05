@@ -129,3 +129,18 @@ fn json_has_imports_aliases_and_framework() {
     assert_eq!(call("index")["caller"], "count");
     assert_eq!(call("index")["resolved"], "aliases::index");
 }
+
+/// Egy név több metódusra is illeszkedhet (több `impl`): a `::metódus` kijelölés ettől nem eshet szét.
+#[test]
+fn method_selector_with_duplicate_names_does_not_panic() {
+    let sample = Sample::new();
+    fs::write(
+        sample.0.join("src/dup.rs"),
+        "struct A;\nstruct B;\nimpl A { fn new() -> Self { A } }\nimpl B { fn new() -> Self { B } }\n",
+    )
+    .unwrap();
+    let flow = sample.show("src/dup.rs::new", &["--format", "flow"]);
+    assert!(!flow.is_empty());
+    let outline = sample.show("src/dup.rs::new", &[]);
+    assert_eq!(outline.matches("new()").count(), 2, "{outline}");
+}
