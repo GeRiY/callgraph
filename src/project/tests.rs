@@ -14,7 +14,8 @@ struct Tmp(PathBuf);
 impl Tmp {
     fn new() -> Self {
         let n = COUNTER.fetch_add(1, Ordering::SeqCst);
-        let dir = std::env::temp_dir().join(format!("callgraph-project-{}-{n}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("callgraph-project-{}-{n}", std::process::id()));
         fs::create_dir_all(&dir).unwrap();
         Tmp(dir.canonicalize().unwrap())
     }
@@ -122,7 +123,8 @@ fn alias_comes_from_projects_json() {
     let t = Tmp::new();
     t.touch("proj/composer.json");
     let f = t.touch("proj/a.php");
-    let json = format!(r#"{{"gw": {{"path": "{}"}}}}"#, t.0.join("proj").display());
+    // serde_json escape-el: a Windows-út backslash-ei nyers format!-tal érvénytelen JSON-t adnak.
+    let json = serde_json::json!({ "gw": { "path": t.0.join("proj") } }).to_string();
     let loc = ProjectLocator::new(Box::new(ProjectsJsonAliases::parse(&json)));
     let p = loc.locate(&f);
     assert_eq!(p.alias(), Some("gw"));
