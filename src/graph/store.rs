@@ -155,9 +155,11 @@ impl ProjectGraph {
                 .iter()
                 .map(|file| file.to_string_lossy().into_owned())
                 .collect();
-            let keep: HashSet<&str> = order.iter().map(String::as_str).collect();
             let before = self.entries.len();
-            self.entries.retain(|path, _| keep.contains(path.as_str()));
+            {
+                let keep: HashSet<&str> = order.iter().map(String::as_str).collect();
+                self.entries.retain(|path, _| keep.contains(path.as_str()));
+            }
             if self.entries.len() != before {
                 self.dirty = true;
                 self.callers_fresh = false;
