@@ -1,6 +1,6 @@
 # callgraph
 
-PHP / Rust / JS / TS / Vue kód-térkép agenteknek: a fájl beolvasása nélkül ad szerkezetet, hívás-gráfot, metódus-törzset,
+PHP / Rust / JS / TS / Vue / Swift kód-térkép agenteknek: a fájl beolvasása nélkül ad szerkezetet, hívás-gráfot, metódus-törzset,
 „ki hívja” és hatáselemzést. Az elemző egy önálló Rust-bináris (`callgraph`, forrás: callgraph); a `callgraph.sh` vékony burok fölötte.
 A használat leírása a `SKILL.md`-ben van.
 

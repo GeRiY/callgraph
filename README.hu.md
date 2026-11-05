@@ -82,6 +82,7 @@ $ callgraph.sh --project shop app --grep saveTranslations --depth 2
 | Rust | `.rs` | modulok, structok, enumok, traitek, `impl`-blokkok, függvények láthatósággal / `async`-kal, mezők, konstansok, `use`-fák, útvonal- / metódus- / makróhívások, `if` / `match` ágak, framework-felismerés a `Cargo.toml`-ból (axum, actix-web, tokio, serde, …) |
 | JavaScript / TypeScript | `.js` `.mjs` `.cjs` `.jsx` `.ts` `.tsx` | modulok, függvények, osztályok, importok alias-feloldással (`jsconfig` / `tsconfig`) |
 | Vue | `.vue` | props, emits, `setup`, template-komponensek és eseménykezelők, `computed`, `watch`, életciklus-hookok, Options API |
+| Swift / SwiftUI | `.swift` | osztályok, structok, enumok, protokollok, actorok, extensionök; a `View` típusok komponensként; `func` / `init` / computed property-k (`body`); property wrapperek (`@State`, `@Binding`, `@Published`, …); a SwiftUI view-k és modifierek saját hívás-kategóriával |
 | CSS / SCSS | `.css` `.scss` | szabály-blokkok, mixinek, függvények, változók, `@use` / `@import` |
 | JSON / Markdown | `.json` `.md` | kulcs-útvonalak; címsor-szakaszok és linkek |
 
@@ -200,20 +201,21 @@ bash ~/.claude/skills/callgraph/feedback.sh list --open
 ```
 fájlok ─► FileWalker ─► LanguageRegistry ─► Language::analyze ─► FileGraph ─► JSONL cache / projektindex ─► lekérdező formátumok
           (.gitignore,    (kiterjesztés      (mago · oxc · raffia ·   (egy közös
-           vendor, …)      szerint)           pulldown-cmark · syn)    séma)
+           vendor, …)      szerint)           pulldown-cmark · syn ·    séma)
+                                              tree-sitter-swift)
 ```
 
 - Minden nyelv egy modul a `src/lang/<nyelv>/` alatt, ami az AST-jét egy közös `FileGraph` sémára képezi le; a
   lekérdező réteg (`src/query/`) nem tudja, melyik nyelvből jött egy fájl.
 - Parserek: [mago](https://github.com/carthage-software/mago) (PHP), [oxc](https://github.com/oxc-project/oxc)
   (JS / TS / Vue), [raffia](https://github.com/g-plane/raffia) (CSS / SCSS),
-  [pulldown-cmark](https://github.com/pulldown-cmark/pulldown-cmark) (Markdown), [syn](https://github.com/dtolnay/syn) (Rust).
+  [pulldown-cmark](https://github.com/pulldown-cmark/pulldown-cmark) (Markdown), [syn](https://github.com/dtolnay/syn) (Rust), [tree-sitter-swift](https://github.com/alex-pinkus/tree-sitter-swift) (Swift).
 - Az eredmények fájlonként JSONL-be cache-elődnek (mtime-alapon); a „ki hívja?” egy inkrementális projektindexet
   (mtime + méret) használ a `.callgraph/` alatt.
 
 Felépítés és kódolási szabályok: [`ARCHITECTURE.md`](ARCHITECTURE.md) · lekérdező réteg: [`docs/QUERY.md`](docs/QUERY.md) ·
 nyelvenkénti leképezés: [`docs/LANG-JS.md`](docs/LANG-JS.md), [`docs/LANG-CSS.md`](docs/LANG-CSS.md),
-[`docs/LANG-DOC.md`](docs/LANG-DOC.md), [`docs/LANG-RUST.md`](docs/LANG-RUST.md).
+[`docs/LANG-DOC.md`](docs/LANG-DOC.md), [`docs/LANG-RUST.md`](docs/LANG-RUST.md), [`docs/LANG-SWIFT.md`](docs/LANG-SWIFT.md).
 
 ## Fejlesztés
 
