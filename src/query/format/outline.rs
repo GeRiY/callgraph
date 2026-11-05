@@ -85,7 +85,7 @@ fn outline(row: &QueryResult, lang: Lang, source: Option<&SourceLines>) -> Strin
         let cons: Vec<_> = g
             .constants
             .iter()
-            .filter(|x| x.container.as_deref() == Some(&c.name))
+            .filter(|x| g.owns(c, x.container.as_deref(), x.line))
             .collect();
         if !cons.is_empty() {
             writeln!(s, "  constants ({}):", cons.len()).unwrap();
@@ -107,7 +107,7 @@ fn outline(row: &QueryResult, lang: Lang, source: Option<&SourceLines>) -> Strin
         let props: Vec<_> = g
             .properties
             .iter()
-            .filter(|p| p.container.as_deref() == Some(&c.name))
+            .filter(|p| g.owns(c, p.container.as_deref(), p.line))
             .collect();
         if !props.is_empty() {
             writeln!(s, "  properties ({}):", props.len()).unwrap();
@@ -126,7 +126,7 @@ fn outline(row: &QueryResult, lang: Lang, source: Option<&SourceLines>) -> Strin
         let mut methods: Vec<_> = g
             .methods
             .iter()
-            .filter(|m| m.container.as_deref() == Some(&c.name))
+            .filter(|m| g.owns(c, m.container.as_deref(), m.line))
             .filter(|m| row.methods.as_ref().is_none_or(|ms| ms.contains(&m.name)))
             .collect();
         methods.sort_by_key(|m| m.line);

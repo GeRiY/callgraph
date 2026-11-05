@@ -91,7 +91,8 @@ fn write_container(
         .constants
         .iter()
         .filter(|c| {
-            c.container.as_deref() == Some(&container.name) && is_public(c.visibility.as_deref())
+            row.graph.owns(container, c.container.as_deref(), c.line)
+                && is_public(c.visibility.as_deref())
         })
         .collect();
     if !constants.is_empty() {
@@ -123,7 +124,7 @@ fn write_container(
         // a JS/Vue-propnak a régi motorban nincs visibility-je, így a jq `== "public"` kihagyja
         .filter(|p| {
             !p.js
-                && p.container.as_deref() == Some(&container.name)
+                && row.graph.owns(container, p.container.as_deref(), p.line)
                 && is_public(Some(p.visibility.as_str()))
         })
         .collect();
@@ -151,7 +152,8 @@ fn write_container(
         .methods
         .iter()
         .filter(|m| {
-            m.container.as_deref() == Some(&container.name) && is_public(m.visibility.as_deref())
+            row.graph.owns(container, m.container.as_deref(), m.line)
+                && is_public(m.visibility.as_deref())
         })
         .collect();
     if methods.is_empty() {

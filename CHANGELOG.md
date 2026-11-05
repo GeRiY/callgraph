@@ -15,6 +15,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   (in `--depth` and `callers` too). When the type is unclear (no type, `any`, a union like `Repo | null`, a generic
   `T`, or different values in the same function) the call stays as before.
 
+### Fixed
+- **JS/TS: no more doubled methods when a class is named like its file** (`PlaylistResolver.ts` with
+  `class PlaylistResolver`): the class's methods were listed twice, once under the file's `module` entry and once
+  under the class. Now class members appear only under the class and top-level functions only under the module.
+
 ## [0.2.0] — 2026-11-05
 
 ### Added

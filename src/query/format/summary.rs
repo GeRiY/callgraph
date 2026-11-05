@@ -29,7 +29,7 @@ impl Formatter for Summary {
                         .graph
                         .methods
                         .iter()
-                        .filter(|m| m.container.as_deref() == Some(&container.name))
+                        .filter(|m| row.graph.owns(container, m.container.as_deref(), m.line))
                         .count();
                     write!(out, "{file}  {} {}", container.kind, container.name).unwrap();
                     if let Some(extends) = &container.extends
