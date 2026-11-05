@@ -1,12 +1,12 @@
 ---
 name: callgraph
-description: PHP / Rust / JS / TS / Vue kódbázis token-hatékony feltérképezése AST-elemzéssel, a fájl beolvasása NÉLKÜL — kategorizált hívás-gráf (osztály/komponens, metódus/függvény sortartománnyal), metódus-törzs, "hol hívják" keresés, hatáselemzés (--depth), string- és konstans-keresés, vezérlési ágak, framework-nézetek (routes, validation, events…). Használd PHP-, .rs-, .vue-, .js-, .ts-fájl megértéséhez, hívási kapcsolatok, "ki hívja / hol használják" kérdésekhez — ez legyen az ELSŐ lépés a teljes Read/Grep helyett. NE használd nem kód fájlra (md, json, css, sima szöveg), vagy ha a pontos fájlszöveg kell egy már ismert sávban (akkor --lines vagy célzott Read).
+description: PHP / Rust / JS / TS / Vue / Swift kódbázis token-hatékony feltérképezése AST-elemzéssel, a fájl beolvasása NÉLKÜL — kategorizált hívás-gráf (osztály/komponens, metódus/függvény sortartománnyal), metódus-törzs, "hol hívják" keresés, hatáselemzés (--depth), string- és konstans-keresés, vezérlési ágak, framework-nézetek (routes, validation, events…). Használd PHP-, .rs-, .vue-, .js-, .ts-, .swift-fájl megértéséhez, hívási kapcsolatok, "ki hívja / hol használják" kérdésekhez — ez legyen az ELSŐ lépés a teljes Read/Grep helyett. NE használd nem kód fájlra (md, json, css, sima szöveg), vagy ha a pontos fájlszöveg kell egy már ismert sávban (akkor --lines vagy célzott Read).
 ---
 
 # callgraph — kód-térkép Read nélkül
 
 `bash <skill>/callgraph.sh …` (a `<skill>` ennek a skillnek a mappája, pl. `~/.claude/skills/callgraph`).
-Minden célra (PHP, Rust, JS / TS / Vue, CSS / SCSS, JSON, MD) a natív `callgraph` bináris (`callgraph show`) dolgozik; a kimenet közös
+Minden célra (PHP, Rust, JS / TS / Vue, Swift / SwiftUI, CSS / SCSS, JSON, MD) a natív `callgraph` bináris (`callgraph show`) dolgozik; a kimenet közös
 szerkezetű: container (osztály / komponens / modul) → metódusok sortartománnyal → hívások kategóriánként.
 
 ## 0. lépés — projekt regisztrálása (egyszer, projektenként)
@@ -79,6 +79,14 @@ kerülnek (`implements` = a traitek). Kategóriák: `internal_helper` (saját), 
 bash $CG --project myapp src/api/users.rs                            # outline: struct/impl/trait, fn-ek sortartománnyal
 bash $CG --project myapp src --grep 'Repo::find'                      # ki hívja (crate-belső: Típus::fn / modul::fn)
 ```
+
+## Swift / SwiftUI
+
+Ugyanazok a kapcsolók. Container: `class` / `struct` / `enum` / `protocol` / `actor` / `extension`, a `View`-nak
+megfelelő típus `component`; a fájl-szintű függvények a `<Fájl>.swift` `module` containerben. A `var body: some View`
+és a többi computed property metódus; a property wrapper (`@State`, `@Published`, `@EnvironmentObject`…) a
+property típusa előtt látszik. Hívás-kategóriák: `swiftui_view`, `swiftui_modifier`, `component_use`,
+`native_swift`, `internal_helper`, `external_call`. Részletek: `docs/LANG-SWIFT.md`.
 
 ## Kimenet-korlát
 

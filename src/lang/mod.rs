@@ -13,6 +13,7 @@ mod registry;
 pub mod rs;
 pub mod scss;
 pub(crate) mod stylesheet;
+pub mod swift;
 
 pub use backend::LanguageBackend;
 pub use document::LanguageDocument;
