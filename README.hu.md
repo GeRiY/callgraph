@@ -258,7 +258,7 @@ A sérülékenységeket privátban jelezd, a
 
 ## Szerző
 
-Készítette és karbantartja: **Gergő Makra** — [LinkedIn](https://www.linkedin.com/in/gergomakra/).
+Készítette és karbantartja: **Makra Gergő** — [LinkedIn](https://www.linkedin.com/in/gergomakra/).
 
 ## Licenc
 
