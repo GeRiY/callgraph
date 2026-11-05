@@ -23,12 +23,13 @@ pub(crate) use re;
 type Collect = fn(&FileGraph, &str, &mut Vec<String>);
 
 pub(super) struct RuleView {
-    empty: &'static str,
+    /// Az üres kimenet szövege: (angol, magyar).
+    empty: (&'static str, &'static str),
     collect: Collect,
 }
 
 impl Formatter for RuleView {
-    fn format(&self, rows: &[QueryResult]) -> String {
+    fn format(&self, rows: &[QueryResult], lang: crate::i18n::Lang) -> String {
         let mut lines = Vec::new();
         for row in rows {
             let graph = selected(row);
@@ -43,7 +44,7 @@ impl Formatter for RuleView {
         let text = lines.join("\n");
         let text = text.trim_end_matches('\n');
         if text.is_empty() {
-            format!("{}\n", self.empty)
+            format!("{}\n", lang.pick(self.empty.0, self.empty.1))
         } else {
             format!("{text}\n")
         }
@@ -51,28 +52,62 @@ impl Formatter for RuleView {
 }
 
 pub(super) fn register(registry: &mut FormatterRegistry) {
-    let views: [(&'static str, &'static str, Collect); 9] = [
-        ("events", "(nincs event/listener találat)", rules::events),
-        ("routes", "(nincs route találat)", rules::routes),
+    type Empty = (&'static str, &'static str);
+    let views: [(&'static str, Empty, Collect); 9] = [
+        (
+            "events",
+            (
+                "(no event/listener matches)",
+                "(nincs event/listener találat)",
+            ),
+            rules::events,
+        ),
+        (
+            "routes",
+            ("(no route matches)", "(nincs route találat)"),
+            rules::routes,
+        ),
         (
             "middleware",
-            "(nincs middleware találat)",
+            ("(no middleware matches)", "(nincs middleware találat)"),
             rules::middleware,
         ),
         (
             "validation",
-            "(nincs validation találat)",
+            ("(no validation matches)", "(nincs validation találat)"),
             rules::validation,
         ),
-        ("jobs", "(nincs job/queue találat)", rules::jobs),
+        (
+            "jobs",
+            ("(no job/queue matches)", "(nincs job/queue találat)"),
+            rules::jobs,
+        ),
         (
             "providers",
-            "(nincs service provider találat)",
+            (
+                "(no service provider matches)",
+                "(nincs service provider találat)",
+            ),
             rules::providers,
         ),
-        ("magic", "(nincs magic method találat)", rules::magic),
-        ("di", "(nincs DI container találat)", rules::di),
-        ("views", "(nincs view/template találat)", rules::views),
+        (
+            "magic",
+            ("(no magic method matches)", "(nincs magic method találat)"),
+            rules::magic,
+        ),
+        (
+            "di",
+            ("(no DI container matches)", "(nincs DI container találat)"),
+            rules::di,
+        ),
+        (
+            "views",
+            (
+                "(no view/template matches)",
+                "(nincs view/template találat)",
+            ),
+            rules::views,
+        ),
     ];
     for (name, empty, collect) in views {
         registry.register(name, Box::new(RuleView { empty, collect }));
@@ -121,26 +156,49 @@ mod tests {
     use super::*;
     use crate::model::FileGraphBuilder;
 
-    #[test]
-    fn every_view_compiles_its_patterns_and_reports_empty() {
+    use crate::i18n::Lang;
+
+    const VIEWS: [&str; 9] = [
+        "events",
+        "routes",
+        "middleware",
+        "validation",
+        "jobs",
+        "providers",
+        "magic",
+        "di",
+        "views",
+    ];
+
+    fn render_empty(lang: Lang) -> Vec<(&'static str, String)> {
         let row = QueryResult {
             graph: FileGraphBuilder::new("app/views/x.php").build(),
             methods: None,
         };
-        let mut registry = FormatterRegistry::default();
+        let mut registry = FormatterRegistry::default().in_lang(lang);
         register(&mut registry);
-        for name in [
-            "events",
-            "routes",
-            "middleware",
-            "validation",
-            "jobs",
-            "providers",
-            "magic",
-            "di",
-            "views",
-        ] {
-            let text = registry.render(name, std::slice::from_ref(&row)).unwrap();
+        VIEWS
+            .iter()
+            .map(|name| {
+                let text = registry.render(name, std::slice::from_ref(&row)).unwrap();
+                (*name, text)
+            })
+            .collect()
+    }
+
+    #[test]
+    fn every_view_compiles_its_patterns_and_reports_empty() {
+        for (name, text) in render_empty(Lang::En) {
+            assert!(
+                text.starts_with("(no ") && text.ends_with(" matches)\n"),
+                "{name}: {text}"
+            );
+        }
+    }
+
+    #[test]
+    fn empty_views_keep_the_hungarian_text() {
+        for (name, text) in render_empty(Lang::Hu) {
             assert!(
                 text.starts_with("(nincs ") && text.ends_with("találat)\n"),
                 "{name}: {text}"

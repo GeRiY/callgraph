@@ -20,8 +20,14 @@ A `show` parancs a `SelectorSet` segítségével fájlokat és metódusokat vál
 | `--lines n-m` | `lines.rs` (+`source.rs`) | nyers sorok, elemzés nélkül (legacy view-n is) |
 | `--strings <minta>` / `--const <minta>` | `strings.rs` / `constants.rs` | |
 
+## Nyelv
+A kimenet emberi szövegei (fejlécek, címkék, „nincs találat”, figyelmeztetések, hibaüzenetek) a nyelvbeállítást követik
+(`CALLGRAPH_LANG` › `callgraph lang` › angol); az adatok (azonosítók, kategóriák, JSON-kulcsok, utak) nem fordulnak.
+A formázók a nyelvet paraméterként kapják (`Formatter::format(rows, lang)`, `FormatterRegistry::in_lang`, `OutputLimit::with_lang`).
+
 ## Mérés
 `bash tools/query_check.sh "$PWD/target/release/callgraph show"` (a leképezés: `golden/query/rpg_map.tsv`, felülírható: `CALLGRAPH_MAP=<fájl>`).
+A szkript `CALLGRAPH_LANG=hu`-val futtat: a golden a régi, magyar skill kimenete.
 
 ### R6b: `api`, `stats`, `summary`
 | `--format api` / `stats` / `summary` | `api.rs` / `stats.rs` / `summary.rs` | a summary a mappás kimenet-korlát tartaléka is (400 sor fölött a figyelmeztető sorral) |

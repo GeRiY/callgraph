@@ -4,6 +4,7 @@ use super::{QueryEngine, QueryResult};
 use crate::error::Result;
 use crate::index::{CallerIndex, FileGraphRecord};
 use crate::query::format::FormatterRegistry;
+use crate::{t, tf};
 use std::path::Path;
 
 impl QueryEngine {
@@ -24,7 +25,8 @@ impl QueryEngine {
             }
             let max = limit.unwrap_or_else(|| crate::query::OutputLimit::from_env(full).limit);
             if !full && text.lines().count() > max {
-                let mut lines = format!(
+                let mut lines = tf!(
+                    "⚠ --grep outline would be {} lines — showing 1 line per match instead (file  caller  L<line>  ← target). Narrow it down, or --full.\n\n",
                     "⚠ A --grep outline {} sor lenne — helyette találatonként 1 sor (fájl  hívó  L<sor>  ← cél). Szűkíts, vagy --full.\n\n",
                     text.lines().count()
                 );
@@ -39,7 +41,10 @@ impl QueryEngine {
                             call.resolved.as_deref().unwrap_or(&call.target)
                         ));
                         if lines.lines().count() >= max + 2 {
-                            lines.push_str(&format!("⚠ … levágva {max} sornál\n"));
+                            lines.push_str(&tf!(
+                                "⚠ … truncated at {max} lines\n",
+                                "⚠ … levágva {max} sornál\n"
+                            ));
                             return Ok(lines);
                         }
                     }
@@ -75,17 +80,18 @@ impl QueryEngine {
         let mut output = String::new();
         use std::fmt::Write;
         for level in 1..=depth {
-            writeln!(
-                output,
-                "== {}. szint — {}",
-                level,
-                if level == 1 {
-                    format!("közvetlenül hívja: /{pattern}/")
-                } else {
-                    "az előző szintet hívja".to_owned()
-                }
-            )
-            .unwrap();
+            let what = if level == 1 {
+                tf!(
+                    "directly calls: /{pattern}/",
+                    "közvetlenül hívja: /{pattern}/"
+                )
+            } else {
+                t!("calls the previous level", "az előző szintet hívja").to_owned()
+            };
+            output.push_str(&tf!(
+                "== level {level} — {what}\n",
+                "== {level}. szint — {what}\n"
+            ));
             let mut direct = rows
                 .iter()
                 .flat_map(|row| {
@@ -165,21 +171,23 @@ impl QueryEngine {
             if (level == 1 && direct.is_empty())
                 || (level > 1 && !callers.iter().any(|row| row.level == level))
             {
-                output.push_str("  (nincs további hívó)\n");
+                output.push_str(t!("  (no more callers)\n", "  (nincs további hívó)\n"));
             }
             if level > 1
                 && !guess
                 && let Some(count) = skipped.get(level - 2).copied().filter(|count| *count > 0)
             {
-                writeln!(
-                    output,
-                    "  (+{count} feloldatlan, csak név szerinti egyezés kihagyva — --guess mutatja)"
-                )
-                .unwrap();
+                output.push_str(&tf!(
+                    "  (+{count} unresolved, name-only matches skipped — --guess shows them)\n",
+                    "  (+{count} feloldatlan, csak név szerinti egyezés kihagyva — --guess mutatja)\n"
+                ));
             }
             output.push('\n');
         }
-        output.push_str("💡 \"?\" = feloldatlan, csak név szerinti egyezés (lehet hamis). Egy hívó törzse: <fájl>::<metódus> --body\n");
+        output.push_str(t!(
+            "💡 \"?\" = unresolved, name-only match (may be wrong). A caller's body: <file>::<method> --body\n",
+            "💡 \"?\" = feloldatlan, csak név szerinti egyezés (lehet hamis). Egy hívó törzse: <fájl>::<metódus> --body\n"
+        ));
         Ok(output)
     }
 }

@@ -10,7 +10,7 @@ pub struct Constants {
 }
 
 impl Formatter for Constants {
-    fn format(&self, rows: &[QueryResult]) -> String {
+    fn format(&self, rows: &[QueryResult], lang: crate::i18n::Lang) -> String {
         let mut out = String::new();
         let mut found = false;
         for row in rows {
@@ -51,7 +51,7 @@ impl Formatter for Constants {
             }
         }
         if !found {
-            out.push_str("(nincs találat)\n");
+            out.push_str(lang.pick("(no matches)\n", "(nincs találat)\n"));
         }
         out
     }
