@@ -4,7 +4,7 @@
 #
 # A logika (projekt-aliasok, feedback, hibanapló error-id-val) a callgraph binárisban él:
 #   callgraph wrap | project | feedback …
-# Az indítók csak a súgót írják ki és továbbítanak. jq nem kell.
+# Az indítók csak a súgót írják ki és továbbítanak; a régi scripteknek a `fail` / `abs_path` / `resolve_project_*` is itt van. jq nem kell.
 
 # LIB_DIR: a skill fizikai helye — itt él a projects.json, az errors.jsonl és a feedback.jsonl.
 LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -51,4 +51,22 @@ resolve_project_root() {
 resolve_project_setting() {
     local bin; bin="$(callgraph_bin)"
     CALLGRAPH_SKILL_DIR="$LIB_DIR" CALLGRAPH_REGISTRY="$1" "$bin" project get "$2" "$3" 2>/dev/null || true
+}
+
+# abszolút, fizikai (symlink-feloldott) útvonal — létező fájlra / mappára (a régi scriptek használják)
+abs_path() {
+    local p="$1"
+    if [[ -d "$p" ]]; then (cd "$p" && pwd -P); else printf '%s/%s\n' "$(cd "$(dirname "$p")" && pwd -P)" "$(basename "$p")"; fi
+}
+
+# Hibaüzenet + error-id (napló: errors.jsonl), majd exit 1 — a `callgraph error` végzi (jq nélkül).
+fail() {
+    local context="$1" message="${2//\~\/.claude\/skills\/callgraph/$PHP_AST_HOME}" bin
+    bin="$(callgraph_bin)"
+    if [[ -n "$bin" ]]; then
+        CALLGRAPH_SKILL_DIR="$LIB_DIR" PHP_AST_HOME="$PHP_AST_HOME" "$bin" error "$(basename "$0")" "$context" "$message"
+    else
+        echo "$message" >&2
+    fi
+    exit 1
 }

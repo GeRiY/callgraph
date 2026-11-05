@@ -50,7 +50,7 @@ pub enum CliArgs {
         depth: usize,
         guess: bool,
     },
-    /// Skill-parancs (`project`, `feedback`, `wrap`) nyers argumentumokkal.
+    /// Skill-parancs (`project`, `feedback`, `wrap`, `error`) nyers argumentumokkal.
     Skill { command: String, args: Vec<String> },
 }
 
@@ -70,7 +70,7 @@ impl CliArgs {
         // a skill-parancsok maguk értelmezik az argumentumaikat (a hibáik error-id-t kapnak)
         if let Some(command) = args
             .first()
-            .filter(|a| matches!(a.as_str(), "project" | "feedback" | "wrap"))
+            .filter(|a| matches!(a.as_str(), "project" | "feedback" | "wrap" | "error"))
         {
             return Ok(Self::Skill {
                 command: command.clone(),
