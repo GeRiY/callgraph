@@ -9,7 +9,19 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib.sh"
 
-if [[ "${1:-}" == lang ]]; then
+# `lang` is the language command, unless it names an existing path (e.g. a Laravel `lang/` dir):
+#   callgraph.sh lang          → language command if there is no ./lang
+#   callgraph.sh lang <code>   → language command if <code> looks like en / hu / hu_HU… and is not a path
+# To analyse a `lang` dir anyway: callgraph.sh ./lang (or lang/).
+is_lang_command() {
+    [[ "${1:-}" == lang ]] || return 1
+    case $# in
+        1) [[ ! -e lang ]] ;;
+        2) [[ "$2" =~ ^[A-Za-z]{2}([_.-].*)?$ && ! -e "$2" ]] ;;
+        *) return 1 ;;
+    esac
+}
+if is_lang_command "$@"; then
     shift
     run_callgraph lang "$@"
 fi
