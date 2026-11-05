@@ -127,8 +127,14 @@ fn initialize_list_and_call_outline() {
     let canonical = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .canonicalize()
         .unwrap();
+    // Windowson a kiírt gyökér a `\\?\` előtag nélküli alak (lásd QueryEngine::relativize)
+    let canonical = canonical.display().to_string();
+    let plain = canonical
+        .strip_prefix(r"\\?\")
+        .unwrap_or(&canonical)
+        .to_owned();
     assert_eq!(
-        body.replace(&canonical.display().to_string(), "<root>"),
+        body.replace(&canonical, "<root>").replace(&plain, "<root>"),
         cli_text.replace(env!("CARGO_MANIFEST_DIR"), "<root>")
     );
 }
