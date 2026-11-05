@@ -53,6 +53,9 @@ Kis korpuszon (< 30 fájl, pl. a golden-minták) a küszöbök lazábbak.
   szerinti (`(^|::|\.|->)X$`); a SKILL.md-stílusú `Típus::X$` minta külön is lefut (`callgraph_qualified`).
 - **Tényleges költség:** ha a callgraph-válasz a helyességi kritérium szerint hiányos, az agentnek a grep-es úton is végig kell
   mennie: tényleges token = callgraph + okos baseline, lépés = 1 + okos lépések. A fő mutató ez (`x_eff_smart_*`).
+- **„Hogyan hívják?” (v2):** az okos baseline ±30 soros ablakai a hívás sorát is megmutatják. Ha a callgraph hívó-kimenetében
+  nincs hívássor (`L<n> │ …`), az agentnek még egy `--grep … --body` kell: ennek tokenje és +1 lépés a callgraph-oldalra kerül
+  (`callgraph_followup`). Így a régebbi, hívássor nélküli verziók is azonos mércével mérhetők.
 
 A Read kimenete `cat -n` formátum (6 széles sorszám + tab), a grep-é `út:sor:szöveg`, a gyökérhez relatív utakkal.
 
@@ -64,9 +67,11 @@ A Read kimenete `cat -n` formátum (6 széles sorszám + tab), a grep-é `út:so
 - **Lépés:** eszközhívások száma.
 - **Idő:** a parancsok saját futásideje, `--runs` futás mediánja; callgraph **hideg** (a `.callgraph/` törölve minden futás előtt) és
   **meleg** cache-sel. A modell körútja (lépésenként jellemzően másodpercek) NINCS benne — a valós falióra-különbséget a lépésszám dönti el.
-- **Helyesség** (a grep a viszonyítás, nem tökéletes igazság):
+- **Helyesség** (a grep a viszonyítás, nem tökéletes igazság). **v2:** a grep-találatok **komment-szűrtek** — egy fájl-szintű
+  állapotgép (stringek, `//`, `/* … */` több soron át, `/*! … */` doc-blokk, PHP `#`) kivágja a megjegyzéseket, és csak az a
+  találat számít, ahol a név / szöveg a kódban van (a nyers szám `grep_files_raw` néven megmarad):
   outline/api — a regexszel talált (api-nál a publikus) definíciók hány %-a látszik (≥ 90%);
-  body — a függvény nem üres sorainak hány %-a van a kimenetben (≥ 98%);
+  body — a függvény nem üres **kód**sorainak hány %-a van a kimenetben (≥ 98%; a megjegyzés-sorok nem kötelezők);
   hívók — a grep-pel talált hívó fájlok közül hányat ad vissza a callgraph (≥ 90%), és a grep-sorok hány %-át fedi le metódus-sáv;
   string/konstans — fájlszintű visszahívás a grep-hez képest (≥ 90%).
 
