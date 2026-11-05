@@ -92,6 +92,16 @@ impl Imports {
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
+
+    /// A veszteségmentes (bináris) tároláshoz: a bejegyzések és az „üresen is objektum” jelző.
+    pub fn parts(&self) -> (&[(String, String)], bool) {
+        (&self.0, self.1)
+    }
+
+    /// A `parts` párja.
+    pub fn from_parts(entries: Vec<(String, String)>, object: bool) -> Self {
+        Self(entries, object)
+    }
 }
 
 impl Serialize for Imports {

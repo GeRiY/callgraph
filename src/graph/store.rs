@@ -1,169 +1,145 @@
-//! `ProjectGraph`: a projekt fájljainak gráfjai egy helyen, a `.callgraph/index.jsonl`-ben tárolva, fájlonként
-//! (mtime + méret) frissítve, és a belőlük épített, projekt-szintű fordított hívó-index.
+//! `ProjectGraph`: a projekt fájljainak gráfjai fájlonkénti bináris shardokban (`.callgraph/graph/<név>.bin`), egy
+//! kis manifesztben (`index.bin`: út → bélyeg + shard) és a hívó-index bemenetében (`callers.bin`). Indításkor csak
+//! a manifest töltődik; a shardok csak a lekérdezés hatókörére, a hívó-index csak a `--depth` / `callers` kérésre.
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::UNIX_EPOCH;
 
 use rayon::prelude::*;
 
-use super::record::{FileFacts, FileStamp, Header, RecordBody, RecordHead, RecordOut};
+use super::codec::{self, ManifestEntry};
+use super::record::{FileFacts, FileStamp};
 use crate::analysis::Analyzer;
 use crate::error::Result;
 use crate::index::CallerIndex;
-use crate::io::{CacheStore, JsonlCacheStore};
 use crate::model::FileGraph;
 use crate::query::snippet;
 
-/// Egy fájl állapota: a bélyeg, a tárolt sor (betöltéskor; mentéskor változatlanul visszaírható) és az értelmezett
-/// tények (csak ha egy lekérdezés kérte, vagy friss elemzésből jön).
-#[derive(Debug)]
-struct Entry {
+/// A manifest fájlneve a `.callgraph/` mappában.
+const MANIFEST_FILE: &str = "index.bin";
+/// A hívó-index bemenete.
+const CALLERS_FILE: &str = "callers.bin";
+/// A shardok mappája.
+const SHARDS_DIR: &str = "graph";
+/// A korábbi tárolók (JSONL gráf, fájlonkénti JSON-cache): az új tároló első építésekor törlődnek.
+const LEGACY_FILES: [&str; 3] = ["index.jsonl", "cache.jsonl", "cache.jsonl.lock"];
+
+/// Egy ismert fájl: a bélyeg és a shard neve.
+#[derive(Debug, Clone)]
+struct Tracked {
     stamp: FileStamp,
-    raw: Option<String>,
-    facts: Option<Box<FileFacts>>,
+    shard: String,
 }
 
-/// A projekt-gráf: fájlonkénti gráfok (+ hívás-sorok), a teljes projekt bejárási sorrendje és a hívó-index.
+/// A hívó-index egy fájlra eső bemenete (a `FileFacts::slim` alak) és a tárolt kerete (újraírás kódolás nélkül).
+struct CallerEntry {
+    stamp: FileStamp,
+    facts: FileFacts,
+    frame: Option<Vec<u8>>,
+}
+
+/// Egy elemzendő fájl: az út és a frissítés előtti bélyeg.
+type Work<'a> = (&'a Path, FileStamp);
+
+/// Egy elemzés eredménye: kulcs, bélyeg, tények, és a shard neve, ha a kiírás sikerült.
+type Analyzed = (String, FileStamp, FileFacts, Option<String>);
+
+/// A projekt-gráf (a folyamatban gyökerenként egy példány: `graph::shared`).
 pub(crate) struct ProjectGraph {
-    file: PathBuf,
-    entries: HashMap<String, Entry>,
+    dir: PathBuf,
+    tracked: HashMap<String, Tracked>,
     /// Az utolsó teljes frissítés fájl-sorrendje (a régi bejárás sorrendje: a hívó-index holtversenyei ezt követik).
     order: Vec<String>,
+    /// A memóriában lévő shardok (a lekérdezett fájlok; az MCP-szerverben kérésről kérésre megmaradnak).
+    loaded: HashMap<String, FileFacts>,
+    /// A `callers.bin` tartalma, ha már kellett.
+    callers_facts: Option<HashMap<String, CallerEntry>>,
     callers: CallerIndex,
     callers_fresh: bool,
-    dirty: bool,
+    manifest_dirty: bool,
+    callers_dirty: bool,
 }
 
-/// Egy elemzendő fájl: az út, a frissítés előtti bélyeg, és hogy volt-e már (elavult) rekordja.
-type Pending<'a> = (&'a Path, FileStamp, bool);
-
 impl ProjectGraph {
-    /// Betöltés a tárolt fájlból. Hiányzó, sérült, régi formátumú vagy más build által írt fájl: üres gráf (a
-    /// következő frissítés csendben újraépíti). A rekordoknak itt csak a fejét értelmezzük.
-    pub(crate) fn load(file: PathBuf) -> Self {
+    /// Megnyitás: csak a manifest olvasódik be. Hiányzó, sérült, régi formátumú vagy más build által írt manifest:
+    /// üres gráf, a régi tárolók (shardok, `callers.bin`, a JSONL gráf és cache) törlődnek, és a következő
+    /// frissítés csendben újraépít.
+    pub(crate) fn open(dir: PathBuf) -> Self {
         let mut graph = Self {
-            file,
-            entries: HashMap::new(),
+            dir,
+            tracked: HashMap::new(),
             order: Vec::new(),
+            loaded: HashMap::new(),
+            callers_facts: None,
             callers: CallerIndex::build(std::iter::empty()),
             callers_fresh: false,
-            dirty: true,
+            manifest_dirty: false,
+            callers_dirty: false,
         };
-        let Ok(text) = fs::read_to_string(&graph.file) else {
-            return graph;
-        };
-        let mut lines = text.lines().filter(|line| !line.trim().is_empty());
-        let current = lines
-            .next()
-            .and_then(|line| serde_json::from_str::<Header>(line).ok())
-            .is_some_and(|header| header == Header::current());
-        if !current {
-            return graph;
-        }
-        graph.dirty = false;
-        for line in lines {
-            match serde_json::from_str::<RecordHead>(line) {
-                Ok(head) => {
-                    graph.entries.insert(
-                        head.path,
-                        Entry {
+        match codec::read_manifest(&graph.dir.join(MANIFEST_FILE)) {
+            Some(entries) => {
+                for entry in entries {
+                    graph.tracked.insert(
+                        entry.path,
+                        Tracked {
                             stamp: FileStamp {
-                                mtime: head.mtime,
-                                size: head.size,
+                                mtime: entry.mtime,
+                                size: entry.size,
                             },
-                            raw: Some(line.to_owned()),
-                            facts: None,
+                            shard: entry.shard,
                         },
                     );
                 }
-                Err(_) => graph.dirty = true,
+            }
+            None => {
+                graph.manifest_dirty = true;
+                graph.reset_storage();
             }
         }
         graph
     }
 
-    /// A megadott fájlok naprakészre hozása: a változatlan bélyegűek tárolt gráfja (forrás-elemzés nélkül), a
-    /// változottak / újak elemzése (új fájlnál előbb a fájlonkénti cache). `full`: a `files` a teljes projekt a
-    /// bejárás sorrendjében — a benne nem szereplő (törölt, átnevezett) fájlok kikerülnek, és ez lesz a hívó-index
-    /// sorrendje. Utána a `files` minden gráfja elérhető (`graph`).
-    pub(crate) fn sync(
+    /// Az érvénytelen tároló eltakarítása (a `notes.jsonl` és a `.gitignore` marad).
+    fn reset_storage(&self) {
+        let _ = fs::remove_dir_all(self.dir.join(SHARDS_DIR));
+        let _ = fs::remove_file(self.dir.join(CALLERS_FILE));
+        for name in LEGACY_FILES {
+            let _ = fs::remove_file(self.dir.join(name));
+        }
+    }
+
+    fn shard_path(&self, shard: &str) -> PathBuf {
+        self.dir.join(SHARDS_DIR).join(shard)
+    }
+
+    /// A megadott fájlok bélyegének ellenőrzése (stat, tartalom-olvasás nélkül); a változott / új fájlok elemzése
+    /// (párhuzamosan) és csak az ő shardjuk újraírása. `full`: a `files` a teljes projekt a bejárás sorrendjében —
+    /// a benne nem szereplő (törölt, átnevezett) fájlok és shardjaik kikerülnek, és ez lesz a hívó-index sorrendje.
+    pub(crate) fn refresh(
         &mut self,
         files: &[PathBuf],
         full: bool,
         analyzer: &Analyzer,
-        cache: &mut Option<JsonlCacheStore>,
     ) -> Result<()> {
-        let mut pending: Vec<Pending<'_>> = Vec::new();
-        let mut parse: Vec<(usize, String)> = Vec::new();
-        for (at, file) in files.iter().enumerate() {
-            let key = file.to_string_lossy().into_owned();
-            let stamp = FileStamp::of(file);
-            match self.entries.get(&key) {
-                Some(entry) if entry.stamp == stamp => {
-                    if entry.facts.is_none() {
-                        parse.push((at, key));
-                    }
-                }
-                Some(_) => pending.push((file.as_path(), stamp, true)),
-                None => pending.push((file.as_path(), stamp, false)),
-            }
-        }
-        let parsed: Vec<(usize, String, Option<FileFacts>)> = {
-            let entries = &self.entries;
-            parse
-                .into_par_iter()
-                .map(|(at, key)| {
-                    let facts = entries
-                        .get(&key)
-                        .and_then(|entry| entry.raw.as_deref())
-                        .and_then(|raw| serde_json::from_str::<RecordBody>(raw).ok())
-                        .map(FileFacts::from);
-                    (at, key, facts)
-                })
-                .collect()
-        };
-        for (at, key, facts) in parsed {
-            if let Some(facts) = facts
-                && let Some(entry) = self.entries.get_mut(&key)
-            {
-                entry.facts = Some(Box::new(facts));
-                continue;
-            }
-            // sérült rekord: újraelemzés
-            self.entries.remove(&key);
-            let file = files[at].as_path();
-            pending.push((file, FileStamp::of(file), true));
-        }
-        for (file, stamp, changed) in pending {
-            let graph = analyze(file, changed, analyzer, cache)?;
-            let snippets = snippet::call_snippets(file, graph.calls.iter().map(|call| call.line));
-            self.entries.insert(
-                file.to_string_lossy().into_owned(),
-                Entry {
-                    stamp,
-                    raw: None,
-                    facts: Some(Box::new(FileFacts { graph, snippets })),
-                },
-            );
-            self.dirty = true;
-            self.callers_fresh = false;
-        }
+        let stamps: Vec<FileStamp> = files.par_iter().map(|file| FileStamp::of(file)).collect();
+        let work: Vec<Work<'_>> = files
+            .iter()
+            .zip(stamps)
+            .filter(|(file, stamp)| {
+                self.tracked
+                    .get(file.to_string_lossy().as_ref())
+                    .is_none_or(|tracked| tracked.stamp != *stamp)
+            })
+            .map(|(file, stamp)| (file.as_path(), stamp))
+            .collect();
+        self.analyze(&work, analyzer)?;
         if full {
             let order: Vec<String> = files
                 .iter()
                 .map(|file| file.to_string_lossy().into_owned())
                 .collect();
-            let before = self.entries.len();
-            {
-                let keep: HashSet<&str> = order.iter().map(String::as_str).collect();
-                self.entries.retain(|path, _| keep.contains(path.as_str()));
-            }
-            if self.entries.len() != before {
-                self.dirty = true;
-                self.callers_fresh = false;
-            }
+            self.prune(&order);
             if order != self.order {
                 self.order = order;
                 self.callers_fresh = false;
@@ -172,18 +148,134 @@ impl ProjectGraph {
         Ok(())
     }
 
-    /// A fájl gráfja (a `sync` után; az út a bejárás / lekérdezés alakjában).
-    pub(crate) fn graph(&self, path: &str) -> Option<&FileGraph> {
-        Some(&self.entries.get(path)?.facts.as_ref()?.graph)
+    /// A teljes projekt-listában nem szereplő fájlok (és shardjaik) eltávolítása.
+    fn prune(&mut self, order: &[String]) {
+        let keep: HashSet<&str> = order.iter().map(String::as_str).collect();
+        let gone: Vec<String> = self
+            .tracked
+            .keys()
+            .filter(|path| !keep.contains(path.as_str()))
+            .cloned()
+            .collect();
+        for path in &gone {
+            if let Some(tracked) = self.tracked.remove(path) {
+                let _ = fs::remove_file(self.shard_path(&tracked.shard));
+            }
+            self.loaded.remove(path);
+            self.manifest_dirty = true;
+            self.callers_fresh = false;
+        }
+        self.loaded.retain(|path, _| keep.contains(path.as_str()));
+        if let Some(facts) = self.callers_facts.as_mut() {
+            let before = facts.len();
+            facts.retain(|path, _| keep.contains(path.as_str()));
+            if facts.len() != before {
+                self.callers_dirty = true;
+                self.callers_fresh = false;
+            }
+        }
     }
 
-    /// A fájl hívás-sorai tömörítve (`(sor, kód)`), a `SourceLines::remember`-hez.
+    /// Elemzés párhuzamosan, a shardok kiírása; hibánál a sorrendben első hibás fájl hibája (mint a régi úton).
+    fn analyze(&mut self, work: &[Work<'_>], analyzer: &Analyzer) -> Result<()> {
+        if work.is_empty() {
+            return Ok(());
+        }
+        let shards = self.dir.join(SHARDS_DIR);
+        let _ = fs::create_dir_all(&shards);
+        let results: Vec<Result<Analyzed>> = work
+            .par_iter()
+            .map(|&(path, stamp)| {
+                let graph = analyzer.analyze_path(path)?.graph;
+                let snippets =
+                    snippet::call_snippets(path, graph.calls.iter().map(|call| call.line));
+                let key = path.to_string_lossy().into_owned();
+                let facts = FileFacts { graph, snippets };
+                let shard = codec::shard_name(&key);
+                // a kiírás hibája nem állítja meg a lekérdezést (a fájl legközelebb újraelemződik)
+                let written = codec::write_shard(&shards.join(&shard), &key, stamp, &facts).is_ok();
+                Ok((key, stamp, facts, written.then_some(shard)))
+            })
+            .collect();
+        for result in results {
+            let (key, stamp, facts, shard) = result?;
+            match shard {
+                Some(shard) => {
+                    self.tracked.insert(key.clone(), Tracked { stamp, shard });
+                }
+                None => {
+                    self.tracked.remove(&key);
+                }
+            }
+            if let Some(entries) = self.callers_facts.as_mut() {
+                entries.insert(
+                    key.clone(),
+                    CallerEntry {
+                        stamp,
+                        facts: facts.slim(),
+                        frame: None,
+                    },
+                );
+                self.callers_dirty = true;
+            }
+            self.manifest_dirty = true;
+            self.callers_fresh = false;
+            self.loaded.insert(key, facts);
+        }
+        Ok(())
+    }
+
+    /// A megadott fájlok shardjai a memóriába (párhuzamosan); a sérült / hiányzó shard fájlja újraelemződik.
+    /// A `refresh` után hívandó (a bélyeg akkor már a manifestben van).
+    pub(crate) fn load(&mut self, files: &[PathBuf], analyzer: &Analyzer) -> Result<()> {
+        let want: Vec<(&Path, String)> = files
+            .iter()
+            .map(|file| (file.as_path(), file.to_string_lossy().into_owned()))
+            .filter(|(_, key)| !self.loaded.contains_key(key))
+            .collect();
+        if want.is_empty() {
+            return Ok(());
+        }
+        let read: Vec<Option<FileFacts>> = {
+            let tracked = &self.tracked;
+            let shards = self.dir.join(SHARDS_DIR);
+            want.par_iter()
+                .map(|(_, key)| {
+                    let entry = tracked.get(key)?;
+                    codec::read_shard(&shards.join(&entry.shard), key, entry.stamp)
+                })
+                .collect()
+        };
+        let mut broken: Vec<Work<'_>> = Vec::new();
+        for ((path, key), facts) in want.into_iter().zip(read) {
+            match facts {
+                Some(facts) => {
+                    self.loaded.insert(key, facts);
+                }
+                None => broken.push((path, FileStamp::of(path))),
+            }
+        }
+        self.analyze(&broken, analyzer)
+    }
+
+    /// A fájl gráfja (a `load` után; az út a bejárás / lekérdezés alakjában).
+    pub(crate) fn graph(&self, path: &str) -> Option<&FileGraph> {
+        self.loaded.get(path).map(|facts| &facts.graph)
+    }
+
+    /// A fájl hívás-sorai tömörítve (`(sor, kód)`), a `SourceLines::remember`-hez: a betöltött shardból, vagy a
+    /// hívó-index bemenetéből (a `--depth` hívói így shard nélkül is kiírhatók).
     pub(crate) fn snippets(&self, path: &str) -> Option<&[(u32, String)]> {
-        self.entries
-            .get(path)?
-            .facts
-            .as_ref()
-            .map(|facts| facts.snippets.as_slice())
+        self.facts(path).map(|facts| facts.snippets.as_slice())
+    }
+
+    fn facts(&self, path: &str) -> Option<&FileFacts> {
+        self.loaded.get(path).or_else(|| {
+            self.callers_facts
+                .as_ref()?
+                .get(path)
+                .map(|entry| &entry.facts)
+        })
     }
 
     /// Szimbólum-keresés: egy metódus / függvény sortartománya (az első egyező definíció).
@@ -193,27 +285,106 @@ impl ProjectGraph {
         container: Option<&str>,
         name: &str,
     ) -> Option<(u32, u32)> {
-        self.graph(file)?
+        self.facts(file)?
+            .graph
             .methods
             .iter()
             .find(|method| method.container.as_deref() == container && method.name == name)
             .map(|method| (method.line, method.end_line.unwrap_or(method.line)))
     }
 
-    /// A hívó-index újraépítése, ha egy fájl vagy a sorrend változott az utolsó építés óta (különben a régi marad —
-    /// a folyamatban élő gráf, pl. az MCP-szerveré, így kérésenként csak a változást fizeti).
-    pub(crate) fn ensure_callers(&mut self) {
+    /// A hívó-index naprakészre hozása (a teljes `refresh` után): a `callers.bin`-ből, a változott fájlok bemenete
+    /// a shardjukból (vagy a friss elemzésből). Ha semmi sem változott az utolsó építés óta, a régi marad — a
+    /// folyamatban élő gráf (pl. az MCP-szerveré) így kérésenként csak a változást fizeti.
+    pub(crate) fn ensure_callers(&mut self, analyzer: &Analyzer) -> Result<()> {
         if self.callers_fresh {
-            return;
+            return Ok(());
         }
-        let built = CallerIndex::build(self.order.iter().filter_map(|path| {
-            Some((
-                path.as_str(),
-                &self.entries.get(path)?.facts.as_ref()?.graph,
-            ))
-        }));
+        if self.callers_facts.is_none() {
+            self.callers_facts = Some(self.read_callers());
+        }
+        // a hiányzó vagy elavult bemenetű fájlok
+        let stale: Vec<PathBuf> = {
+            let entries = self.callers_facts.as_ref();
+            self.order
+                .iter()
+                .filter(|path| {
+                    let stored = entries.and_then(|entries| entries.get(path.as_str()));
+                    let current = self.tracked.get(path.as_str()).map(|tracked| tracked.stamp);
+                    stored.is_none_or(|entry| Some(entry.stamp) != current)
+                })
+                .map(PathBuf::from)
+                .collect()
+        };
+        if !stale.is_empty() {
+            let borrowed: HashSet<String> = stale
+                .iter()
+                .map(|path| path.to_string_lossy().into_owned())
+                .filter(|key| !self.loaded.contains_key(key))
+                .collect();
+            self.load(&stale, analyzer)?;
+            let mut entries = self.callers_facts.take().unwrap_or_default();
+            for path in &stale {
+                let key = path.to_string_lossy().into_owned();
+                let Some(facts) = self.loaded.get(&key) else {
+                    continue;
+                };
+                let stamp = self
+                    .tracked
+                    .get(&key)
+                    .map(|tracked| tracked.stamp)
+                    .unwrap_or_default();
+                entries.insert(
+                    key,
+                    CallerEntry {
+                        stamp,
+                        facts: facts.slim(),
+                        frame: None,
+                    },
+                );
+            }
+            // a csak a hívó-indexhez betöltött shardok nem maradnak a memóriában
+            self.loaded.retain(|key, _| !borrowed.contains(key));
+            self.callers_facts = Some(entries);
+            self.callers_dirty = true;
+        }
+        if let Some(entries) = self.callers_facts.as_mut() {
+            let keep: HashSet<&str> = self.order.iter().map(String::as_str).collect();
+            let before = entries.len();
+            entries.retain(|path, _| keep.contains(path.as_str()));
+            if entries.len() != before {
+                self.callers_dirty = true;
+            }
+        }
+        let built = {
+            let entries = self.callers_facts.as_ref();
+            CallerIndex::build(self.order.iter().filter_map(|path| {
+                let entry = entries?.get(path)?;
+                Some((path.as_str(), &entry.facts.graph))
+            }))
+        };
         self.callers = built;
         self.callers_fresh = true;
+        Ok(())
+    }
+
+    /// A `callers.bin` beolvasása (a keretek párhuzamos dekódolásával); a sérült keret kimarad (újraépül).
+    fn read_callers(&self) -> HashMap<String, CallerEntry> {
+        let frames = codec::read_callers(&self.dir.join(CALLERS_FILE));
+        frames
+            .into_par_iter()
+            .filter_map(|frame| {
+                let (path, stamp, facts) = codec::decode_record(&frame)?;
+                Some((
+                    path,
+                    CallerEntry {
+                        stamp,
+                        facts,
+                        frame: Some(frame),
+                    },
+                ))
+            })
+            .collect()
     }
 
     /// A teljes projekt fordított hívó-indexe (az `ensure_callers` után naprakész).
@@ -221,78 +392,41 @@ impl ProjectGraph {
         &self.callers
     }
 
-    /// Kiírás, ha változott valami: ideiglenes fájlba, majd átnevezés (egy félbeszakadt írás nem rontja el).
+    /// Kiírás, ha változott valami: a manifest és (ha kellett) a `callers.bin`, mindkettő atomikusan. A shardok már
+    /// az elemzéskor kiíródtak (csak a változott fájloké).
     pub(crate) fn save(&mut self) -> Result<()> {
-        if !self.dirty {
-            return Ok(());
+        if self.manifest_dirty {
+            let mut entries: Vec<ManifestEntry> = self
+                .tracked
+                .iter()
+                .map(|(path, tracked)| ManifestEntry {
+                    path: path.clone(),
+                    mtime: tracked.stamp.mtime,
+                    size: tracked.stamp.size,
+                    shard: tracked.shard.clone(),
+                })
+                .collect();
+            entries.sort_by(|a, b| a.path.cmp(&b.path));
+            codec::write_manifest(&self.dir.join(MANIFEST_FILE), &entries)?;
+            self.manifest_dirty = false;
         }
-        let mut keys: Vec<String> = self.entries.keys().cloned().collect();
-        keys.sort();
-        let mut text = serde_json::to_string(&Header::current())?;
-        text.push('\n');
-        for key in keys {
-            let Some(entry) = self.entries.get_mut(&key) else {
-                continue;
-            };
-            if entry.raw.is_none()
-                && let Some(facts) = entry.facts.as_ref()
-            {
-                entry.raw = Some(serde_json::to_string(&RecordOut {
-                    path: &key,
-                    mtime: entry.stamp.mtime,
-                    size: entry.stamp.size,
-                    snippets: &facts.snippets,
-                    graph: &facts.graph,
-                })?);
-            }
-            if let Some(raw) = entry.raw.as_deref() {
-                text.push_str(raw);
-                text.push('\n');
-            }
+        if self.callers_dirty
+            && let Some(entries) = self.callers_facts.as_mut()
+        {
+            entries.par_iter_mut().for_each(|(path, entry)| {
+                if entry.frame.is_none() {
+                    entry.frame = codec::encode_record(path, entry.stamp, &entry.facts).ok();
+                }
+            });
+            let mut frames: Vec<(&String, &[u8])> = entries
+                .iter()
+                .filter_map(|(path, entry)| Some((path, entry.frame.as_deref()?)))
+                .collect();
+            frames.sort_by(|a, b| a.0.cmp(b.0));
+            let frames: Vec<&[u8]> = frames.into_iter().map(|(_, frame)| frame).collect();
+            codec::write_callers(&self.dir.join(CALLERS_FILE), &frames)?;
+            self.callers_dirty = false;
         }
-        let mut tmp = self.file.as_os_str().to_owned();
-        tmp.push(format!(".tmp{}", std::process::id()));
-        let tmp = PathBuf::from(tmp);
-        fs::write(&tmp, text)?;
-        fs::rename(&tmp, &self.file)?;
-        self.dirty = false;
         Ok(())
     }
-}
-
-/// Egy fájl gráfja: új fájlnál a fájlonkénti cache-ből, ha friss (másodperces mtime), különben elemzés; a már
-/// ismert, de változott fájl mindig újraelemződik (a másodperces cache egy gyors szerkesztést nem venne észre).
-fn analyze(
-    file: &Path,
-    changed: bool,
-    analyzer: &Analyzer,
-    cache: &mut Option<JsonlCacheStore>,
-) -> Result<FileGraph> {
-    let seconds = mtime_seconds(file);
-    let language = analyzer
-        .registry()
-        .for_path(file)
-        .map(|language| language.id())
-        .unwrap_or("unknown");
-    if !changed
-        && let (Some(store), Some(mtime)) = (cache.as_ref(), seconds)
-        && let Some(graph) = store.get_for_language(file, mtime, language)
-    {
-        return Ok(graph);
-    }
-    let graph = analyzer.analyze_path(file)?.graph;
-    if let (Some(store), Some(mtime)) = (cache.as_mut(), seconds) {
-        let _ = store.put_for_language(file, mtime, &graph, language);
-    }
-    Ok(graph)
-}
-
-fn mtime_seconds(path: &Path) -> Option<u64> {
-    path.metadata()
-        .ok()?
-        .modified()
-        .ok()?
-        .duration_since(UNIX_EPOCH)
-        .ok()
-        .map(|duration| duration.as_secs())
 }

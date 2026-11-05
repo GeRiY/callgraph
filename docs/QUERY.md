@@ -1,12 +1,12 @@
 # Query-réteg
 
-A `show` parancs a `SelectorSet` segítségével fájlokat és metódusokat választ ki. A `QueryEngine` a projekt gyökeréhez relatív utat old fel, előbb a projekt `.callgraph/cache.jsonl` cache-ét használja, majd az `Analyzer` facade-et. A kimenetet a `FormatterRegistry` név szerint választott Strategy-je állítja elő.
+A `show` parancs a `SelectorSet` segítségével fájlokat és metódusokat választ ki. A `QueryEngine` a projekt gyökeréhez relatív utat old fel, a gráfokat a projekt-gráf shardjaiból veszi (`.callgraph/`, `docs/PROJECT-GRAPH.md`), a változott fájlokat az `Analyzer` facade elemzi. A kimenetet a `FormatterRegistry` név szerint választott Strategy-je állítja elő.
 
 Új formázó: hozz létre egy külön `Formatter` implementációt a `src/query/format/` alatt, majd adj hozzá egy `register`/névágatot a registryhez. A limit előtti formázás és a `method-index` változatlan marad.
 
 ## Felépítés
 - `src/query/selector.rs` — `<fájl>[::m1[::m2]]` argumentumok (`SelectorSet`), a callgraph hibáival (szelektoros és sima argumentum keverése).
-- `src/query/engine.rs` — `QueryEngine` (Facade): a gyökérhez relatív utak → `QueryResult` (FileGraph + kijelölt metódusok); cache: `<gyökér>/.callgraph/`, a cache-írás hibája nem állítja meg.
+- `src/query/engine.rs` — `QueryEngine` (Facade): a gyökérhez relatív utak → `QueryResult` (FileGraph + kijelölt metódusok); tároló: `<gyökér>/.callgraph/` (projekt-gráf), az írás hibája nem állítja meg.
 - `src/query/limit.rs` — `OutputLimit`: 400 sor (`CALLGRAPH_OUT_LIMIT`, `--full` kikapcsolja); mappán summary, fájlon `method-index`.
 - `src/query/format/` — egy formázó = egy fájl, `FormatterRegistry::with_defaults()` regisztrálja.
   Paraméteres nézetek (`lines` sávval, `strings`/`const` mintával) a `FormatterRegistry::format_with`-en át.
@@ -63,8 +63,8 @@ az callgraph a szándékolt `later\(` mintát használja (így a `sp_jobs` golde
   a hibák `[error-id]` sora (`skill/lib.sh` `fail`), és a JS / TS / Vue cél továbbítása a régi motornak (`CALLGRAPH_LEGACY`) változatlan argumentumokkal.
 - Az callgraph csak abszolút gyökeret (`--project <út>`) és címkét (`--label <alias>`) kap; projektnevet maga nem old fel.
 - A bináris: `CALLGRAPH_BIN`, vagy `bin/<os>-<arch>/callgraph`, vagy `bin/callgraph`.
-- A `show` a projekt `.callgraph/` tárolóját az `ensure()`-rel hozza létre (`*`-os `.gitignore`), olvas és ír is a cache-be; ha a tároló nem írható, cache nélkül fut.
-- A `--grep`, `--depth`, `--strings`, `--const` (és a `callers`) a perzisztens projekt-gráfból (`.callgraph/index.jsonl`) olvas: `docs/PROJECT-GRAPH.md`; `CALLGRAPH_NO_GRAPH=1` a fájlonkénti út (azonos kimenet).
+- A `show` a projekt `.callgraph/` tárolóját az `ensure()`-rel hozza létre (`*`-os `.gitignore`), olvas és ír is a projekt-gráfba; ha a tároló nem írható, gráf nélkül (minden fájlt elemezve) fut.
+- Minden `show` (és a `callers`) a perzisztens projekt-gráfból olvas: `docs/PROJECT-GRAPH.md`; `CALLGRAPH_NO_GRAPH=1` a gráf nélküli út (azonos kimenet).
 - Mérés a burkon át: `CALLGRAPH_MAP=golden/query/cases.tsv bash tools/query_check.sh "CALLGRAPH_BIN=… PHP_AST_HOME=… CALLGRAPH_REGISTRY=… CALLGRAPH_LEGACY=… bash skill/callgraph.sh"` → 39/51 AZONOS
   (a hibaesetek is); a maradék a FileGraph 99%+ eltérése (G1d) és a szándékos `jobs`-javítás.
 - Az élő `~/.claude/skills/callgraph/callgraph.sh` NINCS lecserélve — az átállás a felhasználó döntése.

@@ -74,11 +74,9 @@ impl Command for ShowCommand {
             Ok(value) => value,
             Err(error) => return Self::report(_err, error),
         };
-        // a projekt-szintű lekérdezések a perzisztens projekt-gráfból olvasnak (crate::graph)
-        let engine = QueryEngine::new(self.project.as_deref(), self.label.clone())
-            .use_project_graph(
-                self.grep.is_some() || self.strings.is_some() || self.const_filter.is_some(),
-            );
+        // minden lekérdezés a perzisztens projekt-gráfból olvas (crate::graph: a shardok a fájlonkénti cache is)
+        let engine =
+            QueryEngine::new(self.project.as_deref(), self.label.clone()).use_project_graph(true);
         let mut rows =
             match engine.query_filtered(&selectors, self.grep.as_deref(), self.category.as_deref())
             {

@@ -45,13 +45,13 @@ impl QueryEngine {
         let direct = direct_rows(rows);
         let whole_project = scope == self.depth_scope().as_slice();
         if let Some(graph) = project.as_deref_mut().filter(|_| whole_project) {
-            // a 2. szinttől a teljes projektben keresünk: a gráf naprakészre hozva (csak a változott fájlok
-            // elemződnek), a hívó-index a folyamatban megmarad, amíg nem változik semmi
+            // a 2. szinttől a teljes projektben keresünk: minden fájl bélyege ellenőrizve (csak a változottak
+            // elemződnek), a hívók a `callers.bin`-ből — shardot csak a változott fájlokhoz kell olvasni; a
+            // hívó-index a folyamatban megmarad, amíg nem változik semmi
             let files = self.walk(scope);
-            let mut cache = self.cache();
-            graph.sync(&files, true, &self.analyzer, &mut cache)?;
+            graph.refresh(&files, true, &self.analyzer)?;
+            graph.ensure_callers(&self.analyzer)?;
             let _ = graph.save();
-            graph.ensure_callers();
             let graph: &ProjectGraph = graph;
             let (callers, skipped) = graph
                 .caller_index()

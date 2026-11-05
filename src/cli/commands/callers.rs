@@ -7,7 +7,7 @@ use crate::analysis::Analyzer;
 use crate::cli::Command;
 use crate::error::Result;
 use crate::graph::ProjectGraph;
-use crate::io::{FileWalker, JsonlCacheStore};
+use crate::io::FileWalker;
 use crate::project::{Project, ProjectLocator, ProjectStore};
 
 /// A projekten belüli, minta szerinti hívókat JSONL-ként írja ki.
@@ -33,7 +33,7 @@ impl CallersCommand {
         ProjectLocator::default().locate(start)
     }
 
-    /// A projekt-gráfból (`.callgraph/index.jsonl`, a folyamatban közös példány) a minta hívói; előtte a gráf
+    /// A projekt-gráfból (`.callgraph/`, a folyamatban közös példány) a minta hívói; előtte a gráf
     /// naprakészre hozva: csak a változott fájlok elemződnek újra, a törölt / átnevezett fájlok kikerülnek.
     fn callers(&self, project: &Project) -> Result<Vec<crate::index::CallerRow>> {
         let store = ProjectStore::new(project);
@@ -44,17 +44,16 @@ impl CallersCommand {
             FileWalker::for_registry(analyzer.registry())
                 .collect(&[project.root().to_path_buf()], &mut |_| {}),
         );
-        let mut cache = Some(JsonlCacheStore::new(store.cache_path()));
         let shared = crate::graph::shared(project.root());
         let mut guard = shared.as_ref().map(crate::graph::lock);
         let mut owned = None;
         let graph: &mut ProjectGraph = match guard.as_deref_mut() {
             Some(graph) => graph,
-            None => owned.insert(ProjectGraph::load(store.index_path())),
+            None => owned.insert(ProjectGraph::open(store.dir().to_path_buf())),
         };
-        graph.sync(&files, true, &analyzer, &mut cache)?;
+        graph.refresh(&files, true, &analyzer)?;
+        graph.ensure_callers(&analyzer)?;
         graph.save()?;
-        graph.ensure_callers();
         graph.caller_index().callers(&self.pattern, self.depth)
     }
 }

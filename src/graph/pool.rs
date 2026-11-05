@@ -24,7 +24,7 @@ pub(crate) fn shared(root: &Path) -> Option<SharedGraph> {
     let mut pool = pool.lock().unwrap_or_else(PoisonError::into_inner);
     let graph = pool
         .entry(root)
-        .or_insert_with(|| Arc::new(Mutex::new(ProjectGraph::load(store.index_path()))));
+        .or_insert_with(|| Arc::new(Mutex::new(ProjectGraph::open(store.dir().to_path_buf()))));
     Some(Arc::clone(graph))
 }
 
