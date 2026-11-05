@@ -50,14 +50,7 @@ pub(super) fn events(g: &FileGraph, ns: &str, out: &mut Vec<String>) {
 }
 
 pub(super) fn routes(g: &FileGraph, ns: &str, out: &mut Vec<String>) {
-    let route = re!(
-        r"(?i)Route::(get|post|put|delete|patch|any|match|resource|apiResource)|->(get|post|put|delete|patch|any|match|resource)"
-    );
-    let method = re!(r"(?i)get|post|put|delete|patch|any|match|resource|apiResource");
-    for c in g.calls.iter().filter(|c| route.is_match(&c.target)) {
-        let m = method.find(&c.target).map_or("unknown", |m| m.as_str());
-        out.push(at_line("route     ", &format!("{m}  {}", c.target), ns, c));
-    }
+    super::routes::collect(g, ns, out);
     let (start, path) = (re!(r"^/|^[A-Z]"), re!(r"(?i)/[a-zA-Z]|api|route"));
     for s in g
         .strings

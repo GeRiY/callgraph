@@ -2,6 +2,7 @@
 //! fájlonként szekciók, mindegyik egy forrást (hívás / string / metódus) regexszel szűr és fix sorsablont tölt ki.
 //! Egy nézet = egy gyűjtőfüggvény a `rules.rs`-ben + egy sor a `register`-ben.
 
+mod routes;
 mod rules;
 
 use super::selection::selected;
