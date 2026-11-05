@@ -5,7 +5,15 @@ on:
   push:
     branches: [main, develop]
     tags: ["v*"]
+    # csak dokumentáció változott → nincs build (a tag-pusholásra a paths-ignore nem vonatkozik)
+    paths-ignore: ["**/*.md", "docs/**", ".github/ISSUE_TEMPLATE/**", "LICENSE"]
   pull_request:
+    paths-ignore: ["**/*.md", "docs/**", ".github/ISSUE_TEMPLATE/**", "LICENSE"]
+
+# egymás utáni pusholásnál a régi futás leáll; a release-t készítő tag-futás soha
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 permissions:
   contents: write
