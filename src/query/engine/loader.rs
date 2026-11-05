@@ -1,79 +1,47 @@
-//! Gráf-betöltés: cache-ből, ha friss, különben elemzés; teljes hatókör bejárása.
+//! Gráf-betöltés gráf nélkül (`CALLGRAPH_NO_GRAPH=1`, írásvédett projekt): elemzés; teljes hatókör bejárása.
+//! A gráfos út a `crate::graph::ProjectGraph`-ban (a pack a fájlonkénti cache is).
 
 use super::QueryEngine;
 use crate::error::Result;
-use crate::io::{CacheStore, FileWalker, JsonlCacheStore};
+use crate::io::FileWalker;
 use crate::model::FileGraph;
-use crate::project::ProjectStore;
+use rayon::prelude::*;
 use std::path::{Path, PathBuf};
-use std::time::UNIX_EPOCH;
 
 impl QueryEngine {
+    /// A hatókör minden fájljának gráfja (párhuzamos elemzés; hibánál a sorrendben első hibás fájl hibája).
     pub(super) fn all_graphs(&self, scope: &[PathBuf]) -> Result<Vec<(String, FileGraph)>> {
-        let files = self.legacy_order(
+        let files = self.walk(scope);
+        let graphs: Vec<Result<(String, FileGraph)>> = files
+            .par_iter()
+            .map(|path| Ok((path.to_string_lossy().into_owned(), self.analyze(path)?)))
+            .collect();
+        graphs.into_iter().collect()
+    }
+
+    /// A hatókör kódfájljai a régi bejárási sorrendben.
+    pub(super) fn walk(&self, scope: &[PathBuf]) -> Vec<PathBuf> {
+        self.legacy_order(
             FileWalker::for_registry(self.analyzer.registry()).collect(scope, &mut |_| {}),
-        );
-        let mut cache = self.cache();
-        files
-            .into_iter()
-            .map(|path| {
-                let graph = self.load(&mut cache, &path)?;
-                Ok((path.to_string_lossy().into_owned(), graph))
-            })
-            .collect()
+        )
     }
-    /// A régi callgraph sorrendje: előbb a PHP-motor (fájlrendszer-sorrend), majd a JS-motor
-    /// (`readdirSync().sort()`: mappánként név szerint, ami komponensenkénti összehasonlítás).
+
+    /// A projekt-gráf (`crate::graph`), ha ez a lekérdezés használja (`use_project_graph`) és a `.callgraph/`
+    /// tároló létrehozható; a folyamatban gyökerenként egy példány (az MCP-szerverben kérésről kérésre megmarad).
+    pub(super) fn project_graph(&self) -> Option<crate::graph::SharedGraph> {
+        if !self.graph {
+            return None;
+        }
+        crate::graph::shared(&self.root)
+    }
+
+    /// A régi callgraph bejárási sorrendje (`crate::graph::legacy_order`).
     pub(super) fn legacy_order(&self, files: Vec<PathBuf>) -> Vec<PathBuf> {
-        let registry = self.analyzer.registry();
-        let (mut js, mut rest): (Vec<_>, Vec<_>) = files
-            .into_iter()
-            .partition(|f| registry.for_path(f).is_some_and(|l| l.id() == "js"));
-        js.sort();
-        rest.extend(js);
-        rest
+        crate::graph::legacy_order(self.analyzer.registry(), files)
     }
 
-    /// A projekt `.callgraph/` tárolója: létrehozza (a `*`-os `.gitignore`-ral együtt), hogy ne kerüljön gitbe.
-    /// Ha nem hozható létre (pl. írásvédett projekt), a cache nélkül megy tovább.
-    pub(super) fn cache(&self) -> Option<JsonlCacheStore> {
-        let store = ProjectStore::at_root(&self.root);
-        store.ensure().ok()?;
-        Some(JsonlCacheStore::new(store.cache_path()))
+    /// Egy fájl elemzése (gráf nélküli út).
+    pub(super) fn analyze(&self, path: &Path) -> Result<FileGraph> {
+        Ok(self.analyzer.analyze_path(path)?.graph)
     }
-
-    /// Cache-ből, ha friss; különben elemzés, és a gráf visszaírása (az írás hibája nem állítja meg a lekérdezést).
-    pub(super) fn load(
-        &self,
-        cache: &mut Option<JsonlCacheStore>,
-        path: &Path,
-    ) -> Result<FileGraph> {
-        let id = self
-            .analyzer
-            .registry()
-            .for_path(path)
-            .map(|l| l.id())
-            .unwrap_or("unknown");
-        let seconds = mtime(path);
-        if let (Some(store), Some(m)) = (cache.as_ref(), seconds)
-            && let Some(graph) = store.get_for_language(path, m, id)
-        {
-            return Ok(graph);
-        }
-        let graph = self.analyzer.analyze_path(path)?.graph;
-        if let (Some(store), Some(m)) = (cache.as_mut(), seconds) {
-            let _ = store.put_for_language(path, m, &graph, id);
-        }
-        Ok(graph)
-    }
-}
-
-fn mtime(path: &Path) -> Option<u64> {
-    path.metadata()
-        .ok()?
-        .modified()
-        .ok()?
-        .duration_since(UNIX_EPOCH)
-        .ok()
-        .map(|d| d.as_secs())
 }

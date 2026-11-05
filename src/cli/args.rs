@@ -5,11 +5,12 @@ use std::path::PathBuf;
 
 use crate::error::{CallgraphError, Result};
 use crate::lang::LanguageRegistry;
+use crate::query::format::BodyMode;
 
 fn usage() -> &'static str {
     crate::t!(
-        "callgraph [--lang <id,...>] [--cache <file>] [--no-cache] <file|dir> [...] | callgraph prune [--cache <file>] [--dry-run] | callgraph set-lang [en|hu] | callgraph self-update [--check] | callgraph mcp | callgraph --version",
-        "callgraph [--lang <id,...>] [--cache <fájl>] [--no-cache] <fájl|mappa> [...] | callgraph prune [--cache <fájl>] [--dry-run] | callgraph set-lang [en|hu] | callgraph self-update [--check] | callgraph mcp | callgraph --version"
+        "callgraph [--lang <id,...>] [--cache <file>] [--no-cache] <file|dir> [...] | callgraph prune [--cache <file>] [--dry-run] | callgraph set-lang [en|hu] | callgraph self-update [--check] | callgraph note add|list|rm … | callgraph mcp | callgraph --version",
+        "callgraph [--lang <id,...>] [--cache <fájl>] [--no-cache] <fájl|mappa> [...] | callgraph prune [--cache <fájl>] [--dry-run] | callgraph set-lang [en|hu] | callgraph self-update [--check] | callgraph note add|list|rm … | callgraph mcp | callgraph --version"
     )
 }
 
@@ -29,9 +30,27 @@ fn callers_usage() -> &'static str {
 
 fn show_usage() -> &'static str {
     crate::t!(
-        "callgraph show [--project <root>] [--label <name>] [--format <f>] [--body|--lines <n>-<m>|--strings <pattern>|--const <pattern>] [--grep <pattern>] [--category <cat,...>] [--depth N] [--guess] [--full] <path[::m]>...",
-        "callgraph show [--project <gyökér>] [--label <név>] [--format <f>] [--body|--lines <n>-<m>|--strings <minta>|--const <minta>] [--grep <minta>] [--category <kat,...>] [--depth N] [--guess] [--full] <út[::m]>..."
+        "callgraph show [--project <root>] [--label <name>] [--format <f>] [--body [--doc|--raw]|--lines <n>-<m>|--strings <pattern>|--const <pattern>] [--grep <pattern>] [--category <cat,...>] [--depth N] [--guess] [--notes <pattern>] [--full] <path[::m]>...",
+        "callgraph show [--project <gyökér>] [--label <név>] [--format <f>] [--body [--doc|--raw]|--lines <n>-<m>|--strings <minta>|--const <minta>] [--grep <minta>] [--category <kat,...>] [--depth N] [--guess] [--notes <minta>] [--full] <út[::m]>..."
     )
+}
+
+fn note_usage() -> &'static str {
+    crate::t!(
+        "callgraph note add <file>[::<method>] \"<text>\" | note list [<path>] | note rm <id>  [--project <alias|root>]",
+        "callgraph note add <fájl>[::<metódus>] \"<szöveg>\" | note list [<út>] | note rm <id>  [--project <alias|gyökér>]"
+    )
+}
+
+/// A `note` alparancs művelete (PILOT: jegyzetek fájlhoz / metódushoz).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NoteAction {
+    /// Új jegyzet: `<fájl>[::<metódus>]` és a szöveg.
+    Add { target: String, text: String },
+    /// Jegyzetek listája, opcionálisan egy fájl / mappa alatt.
+    List { path: Option<String> },
+    /// Jegyzet törlése azonosító szerint.
+    Rm { id: String },
 }
 
 /// A feldolgozott parancssori argumentumok — alparancsonként egy változat (Command minta bemenete).
@@ -68,10 +87,18 @@ pub enum CliArgs {
         strings: Option<String>,
         const_filter: Option<String>,
         body: bool,
+        /// A `--body` nézete: tömör (alap), `--doc` (docblockkal) vagy `--raw` (szűretlen); mindkettő `--body`-t is jelent.
+        body_mode: BodyMode,
         grep: Option<String>,
         category: Option<Vec<String>>,
         depth: usize,
         guess: bool,
+        notes: Option<String>,
+    },
+    /// `note add|list|rm` (PILOT); `project`: alias vagy gyökér-út.
+    Note {
+        action: NoteAction,
+        project: Option<String>,
     },
     /// `--version` / `-V`: a verzió és a platform.
     Version,
@@ -105,6 +132,9 @@ impl CliArgs {
         }
         if args.first().is_some_and(|a| a == "callers") {
             return Self::parse_callers(&args[1..]);
+        }
+        if args.first().is_some_and(|a| a == "note") {
+            return Self::parse_note(&args[1..]);
         }
         if args.first().is_some_and(|a| a == "show") {
             return Self::parse_show(&args[1..]);
@@ -141,10 +171,12 @@ impl CliArgs {
         let mut strings = None;
         let mut const_filter = None;
         let mut body = false;
+        let mut body_mode = BodyMode::Compact;
         let mut grep = None;
         let mut category = None;
         let mut depth = 1;
         let mut guess = false;
+        let mut notes = None;
         let mut i = 0;
         while i < args.len() {
             match args[i].as_str() {
@@ -160,6 +192,18 @@ impl CliArgs {
                     body = true;
                     i += 1;
                 }
+                "--doc" => {
+                    body = true;
+                    if body_mode != BodyMode::Raw {
+                        body_mode = BodyMode::Doc;
+                    }
+                    i += 1;
+                }
+                "--raw" => {
+                    body = true;
+                    body_mode = BodyMode::Raw;
+                    i += 1;
+                }
                 "--guess" => {
                     guess = true;
                     i += 1;
@@ -170,6 +214,14 @@ impl CliArgs {
                 }
                 x if x.starts_with("--grep=") => {
                     grep = Some(x[7..].to_owned());
+                    i += 1;
+                }
+                "--notes" if i + 1 < args.len() => {
+                    notes = Some(args[i + 1].clone());
+                    i += 2;
+                }
+                x if x.starts_with("--notes=") => {
+                    notes = Some(x[8..].to_owned());
                     i += 1;
                 }
                 "--category" if i + 1 < args.len() => {
@@ -261,11 +313,59 @@ impl CliArgs {
             strings,
             const_filter,
             body,
+            body_mode,
             grep,
             category,
             depth,
             guess,
+            notes,
         })
+    }
+
+    /// `note <add|list|rm> …`; a `--project` bárhol állhat, `--` után minden szöveg (pl. `-`-sal kezdődő jegyzet).
+    fn parse_note(args: &[String]) -> Result<Self> {
+        let usage = || CallgraphError::Usage(note_usage().into());
+        let mut project = None;
+        let mut positional: Vec<String> = Vec::new();
+        let mut i = 0;
+        while i < args.len() {
+            match args[i].as_str() {
+                "--" => {
+                    positional.extend(args[i + 1..].iter().cloned());
+                    break;
+                }
+                "--project" if i + 1 < args.len() => {
+                    project = Some(args[i + 1].clone());
+                    i += 1;
+                }
+                x if x.starts_with("--project=") => project = Some(x[10..].to_owned()),
+                x if x.starts_with('-') && x.len() > 1 => return Err(usage()),
+                x => positional.push(x.to_owned()),
+            }
+            i += 1;
+        }
+        let Some((action, rest)) = positional.split_first() else {
+            return Err(usage());
+        };
+        let action = match (action.as_str(), rest) {
+            ("add", [target, words @ ..]) if !words.is_empty() => {
+                let text = words.join(" ");
+                if text.trim().is_empty() {
+                    return Err(usage());
+                }
+                NoteAction::Add {
+                    target: target.clone(),
+                    text,
+                }
+            }
+            ("list" | "ls", []) => NoteAction::List { path: None },
+            ("list" | "ls", [path]) => NoteAction::List {
+                path: Some(path.clone()),
+            },
+            ("rm" | "remove", [id]) => NoteAction::Rm { id: id.clone() },
+            _ => return Err(usage()),
+        };
+        Ok(Self::Note { action, project })
     }
 
     fn parse_callers(args: &[String]) -> Result<Self> {
@@ -485,6 +585,90 @@ mod tests {
             }
         );
         assert!(parse(&["prune", "--bogus"]).is_err());
+    }
+
+    #[test]
+    fn parses_body_modes() {
+        let mode = |a: &[&str]| match parse(a).unwrap() {
+            CliArgs::Show {
+                body, body_mode, ..
+            } => (body, body_mode),
+            other => panic!("{other:?}"),
+        };
+        assert_eq!(mode(&["show", "a.php::m"]), (false, BodyMode::Compact));
+        assert_eq!(
+            mode(&["show", "--body", "a.php::m"]),
+            (true, BodyMode::Compact)
+        );
+        assert_eq!(
+            mode(&["show", "--body", "--doc", "a.php::m"]),
+            (true, BodyMode::Doc)
+        );
+        // a --doc / --raw magában is --body; a --raw erősebb
+        assert_eq!(mode(&["show", "--raw", "a.php::m"]), (true, BodyMode::Raw));
+        assert_eq!(
+            mode(&["show", "--raw", "--doc", "a.php::m"]),
+            (true, BodyMode::Raw)
+        );
+    }
+
+    #[test]
+    fn parses_note_subcommands() {
+        assert_eq!(
+            parse(&[
+                "note",
+                "add",
+                "a.rs::run",
+                "slow",
+                "path",
+                "--project",
+                "sp"
+            ])
+            .unwrap(),
+            CliArgs::Note {
+                action: NoteAction::Add {
+                    target: "a.rs::run".into(),
+                    text: "slow path".into()
+                },
+                project: Some("sp".into())
+            }
+        );
+        assert_eq!(
+            parse(&["note", "add", "a.rs", "--", "-1 is a sentinel"]).unwrap(),
+            CliArgs::Note {
+                action: NoteAction::Add {
+                    target: "a.rs".into(),
+                    text: "-1 is a sentinel".into()
+                },
+                project: None
+            }
+        );
+        assert_eq!(
+            parse(&["note", "list", "--project=/x", "src"]).unwrap(),
+            CliArgs::Note {
+                action: NoteAction::List {
+                    path: Some("src".into())
+                },
+                project: Some("/x".into())
+            }
+        );
+        assert_eq!(
+            parse(&["note", "rm", "ab12cd34"]).unwrap(),
+            CliArgs::Note {
+                action: NoteAction::Rm {
+                    id: "ab12cd34".into()
+                },
+                project: None
+            }
+        );
+        assert!(parse(&["note"]).is_err());
+        assert!(parse(&["note", "add", "a.rs"]).is_err());
+        assert!(parse(&["note", "rm"]).is_err());
+        assert!(parse(&["note", "list", "--bogus"]).is_err());
+        assert!(matches!(
+            parse(&["show", "src", "--notes", "cache"]).unwrap(),
+            CliArgs::Show { notes: Some(n), .. } if n == "cache"
+        ));
     }
 
     #[test]

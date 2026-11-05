@@ -2,7 +2,8 @@
 
 use crate::cli::Command;
 use crate::error::Result;
-use crate::query::{OutputLimit, QueryEngine, SelectorSet, format::FormatterRegistry};
+use crate::query::format::{BodyMode, FormatterRegistry};
+use crate::query::{OutputLimit, QueryEngine, SelectorSet};
 use std::io::Write;
 use std::path::PathBuf;
 pub struct ShowCommand {
@@ -16,10 +17,13 @@ pub struct ShowCommand {
     strings: Option<String>,
     const_filter: Option<String>,
     body: bool,
+    body_mode: BodyMode,
     grep: Option<String>,
     category: Option<Vec<String>>,
     depth: usize,
     guess: bool,
+    /// `--notes <minta>` (PILOT): a jegyzetek keresése a célok alatt, elemzés helyett.
+    notes: Option<String>,
 }
 impl ShowCommand {
     #[allow(clippy::too_many_arguments)]
@@ -34,10 +38,12 @@ impl ShowCommand {
         strings: Option<String>,
         const_filter: Option<String>,
         body: bool,
+        body_mode: BodyMode,
         grep: Option<String>,
         category: Option<Vec<String>>,
         depth: usize,
         guess: bool,
+        notes: Option<String>,
     ) -> Self {
         Self {
             paths,
@@ -50,21 +56,29 @@ impl ShowCommand {
             strings,
             const_filter,
             body,
+            body_mode,
             grep,
             category,
             depth,
             guess,
+            notes,
         }
     }
 }
 impl Command for ShowCommand {
     fn run(&self, out: &mut dyn Write, _err: &mut dyn Write) -> Result<i32> {
+        if let Some(pattern) = self.notes.as_deref() {
+            return self.search_notes(pattern, out, _err);
+        }
         let selectors = match SelectorSet::parse(&self.paths) {
             Ok(value) => value,
             Err(error) => return Self::report(_err, error),
         };
-        let engine = QueryEngine::new(self.project.as_deref(), self.label.clone());
-        let rows =
+        // minden lekérdezés a perzisztens projekt-gráfból olvas (crate::graph: a pack a fájlonkénti cache is)
+        let engine = QueryEngine::new(self.project.as_deref(), self.label.clone())
+            .use_project_graph(true)
+            .use_slim_rows(self.slim_rows());
+        let mut rows =
             match engine.query_filtered(&selectors, self.grep.as_deref(), self.category.as_deref())
             {
                 Ok(value) => value,
@@ -82,6 +96,13 @@ impl Command for ShowCommand {
                 ),
             );
         }
+        // `--grep … --body`: a talált hívó metódusok forrása (a szűrt sorok a hívókat tartják meg);
+        // találat nélkül a `--grep` szokásos „nincs találat” kimenete marad
+        if self.grep.is_some() && self.body && self.depth <= 1 && !rows.is_empty() {
+            let text = FormatterRegistry::format_body(&rows, self.body_mode);
+            write!(out, "{}", engine.relativize(&text))?;
+            return Ok(0);
+        }
         if let Some(pattern) = self.grep.as_deref() {
             let scope = engine.depth_scope();
             let text = match engine.grep_text(
@@ -92,6 +113,15 @@ impl Command for ShowCommand {
             };
             write!(out, "{}", engine.relativize(&text))?;
             return Ok(0);
+        }
+        if self.body
+            || (self.format == "outline"
+                && self.lines.is_none()
+                && self.strings.is_none()
+                && self.const_filter.is_none())
+        {
+            // jegyzetek (PILOT) csak az outline-ba és a --body-ba; jegyzet nélkül a kimenet változatlan
+            crate::notes::annotate(&mut rows, engine.root());
         }
         let text = match self.render(&rows) {
             Ok(value) => value,
@@ -137,7 +167,7 @@ impl Command for ShowCommand {
 impl ShowCommand {
     fn render(&self, rows: &[crate::query::QueryResult]) -> Result<String> {
         if self.body {
-            return FormatterRegistry::format("body", rows);
+            return Ok(FormatterRegistry::format_body(rows, self.body_mode));
         }
         if let Some(value) = &self.lines {
             let Some((start, end)) = value.split_once('-') else {
@@ -160,6 +190,32 @@ impl ShowCommand {
             return FormatterRegistry::format_with("const", rows, None, Some(filter));
         }
         FormatterRegistry::format(&self.format, rows)
+    }
+
+    /// `show <cél>... --notes <minta>`: a célok alatti, a mintára illeszkedő jegyzetek (`root:` konvencióval).
+    fn search_notes(&self, pattern: &str, out: &mut dyn Write, err: &mut dyn Write) -> Result<i32> {
+        let engine = QueryEngine::new(self.project.as_deref(), self.label.clone());
+        let root = engine.root();
+        let text = crate::notes::NoteFilter::new(root, &self.paths, Some(pattern))
+            .and_then(|filter| crate::notes::search_text(root, &filter, crate::i18n::lang()));
+        match text {
+            Ok(text) => {
+                write!(out, "{}", engine.relativize(&text))?;
+                Ok(0)
+            }
+            Err(error) => Self::report(err, error),
+        }
+    }
+
+    /// A sorok elég-e a szűkített tényekből (`facts.bin`): a `--grep` (a `--grep … --body` kivételével) és a
+    /// `--strings` / `--const` csak azok mezőit olvassa; minden más nézet a teljes rekordot kapja.
+    fn slim_rows(&self) -> bool {
+        if self.grep.is_some() {
+            return !(self.body && self.depth <= 1);
+        }
+        !self.body
+            && self.lines.is_none()
+            && (self.strings.is_some() || self.const_filter.is_some())
     }
 
     fn report(err: &mut dyn Write, error: crate::error::CallgraphError) -> Result<i32> {

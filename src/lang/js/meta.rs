@@ -2,7 +2,9 @@
 
 use std::path::Path;
 
-use oxc_ast::ast::{Class, Declaration, ExportDefaultDeclarationKind, Program, Statement};
+use oxc_ast::ast::{
+    Declaration, ExportDefaultDeclarationKind, Program, Statement, TSInterfaceDeclaration,
+};
 use oxc_span::GetSpan;
 
 use super::analysis::{JsAnalysis, JsPass, PassContext};
@@ -54,7 +56,8 @@ fn is_ignored(text: &str, block: &SfcBlock) -> bool {
     text[block.start..block.end].trim().is_empty() && !open.contains(" src")
 }
 
-/// A top-level osztály-deklarációkat `type:'class'` containerként veszi fel.
+/// A top-level osztály-deklarációkat `type:'class'`, a TS interfészeket `type:'interface'` containerként veszi
+/// fel; az `extends` / `implements` a típus-hierarchiához (a `via <Interfész>` hívó-kereséshez) kell.
 pub struct ClassContainerPass;
 
 impl JsPass for ClassContainerPass {
@@ -64,17 +67,25 @@ impl JsPass for ClassContainerPass {
                 Statement::ClassDeclaration(c) => (c.as_ref(), true),
                 Statement::ExportDeclaration(e) => match &e.declaration {
                     Declaration::ClassDeclaration(c) => (c.as_ref(), false),
+                    Declaration::TSInterfaceDeclaration(i) => {
+                        interface_container(ctx, program, i, false, out);
+                        continue;
+                    }
                     _ => continue,
                 },
                 Statement::ExportDefaultDeclaration(e) => match &e.declaration {
                     ExportDefaultDeclarationKind::ClassDeclaration(c) => (c.as_ref(), false),
                     _ => continue,
                 },
+                Statement::TSInterfaceDeclaration(i) => {
+                    interface_container(ctx, program, i, true, out);
+                    continue;
+                }
                 _ => continue,
             };
             let Some(id) = &class.id else { continue };
             let doc = own_doc
-                .then(|| doc_before(program, ctx.source, class))
+                .then(|| doc_before(program, ctx.source, class.span.start))
                 .flatten();
             out.builder.container(Container {
                 kind: "class".to_string(),
@@ -90,12 +101,48 @@ impl JsPass for ClassContainerPass {
                         .map(|h| squeeze(slice(ctx.source, h.expression.span()), 60))
                         .collect(),
                 ),
-                implements: Some(Vec::new()),
+                implements: Some(
+                    class
+                        .implements
+                        .iter()
+                        .map(|i| squeeze(slice(ctx.source, i.expression.span()), 60))
+                        .collect(),
+                ),
                 traits: Some(Vec::new()),
                 doc,
             });
         }
     }
+}
+
+/// `interface X extends Y, Z {}`: container a szülő-interfészekkel (`extends`), mint a PHP-ban.
+fn interface_container(
+    ctx: &PassContext<'_>,
+    program: &Program<'_>,
+    i: &TSInterfaceDeclaration<'_>,
+    own_doc: bool,
+    out: &mut JsAnalysis,
+) {
+    let doc = own_doc
+        .then(|| doc_before(program, ctx.source, i.span.start))
+        .flatten();
+    out.builder.container(Container {
+        kind: "interface".to_string(),
+        name: i.id.name.to_string(),
+        line: ctx.lines.line_of(i.span.start as usize),
+        end_line: ctx.lines.line_of(i.span.end as usize),
+        is_abstract: Some(false),
+        is_final: Some(false),
+        extends: Some(
+            i.extends
+                .iter()
+                .map(|h| squeeze(slice(ctx.source, h.type_name.span()), 60))
+                .collect(),
+        ),
+        implements: Some(Vec::new()),
+        traits: Some(Vec::new()),
+        doc,
+    });
 }
 
 fn slice(src: &str, span: oxc_span::Span) -> &str {
@@ -114,12 +161,12 @@ fn squeeze(text: &str, max: usize) -> String {
     }
 }
 
-/// Az osztály elé tapadó utolsó `/** */` docblock szövege (≤300 karakter).
-fn doc_before(program: &Program<'_>, src: &str, class: &Class<'_>) -> Option<String> {
+/// A `start` offsetű deklaráció elé tapadó utolsó `/** */` docblock szövege (≤300 karakter).
+fn doc_before(program: &Program<'_>, src: &str, start: u32) -> Option<String> {
     let comment = program
         .comments
         .iter()
-        .filter(|c| c.attached_to == class.span.start && c.is_block())
+        .filter(|c| c.attached_to == start && c.is_block())
         .rfind(|c| slice(src, c.content_span()).starts_with('*'))?;
     let text = slice(src, comment.content_span())
         .trim_start_matches('*')

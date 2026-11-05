@@ -61,11 +61,12 @@ fn parse(args: &[String]) -> Parsed {
                 p.depth = value();
                 p.forward.extend(["--depth".into(), p.depth.clone()]);
             }
-            "--format" | "--grep" | "--category" | "--lines" | "--strings" | "--const" => {
+            "--format" | "--grep" | "--category" | "--lines" | "--strings" | "--const"
+            | "--notes" => {
                 let v = value();
                 p.forward.extend([a.clone(), v]);
             }
-            "--body" | "--full" | "--guess" => p.forward.push(a.clone()),
+            "--body" | "--doc" | "--raw" | "--full" | "--guess" => p.forward.push(a.clone()),
             _ => p.targets.push(a.clone()),
         }
     }

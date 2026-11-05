@@ -20,8 +20,13 @@ impl Formatter for Outline {
 pub struct GrepOutline;
 impl Formatter for GrepOutline {
     fn format(&self, rows: &[QueryResult], lang: Lang) -> String {
-        render(rows, lang, Some(&SourceLines::default()))
+        grep_outline(rows, lang, &SourceLines::default())
     }
+}
+
+/// A `--grep` outline a megadott forrássor-tárral (a projekt-gráf tárolt hívás-soraival előtöltve is lehet).
+pub(crate) fn grep_outline(rows: &[QueryResult], lang: Lang, source: &SourceLines) -> String {
+    render(rows, lang, Some(source))
 }
 
 fn render(rows: &[QueryResult], lang: Lang, source: Option<&SourceLines>) -> String {
@@ -49,6 +54,9 @@ fn outline(row: &QueryResult, lang: Lang, source: Option<&SourceLines>) -> Strin
             .unwrap_or_default()
     )
     .unwrap();
+    // jegyzetek (PILOT): fájl-jegyzetek, és a nem listázott (konténer nélküli) függvényeiké
+    crate::notes::file_lines(&mut s, &row.notes);
+    crate::notes::unlisted_lines(&mut s, &row.notes, g);
     writeln!(s).unwrap();
     if g.containers.is_empty() {
         super::outline_procedural::procedural(g, &mut s, lang, source.map(|lines| (row, lines)));
@@ -85,7 +93,7 @@ fn outline(row: &QueryResult, lang: Lang, source: Option<&SourceLines>) -> Strin
         let cons: Vec<_> = g
             .constants
             .iter()
-            .filter(|x| x.container.as_deref() == Some(&c.name))
+            .filter(|x| g.owns(c, x.container.as_deref(), x.line))
             .collect();
         if !cons.is_empty() {
             writeln!(s, "  constants ({}):", cons.len()).unwrap();
@@ -107,7 +115,7 @@ fn outline(row: &QueryResult, lang: Lang, source: Option<&SourceLines>) -> Strin
         let props: Vec<_> = g
             .properties
             .iter()
-            .filter(|p| p.container.as_deref() == Some(&c.name))
+            .filter(|p| g.owns(c, p.container.as_deref(), p.line))
             .collect();
         if !props.is_empty() {
             writeln!(s, "  properties ({}):", props.len()).unwrap();
@@ -126,12 +134,13 @@ fn outline(row: &QueryResult, lang: Lang, source: Option<&SourceLines>) -> Strin
         let mut methods: Vec<_> = g
             .methods
             .iter()
-            .filter(|m| m.container.as_deref() == Some(&c.name))
+            .filter(|m| g.owns(c, m.container.as_deref(), m.line))
             .filter(|m| row.methods.as_ref().is_none_or(|ms| ms.contains(&m.name)))
             .collect();
         methods.sort_by_key(|m| m.line);
         for m in methods {
             method_line(&mut s, m);
+            crate::notes::method_lines(&mut s, &row.notes, m.container.as_deref(), &m.name, "    ");
             for cat in categories(g, m) {
                 writeln!(s, "    {:<18}{}", cat.0, cat.1).unwrap();
             }
@@ -175,7 +184,8 @@ pub(crate) fn method_calls<'g>(g: &'g FileGraph, m: &Method) -> Vec<&'g Call> {
         .collect()
 }
 
-/// A hívások helye soronként egyszer (`L25 [via X] │ kód`), legfeljebb `snippet::MAX_PER_METHOD`, a többi `… +N`.
+/// A hívások helye soronként egyszer (`L25 [via X] │ kód`); az azonos (és azonos `via`-jú) sorok egy sorba vonva
+/// (`L12, L40 │ kód`), legfeljebb `snippet::MAX_PER_METHOD` sor, a többi `… +N more: L55, L61`.
 pub(crate) fn call_lines(
     s: &mut String,
     row: &QueryResult,
@@ -187,26 +197,24 @@ pub(crate) fn call_lines(
     let mut lines: Vec<u32> = calls.iter().map(|c| c.line).collect();
     lines.sort_unstable();
     lines.dedup();
-    for &line in lines.iter().take(snippet::MAX_PER_METHOD) {
+    let sites = snippet::merge(lines.iter().map(|&line| {
         let via = calls
             .iter()
             .filter(|c| c.line == line)
             .find_map(|c| row.via_of(c));
-        let code = source.get(&row.graph.file, line);
+        (line, via, source.get(&row.graph.file, line))
+    }));
+    let (shown, rest) = snippet::cap(sites);
+    for site in &shown {
         writeln!(
             s,
             "{indent}{}",
-            snippet::call_line(lang, line, via, code.as_deref())
+            snippet::sites_line(lang, &site.lines, site.key, site.code.as_deref())
         )
         .unwrap();
     }
-    if lines.len() > snippet::MAX_PER_METHOD {
-        writeln!(
-            s,
-            "{indent}{}",
-            snippet::more(lang, lines.len() - snippet::MAX_PER_METHOD)
-        )
-        .unwrap();
+    if !rest.is_empty() {
+        writeln!(s, "{indent}{}", snippet::more(lang, &rest)).unwrap();
     }
 }
 

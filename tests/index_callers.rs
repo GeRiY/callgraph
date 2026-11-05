@@ -60,7 +60,7 @@ fn creates_project_index_and_updates_changed_file() {
     .unwrap();
     let first = run(&project, 1);
     assert_eq!(first.len(), 1);
-    assert!(project.0.join(".callgraph/index.jsonl").exists());
+    assert!(project.0.join(".callgraph/index.bin").exists());
     fs::write(
         &source,
         "<?php\nnamespace App;\nclass Order { function saveTranslations() {} }\nclass Caller { function second() { Order::saveTranslations(); } }",

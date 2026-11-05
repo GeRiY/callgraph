@@ -1,12 +1,12 @@
 # Query-réteg
 
-A `show` parancs a `SelectorSet` segítségével fájlokat és metódusokat választ ki. A `QueryEngine` a projekt gyökeréhez relatív utat old fel, előbb a projekt `.callgraph/cache.jsonl` cache-ét használja, majd az `Analyzer` facade-et. A kimenetet a `FormatterRegistry` név szerint választott Strategy-je állítja elő.
+A `show` parancs a `SelectorSet` segítségével fájlokat és metódusokat választ ki. A `QueryEngine` a projekt gyökeréhez relatív utat old fel, a gráfokat a projekt-gráfból veszi (`.callgraph/`, `docs/PROJECT-GRAPH.md`), a változott fájlokat az `Analyzer` facade elemzi. A kimenetet a `FormatterRegistry` név szerint választott Strategy-je állítja elő.
 
 Új formázó: hozz létre egy külön `Formatter` implementációt a `src/query/format/` alatt, majd adj hozzá egy `register`/névágatot a registryhez. A limit előtti formázás és a `method-index` változatlan marad.
 
 ## Felépítés
 - `src/query/selector.rs` — `<fájl>[::m1[::m2]]` argumentumok (`SelectorSet`), a callgraph hibáival (szelektoros és sima argumentum keverése).
-- `src/query/engine.rs` — `QueryEngine` (Facade): a gyökérhez relatív utak → `QueryResult` (FileGraph + kijelölt metódusok); cache: `<gyökér>/.callgraph/`, a cache-írás hibája nem állítja meg.
+- `src/query/engine.rs` — `QueryEngine` (Facade): a gyökérhez relatív utak → `QueryResult` (FileGraph + kijelölt metódusok); tároló: `<gyökér>/.callgraph/` (projekt-gráf), az írás hibája nem állítja meg.
 - `src/query/limit.rs` — `OutputLimit`: 400 sor (`CALLGRAPH_OUT_LIMIT`, `--full` kikapcsolja); mappán summary, fájlon `method-index`.
 - `src/query/format/` — egy formázó = egy fájl, `FormatterRegistry::with_defaults()` regisztrálja.
   Paraméteres nézetek (`lines` sávval, `strings`/`const` mintával) a `FormatterRegistry::format_with`-en át.
@@ -16,9 +16,9 @@ A `show` parancs a `SelectorSet` segítségével fájlokat és metódusokat vál
 |---|---|---|
 | (alap) / `--format outline` | `outline.rs` | |
 | `--format json` / `jsonl` | `json.rs` | a json a callgraph `jq -s '.'` paritása, a jsonl natív |
-| `--body` | `body.rs` | a kijelölt metódusok forrása sorszámozva, docblockkal |
+| `--body` [`--doc`\|`--raw`] | `body.rs` (+`body_filter.rs`) | a kijelölt metódusok forrása sorszámozva; alapból tömör (docblock, üres és csak megjegyzés sorok nélkül, a sorszámok a forrásbeliek; a string / heredoc / template literal belseje marad), `--doc`: docblockkal, `--raw`: szűretlenül; `--grep`-pel a talált hívók forrása |
 | `--lines n-m` | `lines.rs` (+`source.rs`) | nyers sorok, elemzés nélkül (legacy view-n is) |
-| `--strings <minta>` / `--const <minta>` | `strings.rs` / `constants.rs` | |
+| `--strings <minta>` / `--const <minta>` | `strings.rs` / `constants.rs` (+`reexports.rs`) | a `--const` a továbbexportálásokat is listázza (`[re-export]`: Rust `pub use`, JS/TS `export { … }`, PHP `use const`), a forrásszövegből |
 
 ## Nyelv
 A kimenet emberi szövegei (fejlécek, címkék, „nincs találat”, figyelmeztetések, hibaüzenetek) a nyelvbeállítást követik
@@ -34,7 +34,7 @@ A szkript `CALLGRAPH_LANG=hu`-val futtat: a golden a régi, magyar skill kimenet
 
 ### R6e: `--grep`, `--category`, `--depth`, `--guess`
 | `--grep <minta>` / `--category <k,...>` | `src/query/filter/` (Specification) + `QueryEngine::query_filtered` | 400 sor fölött találatonként 1 sor (`⚠ A --grep outline N sor lenne …`) |
-| `--depth N` / `--guess` | `QueryEngine::grep_text` + `index::CallerIndex` | a csak név szerinti egyezést „?” jelöli; `--guess` nélkül a szint végén „(+N feloldatlan …)” |
+| `--depth N` / `--guess` | `QueryEngine::grep_text` + `index::CallerIndex` (a `graph::ProjectGraph`-ból) | a csak név szerinti egyezést „?” jelöli; `--guess` nélkül a szint végén „(+N feloldatlan …)” |
 Ismert maradék (99%+ FileGraph-eltérés, halasztva): a grep-outline sorszáma és néhány feloldatlan hívó a calls-mezőből.
 0.2.0 (szándékos eltérés a régi skilltől): a `--grep` a `grep-outline` formázóval fut — metódusonként a találat-hívások
 helye és forrássora (`L25 │ kód`, `query/snippet.rs`, metódusonként ≤ 5 sor); a `--depth` szintjein is. Rokon típuson át
@@ -63,7 +63,8 @@ az callgraph a szándékolt `later\(` mintát használja (így a `sp_jobs` golde
   a hibák `[error-id]` sora (`skill/lib.sh` `fail`), és a JS / TS / Vue cél továbbítása a régi motornak (`CALLGRAPH_LEGACY`) változatlan argumentumokkal.
 - Az callgraph csak abszolút gyökeret (`--project <út>`) és címkét (`--label <alias>`) kap; projektnevet maga nem old fel.
 - A bináris: `CALLGRAPH_BIN`, vagy `bin/<os>-<arch>/callgraph`, vagy `bin/callgraph`.
-- A `show` a projekt `.callgraph/` tárolóját az `ensure()`-rel hozza létre (`*`-os `.gitignore`), olvas és ír is a cache-be; ha a tároló nem írható, cache nélkül fut.
+- A `show` a projekt `.callgraph/` tárolóját az `ensure()`-rel hozza létre (`*`-os `.gitignore`), olvas és ír is a projekt-gráfba; ha a tároló nem írható, gráf nélkül (minden fájlt elemezve) fut.
+- Minden `show` (és a `callers`) a perzisztens projekt-gráfból olvas: `docs/PROJECT-GRAPH.md`; `CALLGRAPH_NO_GRAPH=1` a gráf nélküli út (azonos kimenet).
 - Mérés a burkon át: `CALLGRAPH_MAP=golden/query/cases.tsv bash tools/query_check.sh "CALLGRAPH_BIN=… PHP_AST_HOME=… CALLGRAPH_REGISTRY=… CALLGRAPH_LEGACY=… bash skill/callgraph.sh"` → 39/51 AZONOS
   (a hibaesetek is); a maradék a FileGraph 99%+ eltérése (G1d) és a szándékos `jobs`-javítás.
 - Az élő `~/.claude/skills/callgraph/callgraph.sh` NINCS lecserélve — az átállás a felhasználó döntése.

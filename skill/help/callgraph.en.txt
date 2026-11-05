@@ -24,19 +24,37 @@ Usage:
   bash ~/.claude/skills/callgraph/callgraph.sh <file|dir> --grep <pattern>       only calls whose target matches the pattern
                                                 (only the methods/files containing a matching call — "where is it called");
                                                 each call with its source line: "L25 │ $this->repo->find($id)";
+                                                identical lines of one caller merged ("L12, L40 │ …"), at most 3 rows
+                                                per caller, then "… +N more: L55, L61";
                                                 "via Resolver" = called through an interface / trait / parent type
                                                 (a Type::method pattern also finds those calls)
                                                 Rust: "?::m" = receiver type unknown; a Type::m pattern still finds it (by name)
+                                                TS: typed receivers (this.repo.find() with "repo: Repo") match Type::m;
+                                                untyped / any / union receivers stay unresolved (search by method name)
   bash ~/.claude/skills/callgraph/callgraph.sh <dir> --grep <pattern> --depth N [--guess]
                                                 callers of callers up to N levels (impact analysis); --guess: also the
                                                 unresolved, name-only matches ("?")
   Paths: when several would repeat the project root, the first line is "root: /abs/project" and every path after it is
   relative to that root (usable as-is in the next call with the same --project).
-  bash ~/.claude/skills/callgraph/callgraph.sh <file>::<method> [...] --body   source of the method(s), line-numbered, with docblock
+  bash ~/.claude/skills/callgraph/callgraph.sh <file>::<method> [...] --body   source of the method(s), line-numbered, compact: no
+                                                docblock, blank or comment-only lines (the line numbers stay exact)
+                                                --doc: with the docblock; --raw: the exact, unfiltered source
   bash ~/.claude/skills/callgraph/callgraph.sh <dir> --grep <pattern> --body    source of the caller methods found
   bash ~/.claude/skills/callgraph/callgraph.sh <file> --lines <n>-<m>           any line range, line-numbered (e.g. a view file)
   bash ~/.claude/skills/callgraph/callgraph.sh <dir|file> --strings <pattern>   where string literals (error message, key) occur
-  bash ~/.claude/skills/callgraph/callgraph.sh <dir|file> --const <pattern>     constant references and definitions (PHP class constants, Rust const/static)
+  bash ~/.claude/skills/callgraph/callgraph.sh <dir|file> --const <pattern>     constant references, definitions and re-exports
+                                                (PHP class constants / use const, Rust const/static / pub use, JS/TS export { })
+
+Notes (pilot — a short note on a file or method, stored outside the source in <project>/.callgraph/notes.jsonl):
+  bash ~/.claude/skills/callgraph/callgraph.sh note add <file>[::<method>] "<text>" [--project alias]
+                                                prints the new note id; the anchor is the method NAME (Class::method also ok)
+  bash ~/.claude/skills/callgraph/callgraph.sh note list [<file|dir>] [--project alias]
+                                                "<id>  <file>::<Class>::<method>  2026-11-05 20:27  📝 <text>";
+                                                [orphaned] = the method is no longer in the file
+  bash ~/.claude/skills/callgraph/callgraph.sh note rm <id> [--project alias]
+  bash ~/.claude/skills/callgraph/callgraph.sh <dir|file> --notes <pattern>    search notes (regex on text or anchor, case-insensitive)
+  The outline shows "📝 2026-11-05 20:27 · <text>" under the file header / the method (newest first, max 3),
+  --body above the method source. Times are UTC.
 
 Language (of the terminal output and the help: en = English, default; hu = Hungarian):
   bash ~/.claude/skills/callgraph/callgraph.sh set-lang                 the current language and where it comes from

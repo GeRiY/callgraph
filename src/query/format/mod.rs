@@ -3,6 +3,7 @@
 
 mod api;
 mod body;
+mod body_filter;
 mod constants;
 mod coverage;
 mod flow;
@@ -14,6 +15,7 @@ mod lines;
 mod method_index;
 mod outline;
 mod outline_procedural;
+mod reexports;
 mod selection;
 mod source;
 mod stats;
@@ -23,7 +25,8 @@ mod summary;
 #[cfg(test)]
 mod tests;
 
-pub(crate) use outline::{call_lines, method_calls};
+pub use body::BodyMode;
+pub(crate) use outline::{call_lines, grep_outline, method_calls};
 
 use crate::error::{CallgraphError, Result};
 use crate::i18n::Lang;
@@ -64,7 +67,7 @@ impl FormatterRegistry {
         registry.register("json", Box::new(json::Json));
         registry.register("jsonl", Box::new(json::Jsonl));
         registry.register("method-index", Box::new(method_index::MethodIndex));
-        registry.register("body", Box::new(body::Body));
+        registry.register("body", Box::new(body::Body::default()));
         registry.register("flow", Box::new(flow::Flow));
         registry.register("hotspots", Box::new(hotspots::Hotspots));
         registry.register("coverage", Box::new(coverage::Coverage));
@@ -120,6 +123,11 @@ impl FormatterRegistry {
             _ => return self.render(name, rows),
         };
         Ok(formatter.format(rows, self.lang))
+    }
+
+    /// `--body` a megadott nézettel (tömör / docblockkal / nyers).
+    pub fn format_body(rows: &[QueryResult], mode: BodyMode) -> String {
+        body::Body { mode }.format(rows, crate::i18n::lang())
     }
 
     /// Rövidítés az alapértelmezett összeállításra.

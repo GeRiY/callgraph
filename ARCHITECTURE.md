@@ -36,6 +36,10 @@ src/
   model/                        közös kimeneti séma (FileGraph + FileGraphBuilder)
   analysis/                     Analyzer (Facade): fájl → registry.for_path → nyelv.analyze → Analysis
   io/                           walker (a registry kiterjesztéseivel), cache (CacheStore + JsonlCacheStore), jsonl_writer
+  index/                        CallerIndex (fordított hívó-index, mindkét irány) + TypeHierarchy (via-illesztés)
+  graph/                        ProjectGraph: perzisztens projekt-gráf (.callgraph/: index.bin manifest, graph.pack,
+                                facts.bin), fájlonként frissítve; folyamaton belül gyökerenként egy példány
+  query/                        QueryEngine (Facade), formázók (Strategy + FormatterRegistry), kimeneti korlát
   cli/                          Command minta; args, parancsok (analyze, prune)
   mcp/                          MCP-szerver (`callgraph mcp`, rmcp, stdio): eszköz-paraméter → `show`-lekérdezés, útvonal-őr
 tests/                          integrációs tesztek (pl. languages.rs: teszt-nyelvek a registryn)
@@ -72,6 +76,7 @@ kiterjesztést kéri, az előbb regisztrált nyer.
 | **Strategy** | `lang::php::framework::FrameworkStrategy` (`laravel`, `yii`, `generic`) | framework-specifikus ismert nevek / kategóriák |
 | **Factory** | `lang::php::framework::FrameworkDetector` | composer.json alapján a megfelelő stratégia (könyvtáranként cache-elve) |
 | **Repository** | `io::CacheStore` trait + `JsonlCacheStore` | mtime-alapú cache JSONL-ben, cserélhető tároló |
+| **Repository** | `graph::ProjectGraph` | a projekt fájljainak gráfja egy hozzáfűzős packben + manifest + szűkített tények, mtime + méret szerint frissítve |
 | **Command** | `cli::commands::*` | CLI-alparancsok egységes felülettel |
 
 ## Közös rétegek
@@ -81,6 +86,14 @@ kiterjesztést kéri, az előbb regisztrált nyer.
   JSON — constants: kulcs-útvonalak; Markdown — „metódus”: címsor-szakaszok, „hívás”: linkek.
 - **`io/`** — `FileWalker::for_registry` a regisztrált kiterjesztéseket járja be (a `vendor`, `node_modules`, `.git`… mappákat kihagyja);
   a cache kulcsa az abszolút út, értéke mtime + az eszköz verziója.
+- **`graph/`** — a perzisztens projekt-gráf (`docs/PROJECT-GRAPH.md`): egy hozzáfűzős pack (`graph.pack`: fájlonként
+  a frontend `FileGraph`-ja veszteségmentes tükör-alakban + a hívás-sorok; MessagePack + LZ4), egy kis manifest
+  (`index.bin`: út → bélyeg + a rekord helye) és a szűkített tények (`facts.bin`); minden fájl fejléce: fajta, verzió,
+  build-ujjlenyomat (eltérésre csendes újraépítés). Indításkor csak a manifest töltődik; a teljes hatókörű
+  lekérdezések (`--grep`, `--depth`, `callers`, `--strings`, `--const`) a `facts.bin`-ből, az egyfájlos nézetek a pack
+  rekordjaiból válaszolnak — egy meleg lekérdezés a projekt méretétől függetlenül állandó számú fájlt nyit. Minden
+  `show` és a `callers` ebből olvas — a pack a fájlonkénti cache is; a meleg lekérdezés forrásfájlt nem elemez. A levél-típusok új mezői kódváltozás nélkül tárolódnak; egy új `FileGraph`- /
+  `Property`- / `Constant`-mező a `graph/codec.rs` tükrében fordítási hibát ad (egy sor).
 - **`analysis/`** — az `Analyzer` nem ismer nyelvet: ismeretlen kiterjesztésre `CallgraphError::Unsupported`.
 - **`core/`** — a nyelvek által közösen használt, nyelvfüggetlen típusok.
 

@@ -5,6 +5,63 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-11-06
+
+### Changed
+- **Faster queries on big projects:** callgraph now keeps a compact project map in `.callgraph/` in just three
+  files, however big the project is: a short list of all files, one file with every file's full analysis, and one
+  with the summary that searches need. It is updated file by file, only for files that changed since the last query
+  (deleted or renamed files drop out). "Where is it called" (`--grep`, every `--depth` level), `callers`,
+  `--strings` and `--const` are answered from the summary file in one read; a single-file view (outline, `--body` …)
+  reads just that file's part of the full-analysis file. The output is exactly the same as before.
+  An edited file shows up in the very next query; anything damaged or written by another callgraph version is
+  rebuilt quietly. The map replaces the old analysis cache (`cache.jsonl`), which is removed automatically, so the
+  folder takes less space than before. The MCP server (`callgraph mcp`) keeps the map in memory between requests.
+  To switch it off (e.g. to compare), set `CALLGRAPH_NO_GRAPH=1`. Details: `docs/PROJECT-GRAPH.md`.
+- **Shorter call lists in "where is it called" results:** when one caller method makes the same call on several lines
+  with the very same source text, it is now shown once with all its line numbers, e.g.
+  `L12, L40 │ $this->repo->find($id)`. Each caller shows at most 3 such rows; the rest are listed by line number only:
+  `… +2 more: L55, L61`. This applies to `--grep`, the first `--depth` level and the one-line-per-call view used when
+  the result would be too long. Calls through an interface stay on their own row (`via …`).
+- **Shorter method bodies:** `--body` now leaves out what an agent rarely needs: the docblock / doc comments above the
+  method, blank lines and lines that are only a comment. Code lines are printed exactly as written (a comment at the end
+  of a code line stays), and nothing inside a string, heredoc or template literal is ever removed. The line numbers are
+  still the real ones, so a gap shows where lines were skipped and you can still read an exact range. Attributes such as
+  `#[test]` / `#[Route(...)]` are kept. Works for PHP, JS / TS / Vue, Rust and Swift, for several methods at once and
+  for `--grep … --body`.
+- New `--doc` adds the docblock back; new `--raw` prints the exact, unfiltered source (as before, plus Rust / Swift
+  doc comments and attributes). The MCP `method_body` tool follows the same default and has `doc` / `raw` options.
+
+### Added
+- **Notes on files and methods (pilot):** `callgraph note add <file>[::<method>] "<text>"` (also
+  `callgraph.sh note …`) attaches a short note, stored outside the source in `<project>/.callgraph/notes.jsonl`
+  (git-ignored) with the date and time (UTC). The outline shows it under the file header or the method
+  (`📝 2026-11-05 20:27 · text`, newest first, at most 3), `--body` above the method source. `note list [<path>]`
+  lists them (with `[orphaned]` when the method is gone), `note rm <id>` deletes one, and
+  `show <dir> --notes <pattern>` searches them. The anchor is the method name, not a line number. MCP: a new
+  read-only `notes` tool (there is no write tool). Without notes the output is unchanged. Details: `docs/NOTES.md`.
+- **TypeScript: calls through typed objects and interfaces.** callgraph now works out which class a TS method call
+  goes to when the type is written down: a typed parameter (`repo: Repo`), a typed class property
+  (`private repo: Repo`, also `constructor(private repo: Repo)`), `this.repo = new Repo()` or `const x = new Repo()`.
+  So `this.repo.find()` shows up as `Repo::find`, and `--grep 'Repo::find'` finds it. Classes record their
+  `implements`, and TS interfaces (`interface X extends Y`) appear in the map, so searching
+  `PlaylistResolver::getPlayables` also finds calls made through its `Resolver` interface, marked `via Resolver`
+  (in `--depth` and `callers` too). When the type is unclear (no type, `any`, a union like `Repo | null`, a generic
+  `T`, or different values in the same function) the call stays as before.
+- **`--const` lists re-exports:** besides references and definitions, `--const NAME` now shows where a name is passed
+  on, marked `[re-export]`: Rust `pub use state::{CheckState, STATE_FILE};` / `pub(crate) use …`, JS / TS
+  `export { NAME } from './x'` / `export { NAME }`, PHP `use const App\NAME;`.
+
+### Fixed
+- `--grep <pattern> --body` prints the source of the caller methods again (the option was ignored).
+- MCP `method_body`: `method` may be a single name as a plain string as well as a list (some clients send
+  `"method": "parse"`, which used to fail with an "expected a sequence" error).
+
+### Fixed
+- **JS/TS: no more doubled methods when a class is named like its file** (`PlaylistResolver.ts` with
+  `class PlaylistResolver`): the class's methods were listed twice, once under the file's `module` entry and once
+  under the class. Now class members appear only under the class and top-level functions only under the module.
+
 ## [0.2.0] — 2026-11-05
 
 ### Added
@@ -87,6 +144,7 @@ First release.
 - Built-in update: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Prebuilt packages for macOS (arm64, x86_64), Linux (x86_64, ARM64, static musl) and Windows.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.2.0...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.3.0...develop
+[0.3.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.3.0
 [0.2.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.2.0
 [0.1.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.1.0

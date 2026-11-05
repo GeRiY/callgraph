@@ -4,7 +4,7 @@ mod args;
 mod command;
 pub mod commands;
 
-pub use args::CliArgs;
+pub use args::{CliArgs, NoteAction};
 pub use command::Command;
 
 use crate::error::Result;
@@ -48,10 +48,12 @@ pub fn build_command(args: CliArgs) -> Result<Box<dyn Command>> {
             strings,
             const_filter,
             body,
+            body_mode,
             grep,
             category,
             depth,
             guess,
+            notes,
         } => Ok(Box::new(commands::ShowCommand::new(
             paths,
             project,
@@ -63,10 +65,17 @@ pub fn build_command(args: CliArgs) -> Result<Box<dyn Command>> {
             strings,
             const_filter,
             body,
+            body_mode,
             grep,
             category,
             depth,
             guess,
+            notes,
+        ))),
+        CliArgs::Note { action, project } => Ok(Box::new(commands::NoteCommand::new(
+            action,
+            project,
+            crate::skill::SkillHome::from_env(),
         ))),
         CliArgs::Version => Ok(Box::new(commands::VersionCommand)),
         CliArgs::Mcp => Ok(Box::new(commands::McpCommand::new(

@@ -113,6 +113,74 @@ def strip_code(line):
     return line
 
 
+QUOTES = {"rust": '"', "swift": '"', "php": "\"'", "ts": "\"'`", "scss": "\"'"}
+
+
+def code_lines(corpus, rel):
+    """A fájl sorainak kód-része: a megjegyzések (`//`, `/* … */` több soron át is, PHP `#`) kivágva, a stringek maradnak.
+    Fájl-szintű állapotgép (a többsoros string és a `/*! … */` doc-blokk is helyes); az eredmény a korpuszon cache-elve."""
+    cache = corpus.__dict__.setdefault("_code_lines", {})
+    if rel in cache:
+        return cache[rel]
+    text, lang = corpus.text(rel), corpus.lang
+    quotes = QUOTES.get(lang, '"')
+    out, line = [], []
+    state, quote, i, n = "code", None, 0, len(text)
+    while i < n:
+        c = text[i]
+        if c == "\n":
+            out.append("".join(line))
+            line = []
+            if state == "line":
+                state = "code"
+            i += 1
+            continue
+        if state == "code":
+            if text.startswith("//", i) or (c == "#" and lang == "php" and not text.startswith("#[", i)):
+                state = "line"
+            elif text.startswith("/*", i):
+                state, i = "block", i + 2
+                continue
+            elif c in quotes:
+                state, quote = "str", c
+                line.append(c)
+            else:
+                line.append(c)
+        elif state == "str":
+            line.append(c)
+            if c == "\\" and i + 1 < n and text[i + 1] != "\n":
+                line.append(text[i + 1])
+                i += 2
+                continue
+            if c == quote:
+                state = "code"
+        elif state == "block" and text.startswith("*/", i):
+            state, i = "code", i + 2
+            continue
+        i += 1
+    out.append("".join(line))
+    cache[rel] = out
+    return out
+
+
+def code_hits(corpus, t, hits):
+    """A grep-találatok közül azok, ahol a keresett név / szöveg a kódban van, nem csak megjegyzésben."""
+    ty = t["type"]
+    if ty in ("callers", "callers_d2"):
+        rx = re.compile(call_pattern(t["name"]))
+        keep = lambda code: rx.search(code)
+    elif ty == "strings":
+        keep = lambda code: t["literal"] in code
+    else:
+        rx = re.compile(r"\b" + re.escape(t["name"]) + r"\b")
+        keep = lambda code: rx.search(code)
+    def code(h):
+        lines = code_lines(corpus, h[0])
+        return lines[h[1]] if h[1] < len(lines) else h[2]
+
+    return [h for h in hits if keep(code(h))]
+
+
 def block_end(lines, start):
     """A start sorban kezdődő {…} blokk utolsó sora (0-bázisú), vagy None."""
     depth, seen = 0, False
@@ -430,12 +498,14 @@ def baseline(corpus, t):
             t["_level1_grep"] = sorted(level1)
             t["_level2_grep"] = sorted(level2 - level1)
         t["_grep_hits"] = hits
+        t["_grep_hits_code"] = code_hits(corpus, t, hits)
         return naive, smart
     if ty == "strings":
         gout, hits, _ = grep(corpus, t["literal"], fixed=True)
         n_txt, n_steps = full_reads(corpus, {h[0] for h in hits})
         cout, _, _ = grep(corpus, t["literal"], fixed=True, context=3)
         t["_grep_hits"] = hits
+        t["_grep_hits_code"] = code_hits(corpus, t, hits)
         return ({"text": gout + n_txt, "steps": 1 + n_steps, "cmds": [f"grep -rnF '{t['literal']}' {corpus.sub}"]},
                 {"text": cout, "steps": 1, "cmds": [f"grep -rnF -C3 '{t['literal']}' {corpus.sub}"]})
     if ty == "const":
@@ -443,6 +513,7 @@ def baseline(corpus, t):
         n_txt, n_steps = full_reads(corpus, {h[0] for h in hits})
         cout, _, _ = grep(corpus, t["name"], fixed=True, word=True, context=3)
         t["_grep_hits"] = hits
+        t["_grep_hits_code"] = code_hits(corpus, t, hits)
         return ({"text": gout + n_txt, "steps": 1 + n_steps, "cmds": [f"grep -rnw '{t['name']}' {corpus.sub}"]},
                 {"text": cout, "steps": 1, "cmds": [f"grep -rnw -C3 '{t['name']}' {corpus.sub}"]})
     raise ValueError(ty)
@@ -562,8 +633,10 @@ def correctness(corpus, t, out):
         return {"ok": rec >= 0.9, "def_recall": round(rec, 3), "missing": miss[:15],
                 "note": f"definíciók: {len(found)}/{len(names)} látszik" + (f"; hiányzik: {', '.join(miss[:6])}" if miss else "")}
     if ty == "body":
-        lines = corpus.lines(t["file"])
-        want = [lines[i].strip() for i in range(t["start"], t["end"] + 1) if lines[i].strip()]
+        # a függvény KÓD-sorai (a megjegyzés-sorok nem kötelezőek: a tömör --body elhagyja őket);
+        # a kódsor megjegyzés nélküli részének kell szerepelnie a kimenetben
+        code = code_lines(corpus, t["file"])
+        want = [code[i].strip() for i in range(t["start"], t["end"] + 1) if code[i].strip()]
         got = sum(1 for w in want if w in out)
         rec = got / len(want) if want else 1.0
         return {"ok": rec >= 0.98, "line_recall": round(rec, 3),
@@ -571,15 +644,17 @@ def correctness(corpus, t, out):
     if ty in ("callers", "callers_d2"):
         levels = cg_hits(corpus, out)
         l1 = levels.get(1, [])
-        gfiles = {h[0] for h in t["_grep_hits"]}
+        ghits = t.get("_grep_hits_code", t["_grep_hits"])
+        gfiles = {h[0] for h in ghits}
         cfiles = {h[0] for h in l1}
         both = gfiles & cfiles
         # a grep-találat sorát lefedi-e egy callgraph-sáv (ugyanabban a fájlban)
-        covered = sum(1 for h in t["_grep_hits"]
+        covered = sum(1 for h in ghits
                       if any(c[0] == h[0] and c[2] - 1 <= h[1] <= c[3] - 1 for c in l1))
-        res = {"grep_files": len(gfiles), "cg_files": len(cfiles), "both": len(both),
+        res = {"grep_files": len(gfiles), "grep_files_raw": len({h[0] for h in t["_grep_hits"]}),
+               "cg_files": len(cfiles), "both": len(both),
                "grep_only": sorted(gfiles - cfiles)[:20], "cg_only": sorted(cfiles - gfiles)[:20],
-               "hit_coverage": round(covered / len(t["_grep_hits"]), 3) if t["_grep_hits"] else None,
+               "hit_coverage": round(covered / len(ghits), 3) if ghits else None,
                "file_recall_vs_grep": round(len(both) / len(gfiles), 3) if gfiles else None,
                "file_precision_vs_grep": round(len(both) / len(cfiles), 3) if cfiles else None}
         if ty == "callers_d2":
@@ -594,18 +669,19 @@ def correctness(corpus, t, out):
             res["unresolved_skipped"] = sum(int(m) for m in re.findall(r"\(\+(\d+) (?:unresolved|feloldatlan)", out))
         res["ok"] = bool(gfiles) and res["file_recall_vs_grep"] is not None and res["file_recall_vs_grep"] >= 0.9
         res["note"] = (f"fájlszint: grep {len(gfiles)}, callgraph {len(cfiles)}, közös {len(both)}; "
-                       f"grep-sorok lefedve: {covered}/{len(t['_grep_hits'])}")
+                       f"grep-sorok lefedve: {covered}/{len(ghits)}")
         if ty == "callers_d2":
             l2 = res["level2_names"]
             res["note"] += (f"; 2. szint nevei: grep {l2['grep_n']}, callgraph {l2['cg_n']}, közös {l2['both']}"
                             f" (+{res['unresolved_skipped']} feloldatlan kihagyva)")
         return res
     if ty in ("strings", "const"):
-        gfiles = {h[0] for h in t["_grep_hits"]}
+        gfiles = {h[0] for h in t.get("_grep_hits_code", t["_grep_hits"])}
         cfiles = cg_files_any(corpus, out)
         both = gfiles & cfiles
         rec = len(both) / len(gfiles) if gfiles else 0.0
-        return {"ok": bool(gfiles) and rec >= 0.9, "file_recall_vs_grep": round(rec, 3), "grep_files": len(gfiles), "cg_files": len(cfiles), "both": len(both),
+        return {"ok": bool(gfiles) and rec >= 0.9, "file_recall_vs_grep": round(rec, 3), "grep_files": len(gfiles),
+                "grep_files_raw": len({h[0] for h in t["_grep_hits"]}), "cg_files": len(cfiles), "both": len(both),
                 "grep_only": sorted(gfiles - cfiles)[:20], "cg_only": sorted(cfiles - gfiles)[:20],
                 "note": f"fájlszint: grep {len(gfiles)}, callgraph {len(cfiles)}, közös {len(both)}"}
     return {"ok": None, "note": ""}
@@ -665,13 +741,22 @@ def run(args):
                 qc = correctness(corpus, t, qout)
                 rec["callgraph_qualified"] = {**est_tokens(qout), "cmd": cmd_str(qargs), "time_s": round(qt, 4),
                                               "correctness": {k: v for k, v in qc.items() if k != "grep_only"}}
+            # a „hogyan hívják?”: a grep-ablakok (okos baseline) megmutatják a hívás sorát; ha a callgraph-kimenetben nincs
+            # hívássor („L<n> │ …”), az agentnek még egy `--grep … --body` kell — ennek a költsége is a callgraph-oldalra kerül
+            follow = {"tok_b4": 0, "tok_words": 0, "steps": 0}
+            if t["type"] in ("callers", "callers_d2") and "│" not in out:
+                fargs = [a for a in cargs if a not in ("--depth", "2")] + ["--body"]
+                fout, _, _ = cg.run(corpus, fargs)
+                follow = {**est_tokens(fout), "steps": 1}
+                rec["callgraph_followup"] = {**follow, "cmd": cmd_str(fargs)}
             # tényleges költség: ha a callgraph-válasz a kritérium szerint hiányos, az agent a grep-es úton is végigmegy
             ok = bool(corr.get("ok"))
             rec["effective"] = {
                 "fallback": not ok,
-                "tok_b4": rec["callgraph"]["tok_b4"] + (0 if ok else rec["baseline_smart"]["tok_b4"]),
-                "tok_words": rec["callgraph"]["tok_words"] + (0 if ok else rec["baseline_smart"]["tok_words"]),
-                "steps": 1 + (0 if ok else rec["baseline_smart"]["steps"]),
+                "tok_b4": rec["callgraph"]["tok_b4"] + follow["tok_b4"] + (0 if ok else rec["baseline_smart"]["tok_b4"]),
+                "tok_words": rec["callgraph"]["tok_words"] + follow["tok_words"]
+                + (0 if ok else rec["baseline_smart"]["tok_words"]),
+                "steps": 1 + follow["steps"] + (0 if ok else rec["baseline_smart"]["steps"]),
             }
             for k in ("tok_b4", "tok_words"):
                 c = max(1, rec["callgraph"][k])

@@ -24,19 +24,37 @@ Használat:
   bash ~/.claude/skills/callgraph/callgraph.sh <fájl|mappa> --grep <minta>       csak a mintára illeszkedő célú hívások
                                                 (csak az illeszkedő hívást tartalmazó metódusok/fájlok — "hol hívják");
                                                 minden hívás a forrássorával: "L25 │ $this->repo->find($id)";
+                                                egy hívón belül az azonos sorok összevonva ("L12, L40 │ …"), hívónként
+                                                legfeljebb 3 sor, utána "… +N további: L55, L61";
                                                 "via Resolver" = interfészen / trait-en / szülő-típuson át hívva
                                                 (a Típus::metódus minta ezeket a hívásokat is megtalálja)
                                                 Rust: "?::m" = ismeretlen fogadó-típus; a Típus::m minta név szerint is megtalálja
+                                                TS: a típusos fogadó (this.repo.find(), ha "repo: Repo") a Típus::m mintára illik;
+                                                típus nélküli / any / unió fogadó feloldatlan (a metódusnévvel keresd)
   bash ~/.claude/skills/callgraph/callgraph.sh <mappa> --grep <minta> --depth N [--guess]
                                                 hívók hívói N szintig (hatáselemzés); --guess: a feloldatlan,
                                                 csak név szerinti egyezéseket is ("?")
   Utak: ha a projekt-gyökér többször ismétlődne, az első sor "gyökér: /abs/projekt", utána minden út ehhez relatív
   (a következő hívásban ugyanazzal a --project-tel változatlanul használható).
-  bash ~/.claude/skills/callgraph/callgraph.sh <fájl>::<metódus> [...] --body   a metódus(ok) forrása sorszámozva, docblockkal
+  bash ~/.claude/skills/callgraph/callgraph.sh <fájl>::<metódus> [...] --body   a metódus(ok) forrása sorszámozva, tömören: docblock,
+                                                üres és csak megjegyzés sorok nélkül (a sorszámok pontosak maradnak)
+                                                --doc: docblockkal; --raw: a pontos, szűretlen forrás
   bash ~/.claude/skills/callgraph/callgraph.sh <mappa> --grep <minta> --body    a talált hívó metódusok forrása
   bash ~/.claude/skills/callgraph/callgraph.sh <fájl> --lines <n>-<m>           tetszőleges sáv sorszámozva (pl. view-fájl)
   bash ~/.claude/skills/callgraph/callgraph.sh <mappa|fájl> --strings <minta>   string-literálok (hibaüzenet, kulcs) helye
-  bash ~/.claude/skills/callgraph/callgraph.sh <mappa|fájl> --const <minta>     konstans-hivatkozások és -definíciók (PHP osztálykonstans, Rust const/static)
+  bash ~/.claude/skills/callgraph/callgraph.sh <mappa|fájl> --const <minta>     konstans-hivatkozások, -definíciók és továbbexportálások
+                                                (PHP osztálykonstans / use const, Rust const/static / pub use, JS/TS export { })
+
+Jegyzetek (pilot — rövid jegyzet egy fájlhoz vagy metódushoz, a forráson kívül: <projekt>/.callgraph/notes.jsonl):
+  bash ~/.claude/skills/callgraph/callgraph.sh note add <fájl>[::<metódus>] "<szöveg>" [--project alias]
+                                                kiírja az új jegyzet azonosítóját; a horgony a metódus NEVE (Osztály::metódus is jó)
+  bash ~/.claude/skills/callgraph/callgraph.sh note list [<fájl|mappa>] [--project alias]
+                                                "<id>  <fájl>::<Osztály>::<metódus>  2026-11-05 20:27  📝 <szöveg>";
+                                                [árva] = a metódus már nincs a fájlban
+  bash ~/.claude/skills/callgraph/callgraph.sh note rm <id> [--project alias]
+  bash ~/.claude/skills/callgraph/callgraph.sh <mappa|fájl> --notes <minta>    jegyzetek keresése (regex a szövegre vagy a horgonyra, kis/nagybetű mindegy)
+  Az outline a fájl-fejléc / a metódus alatt mutatja: "📝 2026-11-05 20:27 · <szöveg>" (legújabb elöl, legfeljebb 3),
+  a --body a metódus forrása fölött. Az idő UTC.
 
 Nyelv (a terminál-kimenet és a súgó nyelve: en = angol, alapértelmezett; hu = magyar):
   bash ~/.claude/skills/callgraph/callgraph.sh set-lang                 az aktuális nyelv és a forrása

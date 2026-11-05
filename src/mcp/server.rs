@@ -1,4 +1,4 @@
-//! Az MCP-szerver (rmcp): hat, csak olvasó eszköz a meglévő lekérdező-motor fölött. A leírások rövidek (minden
+//! Az MCP-szerver (rmcp): hét, csak olvasó eszköz a meglévő lekérdező-motor fölött. A leírások rövidek (minden
 //! kliensben kontextus-tokenbe kerülnek), a `skill/SKILL.md` útmutatását követik.
 
 use std::sync::Arc;
@@ -8,7 +8,8 @@ use rmcp::model::{CallToolResult, ContentBlock, Implementation, ServerCapabiliti
 use rmcp::{ServerHandler, tool, tool_handler, tool_router};
 
 use super::params::{
-    FindCallersParams, FrameworkViewParams, MethodBodyParams, OutlineParams, SearchParams,
+    FindCallersParams, FrameworkViewParams, MethodBodyParams, NotesParams, OutlineParams,
+    SearchParams,
 };
 use super::request::ShowQuery;
 use super::runner::QueryRunner;
@@ -56,7 +57,7 @@ impl CallgraphServer {
     }
 
     #[tool(
-        description = "Line-numbered source of one or more methods/functions (with docblock). Use after `outline` instead of reading the whole file."
+        description = "Line-numbered source of one or more methods/functions, compact: docblock, blank and comment-only lines dropped (line numbers stay exact; `doc: true` adds the docblock, `raw: true` = unfiltered). Use after `outline` instead of reading the whole file."
     )]
     async fn method_body(&self, Parameters(p): Parameters<MethodBodyParams>) -> CallToolResult {
         self.execute(ShowQuery::method_body(p)).await
@@ -84,6 +85,13 @@ impl CallgraphServer {
         Parameters(p): Parameters<FrameworkViewParams>,
     ) -> CallToolResult {
         self.execute(ShowQuery::framework_view(p)).await
+    }
+
+    #[tool(
+        description = "Notes (pilot) attached to files or methods by people/agents: `path[::method]  time  📝 text`, [orphaned] if the method is gone. Read-only (notes are written with the CLI `callgraph note add`)."
+    )]
+    async fn notes(&self, Parameters(p): Parameters<NotesParams>) -> CallToolResult {
+        self.execute(ShowQuery::notes(p)).await
     }
 
     #[tool(

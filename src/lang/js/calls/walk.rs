@@ -1,7 +1,7 @@
 //! A bejárás: hívások, `new`, dinamikus import; a kötések a deklarátoroknál töltődnek (forrásbeli sorrendben).
 
 use oxc_ast::ast::{
-    Argument, ArrowFunctionExpression, BindingPattern, CallExpression, Expression, Function,
+    Argument, ArrowFunctionExpression, BindingPattern, CallExpression, Class, Expression, Function,
     ImportExpression, NewExpression, Program, VariableDeclarator,
 };
 use oxc_ast_visit::{Visit, walk};
@@ -10,6 +10,9 @@ use oxc_syntax::scope::ScopeFlags;
 
 use super::callee::{Binding, Callee, Scope, is_native};
 use super::key_name;
+use super::receivers::{
+    ClassFrame, Frame, TypeRef, arrow_frame, class_frame, function_frame, program_frame,
+};
 use crate::lang::js::analysis::PassContext;
 use crate::lang::js::methods::{Docs, MethodIndex};
 use crate::model::Call;
@@ -21,6 +24,10 @@ pub struct Walker<'s> {
     scope: Scope,
     caller: String,
     container: String,
+    /// A függvény-keretek névtípusai (a legbelső a végén; az alja a program).
+    frames: Vec<Frame>,
+    /// A körülvevő osztályok; `None`: egy nem-metódus `function`, amelyben a `this` nem az osztály.
+    classes: Vec<Option<ClassFrame>>,
     pub calls: Vec<Call>,
 }
 
@@ -39,12 +46,71 @@ impl<'s> Walker<'s> {
             scope,
             caller: top.to_string(),
             container: index.main.clone(),
+            frames: Vec::new(),
+            classes: Vec::new(),
             calls: Vec::new(),
         }
     }
 
     pub fn run(&mut self, program: &Program<'_>) {
+        self.frames.push(program_frame(&self.scope.types, program));
         self.visit_program(program);
+        self.frames.pop();
+    }
+
+    /// A helyi név típusa: a legbelső keret dönt, amelyben a név szerepel.
+    fn var_type(&self, name: &str) -> Option<&TypeRef> {
+        self.frames
+            .iter()
+            .rev()
+            .find_map(|f| f.get(name))
+            .and_then(Option::as_ref)
+    }
+
+    /// A `this` osztálya (a nem-metódus `function`-ben nincs).
+    fn this_class(&self) -> Option<&ClassFrame> {
+        self.classes.last()?.as_ref()
+    }
+
+    /// `x.m()` / `this.x.m()` / `this.m()` a fogadó ismert típusával: (típus, metódusnév).
+    fn receiver(&self, callee: &Expression<'_>) -> Option<(TypeRef, String)> {
+        let Expression::StaticMemberExpression(m) = callee.without_parentheses() else {
+            return None;
+        };
+        let method = m.property.name.to_string();
+        let ty = match strip_ts(&m.object) {
+            Expression::Identifier(i) => self.var_type(i.name.as_str())?.clone(),
+            Expression::ThisExpression(_) => {
+                let class = self.this_class()?;
+                if !class.methods.contains(&method) {
+                    return None;
+                }
+                TypeRef {
+                    name: class.name.clone()?,
+                    category: "internal_helper",
+                }
+            }
+            Expression::StaticMemberExpression(inner)
+                if matches!(strip_ts(&inner.object), Expression::ThisExpression(_)) =>
+            {
+                self.this_class()?
+                    .props
+                    .get(inner.property.name.as_str())?
+                    .clone()?
+            }
+            _ => return None,
+        };
+        Some((ty, method))
+    }
+
+    /// A hívott kifejezés feloldása; ismert fogadó-típusnál `Típus::metódus`.
+    fn callee(&self, callee: &Expression<'_>) -> Callee {
+        let mut r = self.scope.resolve(callee);
+        if let Some((ty, method)) = self.receiver(callee) {
+            r.resolved = Some(format!("{}::{method}", ty.name));
+            r.category = ty.category;
+        }
+        r
     }
 
     fn src(&self, a: &Argument<'_>) -> String {
@@ -150,17 +216,48 @@ impl<'s> Walker<'s> {
     }
 }
 
+/// Zárójel és TS non-null (`x!`) nélkül.
+fn strip_ts<'b, 'a>(mut e: &'b Expression<'a>) -> &'b Expression<'a> {
+    loop {
+        e = e.without_parentheses();
+        match e {
+            Expression::TSNonNullExpression(n) => e = &n.expression,
+            _ => return e,
+        }
+    }
+}
+
 impl<'a> Visit<'a> for Walker<'_> {
     fn visit_function(&mut self, it: &Function<'a>, flags: ScopeFlags) {
         let saved = self.enter(it.span.start);
+        self.frames.push(function_frame(&self.scope.types, it));
+        // a nem-metódus `function`-ben a `this` nem az osztály
+        let unbinds = self
+            .this_class()
+            .is_some_and(|c| !c.method_fns.contains(&it.span.start));
+        if unbinds {
+            self.classes.push(None);
+        }
         walk::walk_function(self, it, flags);
+        if unbinds {
+            self.classes.pop();
+        }
+        self.frames.pop();
         self.leave(saved);
     }
 
     fn visit_arrow_function_expression(&mut self, it: &ArrowFunctionExpression<'a>) {
         let saved = self.enter(it.span.start);
+        self.frames.push(arrow_frame(&self.scope.types, it));
         walk::walk_arrow_function_expression(self, it);
+        self.frames.pop();
         self.leave(saved);
+    }
+
+    fn visit_class(&mut self, it: &Class<'a>) {
+        self.classes.push(Some(class_frame(&self.scope.types, it)));
+        walk::walk_class(self, it);
+        self.classes.pop();
     }
 
     fn visit_variable_declarator(&mut self, it: &VariableDeclarator<'a>) {
@@ -169,7 +266,7 @@ impl<'a> Visit<'a> for Walker<'_> {
     }
 
     fn visit_call_expression(&mut self, it: &CallExpression<'a>) {
-        let r = self.scope.resolve(&it.callee);
+        let r = self.callee(&it.callee);
         self.record(it.span.start, r, &it.arguments);
         walk::walk_call_expression(self, it);
     }

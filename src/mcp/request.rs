@@ -3,8 +3,8 @@
 
 use super::guard::ProjectRoot;
 use super::params::{
-    FindCallersParams, FrameworkViewParams, MethodBodyParams, OutlineParams, SearchKind,
-    SearchParams,
+    FindCallersParams, FrameworkViewParams, MethodBodyParams, NotesParams, OutlineParams,
+    SearchKind, SearchParams,
 };
 
 /// A `find_callers` megengedett mélysége.
@@ -56,7 +56,12 @@ impl ShowQuery {
 
     /// `method_body`: `<út>::<m1> <út>::<m2> … --body`.
     pub(crate) fn method_body(p: MethodBodyParams) -> Result<Self, String> {
-        let methods: Vec<String> = p.method.into_iter().filter(|m| !m.is_empty()).collect();
+        let methods: Vec<String> = p
+            .method
+            .into_vec()
+            .into_iter()
+            .filter(|m| !m.is_empty())
+            .collect();
         if methods.is_empty() {
             return Err(crate::t!(
                 "'method' needs at least one method name.",
@@ -66,6 +71,11 @@ impl ShowQuery {
         }
         let mut query = Self::new(p.project, p.path, p.full);
         query.flags.push("--body".into());
+        if p.raw {
+            query.flags.push("--raw".into());
+        } else if p.doc {
+            query.flags.push("--doc".into());
+        }
         query.methods = methods;
         Ok(query)
     }
@@ -104,6 +114,12 @@ impl ShowQuery {
         Ok(Self::new(p.project, p.path, p.full).flag("--format", p.view.as_str()))
     }
 
+    /// `notes` (pilot): `--notes <minta>` (üres minta = minden jegyzet) a hatókörön; csak olvas.
+    pub(crate) fn notes(p: NotesParams) -> Result<Self, String> {
+        let path = p.path.unwrap_or_default();
+        Ok(Self::new(p.project, path, false).flag("--notes", p.pattern.unwrap_or_default()))
+    }
+
     /// A `show` argumentumai (`show` és `--project`/`--label` nélkül): kapcsolók, majd a gyökéren belülre
     /// ellenőrzött cél(ok).
     pub(crate) fn to_args(&self, root: &ProjectRoot) -> Result<Vec<String>, String> {
@@ -131,7 +147,7 @@ fn non_empty(pattern: String) -> Result<String, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::params::{FrameworkView, OutlineFormat};
+    use super::super::params::{FrameworkView, OneOrMany, OutlineFormat};
     use super::*;
 
     fn s(v: &[&str]) -> Vec<String> {
@@ -179,7 +195,7 @@ mod tests {
     fn method_body_selects_every_method() {
         let q = ShowQuery::method_body(MethodBodyParams {
             path: "Cargo.toml".into(),
-            method: s(&["a", "", "b"]),
+            method: OneOrMany::Many(s(&["a", "", "b"])),
             ..MethodBodyParams::default()
         })
         .unwrap();
@@ -188,6 +204,28 @@ mod tests {
             s(&["--body", "Cargo.toml::a", "Cargo.toml::b"])
         );
         assert!(ShowQuery::method_body(MethodBodyParams::default()).is_err());
+        let q = ShowQuery::method_body(MethodBodyParams {
+            path: "Cargo.toml".into(),
+            method: OneOrMany::One("a".into()),
+            doc: true,
+            ..MethodBodyParams::default()
+        })
+        .unwrap();
+        assert_eq!(
+            q.to_args(&root()).unwrap(),
+            s(&["--body", "--doc", "Cargo.toml::a"])
+        );
+        let q = ShowQuery::method_body(MethodBodyParams {
+            path: "Cargo.toml".into(),
+            method: OneOrMany::One("a".into()),
+            raw: true,
+            ..MethodBodyParams::default()
+        })
+        .unwrap();
+        assert_eq!(
+            q.to_args(&root()).unwrap(),
+            s(&["--body", "--raw", "Cargo.toml::a"])
+        );
     }
 
     #[test]
@@ -240,6 +278,19 @@ mod tests {
             q.to_args(&root()).unwrap(),
             s(&["--format", "routes", "src"])
         );
+    }
+
+    #[test]
+    fn notes_maps_to_the_notes_flag() {
+        let q = ShowQuery::notes(NotesParams {
+            pattern: Some("cache".into()),
+            path: Some("src".into()),
+            project: None,
+        })
+        .unwrap();
+        assert_eq!(q.to_args(&root()).unwrap(), s(&["--notes", "cache", "src"]));
+        let q = ShowQuery::notes(NotesParams::default()).unwrap();
+        assert_eq!(q.to_args(&root()).unwrap(), s(&["--notes", "", "."]));
     }
 
     #[test]

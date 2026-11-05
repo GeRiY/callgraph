@@ -31,6 +31,36 @@ pub struct FileGraph {
     pub sfc: Option<serde_json::Value>,
 }
 
+impl FileGraph {
+    /// A `c` container-é-e a `container` nevű, `line` sorú elem (metódus, hívás, property…). Alapból név szerint;
+    /// ha egy azonos nevű container a másikba ágyazódik (JS/TS: a fájlnévről elnevezett `module X` és benne a
+    /// `class X`), a belső tartománya a belsőé, a többi a külsőé — így minden elem pontosan egy alatt jelenik meg.
+    /// Az egymásba nem ágyazott azonos nevűek (pl. több Rust `impl`) viselkedése változatlan.
+    pub fn owns(&self, c: &Container, container: Option<&str>, line: u32) -> bool {
+        if container != Some(c.name.as_str()) {
+            return false;
+        }
+        let nested = |outer: &Container, inner: &Container| {
+            !std::ptr::eq(outer, inner)
+                && outer.line <= inner.line
+                && inner.end_line <= outer.end_line
+                && (outer.line, outer.end_line) != (inner.line, inner.end_line)
+        };
+        let inside = |x: &Container| x.line <= line && line <= x.end_line;
+        let same: Vec<&Container> = self
+            .containers
+            .iter()
+            .filter(|o| o.name == c.name)
+            .collect();
+        // egy belső, azonos nevű container tartományába esik → az övé
+        if same.iter().any(|&o| nested(c, o) && inside(o)) {
+            return false;
+        }
+        // ez a belső: csak a saját tartománya
+        !same.iter().any(|&o| nested(o, c)) || inside(c)
+    }
+}
+
 /// `alias => teljes név` import-térkép, forrásbeli sorrendben (JSON-objektumként szerializálva).
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Imports(Vec<(String, String)>, bool);
@@ -61,6 +91,16 @@ impl Imports {
 
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
+    }
+
+    /// A veszteségmentes (bináris) tároláshoz: a bejegyzések és az „üresen is objektum” jelző.
+    pub fn parts(&self) -> (&[(String, String)], bool) {
+        (&self.0, self.1)
+    }
+
+    /// A `parts` párja.
+    pub fn from_parts(entries: Vec<(String, String)>, object: bool) -> Self {
+        Self(entries, object)
     }
 }
 

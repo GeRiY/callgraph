@@ -16,10 +16,11 @@ ugyanaz a tömör kimenet, amit a `callgraph show` kiír (ez a token-hatékony r
 | Eszköz | Paraméterek | Mit ad | CLI-megfelelő |
 |---|---|---|---|
 | `outline` | `path`, `project?`, `format?` (`outline`\|`api`\|`flow`\|`summary`\|`hotspots`\|`stats`), `method?`, `full?` | fájl / mappa szerkezete; `method`-dal egy metódus hívás-gráfja | `show <út>[::m] --format <f>` |
-| `method_body` | `path`, `method` (egy vagy több név), `project?`, `full?` | a metódus(ok) forrása sorszámozva | `show <út>::m --body` |
+| `method_body` | `path`, `method` (egy név stringként vagy névtömb), `project?`, `doc?`, `raw?`, `full?` | a metódus(ok) forrása sorszámozva, tömören (docblock, üres és megjegyzés-sorok nélkül); `doc: true`: docblockkal, `raw: true`: szűretlenül | `show <út>::m --body [--doc\|--raw]` |
 | `find_callers` | `pattern`, `path?`, `project?`, `depth?` (1–5), `guess?`, `full?` | ki hívja; `depth` > 1: hatáselemzés | `show <út> --grep <minta> --depth N [--guess]` |
 | `search` | `kind` (`strings`\|`constants`), `pattern`, `path?`, `project?`, `full?` | string-literál / konstans helye | `show <út> --strings` / `--const` |
 | `framework_view` | `view` (`routes`\|`middleware`\|`validation`\|`jobs`\|`events`\|`providers`\|`magic`\|`di`\|`views`), `path`, `project?`, `full?` | framework-nézet | `show <út> --format <nézet>` |
+| `notes` (pilot) | `pattern?` (regex a szövegre / horgonyra; üres = mind), `path?`, `project?` | a fájlokhoz / metódusokhoz írt jegyzetek: `út[::metódus]  idő  📝 szöveg`, `[orphaned]`, ha a metódus már nincs | `show <út> --notes <minta>` |
 | `projects` | — | a regisztrált aliasok és gyökereik | `projects.sh list` |
 
 - A `path` a projekt-gyökérhez képest értendő; elhagyva (ahol opcionális) a teljes gyökér.
@@ -31,8 +32,12 @@ ugyanaz a tömör kimenet, amit a `callgraph show` kiír (ez a token-hatékony r
 
 ## Biztonság
 
-- **Csak olvas.** Forrásfájlt nem ír; egyetlen mellékhatás a CLI-vel közös elemzési cache a projekt `.callgraph/`
-  mappájában (ha írható).
+- **Csak olvas.** Forrásfájlt nem ír; egyetlen mellékhatás a CLI-vel közös projekt-gráf a projekt
+  `.callgraph/` mappájában (ha írható). A jegyzeteket (pilot, `docs/NOTES.md`) is csak olvassa: írni (`note add` / `rm`)
+  csak a CLI-vel lehet, MCP-n nincs író eszköz.
+- **Projekt-gráf a memóriában:** a szerver a betöltött projekt-gráfot (`docs/PROJECT-GRAPH.md`: manifest, szűkített tények, a már betöltött teljes rekordok) és a hívó-indexet
+  kérésről kérésre megtartja; kérésenként csak a változott fájlok frissülnek, egy közben szerkesztett fájl a következő
+  kérésben már látszik.
 - **Útvonal-őr:** minden út a projekt-gyökérhez (alias vagy munkakönyvtár) képest oldódik fel; a gyökérből kilépő út
   (`..`, gyökéren kívüli abszolút út, kifelé mutató symlink) hibát ad. A `::` az útban nem megengedett (a metódus
   külön paraméter).

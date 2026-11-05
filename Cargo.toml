@@ -1,6 +1,6 @@
 [package]
 name = "callgraph"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 license = "MIT"
 description = "PHP projekt-gráf elemző (callgraph Rust-port), JSONL kimenettel"
@@ -14,6 +14,8 @@ name = "callgraph"
 path = "src/main.rs"
 
 [dependencies]
+# gyors, szálbiztos allokátor: a musl beépített malloc-ja párhuzamos (rayon) terhelésnél szűk keresztmetszet
+mimalloc = { version = "=0.1.52", default-features = false }
 mago-syntax = "=1.59.0"
 mago-allocator = "=1.59.0"
 mago-database = "=1.59.0"
@@ -32,6 +34,9 @@ rayon = "1"
 regex = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
+# projekt-gráf tárolása (.callgraph/): MessagePack (önleíró, a FileGraph opcionális mezőivel is pontos) + LZ4, tiszta Rust
+rmp-serde = "=1.3.1"
+lz4_flex = { version = "=0.14.0", default-features = false, features = ["std", "safe-encode", "safe-decode", "checked-decode"] }
 syn = { version = "=2.0.119", default-features = false, features = ["full", "parsing", "printing", "visit"] }
 thiserror = "2"
 tree-sitter = "=0.27.1"
