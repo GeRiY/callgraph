@@ -9,6 +9,7 @@ pub mod i18n;
 pub mod index;
 pub mod io;
 pub mod lang;
+pub mod mcp;
 pub mod model;
 pub mod project;
 pub mod query;

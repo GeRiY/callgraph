@@ -37,6 +37,7 @@ src/
   analysis/                     Analyzer (Facade): fájl → registry.for_path → nyelv.analyze → Analysis
   io/                           walker (a registry kiterjesztéseivel), cache (CacheStore + JsonlCacheStore), jsonl_writer
   cli/                          Command minta; args, parancsok (analyze, prune)
+  mcp/                          MCP-szerver (`callgraph mcp`, rmcp, stdio): eszköz-paraméter → `show`-lekérdezés, útvonal-őr
 tests/                          integrációs tesztek (pl. languages.rs: teszt-nyelvek a registryn)
 docs/                           ARCHITECTURE-uj.md, UJ-NYELV.md
 ```

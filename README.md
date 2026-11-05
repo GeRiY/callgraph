@@ -202,6 +202,20 @@ bash ~/.claude/skills/callgraph/callgraph.sh set-lang       # show current langu
 CALLGRAPH_LANG=hu bash ~/.claude/skills/callgraph/callgraph.sh app/Models/Order.php   # one run only
 ```
 
+### Use with other AI tools (MCP)
+
+Besides the Claude Code skill (unchanged, fully supported), the same binary is also an
+[MCP](https://modelcontextprotocol.io) server on stdio, so any MCP client can use it: `callgraph mcp`.
+Tools: `outline`, `method_body`, `find_callers`, `search`, `framework_view`, `projects`. They return the same compact
+text as the CLI, with the same output cap; read-only, no network, paths are confined to the project root.
+
+```bash
+claude mcp add callgraph -- ~/.claude/skills/callgraph/bin/linux-x86_64/callgraph mcp   # Claude Code
+```
+
+Claude Desktop, Cursor and VS Code use a JSON entry with `"command": "<absolute path to the binary>", "args": ["mcp"]`.
+Recipes, tool parameters and safety notes (Hungarian): [`docs/MCP.md`](docs/MCP.md).
+
 ### Feedback from agents
 
 Every error message carries an `[error-id: …]`. Agents (or you) can attach a note to it, which makes broken

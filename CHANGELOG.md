@@ -20,6 +20,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   downloaded zip's SHA-256 before installing and installs nothing on a mismatch; a release without `SHA256SUMS` (v0.1.0)
   is refused unless `--insecure-skip-checksum` is given. `update --from <zip>` checks `--sha256 <hex>` or a
   `SHA256SUMS` next to the zip, otherwise it warns in one line and installs.
+- **MCP server mode:** `callgraph mcp` runs a Model Context Protocol server on stdio (official Rust SDK `rmcp`), so
+  Claude Desktop, Cursor, VS Code or any MCP client can use callgraph. Tools: `outline`, `method_body`, `find_callers`,
+  `search`, `framework_view`, `projects` — the same compact text and output cap as the CLI. Read-only, no network,
+  paths confined to the project root. The skill / CLI usage is unchanged. Setup recipes: `docs/MCP.md`.
 
 ### Changed
 - The committed / packaged default `SKILL.md` is now English (generated from `skill-i18n/SKILL.en.md`).

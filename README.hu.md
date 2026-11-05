@@ -203,6 +203,20 @@ bash ~/.claude/skills/callgraph/callgraph.sh set-lang       # az aktuális nyelv
 CALLGRAPH_LANG=hu bash ~/.claude/skills/callgraph/callgraph.sh app/Models/Order.php   # csak egy futásra
 ```
 
+### Más AI-eszközökkel (MCP)
+
+A Claude Code-skill mellett (változatlan, teljes értékűen támogatott) ugyanaz a bináris
+[MCP](https://modelcontextprotocol.io)-szerver is stdio-n, így bármely MCP-kliens használhatja: `callgraph mcp`.
+Eszközök: `outline`, `method_body`, `find_callers`, `search`, `framework_view`, `projects`. Ugyanazt a tömör szöveget
+adják, mint a CLI, ugyanazzal a kimeneti korláttal; csak olvas, hálózat nincs, az utak a projekt-gyökéren belül maradnak.
+
+```bash
+claude mcp add callgraph -- ~/.claude/skills/callgraph/bin/linux-x86_64/callgraph mcp   # Claude Code
+```
+
+Claude Desktop, Cursor és VS Code: JSON-bejegyzés `"command": "<a bináris abszolút útja>", "args": ["mcp"]` alakban.
+Receptek, paraméterek, biztonság: [`docs/MCP.md`](docs/MCP.md).
+
 ### Visszajelzés az agentektől
 
 Minden hibaüzenet kap egy `[error-id: …]` azonosítót. Az agent (vagy te) megjegyzést fűzhet hozzá, így a rossz
