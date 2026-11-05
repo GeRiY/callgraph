@@ -24,6 +24,8 @@ Usage:
   bash ~/.claude/skills/callgraph/callgraph.sh <file|dir> --grep <pattern>       only calls whose target matches the pattern
                                                 (only the methods/files containing a matching call — "where is it called");
                                                 each call with its source line: "L25 │ $this->repo->find($id)";
+                                                identical lines of one caller merged ("L12, L40 │ …"), at most 3 rows
+                                                per caller, then "… +N more: L55, L61";
                                                 "via Resolver" = called through an interface / trait / parent type
                                                 (a Type::method pattern also finds those calls)
                                                 Rust: "?::m" = receiver type unknown; a Type::m pattern still finds it (by name)

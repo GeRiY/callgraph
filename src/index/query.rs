@@ -6,9 +6,9 @@ use regex::RegexBuilder;
 use serde::Serialize;
 
 use super::hierarchy::{TypeHierarchy, ViaMatcher, normalize, same_type, split_target};
-use super::record::{FileStamp, IndexRecord};
 use super::uncertain::{bare_name, is_uncertain, uncertain_match};
 use crate::error::{CallgraphError, Result};
+use crate::model::FileGraph;
 
 /// A `callers` JSONL-kimenetének egy sora.
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -46,20 +46,15 @@ pub(crate) struct CallerIndex {
 }
 
 impl CallerIndex {
-    pub(crate) fn from_graphs(graphs: impl IntoIterator<Item = FileGraphRecord>) -> Self {
-        Self::from_records(
-            graphs
-                .into_iter()
-                .map(|record| IndexRecord::new(record.path, FileStamp::default(), record.graph)),
-        )
-    }
-    pub fn from_records(records: impl IntoIterator<Item = IndexRecord>) -> Self {
-        let records: Vec<IndexRecord> = records.into_iter().collect();
-        let hierarchy = TypeHierarchy::from_graphs(records.iter().map(|record| &record.graph));
+    /// A hívó-index a fájlok gráfjaiból (út, gráf). Az élek a megadott fájl-sorrendben követik egymást — a kimenet
+    /// holtversenyei (azonos fájl és sor) ezt a sorrendet követik, ezért a hívó a bejárás sorrendjét adja.
+    pub(crate) fn build<'a>(graphs: impl IntoIterator<Item = (&'a str, &'a FileGraph)>) -> Self {
+        let records: Vec<(&str, &FileGraph)> = graphs.into_iter().collect();
+        let hierarchy = TypeHierarchy::from_graphs(records.iter().map(|(_, graph)| *graph));
         let mut edges = Vec::new();
-        for record in records {
-            let namespace = record.graph.namespace.as_deref().unwrap_or("");
-            for call in record.graph.calls {
+        for (path, graph) in records {
+            let namespace = graph.namespace.as_deref().unwrap_or("");
+            for call in &graph.calls {
                 let caller = call.caller.clone().unwrap_or_else(|| "__top__".to_string());
                 let target = call.resolved.clone().unwrap_or_else(|| call.target.clone());
                 let lookup = if call.resolved.is_none() && call.category == "internal_helper" {
@@ -75,8 +70,8 @@ impl CallerIndex {
                 let uncertain = is_uncertain(&target);
                 edges.push(Edge {
                     row: CallerRow {
-                        file: record.path.clone(),
-                        container: call.container,
+                        file: path.to_owned(),
+                        container: call.container.clone(),
                         caller,
                         line: call.line,
                         target,
@@ -350,11 +345,6 @@ impl CallerIndex {
         }
         (result, skipped)
     }
-}
-
-pub(crate) struct FileGraphRecord {
-    pub path: String,
-    pub graph: crate::model::FileGraph,
 }
 
 fn symbol_key(namespace: &str, container: Option<&str>, caller: &str) -> String {

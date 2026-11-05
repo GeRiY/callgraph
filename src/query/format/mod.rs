@@ -26,7 +26,7 @@ mod summary;
 mod tests;
 
 pub use body::BodyMode;
-pub(crate) use outline::{call_lines, method_calls};
+pub(crate) use outline::{call_lines, grep_outline, method_calls};
 
 use crate::error::{CallgraphError, Result};
 use crate::i18n::Lang;

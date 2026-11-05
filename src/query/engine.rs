@@ -54,6 +54,8 @@ pub struct QueryEngine {
     root: PathBuf,
     label: String,
     analyzer: Analyzer,
+    /// A gráfok a perzisztens projekt-gráfból jönnek (`use_project_graph`), nem fájlonként a cache-ből.
+    graph: bool,
 }
 
 impl QueryEngine {
@@ -76,7 +78,15 @@ impl QueryEngine {
             root,
             label,
             analyzer: Analyzer::with_defaults(),
+            graph: false,
         }
+    }
+    /// A lekérdezés a projekt-gráfból olvasson (`--grep`, `--depth`, `--strings`, `--const`): a változatlan fájlok
+    /// gráfja forrás-elemzés nélkül jön, a hívó-index a teljes projektre kész. `CALLGRAPH_NO_GRAPH=1` kikapcsolja
+    /// (fájlonkénti út; a kimenet azonos — a tesztek ezzel vetik össze a kettőt).
+    pub fn use_project_graph(mut self, on: bool) -> Self {
+        self.graph = on && std::env::var_os("CALLGRAPH_NO_GRAPH").is_none();
+        self
     }
     pub fn label(&self) -> &str {
         &self.label
@@ -94,12 +104,30 @@ impl QueryEngine {
         let files = self.files(selectors)?;
         let mut out = Vec::new();
         let mut cache = self.cache();
+        // a projekt-gráfból: a kiválasztott fájlok naprakészre hozva (csak a változottak elemződnek)
+        let shared = self.project_graph();
+        let mut project = shared.as_ref().map(crate::graph::lock);
+        if let Some(graph) = project.as_deref_mut() {
+            let paths: Vec<PathBuf> = files.iter().map(|(file, _)| self.root.join(file)).collect();
+            // hiányzó fájlnál a régi úton jön a „nem található” hiba
+            if paths.iter().all(|path| path.is_file()) {
+                graph.sync(&paths, false, &self.analyzer, &mut cache)?;
+                let _ = graph.save();
+            }
+        }
         for (file, methods) in files {
             let abs = self.root.join(&file);
             if !abs.is_file() {
                 return Err(self.not_found(&abs));
             }
-            let graph = self.load(&mut cache, &abs)?;
+            let stored = project
+                .as_deref()
+                .and_then(|graph| graph.graph(&abs.to_string_lossy()))
+                .cloned();
+            let graph = match stored {
+                Some(graph) => graph,
+                None => self.load(&mut cache, &abs)?,
+            };
             let methods = methods.map(|names| {
                 // névegyezés: egy név több metódusra is illeszkedhet (Rust: több impl, PHP/Swift: túlterhelés),
                 // ezért a hiányt név szerint nézzük, nem darabszámra

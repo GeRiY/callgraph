@@ -24,6 +24,8 @@ Használat:
   bash ~/.claude/skills/callgraph/callgraph.sh <fájl|mappa> --grep <minta>       csak a mintára illeszkedő célú hívások
                                                 (csak az illeszkedő hívást tartalmazó metódusok/fájlok — "hol hívják");
                                                 minden hívás a forrássorával: "L25 │ $this->repo->find($id)";
+                                                egy hívón belül az azonos sorok összevonva ("L12, L40 │ …"), hívónként
+                                                legfeljebb 3 sor, utána "… +N további: L55, L61";
                                                 "via Resolver" = interfészen / trait-en / szülő-típuson át hívva
                                                 (a Típus::metódus minta ezeket a hívásokat is megtalálja)
                                                 Rust: "?::m" = ismeretlen fogadó-típus; a Típus::m minta név szerint is megtalálja

@@ -6,6 +6,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 ## [Unreleased]
 
 ### Changed
+- **Faster project-wide searches:** callgraph now keeps one project map in `.callgraph/index.jsonl` and updates it
+  file by file, only for files that changed since the last query (deleted or renamed files drop out). "Who calls it"
+  (`--grep`, every `--depth` level), `--strings`, `--const` and `callers` read from it instead of going through every
+  file again, so repeated queries on a big project come back much quicker. The output is exactly the same as before.
+  An edited file shows up in the very next query; if the map file is damaged or written by another callgraph version,
+  it is rebuilt quietly. The MCP server (`callgraph mcp`) keeps the map in memory between requests. To switch it off
+  (e.g. to compare), set `CALLGRAPH_NO_GRAPH=1`. Details: `docs/PROJECT-GRAPH.md`.
+- **Shorter call lists in "where is it called" results:** when one caller method makes the same call on several lines
+  with the very same source text, it is now shown once with all its line numbers, e.g.
+  `L12, L40 │ $this->repo->find($id)`. Each caller shows at most 3 such rows; the rest are listed by line number only:
+  `… +2 more: L55, L61`. This applies to `--grep`, the first `--depth` level and the one-line-per-call view used when
+  the result would be too long. Calls through an interface stay on their own row (`via …`).
 - **Shorter method bodies:** `--body` now leaves out what an agent rarely needs: the docblock / doc comments above the
   method, blank lines and lines that are only a comment. Code lines are printed exactly as written (a comment at the end
   of a code line stays), and nothing inside a string, heredoc or template literal is ever removed. The line numbers are

@@ -14,9 +14,14 @@ struct Session {
 
 impl Session {
     fn start() -> Self {
+        Self::start_in(std::path::Path::new(env!("CARGO_MANIFEST_DIR")))
+    }
+
+    /// A szerver a megadott munkakönyvtárral (ez a projekt-gyökér alias nélkül).
+    fn start_in(dir: &std::path::Path) -> Self {
         let mut child = Command::new(env!("CARGO_BIN_EXE_callgraph"))
             .arg("mcp")
-            .current_dir(env!("CARGO_MANIFEST_DIR"))
+            .current_dir(dir)
             .env("CALLGRAPH_LANG", "en")
             .env("CALLGRAPH_REGISTRY", "/nonexistent/projects.json")
             .stdin(Stdio::piped())
@@ -196,4 +201,66 @@ fn errors_are_tool_errors_and_the_server_keeps_running() {
         json!({"pattern": "TodoStore", "path": "golden/samples/swift"}),
     );
     assert_ne!(callers["isError"], json!(true), "{callers}");
+}
+
+/// Az MCP-szerver a projekt-gráfot kérésről kérésre a memóriában tartja: egy közben szerkesztett fájl a következő
+/// kérésben látszik, és a válasz azonos a CLI-ével.
+#[test]
+fn the_server_keeps_the_project_graph_and_sees_edits() {
+    let id = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let dir = std::env::temp_dir().join(format!("callgraph-mcp-graph-{}-{id}", std::process::id()));
+    let files = [
+        (
+            "src/Repo.php",
+            "<?php\nnamespace App;\n\nclass Repo\n{\n    public function find(int $id): array\n    {\n        return [];\n    }\n}\n",
+        ),
+        (
+            "src/Lookup.php",
+            "<?php\nnamespace App;\n\nclass Lookup\n{\n    private Repo $repo;\n\n    public function run(int $id): array\n    {\n        return $this->repo->find($id);\n    }\n}\n",
+        ),
+    ];
+    for (path, body) in files {
+        let path = dir.join(path);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, body).unwrap();
+    }
+    let dir = dir.canonicalize().unwrap();
+    let mut s = Session::start_in(&dir);
+    s.send(
+        json!({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
+        "protocolVersion": "2025-06-18", "capabilities": {},
+        "clientInfo": {"name": "test", "version": "0"}}}),
+    );
+    s.response(1);
+    s.send(json!({"jsonrpc": "2.0", "method": "notifications/initialized"}));
+    let args = json!({"pattern": "Repo::find", "depth": 2});
+    let first = s.call(2, "find_callers", args.clone());
+    assert!(text(&first).contains("Lookup::run()"), "{first}");
+    assert!(!text(&first).contains("Admin::show()"), "{first}");
+    std::fs::write(
+        dir.join("src/Admin.php"),
+        "<?php\nnamespace App;\n\nclass Admin\n{\n    private Lookup $lookup;\n\n    public function show(int $id): array\n    {\n        return $this->lookup->run($id);\n    }\n}\n",
+    )
+    .unwrap();
+    let second = s.call(3, "find_callers", args);
+    let body = text(&second).to_owned();
+    assert!(
+        body.contains("Admin::show()  L8-11  ← App\\Lookup::run"),
+        "{second}"
+    );
+    let cli = Command::new(env!("CARGO_BIN_EXE_callgraph"))
+        .args(["show", "--project"])
+        .arg(&dir)
+        .arg("--label")
+        .arg(dir.display().to_string())
+        .args(["--grep", "Repo::find", "--depth", "2", "."])
+        .env("CALLGRAPH_LANG", "en")
+        .output()
+        .unwrap();
+    assert_eq!(body, String::from_utf8_lossy(&cli.stdout));
+    drop(s);
+    let _ = std::fs::remove_dir_all(&dir);
 }
