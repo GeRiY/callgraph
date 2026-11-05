@@ -21,3 +21,8 @@
 /spike/
 /tools/local.env
 /.claude/
+
+# a skill futásidejű adatai (projekt-aliasok, hibanapló, visszajelzések)
+/skill/projects.json
+/skill/errors.jsonl
+/skill/feedback.jsonl

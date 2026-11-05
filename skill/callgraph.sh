@@ -35,74 +35,15 @@
 #
 # Kimenet-korlát: 400 sor fölött a mappás outline summary-ra, az egyfájlos metódus-indexre vált;
 #
-# Motor: minden célra az `callgraph show`. A projekt-alias feloldása (projects.json) és a hibák error-id-ja (lib.sh fail) a buroké;
-# az callgraph csak abszolút gyökeret és a hozzá relatív utakat kapja.
+# Motor: a logika (projekt-alias feloldása, `show`, hibák error-id-ja) a `callgraph wrap` alparancsban él;
+# ez a burok csak a súgót írja ki és továbbít.
 
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REGISTRY="${CALLGRAPH_REGISTRY:-$SCRIPT_DIR/projects.json}"
 source "$SCRIPT_DIR/lib.sh"
 
-if [[ "${1:-}" == "--help" || "${1:-}" == "-h" || "${1:-}" == "help" ]]; then
-    print_help "${BASH_SOURCE[0]}"
-    exit 0
-fi
-
-# Az callgraph bináris: env-ből, vagy a skill bin/ mappájából platform szerint (bin/<os>-<arch>/callgraph), vagy bin/callgraph.
-callgraph_bin() {
-    [[ -n "${CALLGRAPH_BIN:-}" ]] && { echo "$CALLGRAPH_BIN"; return; }
-    local os arch
-    os="$(uname -s | tr '[:upper:]' '[:lower:]')"; arch="$(uname -m)"
-    case "$os" in mingw*|msys*|cygwin*) os=windows ;; esac   # Git Bash: MINGW64_NT-… → windows
-    case "$arch" in amd64|AMD64) arch=x86_64 ;; esac
-    for c in "$SCRIPT_DIR/bin/$os-$arch/callgraph" "$SCRIPT_DIR/bin/$os-$arch/callgraph.exe" "$SCRIPT_DIR/bin/callgraph" "$SCRIPT_DIR/bin/callgraph.exe"; do
-        [[ -x "$c" ]] && { echo "$c"; return; }
-    done
-}
-
-ORIG=("$@")
-# KULCS=érték alakú elöl álló argumentum (pl. CALLGRAPH_OUT_LIMIT=50) környezeti változóként él tovább.
-while [[ $# -gt 0 && "$1" =~ ^[A-Z_][A-Z0-9_]*= ]]; do export "$1"; ORIG=("${ORIG[@]:1}"); shift; done
-PROJECT=""
-DEPTH=1
-FORWARD=()   # az callgraph-nek továbbadott kapcsolók
-TARGETS=()   # a fájl/mappa argumentumok (a :: szelektorral együtt)
-while [[ $# -gt 0 ]]; do
-    case "$1" in
-        --help|-h|help) print_help "${BASH_SOURCE[0]}"; exit 0 ;;
-        --project) PROJECT="${2:-}"; shift 2 ;;
-        --depth) DEPTH="${2:-}"; FORWARD+=("$1" "${2:-}"); shift 2 ;;
-        --format|--grep|--category|--lines|--strings|--const) FORWARD+=("$1" "${2:-}"); shift 2 ;;
-        --body|--full|--guess) FORWARD+=("$1"); shift ;;
-        *) TARGETS+=("$1"); shift ;;
-    esac
+for a in "$@"; do
+    case "$a" in --help|-h|help) print_help "${BASH_SOURCE[0]}"; exit 0 ;; esac
 done
-[[ "$DEPTH" =~ ^[1-9][0-9]*$ ]] || fail "usage" "A --depth pozitív egész (kaptam: $DEPTH)."
-if [[ ${#TARGETS[@]} -eq 0 ]]; then
-    fail "usage" "Használat: bash ~/.claude/skills/callgraph/callgraph.sh <fájl|mappa>[::metódusnév] [...] [--project alias] [--format outline|api|stats|mermaid|dot|json]"
-fi
-
-ROOT="$PWD"
-if [[ -n "$PROJECT" ]]; then
-    [[ -f "$REGISTRY" ]] || fail "usage" "Nincs projects.json — regisztrálj előbb: bash ~/.claude/skills/callgraph/projects.sh add $PROJECT <abszolút_útvonal>"
-    ROOT="$(resolve_project_root "$REGISTRY" "$PROJECT")"
-    [[ -n "$ROOT" ]] || fail "usage" "Ismeretlen projekt-alias: $PROJECT (lásd: bash ~/.claude/skills/callgraph/projects.sh list)"
-fi
-
-
-RPG="$(callgraph_bin)"
-[[ -n "$RPG" ]] || fail "usage" "Nem található az callgraph bináris (CALLGRAPH_BIN, vagy $SCRIPT_DIR/bin/<os>-<arch>/callgraph)."
-
-ERR="$(mktemp "${TMPDIR:-/tmp}/callgraph-callgraph.XXXXXX")"
-trap 'rm -f "$ERR"' EXIT
-"$RPG" show --project "$ROOT" --label "${PROJECT:-$ROOT}" "${FORWARD[@]+"${FORWARD[@]}"}" "${TARGETS[@]}" 2>"$ERR"
-rc=$?
-if (( rc != 0 )); then
-    msg="$(cat "$ERR")"
-    case "$msg" in
-        "Nem található"*|"Nincs ilyen metódus"*) fail "not_found" "$msg" ;;
-        *) fail "usage" "$msg" ;;
-    esac
-fi
-exit 0
+run_callgraph wrap "$@"

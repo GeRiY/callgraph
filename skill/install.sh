@@ -1,12 +1,10 @@
 #!/usr/bin/env bash
-# callgraph skill telepítő: ellenőrzi az callgraph platform-binárist és a jq-t, létrehozza az üres projects.json-t.
-# Az elemzést a natív callgraph bináris végzi (bin/<os>-<arch>/callgraph) — PHP / Node nem kell.
+# callgraph skill telepítő: ellenőrzi a callgraph platform-binárist, létrehozza az üres projects.json-t.
+# Az elemzést és a projekt- / feedback-kezelést a natív callgraph bináris végzi (bin/<os>-<arch>/callgraph) — PHP, Node és jq nem kell.
 # Használat:  bash install.sh
 set -euo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$DIR"
-
-command -v jq >/dev/null || { echo "Hiányzik: jq"; exit 1; }
 
 os="$(uname -s | tr '[:upper:]' '[:lower:]')"; arch="$(uname -m)"
 case "$os" in mingw*|msys*|cygwin*) os=windows ;; esac   # Git Bash: MINGW64_NT-… → windows

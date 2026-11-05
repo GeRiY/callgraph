@@ -3,7 +3,7 @@
 
 use std::path::PathBuf;
 
-use crate::error::{Result, CallgraphError};
+use crate::error::{CallgraphError, Result};
 use crate::lang::LanguageRegistry;
 
 const USAGE: &str = "callgraph [--lang <id,...>] [--cache <fájl>] [--no-cache] <fájl|mappa> [...] | callgraph prune [--cache <fájl>] [--dry-run]";
@@ -50,6 +50,8 @@ pub enum CliArgs {
         depth: usize,
         guess: bool,
     },
+    /// Skill-parancs (`project`, `feedback`, `wrap`) nyers argumentumokkal.
+    Skill { command: String, args: Vec<String> },
 }
 
 impl CliArgs {
@@ -64,6 +66,16 @@ impl CliArgs {
         }
         if args.first().is_some_and(|a| a == "show") {
             return Self::parse_show(&args[1..]);
+        }
+        // a skill-parancsok maguk értelmezik az argumentumaikat (a hibáik error-id-t kapnak)
+        if let Some(command) = args
+            .first()
+            .filter(|a| matches!(a.as_str(), "project" | "feedback" | "wrap"))
+        {
+            return Ok(Self::Skill {
+                command: command.clone(),
+                args: args[1..].to_vec(),
+            });
         }
         Self::parse_analyze(args)
     }
@@ -258,16 +270,16 @@ impl CliArgs {
             if arg == "--no-cache" {
                 no_cache = true;
             } else if arg == "--lang" {
-                let value = it
-                    .next()
-                    .ok_or_else(|| CallgraphError::Usage(format!("a --lang értéket vár; {USAGE}")))?;
+                let value = it.next().ok_or_else(|| {
+                    CallgraphError::Usage(format!("a --lang értéket vár; {USAGE}"))
+                })?;
                 lang = Some(parse_lang(&value)?);
             } else if let Some(value) = arg.strip_prefix("--lang=") {
                 lang = Some(parse_lang(value)?);
             } else if arg == "--cache" {
-                let value = it
-                    .next()
-                    .ok_or_else(|| CallgraphError::Usage(format!("a --cache értéket vár; {USAGE}")))?;
+                let value = it.next().ok_or_else(|| {
+                    CallgraphError::Usage(format!("a --cache értéket vár; {USAGE}"))
+                })?;
                 cache = Some(PathBuf::from(value));
             } else if let Some(value) = arg.strip_prefix("--cache=") {
                 cache = Some(PathBuf::from(value));

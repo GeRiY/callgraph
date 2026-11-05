@@ -68,5 +68,13 @@ pub fn build_command(args: CliArgs) -> Result<Box<dyn Command>> {
             depth,
             guess,
         ))),
+        CliArgs::Skill { command, args } => {
+            let home = crate::skill::SkillHome::from_env();
+            Ok(match command.as_str() {
+                "project" => Box::new(commands::ProjectCommand::new(args, home)),
+                "feedback" => Box::new(commands::FeedbackCommand::new(args, home)),
+                _ => Box::new(commands::WrapCommand::new(args, home)),
+            })
+        }
     }
 }

@@ -11,3 +11,4 @@ pub mod lang;
 pub mod model;
 pub mod project;
 pub mod query;
+pub mod skill;

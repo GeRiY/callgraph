@@ -19,11 +19,11 @@ A használat leírása a `SKILL.md`-ben van.
 - A `bin/<os>-<arch>/callgraph` a platformhoz illő előre fordított bináris (pl. `darwin-arm64`, `linux-x86_64`).
   Más platformra forrásból kell fordítani.
 - macOS: a csomag Apple Silicon (`darwin-arm64`) és Intel (`darwin-x86_64`) binárist is tartalmaz (ad-hoc aláírva); az `install.sh` leveszi a letöltés karantén-jelzőjét.
-- Linux: `linux-aarch64` és `linux-x86_64` statikus (musl) bináris — bármely disztribúción fut, külső függőség nélkül (a burokhoz `bash` és `jq` kell).
+- Linux: `linux-aarch64` és `linux-x86_64` statikus (musl) bináris — bármely disztribúción fut, külső függőség nélkül (a burokhoz csak `bash` kell).
 - Forrásból (Rust 1.85+): `cargo build --release`, majd a `target/release/callgraph` másolata a
   `bin/<os>-<arch>/callgraph` helyre (`<os>` = `uname -s` kisbetűvel, `<arch>` = `uname -m`).
 - Windows: Git Bash kell (a `uname` `MINGW64_NT-…` értékét a burok `windows`-ra normalizálja); a csomag `bin/windows-x86_64/callgraph.exe` binárist tartalmaz.
-- Külső függőség nincs (se PHP, se Node): az elemzést az `callgraph` végzi; a burokhoz `bash` és `jq` kell.
+- Külső függőség nincs (se PHP, se Node): az elemzést, a projekt-aliasokat és a feedbacket a `callgraph` végzi; a burokhoz csak `bash` kell.
 
 ## Környezeti változók
 
@@ -40,7 +40,10 @@ Az érték elöl álló argumentumként is megadható: `bash callgraph.sh CALLGR
 
 ```bash
 callgraph <fájl|mappa>...                    # elemzés → fájlonként egy JSONL-sor (jq-val szűrd)
-callgraph show --project <gyökér> [kapcsolók] <fájl|mappa>[::metódus]   # amit a callgraph.sh hív
+callgraph show --project <gyökér> [kapcsolók] <fájl|mappa>[::metódus]   # a lekérdező mag
+callgraph wrap [--project alias] [kapcsolók] <fájl|mappa>[::metódus]   # amit a callgraph.sh hív (alias + error-id)
+callgraph project add|list|remove|resolve|get|set-config …              # amit a projects.sh hív
+callgraph feedback add|resolve|list|show …                              # amit a feedback.sh hív
 callgraph callers <minta> --depth N          # a hívók hívói N szintig
 callgraph prune [--dry-run]                  # a cache-ből törli a nem létező fájlok és a régi verzió bejegyzéseit
 callgraph --lang php,css <fájl|mappa>…       # csak a megadott nyelvek fájljait elemzi (a többit kihagyja)
