@@ -22,16 +22,9 @@ impl QueryEngine {
             })
             .collect()
     }
-    /// A régi callgraph sorrendje: előbb a PHP-motor (fájlrendszer-sorrend), majd a JS-motor
-    /// (`readdirSync().sort()`: mappánként név szerint, ami komponensenkénti összehasonlítás).
+    /// A régi callgraph bejárási sorrendje (`crate::graph::legacy_order`).
     pub(super) fn legacy_order(&self, files: Vec<PathBuf>) -> Vec<PathBuf> {
-        let registry = self.analyzer.registry();
-        let (mut js, mut rest): (Vec<_>, Vec<_>) = files
-            .into_iter()
-            .partition(|f| registry.for_path(f).is_some_and(|l| l.id() == "js"));
-        js.sort();
-        rest.extend(js);
-        rest
+        crate::graph::legacy_order(self.analyzer.registry(), files)
     }
 
     /// A projekt `.callgraph/` tárolója: létrehozza (a `*`-os `.gitignore`-ral együtt), hogy ne kerüljön gitbe.

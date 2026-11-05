@@ -2,7 +2,7 @@
 
 use super::{QueryEngine, QueryResult};
 use crate::error::Result;
-use crate::index::{CallerIndex, FileGraphRecord};
+use crate::index::CallerIndex;
 use crate::query::format::{FormatterRegistry, call_lines, method_calls};
 use crate::query::snippet::{self, SourceLines};
 use crate::{t, tf};
@@ -43,10 +43,7 @@ impl QueryEngine {
         }
         // a 2. szinttől a lekérdezés teljes hatókörében keresünk (nem csak az 1. szint fájljainak mappáiban)
         let all = self.all_graphs(scope)?;
-        let index = CallerIndex::from_graphs(all.iter().map(|(path, graph)| FileGraphRecord {
-            path: path.clone(),
-            graph: graph.clone(),
-        }));
+        let index = CallerIndex::build(all.iter().map(|(path, graph)| (path.as_str(), graph)));
         let direct_rows = rows
             .iter()
             .flat_map(|row| {
