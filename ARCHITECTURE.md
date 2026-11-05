@@ -88,7 +88,8 @@ kiterjesztést kéri, az előbb regisztrált nyer.
 - `cargo fmt` + `cargo clippy --release -- -D warnings` tisztán; edition 2024.
 - Minden publikus típusnak/traitnek rövid doc-kommentje van (miért létezik, nem regény).
 - **Formátum: JSONL mindenhol, JSON-fájl nem.** Kimenet, cache és golden referencia is soronként egy JSON-objektum;
-  konfigurációt (`composer.json`, `jsconfig.json`) természetesen JSON-ként olvasunk.
+  konfigurációt (`composer.json`, `jsconfig.json`) természetesen JSON-ként olvasunk. Kivétel: a skill-mappa kis,
+  egyetlen objektumból álló állapotfájljai (`projects.json`, `update-check.json`) JSON-ok — ezek nem rekordlisták.
 - A mezőnevek és -sorrend a `golden/ref.jsonl` szerint.
 - **Elfogadás refaktornál:** bájtra azonos kimenet az alapvonallal (`tools/identity_check.sh`), a golden egyik mezőben sem romlik.
 - Parser: `mago-syntax = "=1.59.0"` (pontos verzió); mago-specifikus típus csak `lang/php/parser/` és
