@@ -13,18 +13,54 @@ pub(crate) struct Definition {
     pub line: u32,
 }
 
+/// Egy fájl változás-bélyege: mtime (ns) + méret. A méret azért kell, mert több fájlrendszer
+/// (pl. Docker bind mount) durva, ms-os mtime-ot ad: két gyors írás azonos mtime-ot kaphat.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) struct FileStamp {
+    pub mtime: u128,
+    pub size: u64,
+}
+
+impl FileStamp {
+    /// A fájl metaadataiból; ha nem olvasható, az alapérték (mindig eltér a tárolttól).
+    pub fn of(path: &std::path::Path) -> Self {
+        let Ok(meta) = path.metadata() else {
+            return Self::default();
+        };
+        let mtime = meta
+            .modified()
+            .ok()
+            .and_then(|m| m.duration_since(std::time::UNIX_EPOCH).ok())
+            .map_or(0, |d| d.as_nanos());
+        Self {
+            mtime,
+            size: meta.len(),
+        }
+    }
+}
+
 /// Egy már elemzett fájl indexelt állapota.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct IndexRecord {
     pub path: String,
     pub mtime: u128,
+    /// A régi (méret nélküli) rekordoknál 0 → a fájl egyszer újraelemződik.
+    #[serde(default)]
+    pub size: u64,
     #[serde(default)]
     pub definitions: Vec<Definition>,
     pub graph: FileGraph,
 }
 
 impl IndexRecord {
-    pub fn new(path: String, mtime: u128, graph: FileGraph) -> Self {
+    pub fn stamp(&self) -> FileStamp {
+        FileStamp {
+            mtime: self.mtime,
+            size: self.size,
+        }
+    }
+
+    pub fn new(path: String, stamp: FileStamp, graph: FileGraph) -> Self {
         let namespace = graph.namespace.as_deref().unwrap_or("");
         let prefix = if namespace.is_empty() {
             String::new()
@@ -56,7 +92,8 @@ impl IndexRecord {
         }));
         Self {
             path,
-            mtime,
+            mtime: stamp.mtime,
+            size: stamp.size,
             definitions,
             graph,
         }

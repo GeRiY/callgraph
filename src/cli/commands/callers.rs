@@ -7,7 +7,7 @@ use std::time::UNIX_EPOCH;
 use crate::analysis::Analyzer;
 use crate::cli::Command;
 use crate::error::Result;
-use crate::index::{CallerIndex, IndexStore};
+use crate::index::{CallerIndex, FileStamp, IndexStore};
 use crate::io::{CacheStore, FileWalker, JsonlCacheStore};
 use crate::lang::LanguageRegistry;
 use crate::project::{Project, ProjectLocator, ProjectStore};
@@ -46,8 +46,8 @@ impl CallersCommand {
         let analyzer = Analyzer::new(registry);
         let mut cache = JsonlCacheStore::new(store.cache_path());
         for file in &files {
-            let file_mtime = mtime(file).unwrap_or_default();
-            if index.get(file, file_mtime).is_some() {
+            let stamp = FileStamp::of(file);
+            if index.get(file, stamp).is_some() {
                 continue;
             }
             let changed = index.contains(file);
@@ -66,7 +66,7 @@ impl CallersCommand {
                 analyzer.analyze_path(file)?.graph
             };
             let _ = cache.put_for_language(file, seconds, &graph, language);
-            index.put(file, file_mtime, graph);
+            index.put(file, stamp, graph);
         }
         index.save()?;
         Ok(CallerIndex::from_records(index.records()))
@@ -82,16 +82,6 @@ impl Command for CallersCommand {
         }
         Ok(0)
     }
-}
-
-fn mtime(path: &Path) -> Option<u128> {
-    path.metadata()
-        .ok()?
-        .modified()
-        .ok()?
-        .duration_since(UNIX_EPOCH)
-        .ok()
-        .map(|duration| duration.as_nanos())
 }
 
 fn mtime_seconds(path: &Path) -> Option<u64> {
