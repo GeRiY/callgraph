@@ -74,6 +74,7 @@ pub fn build_command(args: CliArgs) -> Result<Box<dyn Command>> {
                 "project" => Box::new(commands::ProjectCommand::new(args, home)),
                 "feedback" => Box::new(commands::FeedbackCommand::new(args, home)),
                 "error" => Box::new(commands::ErrorCommand::new(args, home)),
+                "lang" => Box::new(commands::LangCommand::new(args, home)),
                 _ => Box::new(commands::WrapCommand::new(args, home)),
             })
         }
