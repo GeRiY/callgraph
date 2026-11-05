@@ -151,6 +151,9 @@ bash ~/.claude/skills/callgraph/callgraph.sh update           # download and ins
 The update downloads your platform's zip from the latest GitHub Release and overwrites the skill files and `bin/`;
 `projects.json`, `errors.jsonl`, `feedback.jsonl` and the language setting are kept. `--force` reinstalls the current
 version; `callgraph --version` shows the installed one.
+Every release ships a `SHA256SUMS` file; the update verifies the downloaded zip against it and installs nothing on a
+mismatch. Releases without it (v0.1.0) are refused unless you pass `--insecure-skip-checksum`. With `--from <zip>` the
+zip is checked against `--sha256 <hex>` or a `SHA256SUMS` next to it (otherwise a one-line warning).
 `callgraph.sh` also checks for a new release in the background at most once a day (without slowing queries down) and,
 if there is one, ends its output with a one-line `ℹ callgraph X is available` notice; `CALLGRAPH_UPDATE_CHECK=0`
 turns this off (it is also off when `CI` is set).

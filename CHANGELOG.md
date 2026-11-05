@@ -16,12 +16,22 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   The skill follows the language: `callgraph.sh set-lang <en|hu>` rewrites `SKILL.md` in that language (the other one
   disappears); the first install (`install.sh` → new `callgraph skill-sync`) and `update` keep the user's language.
   Restart Claude Code to reload the skill.
+- **Release checksums:** every release has a `SHA256SUMS` asset (`sha256sum` format, all assets). `update` verifies the
+  downloaded zip's SHA-256 before installing and installs nothing on a mismatch; a release without `SHA256SUMS` (v0.1.0)
+  is refused unless `--insecure-skip-checksum` is given. `update --from <zip>` checks `--sha256 <hex>` or a
+  `SHA256SUMS` next to the zip, otherwise it warns in one line and installs.
 
 ### Changed
 - The committed / packaged default `SKILL.md` is now English (generated from `skill-i18n/SKILL.en.md`).
 - Version lookup for `update` / `update --check` uses the `releases/latest` redirect instead of the GitHub API, so the
   API rate limit (HTTP 403) no longer applies.
 - The project page moved to the `gh-pages` branch (https://geriy.github.io/callgraph/); page edits no longer touch `main`.
+
+### Fixed
+- SCSS: `@mixin` / `@function` parameters (`$color: t.$brand, …`) and `@include` keyword arguments were listed as
+  constants; now only `$var: value;` declarations are (the parameters stay the mixin's params).
+- `update --check` now also records its result in `update-check.json`, so the daily background check does not repeat
+  it and a newer version found manually shows up in the notice.
 
 ## [0.1.0] — 2026-11-05
 

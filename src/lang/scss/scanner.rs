@@ -1,6 +1,6 @@
 use crate::lang::Analysis;
 use crate::lang::scss::scan_helpers::{
-    call, call_parts, constant, control_flow, declaration, functions, is_rule,
+    call, call_parts, constant, control_flow, declaration, functions, is_rule, paren_delta,
 };
 use crate::lang::stylesheet::{line, normalize};
 use crate::model::{Call, Comment, Container, FileGraphBuilder, Method, StringLit};
@@ -43,6 +43,8 @@ impl<'a> ScssScanner<'a> {
         });
         let mut depth = 0usize;
         let mut methods: Vec<(usize, usize)> = Vec::new();
+        // nyitott zárójel a sor elején: többsoros paraméterlista / argumentum / map folytatása — nem deklaráció
+        let mut paren_depth = 0isize;
         for (n, raw) in self.source.lines().enumerate() {
             let ln = n as u32 + 1;
             let clean = raw.trim();
@@ -59,7 +61,10 @@ impl<'a> ScssScanner<'a> {
             self.comments(raw, ln);
             self.strings(raw, ln);
             self.import(raw);
-            constant(&mut self.builder, &self.container, raw, ln);
+            if paren_depth == 0 {
+                constant(&mut self.builder, &self.container, raw, ln);
+            }
+            paren_depth = (paren_depth + paren_delta(raw)).max(0);
             control_flow(&mut self.builder, &self.container, raw, ln);
             self.calls(raw, ln);
             if let Some(head) = raw

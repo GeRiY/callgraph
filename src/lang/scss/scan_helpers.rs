@@ -80,13 +80,12 @@ pub(super) fn is_rule(s: &str) -> bool {
         && !s.ends_with(':')
 }
 
+/// Változó-deklaráció (`$név: érték;`) a sor elején. A `@mixin` / `@function` paraméterlistája
+/// (`$color: t.$brand, …`) és az `@include` kulcsszavas argumentuma nem konstans; a többsoros paraméterlista
+/// folytatósorait a hívó zárja ki (`paren_depth`).
 pub(super) fn constant(builder: &mut FileGraphBuilder, container: &str, raw: &str, ln: u32) {
     let s = raw.trim();
-    if !(s.starts_with('$')
-        || s.starts_with("@function")
-        || s.starts_with("@mixin")
-        || s.starts_with("@include"))
-    {
+    if !s.starts_with('$') {
         return;
     }
     let Some(pos) = s.find('$') else { return };
@@ -123,6 +122,29 @@ pub(super) fn constant(builder: &mut FileGraphBuilder, container: &str, raw: &st
     });
 }
 
+/// A nyitott zárójelek mélységének változása egy sorban (idézőjeles szövegen és a sorvégi ` // megjegyzés`-en
+/// kívül; az `url(http://…)` `//`-je nem megjegyzés, mert nem szóköz / sorkezdet előzi meg).
+pub(super) fn paren_delta(raw: &str) -> isize {
+    let mut delta = 0;
+    let mut quote = None;
+    let (mut prev, mut before) = (' ', ' ');
+    for c in raw.chars() {
+        match quote {
+            Some(q) if c == q => quote = None,
+            Some(_) => {}
+            None => match c {
+                '"' | '\'' => quote = Some(c),
+                '/' if prev == '/' && before.is_whitespace() => break,
+                '(' => delta += 1,
+                ')' => delta -= 1,
+                _ => {}
+            },
+        }
+        (before, prev) = (prev, c);
+    }
+    delta
+}
+
 pub(super) fn control_flow(builder: &mut FileGraphBuilder, container: &str, raw: &str, ln: u32) {
     for kind in ["if", "each", "for", "while", "media", "supports"] {
         let prefix = format!("@{kind}");
@@ -151,6 +173,77 @@ mod tests {
     use super::super::scanner::ScssScanner;
     use std::sync::mpsc;
     use std::time::Duration;
+
+    fn sample(name: &str) -> String {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("golden/samples/scss");
+        std::fs::read_to_string(dir.join(name)).expect("SCSS golden sample")
+    }
+
+    fn constants(name: &str, source: &str) -> Vec<(String, String)> {
+        let graph = serde_json::to_value(ScssScanner::new(name, source).scan().graph).unwrap();
+        graph["constants"]
+            .as_array()
+            .map(|list| {
+                list.iter()
+                    .map(|c| {
+                        let text = |k: &str| c[k].as_str().unwrap_or_default().to_owned();
+                        (text("name"), text("value"))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    #[test]
+    fn mixin_and_function_parameters_are_not_constants() {
+        // regresszió: a `@mixin button($color: t.$brand, $radius: 4px) {` sora `$color` konstans lett
+        assert!(constants("_mixins.scss", &sample("_mixins.scss")).is_empty());
+        assert!(constants("_helpers.scss", &sample("_helpers.scss")).is_empty());
+        assert!(constants("theme.scss", &sample("theme.scss")).is_empty());
+        let graph = serde_json::to_value(
+            ScssScanner::new("_mixins.scss", &sample("_mixins.scss"))
+                .scan()
+                .graph,
+        )
+        .unwrap();
+        let button = graph["methods"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|m| m["name"] == "button")
+            .expect("button mixin");
+        assert_eq!(
+            button["params"],
+            serde_json::json!(["$color: t.$brand", "$radius: 4px"])
+        );
+
+        let multi = "@mixin card(\n  $pad: 4px,\n  $bg: url(http://x/y.png)\n) {\n  padding: $pad;\n}\n$after: 1px;\n";
+        assert_eq!(
+            constants("multi.scss", multi),
+            vec![("$after".to_owned(), "1px".to_owned())]
+        );
+    }
+
+    #[test]
+    fn variable_declarations_are_still_constants() {
+        assert_eq!(
+            constants("_tokens.scss", &sample("_tokens.scss")),
+            vec![
+                ("$brand".to_owned(), "#2f6fed".to_owned()),
+                (
+                    "$spacing".to_owned(),
+                    "(sm: 4px, md: 8px, lg: 16px)".to_owned()
+                ),
+                (
+                    "$breakpoints".to_owned(),
+                    "(tablet: 768px, desktop: 1200px)".to_owned()
+                ),
+            ]
+        );
+        let src = ".a {\n  $local: 2px; // note (x\n  margin: $local;\n}\n$bg: url(http://h/a.png);\n$top: 3;\n";
+        let names: Vec<String> = constants("x.scss", src).into_iter().map(|c| c.0).collect();
+        assert_eq!(names, ["$local", "$bg", "$top"]);
+    }
 
     #[test]
     fn all_golden_samples_finish() {
