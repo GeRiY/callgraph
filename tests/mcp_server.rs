@@ -99,6 +99,7 @@ fn initialize_list_and_call_outline() {
             "find_callers",
             "framework_view",
             "method_body",
+            "notes",
             "outline",
             "projects",
             "search"

@@ -20,6 +20,7 @@ ugyanaz a tömör kimenet, amit a `callgraph show` kiír (ez a token-hatékony r
 | `find_callers` | `pattern`, `path?`, `project?`, `depth?` (1–5), `guess?`, `full?` | ki hívja; `depth` > 1: hatáselemzés | `show <út> --grep <minta> --depth N [--guess]` |
 | `search` | `kind` (`strings`\|`constants`), `pattern`, `path?`, `project?`, `full?` | string-literál / konstans helye | `show <út> --strings` / `--const` |
 | `framework_view` | `view` (`routes`\|`middleware`\|`validation`\|`jobs`\|`events`\|`providers`\|`magic`\|`di`\|`views`), `path`, `project?`, `full?` | framework-nézet | `show <út> --format <nézet>` |
+| `notes` (pilot) | `pattern?` (regex a szövegre / horgonyra; üres = mind), `path?`, `project?` | a fájlokhoz / metódusokhoz írt jegyzetek: `út[::metódus]  idő  📝 szöveg`, `[orphaned]`, ha a metódus már nincs | `show <út> --notes <minta>` |
 | `projects` | — | a regisztrált aliasok és gyökereik | `projects.sh list` |
 
 - A `path` a projekt-gyökérhez képest értendő; elhagyva (ahol opcionális) a teljes gyökér.
@@ -32,7 +33,8 @@ ugyanaz a tömör kimenet, amit a `callgraph show` kiír (ez a token-hatékony r
 ## Biztonság
 
 - **Csak olvas.** Forrásfájlt nem ír; egyetlen mellékhatás a CLI-vel közös elemzési cache a projekt `.callgraph/`
-  mappájában (ha írható).
+  mappájában (ha írható). A jegyzeteket (pilot, `docs/NOTES.md`) is csak olvassa: írni (`note add` / `rm`) csak a
+  CLI-vel lehet, MCP-n nincs író eszköz.
 - **Útvonal-őr:** minden út a projekt-gyökérhez (alias vagy munkakönyvtár) képest oldódik fel; a gyökérből kilépő út
   (`..`, gyökéren kívüli abszolút út, kifelé mutató symlink) hibát ad. A `::` az útban nem megengedett (a metódus
   külön paraméter).

@@ -43,6 +43,17 @@ Usage:
   bash ~/.claude/skills/callgraph/callgraph.sh <dir|file> --const <pattern>     constant references, definitions and re-exports
                                                 (PHP class constants / use const, Rust const/static / pub use, JS/TS export { })
 
+Notes (pilot — a short note on a file or method, stored outside the source in <project>/.callgraph/notes.jsonl):
+  bash ~/.claude/skills/callgraph/callgraph.sh note add <file>[::<method>] "<text>" [--project alias]
+                                                prints the new note id; the anchor is the method NAME (Class::method also ok)
+  bash ~/.claude/skills/callgraph/callgraph.sh note list [<file|dir>] [--project alias]
+                                                "<id>  <file>::<Class>::<method>  2026-11-05 20:27  📝 <text>";
+                                                [orphaned] = the method is no longer in the file
+  bash ~/.claude/skills/callgraph/callgraph.sh note rm <id> [--project alias]
+  bash ~/.claude/skills/callgraph/callgraph.sh <dir|file> --notes <pattern>    search notes (regex on text or anchor, case-insensitive)
+  The outline shows "📝 2026-11-05 20:27 · <text>" under the file header / the method (newest first, max 3),
+  --body above the method source. Times are UTC.
+
 Language (of the terminal output and the help: en = English, default; hu = Hungarian):
   bash ~/.claude/skills/callgraph/callgraph.sh set-lang                 the current language and where it comes from
   bash ~/.claude/skills/callgraph/callgraph.sh set-lang <en|hu>         save the language (to the skill dir's lang file)

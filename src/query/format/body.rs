@@ -56,6 +56,12 @@ impl Formatter for Body {
                     end,
                     has_doc: method.doc.is_some(),
                 };
+                crate::notes::body_lines(
+                    &mut out,
+                    &row.notes,
+                    method.container.as_deref(),
+                    &method.name,
+                );
                 out.push_str(&method_source(&lines, syntax, span, self.mode));
                 out.push('\n');
             }

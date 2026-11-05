@@ -19,6 +19,8 @@ pub struct QueryResult {
     /// A `--grep` találatai közül azok, amelyek a mintára nem, csak rokon típuson (interfész, trait, szülő)
     /// át illeszkedtek.
     pub via: Vec<ViaCall>,
+    /// A fájl jegyzetei (PILOT, `crate::notes`): csak az outline / `--body` előtt töltődik; üres = nincs kiírás.
+    pub notes: Vec<crate::notes::Note>,
 }
 
 /// Egy rokon típuson át illesztett hívás: sor + cél (a `resolved` / `target`), és a hívás típusának rövid neve.
@@ -35,6 +37,7 @@ impl QueryResult {
             graph,
             methods,
             via: Vec::new(),
+            notes: Vec::new(),
         }
     }
 
@@ -77,6 +80,10 @@ impl QueryEngine {
     }
     pub fn label(&self) -> &str {
         &self.label
+    }
+    /// A (kanonikus) projekt-gyökér.
+    pub fn root(&self) -> &Path {
+        &self.root
     }
     /// A `--depth` 2. szinttől kezdve keresett hatókör: a teljes projektgyökér (`--project`, különben a munkamappa).
     /// A hívók hívói bárhol lehetnek a projektben, nem csak a lekérdezett mappában (pl. `app/Services` → `routes/`).

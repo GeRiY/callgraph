@@ -160,6 +160,20 @@ pub(crate) struct FrameworkViewParams {
     pub full: bool,
 }
 
+/// `notes` (pilot): a fájlokhoz / metódusokhoz írt jegyzetek keresése (csak olvas).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, JsonSchema)]
+pub(crate) struct NotesParams {
+    /// Regex on the note text or its `path::method` anchor (case-insensitive); default: all notes.
+    #[serde(default)]
+    pub pattern: Option<String>,
+    /// Only notes under this file or directory (relative to the project root); default: the whole root.
+    #[serde(default)]
+    pub path: Option<String>,
+    /// Registered project alias; default: the server's working directory.
+    #[serde(default)]
+    pub project: Option<String>,
+}
+
 impl OutlineFormat {
     pub(crate) fn as_str(self) -> &'static str {
         match self {

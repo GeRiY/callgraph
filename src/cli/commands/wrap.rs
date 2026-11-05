@@ -61,7 +61,8 @@ fn parse(args: &[String]) -> Parsed {
                 p.depth = value();
                 p.forward.extend(["--depth".into(), p.depth.clone()]);
             }
-            "--format" | "--grep" | "--category" | "--lines" | "--strings" | "--const" => {
+            "--format" | "--grep" | "--category" | "--lines" | "--strings" | "--const"
+            | "--notes" => {
                 let v = value();
                 p.forward.extend([a.clone(), v]);
             }

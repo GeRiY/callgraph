@@ -3,8 +3,8 @@
 
 use super::guard::ProjectRoot;
 use super::params::{
-    FindCallersParams, FrameworkViewParams, MethodBodyParams, OutlineParams, SearchKind,
-    SearchParams,
+    FindCallersParams, FrameworkViewParams, MethodBodyParams, NotesParams, OutlineParams,
+    SearchKind, SearchParams,
 };
 
 /// A `find_callers` megengedett mélysége.
@@ -112,6 +112,12 @@ impl ShowQuery {
     /// `framework_view`: `--format <nézet>`.
     pub(crate) fn framework_view(p: FrameworkViewParams) -> Result<Self, String> {
         Ok(Self::new(p.project, p.path, p.full).flag("--format", p.view.as_str()))
+    }
+
+    /// `notes` (pilot): `--notes <minta>` (üres minta = minden jegyzet) a hatókörön; csak olvas.
+    pub(crate) fn notes(p: NotesParams) -> Result<Self, String> {
+        let path = p.path.unwrap_or_default();
+        Ok(Self::new(p.project, path, false).flag("--notes", p.pattern.unwrap_or_default()))
     }
 
     /// A `show` argumentumai (`show` és `--project`/`--label` nélkül): kapcsolók, majd a gyökéren belülre
@@ -272,6 +278,19 @@ mod tests {
             q.to_args(&root()).unwrap(),
             s(&["--format", "routes", "src"])
         );
+    }
+
+    #[test]
+    fn notes_maps_to_the_notes_flag() {
+        let q = ShowQuery::notes(NotesParams {
+            pattern: Some("cache".into()),
+            path: Some("src".into()),
+            project: None,
+        })
+        .unwrap();
+        assert_eq!(q.to_args(&root()).unwrap(), s(&["--notes", "cache", "src"]));
+        let q = ShowQuery::notes(NotesParams::default()).unwrap();
+        assert_eq!(q.to_args(&root()).unwrap(), s(&["--notes", "", "."]));
     }
 
     #[test]

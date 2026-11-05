@@ -49,6 +49,9 @@ fn outline(row: &QueryResult, lang: Lang, source: Option<&SourceLines>) -> Strin
             .unwrap_or_default()
     )
     .unwrap();
+    // jegyzetek (PILOT): fájl-jegyzetek, és a nem listázott (konténer nélküli) függvényeiké
+    crate::notes::file_lines(&mut s, &row.notes);
+    crate::notes::unlisted_lines(&mut s, &row.notes, g);
     writeln!(s).unwrap();
     if g.containers.is_empty() {
         super::outline_procedural::procedural(g, &mut s, lang, source.map(|lines| (row, lines)));
@@ -132,6 +135,7 @@ fn outline(row: &QueryResult, lang: Lang, source: Option<&SourceLines>) -> Strin
         methods.sort_by_key(|m| m.line);
         for m in methods {
             method_line(&mut s, m);
+            crate::notes::method_lines(&mut s, &row.notes, m.container.as_deref(), &m.name, "    ");
             for cat in categories(g, m) {
                 writeln!(s, "    {:<18}{}", cat.0, cat.1).unwrap();
             }

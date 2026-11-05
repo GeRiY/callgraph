@@ -11,6 +11,7 @@ pub mod io;
 pub mod lang;
 pub mod mcp;
 pub mod model;
+pub mod notes;
 pub mod project;
 pub mod query;
 pub mod skill;

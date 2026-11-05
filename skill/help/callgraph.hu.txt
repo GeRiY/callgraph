@@ -43,6 +43,17 @@ Használat:
   bash ~/.claude/skills/callgraph/callgraph.sh <mappa|fájl> --const <minta>     konstans-hivatkozások, -definíciók és továbbexportálások
                                                 (PHP osztálykonstans / use const, Rust const/static / pub use, JS/TS export { })
 
+Jegyzetek (pilot — rövid jegyzet egy fájlhoz vagy metódushoz, a forráson kívül: <projekt>/.callgraph/notes.jsonl):
+  bash ~/.claude/skills/callgraph/callgraph.sh note add <fájl>[::<metódus>] "<szöveg>" [--project alias]
+                                                kiírja az új jegyzet azonosítóját; a horgony a metódus NEVE (Osztály::metódus is jó)
+  bash ~/.claude/skills/callgraph/callgraph.sh note list [<fájl|mappa>] [--project alias]
+                                                "<id>  <fájl>::<Osztály>::<metódus>  2026-11-05 20:27  📝 <szöveg>";
+                                                [árva] = a metódus már nincs a fájlban
+  bash ~/.claude/skills/callgraph/callgraph.sh note rm <id> [--project alias]
+  bash ~/.claude/skills/callgraph/callgraph.sh <mappa|fájl> --notes <minta>    jegyzetek keresése (regex a szövegre vagy a horgonyra, kis/nagybetű mindegy)
+  Az outline a fájl-fejléc / a metódus alatt mutatja: "📝 2026-11-05 20:27 · <szöveg>" (legújabb elöl, legfeljebb 3),
+  a --body a metódus forrása fölött. Az idő UTC.
+
 Nyelv (a terminál-kimenet és a súgó nyelve: en = angol, alapértelmezett; hu = magyar):
   bash ~/.claude/skills/callgraph/callgraph.sh set-lang                 az aktuális nyelv és a forrása
   bash ~/.claude/skills/callgraph/callgraph.sh set-lang <en|hu>         a nyelv elmentése (a skill-mappa lang fájljába)
