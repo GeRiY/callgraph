@@ -1,4 +1,4 @@
-//! A perzisztens projekt-gráf (`.callgraph/index.jsonl`): a gráfból kiszolgált lekérdezések kimenete bájtra azonos a
+//! A perzisztens projekt-gráf (`.callgraph/`: `index.bin`, `graph/*.bin`, `callers.bin`): a gráfból kiszolgált lekérdezések kimenete bájtra azonos a
 //! fájlonkénti (bejárásos) úttal (`CALLGRAPH_NO_GRAPH=1`) — hidegen és melegen, több nyelvű projekten; egy
 //! szerkesztés a következő lekérdezésben látszik; a sérült / régi gráf-fájl csendben újraépül.
 
@@ -42,7 +42,7 @@ const FILES: [(&str, &str); 7] = [
 ];
 
 /// A vizsgált lekérdezések (a `show` argumentumai, a `--project` nélkül).
-const QUERIES: [&[&str]; 11] = [
+const QUERIES: [&[&str]; 16] = [
     &["show", ".", "--grep", "find"],
     &["show", ".", "--grep", "find", "--depth", "3"],
     &["show", ".", "--grep", "find", "--depth", "3", "--guess"],
@@ -61,6 +61,11 @@ const QUERIES: [&[&str]; 11] = [
     &["show", ".", "--strings", "needle"],
     &["show", ".", "--const", "LIMIT"],
     &["show", "src", "--const", "LIMIT"],
+    &["show", "src/Admin.php"],
+    &["show", "src/Admin.php::other", "--body"],
+    &["show", "web"],
+    &["show", "src", "--format", "json"],
+    &["show", "web", "--format", "json"],
 ];
 
 impl Project {
@@ -102,8 +107,14 @@ impl Project {
         String::from_utf8(out.stdout).unwrap()
     }
 
-    fn index(&self) -> PathBuf {
-        self.0.join(".callgraph/index.jsonl")
+    fn store(&self) -> PathBuf {
+        self.0.join(".callgraph")
+    }
+
+    fn shard_count(&self) -> usize {
+        fs::read_dir(self.store().join("graph"))
+            .map(|dir| dir.count())
+            .unwrap_or_default()
     }
 
     /// Minden lekérdezés: a gráfos kimenet azonos a gráf nélkülivel.
@@ -127,16 +138,18 @@ fn graph_backed_queries_match_the_file_walk_cold_and_warm() {
     let project = Project::new();
     // hideg gráf: minden lekérdezés előtt nincs gráf-fájl
     for args in QUERIES {
-        let _ = fs::remove_file(project.index());
+        let _ = fs::remove_dir_all(project.store());
         let graphed = project.run(args, true);
         assert_eq!(graphed, project.run(args, false), "cold: {args:?}");
     }
     project.assert_same("warm");
-    let stored = fs::read_to_string(project.index()).unwrap();
-    assert!(
-        stored.starts_with("{\"format\":\"callgraph-project-graph\",\"version\":1,"),
-        "{stored}"
-    );
+    let manifest = fs::read(project.store().join("index.bin")).unwrap();
+    assert!(manifest.starts_with(b"CGB1"));
+    assert!(project.store().join("callers.bin").is_file());
+    assert_eq!(project.shard_count(), FILES.len());
+    // a régi JSON-tárolók nem jönnek létre
+    assert!(!project.store().join("index.jsonl").exists());
+    assert!(!project.store().join("cache.jsonl").exists());
     // a kimenet tényleg tartalmaz gráfból jövő részeket (nem üres egyezés)
     let deep = project.run(QUERIES[1], true);
     assert!(deep.contains("Admin::show()"), "{deep}");
@@ -159,16 +172,13 @@ fn an_edited_file_shows_up_in_the_next_query() {
     .unwrap();
     let after = project.run(args, true);
     assert!(after.contains("Report::build()"), "{after}");
+    assert_eq!(project.shard_count(), FILES.len() + 1);
     assert_eq!(after, project.run(args, false));
     // törölt fájl: kikerül
     fs::remove_file(project.0.join("src/Report.php")).unwrap();
     let removed = project.run(args, true);
     assert_eq!(removed, before);
-    assert!(
-        !fs::read_to_string(project.index())
-            .unwrap()
-            .contains("Report.php")
-    );
+    assert_eq!(project.shard_count(), FILES.len());
 }
 
 #[test]
@@ -176,15 +186,32 @@ fn a_corrupt_or_old_graph_file_is_rebuilt_silently() {
     let project = Project::new();
     let args: &[&str] = &["show", ".", "--grep", "find", "--depth", "3"];
     let expected = project.run(args, false);
-    fs::create_dir_all(project.0.join(".callgraph")).unwrap();
-    let old = format!(
-        "{{\"path\":\"{}\",\"mtime\":1,\"size\":1,\"definitions\":[],\"graph\":{{}}}}\n",
-        project.0.join("src/Repo.php").display()
-    );
-    for text in ["garbage\n{{{\n", old.as_str()] {
-        fs::write(project.index(), text).unwrap();
-        assert_eq!(project.run(args, true), expected, "{text}");
-        let stored = fs::read_to_string(project.index()).unwrap();
-        assert!(stored.starts_with("{\"format\":"), "{stored}");
+    // a régi tárolók (v0.2-es JSON-cache, a JSONL gráf) csendben eltűnnek
+    fs::create_dir_all(project.store()).unwrap();
+    for name in ["index.jsonl", "cache.jsonl"] {
+        fs::write(project.store().join(name), "{\"path\":\"x\"}\n").unwrap();
+    }
+    assert_eq!(project.run(args, true), expected);
+    assert!(!project.store().join("index.jsonl").exists());
+    assert!(!project.store().join("cache.jsonl").exists());
+    // sérült manifest, callers.bin és shard: mindegyik után azonos válasz
+    for name in ["index.bin", "callers.bin", "shard"] {
+        let target = if name == "shard" {
+            fs::read_dir(project.store().join("graph"))
+                .unwrap()
+                .next()
+                .unwrap()
+                .unwrap()
+                .path()
+        } else {
+            project.store().join(name)
+        };
+        fs::write(&target, b"garbage").unwrap();
+        assert_eq!(project.run(args, true), expected, "{name}");
+        assert_eq!(
+            project.run(QUERIES[0], true),
+            project.run(QUERIES[0], false),
+            "{name}"
+        );
     }
 }

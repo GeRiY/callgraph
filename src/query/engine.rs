@@ -81,9 +81,9 @@ impl QueryEngine {
             graph: false,
         }
     }
-    /// A lekérdezés a projekt-gráfból olvasson (`--grep`, `--depth`, `--strings`, `--const`): a változatlan fájlok
-    /// gráfja forrás-elemzés nélkül jön, a hívó-index a teljes projektre kész. `CALLGRAPH_NO_GRAPH=1` kikapcsolja
-    /// (fájlonkénti út; a kimenet azonos — a tesztek ezzel vetik össze a kettőt).
+    /// A lekérdezés a projekt-gráfból olvasson: a változatlan fájlok gráfja a shardjukból jön (forrás-elemzés
+    /// nélkül), a hívó-index a teljes projektre kész. `CALLGRAPH_NO_GRAPH=1` kikapcsolja (gráf nélküli út: minden
+    /// fájl elemezve; a kimenet azonos — a tesztek ezzel vetik össze a kettőt).
     pub fn use_project_graph(mut self, on: bool) -> Self {
         self.graph = on && std::env::var_os("CALLGRAPH_NO_GRAPH").is_none();
         self
@@ -103,15 +103,16 @@ impl QueryEngine {
     pub fn query(&self, selectors: &SelectorSet) -> Result<Vec<QueryResult>> {
         let files = self.files(selectors)?;
         let mut out = Vec::new();
-        let mut cache = self.cache();
-        // a projekt-gráfból: a kiválasztott fájlok naprakészre hozva (csak a változottak elemződnek)
+        // a projekt-gráfból: a kiválasztott fájlok bélyege ellenőrizve (csak a változottak elemződnek), a shardjaik
+        // betöltve (párhuzamosan)
         let shared = self.project_graph();
         let mut project = shared.as_ref().map(crate::graph::lock);
         if let Some(graph) = project.as_deref_mut() {
             let paths: Vec<PathBuf> = files.iter().map(|(file, _)| self.root.join(file)).collect();
             // hiányzó fájlnál a régi úton jön a „nem található” hiba
             if paths.iter().all(|path| path.is_file()) {
-                graph.sync(&paths, false, &self.analyzer, &mut cache)?;
+                graph.refresh(&paths, false, &self.analyzer)?;
+                graph.load(&paths, &self.analyzer)?;
                 let _ = graph.save();
             }
         }
@@ -126,7 +127,7 @@ impl QueryEngine {
                 .cloned();
             let graph = match stored {
                 Some(graph) => graph,
-                None => self.load(&mut cache, &abs)?,
+                None => self.analyze(&abs)?,
             };
             let methods = methods.map(|names| {
                 // névegyezés: egy név több metódusra is illeszkedhet (Rust: több impl, PHP/Swift: túlterhelés),
