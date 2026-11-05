@@ -1,12 +1,13 @@
 //! `callgraph set-lang [en|hu]` — a terminál-kimenet nyelve: argumentum nélkül kiírja az aktuálisat (és honnan jön),
-//! argumentummal elmenti a skill-mappa `lang` fájljába. A `CALLGRAPH_LANG` környezeti változó mindkettőt felülírja.
+//! argumentummal elmenti a skill-mappa `lang` fájljába, és a skill-utasítást (`SKILL.md`) is az érvényes nyelvűre
+//! cseréli. A `CALLGRAPH_LANG` környezeti változó mindkettőt felülírja.
 
 use std::io::Write;
 
 use crate::cli::Command;
 use crate::error::Result;
 use crate::i18n::{self, Lang, LangSource};
-use crate::skill::{SkillFailure, SkillHome, finish};
+use crate::skill::{SkillFailure, SkillHome, finish, sync_skill_md};
 use crate::{t, tf};
 
 const SOURCE: &str = "callgraph set-lang";
@@ -14,11 +15,21 @@ const SOURCE: &str = "callgraph set-lang";
 pub struct LangCommand {
     args: Vec<String>,
     home: SkillHome,
+    /// A `CALLGRAPH_LANG` értéke (teszthez injektálható).
+    env_lang: Option<String>,
 }
 
 impl LangCommand {
     pub fn new(args: Vec<String>, home: SkillHome) -> Self {
-        Self { args, home }
+        Self::with_env(args, home, std::env::var("CALLGRAPH_LANG").ok())
+    }
+
+    pub(crate) fn with_env(args: Vec<String>, home: SkillHome, env_lang: Option<String>) -> Self {
+        Self {
+            args,
+            home,
+            env_lang,
+        }
     }
 
     fn show(&self, out: &mut dyn Write) -> std::result::Result<(), SkillFailure> {
@@ -72,7 +83,25 @@ impl LangCommand {
                 format!("Nyelv beállítva: {} ({})", lang.code(), lang.native_name()),
             )
         )?;
-        if let (_, LangSource::Env) = i18n::current() {
+        // a skill-utasítás az érvényes nyelvet követi (CALLGRAPH_LANG › az imént írt lang fájl)
+        let (effective, source) = i18n::resolve(self.env_lang.clone(), &self.home);
+        if sync_skill_md(&self.home, effective)? {
+            writeln!(
+                out,
+                "{}",
+                lang.pick(
+                    format!(
+                        "Skill instructions (SKILL.md) switched to: {} — restart Claude Code to load them.",
+                        effective.code()
+                    ),
+                    format!(
+                        "A skill-utasítás (SKILL.md) nyelve: {} — a betöltéséhez indítsd újra a Claude Code-ot.",
+                        effective.code()
+                    ),
+                )
+            )?;
+        }
+        if source == LangSource::Env {
             writeln!(
                 out,
                 "{}",
@@ -120,6 +149,9 @@ mod tests {
         assert_eq!(code, 0);
         assert_eq!(std::fs::read_to_string(home.lang_file()).unwrap(), "hu\n");
         assert!(String::from_utf8_lossy(&out).starts_with("Nyelv beállítva: hu"));
+        // nincs skill-i18n/ (fejlesztői checkout): a SKILL.md nem jön létre, és nincs róla sor
+        assert!(!home.skill_md_file().exists());
+        assert!(!String::from_utf8_lossy(&out).contains("SKILL.md"));
 
         let (mut out, mut err) = (Vec::new(), Vec::new());
         let code = LangCommand::new(vec!["de".into()], home.clone())
@@ -127,6 +159,58 @@ mod tests {
             .unwrap();
         assert_eq!(code, 1);
         assert_eq!(std::fs::read_to_string(home.lang_file()).unwrap(), "hu\n");
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn set_lang_switches_skill_md() {
+        let dir = std::env::temp_dir().join(format!("callgraph-lang-sync-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("skill-i18n")).unwrap();
+        std::fs::write(
+            dir.join("skill-i18n/SKILL.en.md"),
+            "---\nname: callgraph\n---\nEN\n",
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("skill-i18n/SKILL.hu.md"),
+            "---\nname: callgraph\n---\nHU\n",
+        )
+        .unwrap();
+        let home = SkillHome::new(
+            dir.clone(),
+            dir.display().to_string(),
+            dir.join("projects.json"),
+        );
+        let skill = || std::fs::read_to_string(home.skill_md_file()).unwrap();
+        let run = |arg: &str, env: Option<&str>| {
+            let (mut out, mut err) = (Vec::new(), Vec::new());
+            let code = LangCommand::with_env(vec![arg.into()], home.clone(), env.map(String::from))
+                .run(&mut out, &mut err)
+                .unwrap();
+            assert_eq!(code, 0);
+            String::from_utf8(out).unwrap()
+        };
+        let out = run("hu", None);
+        assert!(
+            skill().starts_with(
+                "---\nname: callgraph\n---\n<!-- generated from skill-i18n/SKILL.hu.md"
+            )
+        );
+        assert!(skill().ends_with("HU\n"));
+        assert!(out.contains("SKILL.md") && out.contains("Claude Code"));
+        run("en", None);
+        assert!(skill().ends_with("EN\n"));
+        // CALLGRAPH_LANG=en mellett a lang fájl hu lesz, de az érvényes nyelv (en) dönt
+        run("hu", Some("en"));
+        assert_eq!(std::fs::read_to_string(home.lang_file()).unwrap(), "hu\n");
+        assert!(skill().ends_with("EN\n"));
+        // argumentum nélkül: semmi nem változik
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        LangCommand::with_env(vec![], home.clone(), None)
+            .run(&mut out, &mut err)
+            .unwrap();
+        assert!(skill().ends_with("EN\n"));
         let _ = std::fs::remove_dir_all(dir);
     }
 }

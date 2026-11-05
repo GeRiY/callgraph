@@ -55,6 +55,23 @@ impl SkillHome {
         self.dir.join("lang")
     }
 
+    /// A skill-mappa.
+    pub fn dir(&self) -> &Path {
+        &self.dir
+    }
+
+    /// A Claude Code által betöltött skill-utasítás (`<skill>/SKILL.md`) — a `skill-i18n/SKILL.<nyelv>.md` másolata.
+    pub fn skill_md_file(&self) -> PathBuf {
+        self.dir.join("SKILL.md")
+    }
+
+    /// A skill-utasítás forrása egy nyelvre: `<skill>/skill-i18n/SKILL.<nyelv>.md`.
+    pub fn skill_md_source(&self, lang: crate::i18n::Lang) -> PathBuf {
+        self.dir
+            .join("skill-i18n")
+            .join(format!("SKILL.{}.md", lang.code()))
+    }
+
     pub fn registry_file(&self) -> &Path {
         &self.registry
     }

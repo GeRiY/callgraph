@@ -11,7 +11,9 @@
 4. Próba: `bash ~/.claude/skills/callgraph/callgraph.sh --project myapp app/Models/User.php`
 5. Indítsd újra a Claude Code-ot, hogy a skillt (`SKILL.md`) betöltse.
 6. Nyelv (nem kötelező): a kimenet és a súgó alapból angol; magyarra: `bash ~/.claude/skills/callgraph/callgraph.sh set-lang hu`
-   (vissza: `lang en`). Egy futásra a `CALLGRAPH_LANG=hu` környezeti változó is jó.
+   (vissza: `set-lang en`). Egy futásra a `CALLGRAPH_LANG=hu` környezeti változó is jó.
+   A nyelvváltás a skill-utasítást (`SKILL.md`) is az adott nyelvűre cseréli; utána indítsd újra a Claude Code-ot.
+   Kézi (másolásos) frissítés után futtasd újra a `bash install.sh`-t, hogy a `SKILL.md` ismét a beállított nyelvű legyen.
 
 Melyik csomag kell?
 

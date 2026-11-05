@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# callgraph skill telepítő: ellenőrzi a callgraph platform-binárist, létrehozza az üres projects.json-t.
+# callgraph skill telepítő: ellenőrzi a callgraph platform-binárist, a SKILL.md-t az aktuális nyelvűre állítja
+# (skill-i18n/SKILL.<en|hu>.md), létrehozza az üres projects.json-t.
 # Az elemzést és a projekt- / feedback-kezelést a natív callgraph bináris végzi (bin/<os>-<arch>/callgraph) — PHP, Node és jq nem kell.
 # Az üzenetek nyelve: CALLGRAPH_LANG › a skill-mappa lang fájlja (friss telepítésnél még nincs) › angol.
 # Használat:  bash install.sh
@@ -27,6 +28,10 @@ else
         "⚠ Nincs callgraph bináris ehhez a platformhoz (bin/$os-$arch/callgraph)."
     msg "  Build it (cargo build --release) and copy it there, or set: CALLGRAPH_BIN=/path/callgraph" \
         "  Építsd meg (cargo build --release) és másold oda, vagy add meg: CALLGRAPH_BIN=/út/callgraph"
+fi
+# a skill-utasítás (SKILL.md) az aktuális nyelven, a skill-i18n/ forrásból (nyelvváltáskor a set-lang cseréli)
+if [[ -n "$RPG" ]]; then
+    CALLGRAPH_SKILL_DIR="$DIR" PHP_AST_HOME="${PHP_AST_HOME:-$DIR}" "./$RPG" skill-sync || true
 fi
 [[ -f projects.json ]] || { echo '{}' > projects.json; msg "✓ empty projects.json" "✓ üres projects.json"; }
 msg "Done. Register a project: bash projects.sh add <alias> <absolute_path>" \

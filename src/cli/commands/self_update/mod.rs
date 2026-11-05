@@ -228,6 +228,7 @@ impl SelfUpdateCommand {
         let report = Installer::new(self.env.platform.clone())
             .install(zip, target)
             .map_err(|e| install_failure(e, target.skill_dir()))?;
+        crate::skill::sync_installed_skill(target.skill_dir()); // a SKILL.md a felhasználó nyelvén (a zipben angol)
         Ok(tf!(
             "{} files, binary: {}",
             "{} fájl, bináris: {}",

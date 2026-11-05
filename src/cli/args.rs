@@ -75,7 +75,7 @@ pub enum CliArgs {
     },
     /// `--version` / `-V`: a verzió és a platform.
     Version,
-    /// Skill-parancs (`project`, `feedback`, `wrap`, `error`, `set-lang`, `self-update`) nyers argumentumokkal.
+    /// Skill-parancs (`project`, `feedback`, `wrap`, `error`, `set-lang`, `self-update`, `skill-sync`) nyers argumentumokkal.
     Skill { command: String, args: Vec<String> },
 }
 
@@ -99,7 +99,13 @@ impl CliArgs {
         if let Some(command) = args.first().filter(|a| {
             matches!(
                 a.as_str(),
-                "project" | "feedback" | "wrap" | "error" | "set-lang" | "self-update"
+                "project"
+                    | "feedback"
+                    | "wrap"
+                    | "error"
+                    | "set-lang"
+                    | "self-update"
+                    | "skill-sync"
             )
         }) {
             return Ok(Self::Skill {

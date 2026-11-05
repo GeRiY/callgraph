@@ -35,6 +35,8 @@ Usage:
 Language (of the terminal output and the help: en = English, default; hu = Hungarian):
   bash ~/.claude/skills/callgraph/callgraph.sh set-lang                 the current language and where it comes from
   bash ~/.claude/skills/callgraph/callgraph.sh set-lang <en|hu>         save the language (to the skill dir's lang file)
+                                                also switches the skill instructions (SKILL.md) to that language;
+                                                restart Claude Code to reload the skill
   CALLGRAPH_LANG=<en|hu> bash ~/.claude/skills/callgraph/callgraph.sh …   for one run (overrides the saved one)
 
 Update (from GitHub Releases; projects.json, lang, errors.jsonl, feedback.jsonl, update-check.json are kept):
