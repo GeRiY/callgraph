@@ -63,7 +63,9 @@ impl Command for ShowCommand {
             Ok(value) => value,
             Err(error) => return Self::report(_err, error),
         };
-        let engine = QueryEngine::new(self.project.as_deref(), self.label.clone());
+        // a projekt-szintű lekérdezések a perzisztens projekt-gráfból olvasnak (crate::graph)
+        let engine = QueryEngine::new(self.project.as_deref(), self.label.clone())
+            .use_project_graph(self.grep.is_some());
         let rows =
             match engine.query_filtered(&selectors, self.grep.as_deref(), self.category.as_deref())
             {
