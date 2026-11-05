@@ -244,6 +244,10 @@ With a local toolchain the usual `cargo build --release` / `cargo test --release
 ([`.github/workflows/release.yml`](.github/workflows/release.yml)) builds and tests macOS (arm64, x86_64),
 Linux (arm64, x86_64, static musl) and Windows on every push, and publishes a GitHub Release on `v*` tags.
 
+### Bugs and feedback
+
+Found a bug or have an idea? [Open an issue](https://github.com/GeRiY/callgraph/issues/new/choose) — the bug form asks for `callgraph --version`, the command and the output (with its `[error-id: …]` line).
+
 ### Contributing
 
 Issues and pull requests are welcome. Before opening a PR, run `bash tools/dev.sh check`.
@@ -253,7 +257,7 @@ Refactors must keep the output byte-identical (`tools/identity_check.sh`).
 ### Security
 
 Please report vulnerabilities privately through
-[GitHub Security Advisories](https://github.com/GeRiY/callgraph/security/advisories/new), not in public issues.
+[GitHub Security Advisories](https://github.com/GeRiY/callgraph/security/advisories/new), not in public issues — see [`SECURITY.md`](SECURITY.md).
 
 ## Author
 

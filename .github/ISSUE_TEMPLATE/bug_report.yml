@@ -1,0 +1,61 @@
+name: "🐞 Bug report / Hibajelentés"
+description: "Something is wrong or crashes. · Valami hibás vagy összeomlik."
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please search [existing issues](https://github.com/GeRiY/callgraph/issues) first.
+        Security problems: please **do not** open a public issue — use a [private security advisory](https://github.com/GeRiY/callgraph/security/advisories/new).
+
+        Köszönjük a jelzést! Előbb nézd meg a [meglévő issue-kat](https://github.com/GeRiY/callgraph/issues).
+        Biztonsági hibát **ne** nyilvános issue-ban jelezz, hanem [privát biztonsági bejelentéssel](https://github.com/GeRiY/callgraph/security/advisories/new).
+  - type: input
+    id: version
+    attributes:
+      label: "Version · Verzió"
+      description: "Output of `callgraph --version` · A `callgraph --version` kimenete"
+      placeholder: "callgraph 0.1.0 (darwin-arm64)"
+    validations:
+      required: true
+  - type: dropdown
+    id: language
+    attributes:
+      label: "Language of the analysed code · Az elemzett kód nyelve"
+      options: ["PHP", "JavaScript / TypeScript", "Vue", "Rust", "Swift / SwiftUI", "CSS / SCSS", "JSON / Markdown", "Other / Egyéb"]
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: "Command · Parancs"
+      description: "The exact command you ran · A pontos parancs, amit futtattál"
+      render: shell
+      placeholder: "bash ~/.claude/skills/callgraph/callgraph.sh --project shop app/Models/Order.php --format outline"
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: "What happened · Mi történt"
+      description: "Output or error message, including the `[error-id: …]` line if there is one · A kimenet vagy a hibaüzenet, az `[error-id: …]` sorral együtt, ha van"
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: "What you expected · Mit vártál"
+    validations:
+      required: true
+  - type: textarea
+    id: sample
+    attributes:
+      label: "Minimal code sample (optional) · Minimális kódrészlet (nem kötelező)"
+      description: "A small, non-confidential snippet that reproduces it · Egy kis, nem bizalmas részlet, amivel előjön"
+      render: text
+  - type: input
+    id: os
+    attributes:
+      label: "OS · Operációs rendszer"
+      placeholder: "macOS 15 / Ubuntu 24.04 / Windows 11 (Git Bash)"
