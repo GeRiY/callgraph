@@ -3,7 +3,9 @@
 All notable changes to callgraph. Work is collected in packages on the `develop` branch and released together.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [SemVer](https://semver.org/).
 
-## [Unreleased] — planned as 0.2.0
+## [Unreleased]
+
+## [0.2.0] — 2026-11-05
 
 ### Added
 - **Background update check:** at most once a day `callgraph.sh` checks GitHub in a detached background process
@@ -85,5 +87,6 @@ First release.
 - Built-in update: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Prebuilt packages for macOS (arm64, x86_64), Linux (x86_64, ARM64, static musl) and Windows.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.1.0...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.2.0...develop
+[0.2.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.2.0
 [0.1.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.1.0
