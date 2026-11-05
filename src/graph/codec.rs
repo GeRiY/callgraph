@@ -1,5 +1,6 @@
 //! A projekt-gráf bináris tárolása: keretezett fájlok (`CGB1` + `[u32 hossz][bájtok]…`), az első keret a fejléc
-//! (fajta, formátum-verzió, build-ujjlenyomat), a többi MessagePack (mezőnevekkel), LZ4-gyel tömörítve.
+//! (fajta, formátum-verzió, build-ujjlenyomat), a többi MessagePack (mezőnevekkel), LZ4-gyel tömörítve. A pack
+//! (`graph.pack`) csak hozzáfűz; a rekordjai helyét a manifest (`index.bin`) tartja.
 //!
 //! A `FileGraph` JSON-alakú serde-je szándékosan veszteséges (pl. `Property::js`, `Constant::caller` / `js`, az üres
 //! `Imports` objektum-jelzője kimarad) — a tároláshoz ezért egy veszteségmentes tükör-alak (`StoredGraph`) kell.
@@ -8,6 +9,7 @@
 //! szétbontással veszi át — egy új mezőjük fordítási hibát ad itt, nem csendes adatvesztést.
 
 use std::fs;
+use std::io::{Read, Seek, SeekFrom, Write as _};
 use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -22,15 +24,18 @@ use crate::model::{
 };
 
 /// A tárolt szerkezet verziója; ha változik, a régi tároló csendben újraépül.
-pub(crate) const FORMAT_VERSION: u32 = 2;
+pub(crate) const FORMAT_VERSION: u32 = 3;
 
 /// A keretezett fájlok eleje.
 const MAGIC: &[u8; 4] = b"CGB1";
 
 /// A fájlfajták (a fejléc `kind` mezője).
 pub(crate) const MANIFEST: &str = "callgraph-manifest";
-pub(crate) const SHARD: &str = "callgraph-shard";
-pub(crate) const CALLERS: &str = "callgraph-callers";
+pub(crate) const PACK: &str = "callgraph-pack";
+pub(crate) const FACTS: &str = "callgraph-facts";
+
+/// Ennél több kért rekordnál a pack egyetlen olvasással jön be (különben rekordonként pozícionált olvasás).
+const WHOLE_PACK_READ: usize = 16;
 
 /// Minden tárolt fájl első kerete. Bármelyik mező eltérése (más fajta, verzió vagy build) = a fájl érvénytelen.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -52,16 +57,18 @@ impl Header {
     }
 }
 
-/// A manifest egy sora: a forrásfájl útja, bélyege és a shard-fájl neve (`graph/<név>`).
+/// A manifest egy sora: a forrásfájl útja, bélyege, és a teljes rekordja helye a packben (a keret tartalmának
+/// eleje és hossza).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct ManifestEntry {
     pub path: String,
     pub mtime: u64,
     pub size: u64,
-    pub shard: String,
+    pub offset: u64,
+    pub len: u32,
 }
 
-/// Egy fájl tárolt rekordja (shard, ill. a `callers.bin` egy kerete): az út és a bélyeg az ellenőrzéshez.
+/// Egy fájl tárolt rekordja (a pack, ill. a `facts.bin` egy kerete): az út és a bélyeg az ellenőrzéshez.
 #[derive(Serialize, Deserialize)]
 struct Record {
     path: String,
@@ -69,16 +76,6 @@ struct Record {
     size: u64,
     graph: StoredGraph,
     snippets: Vec<(u32, String)>,
-}
-
-/// A shard-fájl neve az útból (FNV-1a 64, stabil): `<16 hex>.bin`.
-pub(crate) fn shard_name(path: &str) -> String {
-    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
-    for byte in path.as_bytes() {
-        hash ^= u64::from(*byte);
-        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
-    }
-    format!("{hash:016x}.bin")
 }
 
 /// MessagePack (mezőnevekkel) + LZ4.
@@ -112,18 +109,34 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> Result<()> {
     Ok(())
 }
 
-/// Keretezett fájl írása: a fejléc, utána a már kódolt keretek.
-fn write_frames(path: &Path, kind: &str, frames: &[&[u8]]) -> Result<()> {
+/// Egy keret hozzáfűzése a pufferhez; a visszatérési érték a keret tartalmának helye (eltolás, hossz).
+fn push_frame(out: &mut Vec<u8>, frame: &[u8]) -> Result<(u64, u32)> {
+    let len = u32::try_from(frame.len()).map_err(std::io::Error::other)?;
+    out.extend_from_slice(&len.to_le_bytes());
+    let offset = out.len() as u64;
+    out.extend_from_slice(frame);
+    Ok((offset, len))
+}
+
+/// A fájl eleje: `CGB1` + a fejléc-keret.
+fn file_head(kind: &str) -> Result<Vec<u8>> {
     let header = rmp_serde::to_vec_named(&Header::current(kind)).map_err(std::io::Error::other)?;
-    let total = frames.iter().map(|frame| frame.len() + 4).sum::<usize>() + header.len() + 8;
-    let mut out = Vec::with_capacity(total);
+    let mut out = Vec::with_capacity(header.len() + 8);
     out.extend_from_slice(MAGIC);
-    for frame in std::iter::once(header.as_slice()).chain(frames.iter().copied()) {
-        let len = u32::try_from(frame.len()).map_err(std::io::Error::other)?;
-        out.extend_from_slice(&len.to_le_bytes());
-        out.extend_from_slice(frame);
-    }
-    write_atomic(path, &out)
+    push_frame(&mut out, &header)?;
+    Ok(out)
+}
+
+/// Keretezett fájl írása (atomikusan): a fejléc, utána a már kódolt keretek; a keretek helye a fájlban.
+fn write_frames(path: &Path, kind: &str, frames: &[&[u8]]) -> Result<Vec<(u64, u32)>> {
+    let mut out = file_head(kind)?;
+    out.reserve(frames.iter().map(|frame| frame.len() + 4).sum::<usize>());
+    let places = frames
+        .iter()
+        .map(|frame| push_frame(&mut out, frame))
+        .collect::<Result<Vec<_>>>()?;
+    write_atomic(path, &out)?;
+    Ok(places)
 }
 
 /// Keretezett fájl olvasása: a fejléc utáni keretek, ha a fájl ép és a fejléc a futó buildé; különben `None`.
@@ -147,7 +160,7 @@ fn read_frames(path: &Path, kind: &str) -> Option<Vec<Vec<u8>>> {
 /// A manifest (`index.bin`) írása.
 pub(crate) fn write_manifest(path: &Path, entries: &[ManifestEntry]) -> Result<()> {
     let body = encode(&entries)?;
-    write_frames(path, MANIFEST, &[&body])
+    write_frames(path, MANIFEST, &[&body]).map(|_| ())
 }
 
 /// A manifest olvasása; hiányzó, sérült vagy más build által írt fájlra `None`.
@@ -156,7 +169,7 @@ pub(crate) fn read_manifest(path: &Path) -> Option<Vec<ManifestEntry>> {
     decode(frames.first()?)
 }
 
-/// Egy fájl rekordja kódolva (a shard egyetlen kerete, ill. a `callers.bin` egy kerete).
+/// Egy fájl rekordja kódolva (a pack, ill. a `facts.bin` egy kerete).
 pub(crate) fn encode_record(path: &str, stamp: FileStamp, facts: &FileFacts) -> Result<Vec<u8>> {
     encode(&Record {
         path: path.to_owned(),
@@ -181,32 +194,77 @@ pub(crate) fn decode_record(bytes: &[u8]) -> Option<(String, FileStamp, FileFact
     Some((record.path, stamp, facts))
 }
 
-/// Egy fájl shardja (`graph/<név>`).
-pub(crate) fn write_shard(
-    path: &Path,
-    key: &str,
-    stamp: FileStamp,
-    facts: &FileFacts,
-) -> Result<()> {
-    let body = encode_record(key, stamp, facts)?;
-    write_frames(path, SHARD, &[&body])
+/// Új pack írása (atomikusan) a megadott rekord-keretekkel; a keretek helye.
+pub(crate) fn write_pack(path: &Path, frames: &[&[u8]]) -> Result<Vec<(u64, u32)>> {
+    write_frames(path, PACK, frames)
 }
 
-/// A shard tényei, ha a fájl ép, a futó buildé, és ugyanarról az útról, ugyanazzal a bélyeggel szól.
-pub(crate) fn read_shard(path: &Path, key: &str, stamp: FileStamp) -> Option<FileFacts> {
-    let frames = read_frames(path, SHARD)?;
-    let (path, stored, facts) = decode_record(frames.first()?)?;
-    (path == key && stored == stamp).then_some(facts)
+/// Rekord-keretek hozzáfűzése a meglévő packhez (egyetlen írással); ha nincs pack, újat ír. A félbeszakadt
+/// hozzáfűzés csak holt terület: a manifest csak utána íródik, és minden rekord a saját útját és bélyegét is hordozza.
+pub(crate) fn append_pack(path: &Path, frames: &[&[u8]]) -> Result<Vec<(u64, u32)>> {
+    let len = fs::metadata(path).map(|meta| meta.len()).unwrap_or(0);
+    if len == 0 {
+        return write_pack(path, frames);
+    }
+    let mut out = Vec::with_capacity(frames.iter().map(|frame| frame.len() + 4).sum());
+    let places = frames
+        .iter()
+        .map(|frame| push_frame(&mut out, frame).map(|(offset, size)| (offset + len, size)))
+        .collect::<Result<Vec<_>>>()?;
+    let mut file = fs::OpenOptions::new().append(true).open(path)?;
+    file.write_all(&out)?;
+    file.flush()?;
+    Ok(places)
 }
 
-/// A `callers.bin` írása: fájlonként egy (már kódolt) rekord-keret.
-pub(crate) fn write_callers(path: &Path, frames: &[&[u8]]) -> Result<()> {
-    write_frames(path, CALLERS, frames)
+/// A pack fájl mérete (a holt terület becsléséhez).
+pub(crate) fn pack_len(path: &Path) -> u64 {
+    fs::metadata(path).map(|meta| meta.len()).unwrap_or(0)
 }
 
-/// A `callers.bin` keretei (a dekódolás a hívónál, párhuzamosan); érvénytelen fájlra üres.
-pub(crate) fn read_callers(path: &Path) -> Vec<Vec<u8>> {
-    read_frames(path, CALLERS).unwrap_or_default()
+/// A kért rekord-keretek a packből, egyetlen megnyitással: kevés kérésnél pozícionált olvasással, sok kérésnél a
+/// fájl egyetlen olvasásával. Hiányzó / csonka helyre `None` (a hívó újraelemez).
+pub(crate) fn read_pack(path: &Path, places: &[(u64, u32)]) -> Vec<Option<Vec<u8>>> {
+    let slice = |bytes: &[u8], (offset, len): (u64, u32)| {
+        let start = usize::try_from(offset).ok()?;
+        bytes
+            .get(start..start.checked_add(len as usize)?)
+            .map(<[u8]>::to_vec)
+    };
+    if places.len() > WHOLE_PACK_READ {
+        return match fs::read(path) {
+            Ok(bytes) => places
+                .iter()
+                .map(|place| slice(bytes.as_slice(), *place))
+                .collect(),
+            Err(_) => vec![None; places.len()],
+        };
+    }
+    let Ok(mut file) = fs::File::open(path) else {
+        return vec![None; places.len()];
+    };
+    // eltolás szerint rendezve olvasunk (előre haladó olvasás), az eredmény a kérés sorrendjében
+    let mut order: Vec<usize> = (0..places.len()).collect();
+    order.sort_by_key(|at| places[*at].0);
+    let mut out = vec![None; places.len()];
+    for at in order {
+        let (offset, len) = places[at];
+        let mut buf = vec![0; len as usize];
+        if file.seek(SeekFrom::Start(offset)).is_ok() && file.read_exact(&mut buf).is_ok() {
+            out[at] = Some(buf);
+        }
+    }
+    out
+}
+
+/// A `facts.bin` írása: fájlonként egy (már kódolt, szűkített) rekord-keret.
+pub(crate) fn write_facts(path: &Path, frames: &[&[u8]]) -> Result<()> {
+    write_frames(path, FACTS, frames).map(|_| ())
+}
+
+/// A `facts.bin` keretei (egyetlen olvasás; a dekódolás a hívónál, párhuzamosan); érvénytelen fájlra üres.
+pub(crate) fn read_facts(path: &Path) -> Vec<Vec<u8>> {
+    read_frames(path, FACTS).unwrap_or_default()
 }
 
 /// A `FileGraph` veszteségmentes tároló-alakja.

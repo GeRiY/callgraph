@@ -1,6 +1,6 @@
 # Query-réteg
 
-A `show` parancs a `SelectorSet` segítségével fájlokat és metódusokat választ ki. A `QueryEngine` a projekt gyökeréhez relatív utat old fel, a gráfokat a projekt-gráf shardjaiból veszi (`.callgraph/`, `docs/PROJECT-GRAPH.md`), a változott fájlokat az `Analyzer` facade elemzi. A kimenetet a `FormatterRegistry` név szerint választott Strategy-je állítja elő.
+A `show` parancs a `SelectorSet` segítségével fájlokat és metódusokat választ ki. A `QueryEngine` a projekt gyökeréhez relatív utat old fel, a gráfokat a projekt-gráfból veszi (`.callgraph/`, `docs/PROJECT-GRAPH.md`), a változott fájlokat az `Analyzer` facade elemzi. A kimenetet a `FormatterRegistry` név szerint választott Strategy-je állítja elő.
 
 Új formázó: hozz létre egy külön `Formatter` implementációt a `src/query/format/` alatt, majd adj hozzá egy `register`/névágatot a registryhez. A limit előtti formázás és a `method-index` változatlan marad.
 

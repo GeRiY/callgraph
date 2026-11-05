@@ -1,5 +1,5 @@
 //! Gráf-betöltés gráf nélkül (`CALLGRAPH_NO_GRAPH=1`, írásvédett projekt): elemzés; teljes hatókör bejárása.
-//! A gráfos út a `crate::graph::ProjectGraph`-ban (a shardok a fájlonkénti cache is).
+//! A gráfos út a `crate::graph::ProjectGraph`-ban (a pack a fájlonkénti cache is).
 
 use super::QueryEngine;
 use crate::error::Result;

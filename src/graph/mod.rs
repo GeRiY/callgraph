@@ -1,7 +1,8 @@
-//! Perzisztens projekt-gráf a projekt `.callgraph/` tárolójában: fájlonként egy bináris shard (a nyelvi frontend
-//! `FileGraph`-ja veszteségmentesen + a hívás-sorok), egy kis manifest (út → mtime, méret, shard) és a hívó-index
-//! bemenete (`callers.bin`). Fájlonként (mtime + méret) frissül; belőle épül a projekt-szintű szimbólum-keresés, a
-//! hívó-index (mindkét irány) és a típus-hierarchia. Formátum és működés: `docs/PROJECT-GRAPH.md`.
+//! Perzisztens projekt-gráf a projekt `.callgraph/` tárolójában: egy hozzáfűzős pack (`graph.pack`: fájlonként a
+//! nyelvi frontend `FileGraph`-ja veszteségmentesen + a hívás-sorok), egy kis manifest (`index.bin`: út → mtime,
+//! méret, a rekord helye) és a szűkített fájlonkénti tények (`facts.bin`: a teljes hatókörű lekérdezésekhez).
+//! Fájlonként (mtime + méret) frissül; belőle épül a projekt-szintű szimbólum-keresés, a hívó-index (mindkét irány)
+//! és a típus-hierarchia. Formátum és működés: `docs/PROJECT-GRAPH.md`.
 
 mod codec;
 mod pool;

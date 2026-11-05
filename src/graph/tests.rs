@@ -37,12 +37,6 @@ impl TempDir {
         fs::write(&path, text).unwrap();
         path
     }
-
-    fn shards(&self) -> Vec<PathBuf> {
-        fs::read_dir(self.store().join("graph"))
-            .map(|dir| dir.map(|entry| entry.unwrap().path()).collect())
-            .unwrap_or_default()
-    }
 }
 
 impl Drop for TempDir {
@@ -145,12 +139,12 @@ fn warm_open_needs_no_source_parsing() {
     let mut graph = ProjectGraph::open(dir.store());
     refresh_full(&mut graph, std::slice::from_ref(&file));
     graph
-        .load(std::slice::from_ref(&file), &Analyzer::with_defaults())
+        .load_full(std::slice::from_ref(&file), &Analyzer::with_defaults())
         .unwrap();
     let first = graph.graph(&key(&file)).cloned().unwrap();
-    assert!(dir.store().join("index.bin").is_file());
-    assert!(dir.store().join("callers.bin").is_file());
-    assert_eq!(dir.shards().len(), 1);
+    for name in ["index.bin", "facts.bin", "graph.pack"] {
+        assert!(dir.store().join(name).is_file(), "{name}");
+    }
     // nyelvek nélküli elemző: bármilyen forrás-elemzés hibát adna — a meleg megnyitás mégis kiszolgál
     let none = Analyzer::new(LanguageRegistry::new());
     let mut warm = ProjectGraph::open(dir.store());
@@ -158,8 +152,9 @@ fn warm_open_needs_no_source_parsing() {
         .unwrap();
     warm.ensure_callers(&none).unwrap();
     assert_eq!(callers_of(&warm, "Order::save"), vec!["first"]);
-    // a hívó-indexhez shard sem kell: a sortartomány és a hívás-sor a callers.bin-ből
+    // a hívó-indexhez a pack sem kell: a sortartomány és a hívás-sor a facts.bin-ből
     assert!(warm.graph(&key(&file)).is_none());
+    assert_eq!(warm.stats().records_read, 0);
     assert_eq!(
         warm.method_range(&key(&file), Some("Caller"), "first"),
         Some((4, 4))
@@ -171,8 +166,65 @@ fn warm_open_needs_no_source_parsing() {
             "class Caller { function first() { Order::save(); } }".to_owned()
         )]
     );
-    warm.load(std::slice::from_ref(&file), &none).unwrap();
+    warm.load_full(std::slice::from_ref(&file), &none).unwrap();
     assert_eq!(warm.graph(&key(&file)), Some(&first));
+    assert_eq!(warm.stats().records_read, 1);
+    assert_eq!(warm.stats().analyzed, 0);
+}
+
+/// A meleg, teljes hatókörű lekérdezés a projekt méretétől függetlenül ugyanannyi tároló-fájlt nyit (manifest +
+/// facts.bin), és egyetlen teljes rekordot sem olvas; egy egyfájlos nézet egy pack-megnyitás, egy rekord.
+#[test]
+fn a_warm_query_opens_a_constant_number_of_files() {
+    let none = Analyzer::new(LanguageRegistry::new());
+    let mut seen = Vec::new();
+    for count in [3, 40] {
+        let dir = TempDir::new();
+        let files: Vec<PathBuf> = (0..count)
+            .map(|n| {
+                dir.write(
+                    &format!("f{n}.php"),
+                    &format!(
+                        "<?php\nnamespace App;\nclass C{n} {{ const K = {n}; function run() {{ Order::save(); return \"s{n}\"; }} }}\n"
+                    ),
+                )
+            })
+            .collect();
+        let mut cold = ProjectGraph::open(dir.store());
+        refresh_full(&mut cold, &files);
+        // `--depth` / `callers`: teljes frissítés + hívó-index
+        let mut deep = ProjectGraph::open(dir.store());
+        deep.refresh(&files, true, &none).unwrap();
+        deep.ensure_callers(&none).unwrap();
+        assert_eq!(callers_of(&deep, "Order::save").len(), count);
+        // `--grep` 1. szint / `--strings` / `--const` a teljes hatókörre: szűkített tények
+        let mut wide = ProjectGraph::open(dir.store());
+        wide.refresh(&files, false, &none).unwrap();
+        wide.load_facts(&files, &none).unwrap();
+        assert!(files.iter().all(|file| {
+            wide.slim_graph(&key(file))
+                .is_some_and(|graph| graph.strings.len() == 1 && graph.constants.len() == 1)
+        }));
+        // egyfájlos nézet: egy pack-megnyitás, egy rekord
+        let mut single = ProjectGraph::open(dir.store());
+        single.refresh(&files[..1], false, &none).unwrap();
+        single.load_full(&files[..1], &none).unwrap();
+        seen.push((deep.stats(), wide.stats(), single.stats()));
+    }
+    for (deep, wide, single) in &seen {
+        assert_eq!(
+            (deep.files_opened, deep.records_read, deep.analyzed),
+            (2, 0, 0)
+        );
+        assert_eq!(
+            (wide.files_opened, wide.records_read, wide.analyzed),
+            (2, 0, 0)
+        );
+        assert_eq!(
+            (single.files_opened, single.records_read, single.analyzed),
+            (2, 1, 0)
+        );
+    }
 }
 
 #[test]
@@ -183,7 +235,6 @@ fn edited_file_is_reanalyzed_and_deleted_file_dropped() {
     let mut graph = ProjectGraph::open(dir.store());
     refresh_full(&mut graph, &[file.clone(), other.clone()]);
     assert_eq!(callers_of(&graph, "Order::save"), vec!["first"]);
-    assert_eq!(dir.shards().len(), 2);
     fs::write(&file, ORDER.replace("first", "secondName")).unwrap();
     fs::remove_file(&other).unwrap();
     // új megnyitás (mint egy új CLI-hívás), és a memóriában maradt példány (mint az MCP) is frissül
@@ -193,7 +244,59 @@ fn edited_file_is_reanalyzed_and_deleted_file_dropped() {
         assert_eq!(callers_of(graph, "Order::save"), vec!["secondName"]);
         assert!(graph.method_range(&key(&other), None, "helper").is_none());
     }
-    assert_eq!(dir.shards().len(), 1);
+    // csak a változott fájl elemződött újra (hozzáfűzés a packhez), a teljes rekordja is az új
+    let mut again = ProjectGraph::open(dir.store());
+    let none = Analyzer::new(LanguageRegistry::new());
+    again
+        .refresh(std::slice::from_ref(&file), true, &none)
+        .unwrap();
+    again.load_full(std::slice::from_ref(&file), &none).unwrap();
+    assert!(
+        again
+            .graph(&key(&file))
+            .unwrap()
+            .methods
+            .iter()
+            .any(|method| method.name == "secondName")
+    );
+}
+
+#[test]
+fn many_rewrites_compact_the_pack() {
+    let dir = TempDir::new();
+    // egy nagyobb fájl, sokszor átírva: a holt terület a pack felénél több lesz → tömörítés
+    let body: String = (0..2000)
+        .map(|n| format!("    function m{n}() {{ Order::save(); return \"{n}\"; }}\n"))
+        .collect();
+    let file = dir.write("big.php", &format!("<?php\nclass Big {{\n{body}}}\n"));
+    let mut graph = ProjectGraph::open(dir.store());
+    refresh_full(&mut graph, std::slice::from_ref(&file));
+    let pack = dir.store().join("graph.pack");
+    let single = fs::metadata(&pack).unwrap().len();
+    for round in 0..12 {
+        fs::write(
+            &file,
+            format!("<?php\nclass Big {{\n{body}    function r{round}() {{}}\n}}\n"),
+        )
+        .unwrap();
+        refresh_full(&mut graph, std::slice::from_ref(&file));
+    }
+    assert!(
+        fs::metadata(&pack).unwrap().len() < single * 2,
+        "the pack was not compacted"
+    );
+    let mut warm = ProjectGraph::open(dir.store());
+    let none = Analyzer::new(LanguageRegistry::new());
+    warm.refresh(std::slice::from_ref(&file), true, &none)
+        .unwrap();
+    warm.load_full(std::slice::from_ref(&file), &none).unwrap();
+    assert!(
+        warm.graph(&key(&file))
+            .unwrap()
+            .methods
+            .iter()
+            .any(|method| method.name == "r11")
+    );
 }
 
 #[test]
@@ -201,29 +304,29 @@ fn corrupt_or_old_storage_is_rebuilt_silently() {
     let dir = TempDir::new();
     let file = dir.write("a.php", ORDER);
     let analyzer = Analyzer::with_defaults();
-    // a régi tárolók (JSONL gráf, JSON-cache) az első építéskor törlődnek; a jegyzetek maradnak
-    for name in ["index.jsonl", "cache.jsonl", "notes.jsonl"] {
+    // a régi tárolók (JSONL gráf, JSON-cache, shardos változat) az első építéskor törlődnek; a jegyzetek maradnak
+    for name in ["index.jsonl", "cache.jsonl", "callers.bin", "notes.jsonl"] {
         fs::write(dir.store().join(name), "{}\n").unwrap();
     }
+    fs::create_dir_all(dir.store().join("graph")).unwrap();
+    fs::write(dir.store().join("graph/0123456789abcdef.bin"), "x").unwrap();
     let mut graph = ProjectGraph::open(dir.store());
     refresh_full(&mut graph, std::slice::from_ref(&file));
-    assert!(!dir.store().join("index.jsonl").exists());
-    assert!(!dir.store().join("cache.jsonl").exists());
+    for gone in ["index.jsonl", "cache.jsonl", "callers.bin", "graph"] {
+        assert!(!dir.store().join(gone).exists(), "{gone}");
+    }
     assert!(dir.store().join("notes.jsonl").exists());
-    // sérült manifest, shard, callers.bin — mindegyik után helyes válasz
-    for broken in ["index.bin", "callers.bin", "shard"] {
-        let target = if broken == "shard" {
-            dir.shards().remove(0)
-        } else {
-            dir.store().join(broken)
-        };
-        fs::write(&target, b"CGB1\x05\x00\x00\x00garbage").unwrap();
+    // sérült manifest, facts.bin, pack — mindegyik után helyes válasz
+    for broken in ["index.bin", "facts.bin", "graph.pack"] {
+        fs::write(dir.store().join(broken), b"CGB1\x05\x00\x00\x00garbage").unwrap();
         let mut graph = ProjectGraph::open(dir.store());
         graph
             .refresh(std::slice::from_ref(&file), true, &analyzer)
             .unwrap();
         graph.ensure_callers(&analyzer).unwrap();
-        graph.load(std::slice::from_ref(&file), &analyzer).unwrap();
+        graph
+            .load_full(std::slice::from_ref(&file), &analyzer)
+            .unwrap();
         assert_eq!(callers_of(&graph, "Order::save"), vec!["first"], "{broken}");
         assert!(graph.graph(&key(&file)).is_some(), "{broken}");
         graph.save().unwrap();

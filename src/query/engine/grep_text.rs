@@ -46,7 +46,7 @@ impl QueryEngine {
         let whole_project = scope == self.depth_scope().as_slice();
         if let Some(graph) = project.as_deref_mut().filter(|_| whole_project) {
             // a 2. szinttől a teljes projektben keresünk: minden fájl bélyege ellenőrizve (csak a változottak
-            // elemződnek), a hívók a `callers.bin`-ből — shardot csak a változott fájlokhoz kell olvasni; a
+            // elemződnek), a hívók a `facts.bin`-ből — a packet csak a változott fájlokhoz kell olvasni; a
             // hívó-index a folyamatban megmarad, amíg nem változik semmi
             let files = self.walk(scope);
             graph.refresh(&files, true, &self.analyzer)?;

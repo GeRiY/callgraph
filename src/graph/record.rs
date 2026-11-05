@@ -38,10 +38,12 @@ pub(crate) struct FileFacts {
 }
 
 impl FileFacts {
-    /// A hívó-index (`callers.bin`) bemenete: a gráf a hívó-index, a típus-hierarchia és a metódus-tartományok
-    /// mezőivel (névtér, konténerek, metódusok, hívások — a hívás-argumentumok nélkül), és a hívás-sorok. Ha a
-    /// `CallerIndex` / `TypeHierarchy` egy itt kiürített mezőt kezdene olvasni, a gráf–bejárás összevető teszt
-    /// (`tests/project_graph.rs`) eltérést jelez.
+    /// A `facts.bin` szűkített rekordja — minden, amit a teljes hatókörű lekérdezések olvasnak: a hívó-index és a
+    /// típus-hierarchia (névtér, konténerek, metódusok, hívások), a `--grep` outline (ugyanezek + a vezérlési ágak; a
+    /// `--grep` szűrő a property-ket, konstansokat és kommenteket úgyis eldobja), a `--strings` (string-literálok), a
+    /// `--const` (konstans-definíciók és `const_fetch` hívások), és a hívás-sorok. Kimarad: property-k, kommentek,
+    /// írások, importok, SFC, a hívás-argumentumok, a metódus-doc és -törzs. Ha e lekérdezések egy itt kiürített
+    /// mezőt kezdenének olvasni, a gráf–bejárás összevető teszt (`tests/project_graph.rs`) eltérést jelez.
     pub(crate) fn slim(&self) -> Self {
         let source = &self.graph;
         let graph = FileGraph {
@@ -52,7 +54,7 @@ impl FileFacts {
             imports: crate::model::Imports::default(),
             containers: source.containers.clone(),
             properties: Vec::new(),
-            constants: Vec::new(),
+            constants: source.constants.clone(),
             methods: source
                 .methods
                 .iter()
@@ -71,8 +73,8 @@ impl FileFacts {
                 })
                 .collect(),
             comments: Vec::new(),
-            control_flow: Vec::new(),
-            strings: Vec::new(),
+            control_flow: source.control_flow.clone(),
+            strings: source.strings.clone(),
             writes: Vec::new(),
             sfc: None,
         };

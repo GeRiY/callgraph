@@ -28,7 +28,8 @@ timed() {
 show() { "$BIN" show --project "$PROJECT" "$@"; }
 
 STORE="$PROJECT/.callgraph"
-rm -rf "$STORE/graph" "$STORE/index.bin" "$STORE/callers.bin" "$STORE/index.jsonl" "$STORE/cache.jsonl"
+rm -rf "$STORE/graph" "$STORE/graph.pack" "$STORE/index.bin" "$STORE/facts.bin" "$STORE/callers.bin" \
+    "$STORE/index.jsonl" "$STORE/cache.jsonl"
 printf 'cold build (--depth 2):          %ss\n' "$(timed show "$SCOPE" --grep "$PATTERN" --depth 2)"
 
 queries=(
