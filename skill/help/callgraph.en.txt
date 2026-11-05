@@ -27,6 +27,8 @@ Usage:
                                                 "via Resolver" = called through an interface / trait / parent type
                                                 (a Type::method pattern also finds those calls)
                                                 Rust: "?::m" = receiver type unknown; a Type::m pattern still finds it (by name)
+                                                TS: typed receivers (this.repo.find() with "repo: Repo") match Type::m;
+                                                untyped / any / union receivers stay unresolved (search by method name)
   bash ~/.claude/skills/callgraph/callgraph.sh <dir> --grep <pattern> --depth N [--guess]
                                                 callers of callers up to N levels (impact analysis); --guess: also the
                                                 unresolved, name-only matches ("?")

@@ -27,6 +27,8 @@ Használat:
                                                 "via Resolver" = interfészen / trait-en / szülő-típuson át hívva
                                                 (a Típus::metódus minta ezeket a hívásokat is megtalálja)
                                                 Rust: "?::m" = ismeretlen fogadó-típus; a Típus::m minta név szerint is megtalálja
+                                                TS: a típusos fogadó (this.repo.find(), ha "repo: Repo") a Típus::m mintára illik;
+                                                típus nélküli / any / unió fogadó feloldatlan (a metódusnévvel keresd)
   bash ~/.claude/skills/callgraph/callgraph.sh <mappa> --grep <minta> --depth N [--guess]
                                                 hívók hívói N szintig (hatáselemzés); --guess: a feloldatlan,
                                                 csak név szerinti egyezéseket is ("?")

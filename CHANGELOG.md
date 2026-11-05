@@ -16,6 +16,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   doc comments and attributes). The MCP `method_body` tool follows the same default and has `doc` / `raw` options.
 
 ### Added
+- **TypeScript: calls through typed objects and interfaces.** callgraph now works out which class a TS method call
+  goes to when the type is written down: a typed parameter (`repo: Repo`), a typed class property
+  (`private repo: Repo`, also `constructor(private repo: Repo)`), `this.repo = new Repo()` or `const x = new Repo()`.
+  So `this.repo.find()` shows up as `Repo::find`, and `--grep 'Repo::find'` finds it. Classes record their
+  `implements`, and TS interfaces (`interface X extends Y`) appear in the map, so searching
+  `PlaylistResolver::getPlayables` also finds calls made through its `Resolver` interface, marked `via Resolver`
+  (in `--depth` and `callers` too). When the type is unclear (no type, `any`, a union like `Repo | null`, a generic
+  `T`, or different values in the same function) the call stays as before.
 - **`--const` lists re-exports:** besides references and definitions, `--const NAME` now shows where a name is passed
   on, marked `[re-export]`: Rust `pub use state::{CheckState, STATE_FILE};` / `pub(crate) use …`, JS / TS
   `export { NAME } from './x'` / `export { NAME }`, PHP `use const App\NAME;`.

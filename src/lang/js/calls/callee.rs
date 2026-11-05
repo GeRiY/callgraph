@@ -4,6 +4,8 @@ use std::collections::{HashMap, HashSet};
 
 use oxc_ast::ast::Expression;
 
+use super::receivers::TypeNames;
+
 const NATIVE_GLOBALS: &[&str] = &[
     "console",
     "window",
@@ -136,6 +138,8 @@ pub struct Scope {
     pub names: HashSet<String>,
     pub local_fns: HashSet<String>,
     pub bindings: HashMap<String, Binding>,
+    /// A fogadó-típusok feloldásához ismert típusnevek (osztályok, interfészek, importok).
+    pub types: TypeNames,
 }
 
 /// A tagelérési lánc gyökere.
