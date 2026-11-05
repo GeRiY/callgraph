@@ -28,9 +28,15 @@ jobs:
         with:
           targets: ${{ matrix.target }}
           components: clippy
+      # musl-tools: natív musl-gcc. A C-kódos crate-ek (tree-sitter, ring) cc-je aarch64-en a nem létező
+      # `aarch64-linux-musl-gcc`-t keresné (x86_64-en a musl-gcc-t magától megtalálja) — ezért explicit CC.
       - name: musl-tools
         if: contains(matrix.target, 'musl')
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq musl-tools
+        shell: bash
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq musl-tools
+          t="${{ matrix.target }}"
+          echo "CC_${t//-/_}=musl-gcc" >> "$GITHUB_ENV"
       - name: clippy + test (natív target)
         if: matrix.target != 'x86_64-apple-darwin'
         shell: bash
