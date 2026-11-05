@@ -33,6 +33,12 @@ impl Formatter for Body {
                     row.graph.file, method.name, method.line
                 )
                 .unwrap();
+                crate::notes::body_lines(
+                    &mut out,
+                    &row.notes,
+                    method.container.as_deref(),
+                    &method.name,
+                );
                 out.push_str(&numbered(&lines, start, end));
                 out.push('\n');
             }

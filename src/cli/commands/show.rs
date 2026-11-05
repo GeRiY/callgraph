@@ -20,6 +20,8 @@ pub struct ShowCommand {
     category: Option<Vec<String>>,
     depth: usize,
     guess: bool,
+    /// `--notes <minta>` (PILOT): a jegyzetek keresése a célok alatt, elemzés helyett.
+    notes: Option<String>,
 }
 impl ShowCommand {
     #[allow(clippy::too_many_arguments)]
@@ -38,6 +40,7 @@ impl ShowCommand {
         category: Option<Vec<String>>,
         depth: usize,
         guess: bool,
+        notes: Option<String>,
     ) -> Self {
         Self {
             paths,
@@ -54,17 +57,21 @@ impl ShowCommand {
             category,
             depth,
             guess,
+            notes,
         }
     }
 }
 impl Command for ShowCommand {
     fn run(&self, out: &mut dyn Write, _err: &mut dyn Write) -> Result<i32> {
+        if let Some(pattern) = self.notes.as_deref() {
+            return self.search_notes(pattern, out, _err);
+        }
         let selectors = match SelectorSet::parse(&self.paths) {
             Ok(value) => value,
             Err(error) => return Self::report(_err, error),
         };
         let engine = QueryEngine::new(self.project.as_deref(), self.label.clone());
-        let rows =
+        let mut rows =
             match engine.query_filtered(&selectors, self.grep.as_deref(), self.category.as_deref())
             {
                 Ok(value) => value,
@@ -92,6 +99,15 @@ impl Command for ShowCommand {
             };
             write!(out, "{}", engine.relativize(&text))?;
             return Ok(0);
+        }
+        if self.body
+            || (self.format == "outline"
+                && self.lines.is_none()
+                && self.strings.is_none()
+                && self.const_filter.is_none())
+        {
+            // jegyzetek (PILOT) csak az outline-ba és a --body-ba; jegyzet nélkül a kimenet változatlan
+            crate::notes::annotate(&mut rows, engine.root());
         }
         let text = match self.render(&rows) {
             Ok(value) => value,
@@ -160,6 +176,21 @@ impl ShowCommand {
             return FormatterRegistry::format_with("const", rows, None, Some(filter));
         }
         FormatterRegistry::format(&self.format, rows)
+    }
+
+    /// `show <cél>... --notes <minta>`: a célok alatti, a mintára illeszkedő jegyzetek (`root:` konvencióval).
+    fn search_notes(&self, pattern: &str, out: &mut dyn Write, err: &mut dyn Write) -> Result<i32> {
+        let engine = QueryEngine::new(self.project.as_deref(), self.label.clone());
+        let root = engine.root();
+        let text = crate::notes::NoteFilter::new(root, &self.paths, Some(pattern))
+            .and_then(|filter| crate::notes::search_text(root, &filter, crate::i18n::lang()));
+        match text {
+            Ok(text) => {
+                write!(out, "{}", engine.relativize(&text))?;
+                Ok(0)
+            }
+            Err(error) => Self::report(err, error),
+        }
     }
 
     fn report(err: &mut dyn Write, error: crate::error::CallgraphError) -> Result<i32> {

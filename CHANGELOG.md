@@ -5,6 +5,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+### Added
+- **Notes on files and methods (pilot):** `callgraph note add <file>[::<method>] "<text>"` (also
+  `callgraph.sh note …`) attaches a short note, stored outside the source in `<project>/.callgraph/notes.jsonl`
+  (git-ignored) with the date and time (UTC). The outline shows it under the file header or the method
+  (`📝 2026-11-05 20:27 · text`, newest first, at most 3), `--body` above the method source. `note list [<path>]`
+  lists them (with `[orphaned]` when the method is gone), `note rm <id>` deletes one, and
+  `show <dir> --notes <pattern>` searches them. The anchor is the method name, not a line number. MCP: a new
+  read-only `notes` tool (there is no write tool). Without notes the output is unchanged. Details: `docs/NOTES.md`.
+
 ## [0.2.0] — 2026-11-05
 
 ### Added
