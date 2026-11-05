@@ -52,6 +52,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 - MCP `method_body`: `method` may be a single name as a plain string as well as a list (some clients send
   `"method": "parse"`, which used to fail with an "expected a sequence" error).
 
+### Fixed
+- **JS/TS: no more doubled methods when a class is named like its file** (`PlaylistResolver.ts` with
+  `class PlaylistResolver`): the class's methods were listed twice, once under the file's `module` entry and once
+  under the class. Now class members appear only under the class and top-level functions only under the module.
+
 ## [0.2.0] — 2026-11-05
 
 ### Added

@@ -13,16 +13,22 @@ pub(super) fn selected(row: &QueryResult) -> Cow<'_, FileGraph> {
     let picked = |caller: &Option<String>| caller.as_ref().is_some_and(|c| names.contains(c));
     let mut graph = row.graph.clone();
     graph.methods.retain(|m| names.contains(&m.name));
-    let containers: Vec<Option<String>> =
-        graph.methods.iter().map(|m| m.container.clone()).collect();
     graph.calls.retain(|c| picked(&c.caller));
     graph.control_flow.retain(|c| picked(&c.caller));
     graph.strings.retain(|s| picked(&s.caller));
-    graph.containers.retain(|c| {
-        containers
-            .iter()
-            .any(|n| n.as_deref() == Some(c.name.as_str()))
-    });
+    // a kijelölt metódusok containerei (az egymásba ágyazott azonos nevűeknél a tartomány dönt)
+    let keep: Vec<bool> = graph
+        .containers
+        .iter()
+        .map(|c| {
+            graph
+                .methods
+                .iter()
+                .any(|m| graph.owns(c, m.container.as_deref(), m.line))
+        })
+        .collect();
+    let mut keep = keep.into_iter();
+    graph.containers.retain(|_| keep.next().unwrap_or(false));
     Cow::Owned(graph)
 }
 

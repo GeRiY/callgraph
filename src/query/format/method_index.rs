@@ -17,7 +17,7 @@ impl Formatter for MethodIndex {
                     .graph
                     .methods
                     .iter()
-                    .filter(|m| m.container.as_deref() == Some(&c.name))
+                    .filter(|m| r.graph.owns(c, m.container.as_deref(), m.line))
                     .collect();
                 methods.sort_by_key(|m| m.line);
                 for m in methods {

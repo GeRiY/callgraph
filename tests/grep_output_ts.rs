@@ -129,11 +129,18 @@ impl Drop for Project {
 fn typed_property_call_matches_the_type_qualified_pattern() {
     let project = Project::new();
     let out = project.run(&["show", "src", "--grep", "Repo::find"]);
+    // egyetlen fájl a kimenetben: az út abszolút marad (nincs `root:` sor)
     assert!(
-        out.contains(&format!("FILE  {}", sep("src/PlaylistResolver.ts"))),
+        out.lines()
+            .any(|l| l.starts_with("FILE  ") && l.ends_with(&sep("/src/PlaylistResolver.ts"))),
         "{out}"
     );
-    assert!(out.contains("  getPlayables()  L11-13\n"), "{out}");
+    // a fájlnévvel azonos nevű osztály metódusa egyszer (nem a `module PlaylistResolver` alatt is)
+    assert_eq!(
+        out.matches("  getPlayables()  L11-13\n").count(),
+        1,
+        "{out}"
+    );
     assert!(
         out.contains("    L12 │ return this.repo.find(id);\n"),
         "{out}"
@@ -181,7 +188,7 @@ fn depth_follows_the_ts_interface_upwards() {
     );
     assert!(
         out.contains(&format!(
-            "  {}  Controller::index()  L7-9  ← PlaylistResolver::getPlayables\n    L8 via Resolver │ return this.resolver.getPlayables(id);\n",
+            "  {}  Controller::index()  L7-9  ← Resolver::getPlayables\n    L8 via Resolver │ return this.resolver.getPlayables(id);\n",
             sep("src/Controller.ts")
         )),
         "{out}"
@@ -205,4 +212,43 @@ fn callers_jsonl_marks_ts_interface_matches() {
     assert_eq!(row("lookup")["via"], "Resolver");
     assert!(row("direct").get("via").is_none(), "{out}");
     assert!(row("fresh").get("via").is_none(), "{out}");
+}
+
+#[test]
+fn class_named_like_its_file_lists_each_member_once() {
+    let project = Project::new();
+    fs::write(
+        project.0.join("src/Playlist.ts"),
+        concat!(
+            "export class Playlist {\n",
+            "  play(): void {\n",
+            "    helper();\n",
+            "  }\n",
+            "}\n",
+            "\n",
+            "export function helper(): void {}\n",
+        ),
+    )
+    .unwrap();
+    let out = project.run(&["show", "src/Playlist.ts"]);
+    assert_eq!(out.matches("  play()  L2-4").count(), 1, "{out}");
+    assert_eq!(out.matches("  helper()  L7-7").count(), 1, "{out}");
+    // a top-level függvény a modulé, az osztálymetódus az osztályé
+    let at = |needle: &str| {
+        out.find(needle)
+            .unwrap_or_else(|| panic!("{needle}: {out}"))
+    };
+    assert!(at("module Playlist") < at("  helper()"), "{out}");
+    assert!(at("  helper()") < at("class Playlist"), "{out}");
+    assert!(at("class Playlist") < at("  play()"), "{out}");
+    // `--grep`: a hívó egyszer, csak az osztály alatt
+    let out = project.run(&["show", "src", "--grep", "^helper$"]);
+    assert_eq!(out.matches("  play()  L2-4").count(), 1, "{out}");
+    assert!(!out.contains("module Playlist"), "{out}");
+    let out = project.run(&["callers", "helper"]);
+    assert_eq!(
+        out.lines().filter(|l| l.contains("\"play\"")).count(),
+        1,
+        "{out}"
+    );
 }

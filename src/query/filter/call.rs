@@ -84,10 +84,20 @@ impl FilterChain {
                 Some(method.name.as_str()),
             ))
         });
-        // a container akkor marad, ha a neve a találatok container-részében szerepel (nem a metódusokon át)
-        filtered
+        // a container akkor marad, ha egy találat az övé (név szerint; az egymásba ágyazott azonos nevűeknél a
+        // tartomány dönt, lásd `FileGraph::owns`) — nem a metódusokon át
+        let keep: Vec<bool> = graph
             .containers
-            .retain(|container| hits.iter().any(|(name, _)| *name == container.name));
+            .iter()
+            .map(|container| {
+                filtered
+                    .calls
+                    .iter()
+                    .any(|call| graph.owns(container, call.container.as_deref(), call.line))
+            })
+            .collect();
+        let mut keep = keep.into_iter();
+        filtered.containers.retain(|_| keep.next().unwrap_or(false));
         filtered
             .control_flow
             .retain(|flow| hits.contains(&key(flow.container.as_deref(), flow.caller.as_deref())));
