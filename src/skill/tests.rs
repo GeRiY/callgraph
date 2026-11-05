@@ -104,7 +104,7 @@ fn fail_logs_and_prints_feedback_line() {
     assert_eq!(
         text,
         format!(
-            "lásd: bash /S/x.sh\n[error-id: {id}]  feedback: bash /S/feedback.sh add {id} \"<what you expected, what happened>\"\n"
+            "lásd: bash /S/x.sh\n[error-id: {id}]  report: https://github.com/GeRiY/callgraph/issues/new?template=bug_report.yml  (details to paste: bash /S/feedback.sh show {id})\n"
         )
     );
     let line = std::fs::read_to_string(home.errors_file()).unwrap();
