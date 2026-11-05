@@ -8,8 +8,8 @@ use crate::lang::LanguageRegistry;
 
 fn usage() -> &'static str {
     crate::t!(
-        "callgraph [--lang <id,...>] [--cache <file>] [--no-cache] <file|dir> [...] | callgraph prune [--cache <file>] [--dry-run] | callgraph lang [en|hu]",
-        "callgraph [--lang <id,...>] [--cache <fájl>] [--no-cache] <fájl|mappa> [...] | callgraph prune [--cache <fájl>] [--dry-run] | callgraph lang [en|hu]"
+        "callgraph [--lang <id,...>] [--cache <file>] [--no-cache] <file|dir> [...] | callgraph prune [--cache <file>] [--dry-run] | callgraph set-lang [en|hu]",
+        "callgraph [--lang <id,...>] [--cache <fájl>] [--no-cache] <fájl|mappa> [...] | callgraph prune [--cache <fájl>] [--dry-run] | callgraph set-lang [en|hu]"
     )
 }
 
@@ -73,7 +73,7 @@ pub enum CliArgs {
         depth: usize,
         guess: bool,
     },
-    /// Skill-parancs (`project`, `feedback`, `wrap`, `error`, `lang`) nyers argumentumokkal.
+    /// Skill-parancs (`project`, `feedback`, `wrap`, `error`, `set-lang`) nyers argumentumokkal.
     Skill { command: String, args: Vec<String> },
 }
 
@@ -94,7 +94,7 @@ impl CliArgs {
         if let Some(command) = args.first().filter(|a| {
             matches!(
                 a.as_str(),
-                "project" | "feedback" | "wrap" | "error" | "lang"
+                "project" | "feedback" | "wrap" | "error" | "set-lang"
             )
         }) {
             return Ok(Self::Skill {

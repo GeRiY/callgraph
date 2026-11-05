@@ -1,7 +1,7 @@
 //! Kétnyelvű (angol / magyar) terminál-kimenet. A szövegek a hívás helyén élnek, mindkét nyelven:
 //! `t!("Usage", "Használat")`, formázva `tf!("{n} files", "{n} fájl")`.
 //!
-//! A nyelv futásonként egyszer dől el: `CALLGRAPH_LANG` › a skill-mappa `lang` fájlja (`callgraph lang <en|hu>`
+//! A nyelv futásonként egyszer dől el: `CALLGRAPH_LANG` › a skill-mappa `lang` fájlja (`callgraph set-lang <en|hu>`
 //! írja) › alapértelmezés: angol.
 
 use std::sync::OnceLock;
@@ -42,7 +42,7 @@ impl Lang {
         }
     }
 
-    /// A nyelv neve a saját nyelvén (a `callgraph lang` listájához).
+    /// A nyelv neve a saját nyelvén (a `callgraph set-lang` listájához).
     pub fn native_name(self) -> &'static str {
         match self {
             Lang::En => "English",
@@ -59,7 +59,7 @@ impl Lang {
     }
 }
 
-/// Honnan jött az aktuális nyelv (a `callgraph lang` kiírásához).
+/// Honnan jött az aktuális nyelv (a `callgraph set-lang` kiírásához).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LangSource {
     Env,

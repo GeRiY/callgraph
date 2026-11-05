@@ -27,7 +27,7 @@ A használat leírása a `SKILL.md`-ben van.
 
 ## Nyelv
 
-A terminál-kimenet és a súgó angol (alapértelmezés) vagy magyar. Váltás: `bash callgraph.sh lang hu` (vissza: `lang en`,
+A terminál-kimenet és a súgó angol (alapértelmezés) vagy magyar. Váltás: `bash callgraph.sh set-lang hu` (vissza: `set-lang en`,
 lekérdezés: `lang`) — a skill-mappa `lang` fájljába menti, frissítéskor megmarad. Egy futásra: `CALLGRAPH_LANG=hu bash callgraph.sh …`
 (a környezeti változó erősebb az elmentett beállításnál).
 

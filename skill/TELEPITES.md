@@ -8,7 +8,7 @@
 3. Regisztrálj egy projektet: `bash ~/.claude/skills/callgraph/projects.sh add myapp /abszolút/út/a/projekthez`
 4. Próba: `bash ~/.claude/skills/callgraph/callgraph.sh --project myapp app/Models/User.php`
 5. Indítsd újra a Claude Code-ot, hogy a skillt (`SKILL.md`) betöltse.
-6. Nyelv (nem kötelező): a kimenet és a súgó alapból angol; magyarra: `bash ~/.claude/skills/callgraph/callgraph.sh lang hu`
+6. Nyelv (nem kötelező): a kimenet és a súgó alapból angol; magyarra: `bash ~/.claude/skills/callgraph/callgraph.sh set-lang hu`
    (vissza: `lang en`). Egy futásra a `CALLGRAPH_LANG=hu` környezeti változó is jó.
 
 Melyik csomag kell?

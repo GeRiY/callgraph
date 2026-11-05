@@ -33,10 +33,9 @@ Használat:
   bash ~/.claude/skills/callgraph/callgraph.sh <mappa|fájl> --const <minta>     osztálykonstans-hivatkozások és -definíciók
 
 Nyelv (a terminál-kimenet és a súgó nyelve: en = angol, alapértelmezett; hu = magyar):
-  bash ~/.claude/skills/callgraph/callgraph.sh lang                     az aktuális nyelv és a forrása
-  bash ~/.claude/skills/callgraph/callgraph.sh lang <en|hu>             a nyelv elmentése (a skill-mappa lang fájljába)
+  bash ~/.claude/skills/callgraph/callgraph.sh set-lang                 az aktuális nyelv és a forrása
+  bash ~/.claude/skills/callgraph/callgraph.sh set-lang <en|hu>         a nyelv elmentése (a skill-mappa lang fájljába)
   CALLGRAPH_LANG=<en|hu> bash ~/.claude/skills/callgraph/callgraph.sh …   egy futásra (felülírja az elmentettet)
-  (ha az aktuális mappában van `lang` fájl / mappa, a `callgraph.sh lang` azt elemzi; a `lang <en|hu>` így is vált)
 
 Kimenet-korlát: 400 sor fölött a mappás outline summary-ra, az egyfájlos metódus-indexre vált;
 

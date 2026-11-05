@@ -31,5 +31,5 @@ fi
 [[ -f projects.json ]] || { echo '{}' > projects.json; msg "✓ empty projects.json" "✓ üres projects.json"; }
 msg "Done. Register a project: bash projects.sh add <alias> <absolute_path>" \
     "Kész. Projekt regisztrálása: bash projects.sh add <alias> <abszolút_út>"
-msg "Language: $(ui_lang) — switch: bash callgraph.sh lang <en|hu>" \
-    "Nyelv: $(ui_lang) — váltás: bash callgraph.sh lang <en|hu>"
+msg "Language: $(ui_lang) — switch: bash callgraph.sh set-lang <en|hu>" \
+    "Nyelv: $(ui_lang) — váltás: bash callgraph.sh set-lang <en|hu>"
