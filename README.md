@@ -1,65 +1,246 @@
-# callgraph
+<h1 align="center">callgraph</h1>
 
-**English** | [Magyar](README.hu.md)
+<p align="center">
+  <b>A token-efficient code map for AI coding agents.</b><br>
+  Structure, categorized call graph, method bodies, "who calls this?" and impact analysis —
+  without reading whole files.
+</p>
 
-A token-efficient code map for agents (a Claude Code skill). For PHP, JS / TS / Vue, CSS / SCSS, JSON and Markdown
-files it gives you the structure, a categorized call graph, method bodies, "who calls this" search and impact
-analysis, without reading the file. The analyzer is a standalone Rust binary (`callgraph`); `skill/callgraph.sh` is a
-thin wrapper on top of it.
+<p align="center">
+  <a href="https://github.com/GeRiY/callgraph/actions/workflows/release.yml"><img alt="build" src="https://github.com/GeRiY/callgraph/actions/workflows/release.yml/badge.svg?branch=main"></a>
+  <a href="https://github.com/GeRiY/callgraph/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/GeRiY/callgraph?display_name=tag&sort=semver"></a>
+  <a href="LICENSE"><img alt="license: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
+  <img alt="platforms" src="https://img.shields.io/badge/platforms-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey">
+</p>
 
-- Usage and installation: [`skill/SKILL.md`](skill/SKILL.md), [`skill/README.md`](skill/README.md)
-- Design: [`ARCHITECTURE.md`](ARCHITECTURE.md), the query layer: [`docs/QUERY.md`](docs/QUERY.md), adding a language: [`docs/UJ-NYELV.md`](docs/UJ-NYELV.md)
-  (the detailed docs are currently in Hungarian)
+<p align="center">
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#installation">Installation</a> ·
+  <a href="#usage">Usage</a> ·
+  <a href="#how-it-works">How it works</a> ·
+  <a href="#development">Development</a> ·
+  <a href="README.hu.md">Magyar</a>
+</p>
 
-## Download and install
+---
 
-The ready-to-install package (skill files, the binary for your machine, install guide) is available from the latest
-[GitHub Release](https://github.com/GeRiY/callgraph/releases/latest):
+An agent that needs to understand one method usually reads the whole file, then greps, then reads a few more files.
+**callgraph** answers those questions from the AST instead, in a few dozen lines: what is in this file, which method
+lives on which lines, what it calls (sorted by category), who calls it, and what breaks if it changes.
 
-| Machine | Download |
-|---|---|
-| Mac, Apple Silicon (M1–M4) | [callgraph-darwin-arm64.zip](https://github.com/GeRiY/callgraph/releases/latest/download/callgraph-darwin-arm64.zip) |
-| Mac, Intel | [callgraph-darwin-x86_64.zip](https://github.com/GeRiY/callgraph/releases/latest/download/callgraph-darwin-x86_64.zip) |
-| Linux x86_64 | [callgraph-linux-x86_64.zip](https://github.com/GeRiY/callgraph/releases/latest/download/callgraph-linux-x86_64.zip) |
-| Linux ARM64 | [callgraph-linux-aarch64.zip](https://github.com/GeRiY/callgraph/releases/latest/download/callgraph-linux-aarch64.zip) |
-| Windows x86_64 (Git Bash) | [callgraph-windows-x86_64.zip](https://github.com/GeRiY/callgraph/releases/latest/download/callgraph-windows-x86_64.zip) |
+It ships as a single native Rust binary plus a thin [Claude Code](https://claude.com/claude-code) skill, and it works
+just as well from any terminal or script.
 
-All five binaries in one package: the Release's `callgraph-<version>.tar.gz` file.
+```console
+$ callgraph.sh --project shop app/Models/Order.php
+FILE  /srv/shop/app/Models/Order.php  NS:App\Models
 
-**Quick install (macOS / Linux).** This downloads the package for your machine into `~/.claude/skills/callgraph/` and
-runs `install.sh`. On update, `projects.json`, `errors.jsonl` and `feedback.jsonl` are kept.
+class Order extends Illuminate\Database\Eloquent\Model  L7-23
+  constants (1):
+    STATUS_OPEN = 'open'
+  properties (1):
+    mixed $fillable
+  saveTranslations()  L13-20
+    external_call     create, info
+    global_helper     logger
+    internal_helper   translations
+  translations()  L22-22
+    orm_relation      hasMany
+```
+
+```console
+$ callgraph.sh --project shop app --grep saveTranslations --depth 2
+== level 1 — directly calls: /saveTranslations/
+  /srv/shop/app/Models/Order.php  Caller::run()  L25-25
+
+== level 2 — calls the previous level
+  (no more callers)
+```
+
+## Highlights
+
+- **Reads the AST, not the text.** Classes / components, methods with exact line ranges, properties, constants,
+  imports, docblocks, string literals and `if` / `match` / `switch` branches.
+- **Categorized call graph.** Every call is classified: `native_php`, `orm_relation`, `model_use`, `global_helper`,
+  `internal_helper`, `external_call`, `framework_use`, Vue `composable_use` and more, so the agent sees intent,
+  not just names.
+- **"Who calls this?" and impact analysis.** `--grep <pattern> --depth N` walks callers of callers across the whole
+  project using a cached, incremental project index.
+- **Surgical reads.** `file::method --body` prints just that method, line-numbered; `--lines 30-60` prints any range.
+- **Framework views.** Laravel / Yii aware: `routes`, `middleware`, `validation`, `jobs`, `events`, `providers`,
+  `magic`, `di`, `views`.
+- **Many output formats.** `outline`, `api`, `flow`, `summary`, `hotspots`, `coverage`, `stats`, `mermaid`, `dot`,
+  `json`, `jsonl`.
+- **Fast and dependency-free.** One static binary (no PHP, Node or jq needed), parallel parsing, mtime-based JSONL cache.
+- **English or Hungarian output**, switchable with one command.
+
+### Supported languages
+
+| Language | Extensions | What you get |
+|---|---|---|
+| PHP | `.php` | classes, traits, enums, methods, properties, constants, calls with type tracking, framework detection (Laravel, Yii) |
+| JavaScript / TypeScript | `.js` `.mjs` `.cjs` `.jsx` `.ts` `.tsx` | modules, functions, classes, imports with alias resolution (`jsconfig` / `tsconfig`) |
+| Vue | `.vue` | props, emits, `setup`, template components and event handlers, `computed`, `watch`, lifecycle hooks, Options API |
+| CSS / SCSS | `.css` `.scss` | rule blocks, mixins, functions, variables, `@use` / `@import` |
+| JSON / Markdown | `.json` `.md` | key paths; heading sections and links |
+
+### When *not* to use it
+
+- You need the exact text of a known line range: use `--lines` or a targeted read.
+- Non-code files (plain text, data dumps): the outline adds little.
+- Macro- or reflection-heavy code: dynamic calls that can't be resolved statically are shown as name-only matches
+  (`?`) with `--guess`, or not at all.
+
+## Quick start
 
 ```bash
+# 1. install (macOS / Linux, see below for Windows)
 p="$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)" && t="$(mktemp -d)" \
   && curl -fsSL -o "$t/cg.zip" "https://github.com/GeRiY/callgraph/releases/latest/download/callgraph-$p.zip" \
   && mkdir -p ~/.claude/skills && unzip -qo "$t/cg.zip" -d ~/.claude/skills \
   && bash ~/.claude/skills/callgraph/install.sh && rm -rf "$t"
+
+# 2. register a project once
+bash ~/.claude/skills/callgraph/projects.sh add shop /absolute/path/to/shop
+
+# 3. ask questions
+CG=~/.claude/skills/callgraph/callgraph.sh
+bash $CG --project shop app/Models/Order.php                      # outline
+bash $CG --project shop app/Models/Order.php::save --body         # one method's source
+bash $CG --project shop app --grep 'Order::cancel' --depth 3      # impact analysis
 ```
 
-**Manually (also on Windows):** unzip the package, copy the `callgraph/` folder inside it under `~/.claude/skills/`
-(Windows: `%USERPROFILE%\.claude\skills\`), then run `bash install.sh` there. Details (in Hungarian): [`skill/TELEPITES.md`](skill/TELEPITES.md).
+Restart Claude Code afterwards so it picks up the skill (`SKILL.md`).
 
-Then register your project (`bash ~/.claude/skills/callgraph/projects.sh add myapp /absolute/path/to/project`) and
-restart Claude Code.
+## Installation
 
-## Build
+Prebuilt packages (skill files + the binary for your platform + install guide) are attached to every
+[GitHub Release](https://github.com/GeRiY/callgraph/releases/latest):
 
-Develop in Docker (only Docker is needed locally; the Rust toolchain, clippy, rustfmt, python3 and php are in the
-container, the image is `docker/dev.Dockerfile`):
+| Platform | Package |
+|---|---|
+| macOS, Apple Silicon (M1–M4) | [callgraph-darwin-arm64.zip](https://github.com/GeRiY/callgraph/releases/latest/download/callgraph-darwin-arm64.zip) |
+| macOS, Intel | [callgraph-darwin-x86_64.zip](https://github.com/GeRiY/callgraph/releases/latest/download/callgraph-darwin-x86_64.zip) |
+| Linux x86_64 (static musl) | [callgraph-linux-x86_64.zip](https://github.com/GeRiY/callgraph/releases/latest/download/callgraph-linux-x86_64.zip) |
+| Linux ARM64 (static musl) | [callgraph-linux-aarch64.zip](https://github.com/GeRiY/callgraph/releases/latest/download/callgraph-linux-aarch64.zip) |
+| Windows x86_64 (Git Bash) | [callgraph-windows-x86_64.zip](https://github.com/GeRiY/callgraph/releases/latest/download/callgraph-windows-x86_64.zip) |
+
+All five binaries in one archive: `callgraph-<version>.tar.gz` on the same release page.
+
+**macOS / Linux:** use the one-liner from [Quick start](#quick-start). It installs into `~/.claude/skills/callgraph/`
+and runs `install.sh`. Updating is the same command; your `projects.json`, `errors.jsonl`, `feedback.jsonl` and
+language setting are kept.
+
+**Windows / manual:** unzip the package, copy the `callgraph/` folder under `~/.claude/skills/`
+(Windows: `%USERPROFILE%\.claude\skills\`) and run `bash install.sh` there (Git Bash). On macOS `install.sh` also
+clears the download quarantine flag. Step-by-step guide (Hungarian): [`skill/TELEPITES.md`](skill/TELEPITES.md).
+
+**From source:** see [Development](#development).
+
+The only runtime requirement is `bash`.
+
+## Usage
+
+All commands go through `callgraph.sh` (or the binary directly: `callgraph show …`). `--project <alias>` makes paths
+relative to a registered project root; without it, the current directory is the root.
+
+| Task | Command |
+|---|---|
+| Outline of a file / directory | `callgraph.sh <file\|dir>` |
+| One method only | `callgraph.sh <file>::<method>` (several selectors allowed) |
+| Method source, line-numbered | `callgraph.sh <file>::<method> --body` |
+| Any line range | `callgraph.sh <file> --lines 30-60` |
+| Where is it called? | `callgraph.sh <dir> --grep <pattern>` |
+| Impact analysis | `callgraph.sh <dir> --grep <pattern> --depth N [--guess]` |
+| String literal / constant usages | `callgraph.sh <dir> --strings <pattern>` · `--const <pattern>` |
+| Filter by call category | `callgraph.sh <dir> --category model_use,orm_relation` |
+
+### Output formats (`--format`)
+
+| Format | Gives you |
+|---|---|
+| `outline` (default) | structure + calls by category |
+| `api` | public contract + docblocks, no implementation |
+| `flow` | `if` / `match` / `switch` branches with line ranges (condition → what it calls) |
+| `summary` | one line per file |
+| `hotspots` | top 20 methods by in/out degree |
+| `coverage` | undocumented public methods |
+| `stats` | category statistics |
+| `mermaid` / `dot` | diagrams of inheritance and call edges |
+| `json` / `jsonl` | the raw graph |
+| `routes` `middleware` `validation` `jobs` `events` `providers` `magic` `di` `views` | framework views (run on a directory) |
+
+Large results are capped (above 400 lines a directory outline turns into a summary, a single file into a method
+index); `--full` lifts the cap. Full reference: `callgraph.sh --help` and [`skill/SKILL.md`](skill/SKILL.md).
+
+### Language
+
+Terminal output and help are in English by default; Hungarian is available:
 
 ```bash
-bash tools/dev.sh build        # target/docker/release/callgraph
-bash tools/dev.sh test
-bash tools/dev.sh check        # fmt --check + clippy -D warnings + test (before committing)
-bash tools/dev.sh skill        # dist/callgraph-<version>.tar.gz (the skill package, Linux)
-bash tools/dev.sh shell        # interactive shell in the container
+bash ~/.claude/skills/callgraph/callgraph.sh set-lang hu    # save (back: set-lang en)
+bash ~/.claude/skills/callgraph/callgraph.sh set-lang       # show current language and its source
+CALLGRAPH_LANG=hu bash ~/.claude/skills/callgraph/callgraph.sh app/Models/Order.php   # one run only
 ```
 
-With a local toolchain: `cargo build --release`, `cargo test --release`, `bash tools/build-skill.sh`.
+### Feedback from agents
 
-The multi-platform package (macOS arm64 / x86_64, Linux arm64 / x86_64 musl, Windows x86_64) is built by GitHub
-Actions (`.github/workflows/release.yml`); on a `v*` tag it is published as a GitHub Release.
+Every error message carries an `[error-id: …]`. Agents (or you) can attach a note to it, which makes broken
+cases easy to collect and fix:
+
+```bash
+bash ~/.claude/skills/callgraph/feedback.sh add <error-id> "what I expected, what happened"
+bash ~/.claude/skills/callgraph/feedback.sh list --open
+```
+
+## How it works
+
+```
+files ─► FileWalker ─► LanguageRegistry ─► Language::analyze ─► FileGraph ─► JSONL cache / project index ─► query formats
+         (.gitignore,    (by extension)     (mago · oxc · raffia ·   (one shared
+          vendor, …)                         pulldown-cmark)          schema)
+```
+
+- Every language is a module under `src/lang/<language>/` that maps its AST into one shared `FileGraph` schema; the
+  query layer (`src/query/`) never needs to know which language a file was.
+- Parsers: [mago](https://github.com/carthage-software/mago) (PHP), [oxc](https://github.com/oxc-project/oxc)
+  (JS / TS / Vue), [raffia](https://github.com/g-plane/raffia) (CSS / SCSS),
+  [pulldown-cmark](https://github.com/pulldown-cmark/pulldown-cmark) (Markdown).
+- Results are cached per file in JSONL (keyed by mtime); "who calls this?" uses an incremental project index (mtime + size) under
+  `.callgraph/`.
+
+Design and coding rules: [`ARCHITECTURE.md`](ARCHITECTURE.md) · query layer: [`docs/QUERY.md`](docs/QUERY.md) ·
+per-language mapping: [`docs/LANG-JS.md`](docs/LANG-JS.md), [`docs/LANG-CSS.md`](docs/LANG-CSS.md),
+[`docs/LANG-DOC.md`](docs/LANG-DOC.md) (the detailed docs are currently in Hungarian).
+
+## Development
+
+Only Docker is needed locally; the toolchain (Rust stable, rustfmt, clippy, musl target, python3, php) lives in the
+dev image (`docker/dev.Dockerfile`):
+
+```bash
+bash tools/dev.sh check     # fmt --check + clippy -D warnings + tests — run before every commit
+bash tools/dev.sh build     # target/docker/release/callgraph
+bash tools/dev.sh test      # tests only
+bash tools/dev.sh skill     # dist/callgraph-<version>.tar.gz (skill package, Linux)
+bash tools/dev.sh shell     # shell inside the container
+```
+
+With a local toolchain the usual `cargo build --release` / `cargo test --release` work too. CI
+([`.github/workflows/release.yml`](.github/workflows/release.yml)) builds and tests macOS (arm64, x86_64),
+Linux (arm64, x86_64, static musl) and Windows on every push, and publishes a GitHub Release on `v*` tags.
+
+### Contributing
+
+Issues and pull requests are welcome. Before opening a PR, run `bash tools/dev.sh check`.
+Adding a language is one new module plus one registration line: see [`docs/UJ-NYELV.md`](docs/UJ-NYELV.md).
+Refactors must keep the output byte-identical (`tools/identity_check.sh`).
+
+### Security
+
+Please report vulnerabilities privately through
+[GitHub Security Advisories](https://github.com/GeRiY/callgraph/security/advisories/new), not in public issues.
 
 ## License
 
-MIT — see [`LICENSE`](LICENSE).
+[MIT](LICENSE)
