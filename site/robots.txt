@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://geriy.github.io/callgraph/sitemap.xml
