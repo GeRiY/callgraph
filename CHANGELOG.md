@@ -61,6 +61,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 - The project page moved to the `gh-pages` branch (https://geriy.github.io/callgraph/); page edits no longer touch `main`.
 
 ### Fixed
+- Windows: the project root is printed as `C:\…` instead of `\\?\C:\…` in search output.
+- A bare method selector also finds an object-literal method: `store.ts::updateSongs` selects `playableStore.updateSongs`.
 - `--grep … --depth`: from level 2 on, callers are searched in the whole project (from the project root), not only in
   the folders of the level-1 matches — callers in other folders were missed.
 - Rust `--format api` now lists the `pub fn` methods of `impl` blocks (and trait implementations), the `pub` constants

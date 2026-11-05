@@ -96,8 +96,14 @@ impl QueryEngine {
             let methods = methods.map(|names| {
                 // névegyezés: egy név több metódusra is illeszkedhet (Rust: több impl, PHP/Swift: túlterhelés),
                 // ezért a hiányt név szerint nézzük, nem darabszámra
-                let found = graph.methods.iter().filter(|m| names.iter().any(|n| n == &m.name)).map(|m| m.name.clone()).collect::<Vec<_>>();
-                if let Some(missing) = names.iter().find(|n| !found.contains(n)) {
+                // pontos név; ha nincs ilyen, a pont nélküli név az objektum-literál metódusára is illeszkedik
+                // (`store.ts::updateSongs` → `playableStore.updateSongs`)
+                let exact = |n: &String| graph.methods.iter().any(|m| &m.name == n);
+                let matches = |n: &String, name: &str| {
+                    name == n || (!exact(n) && !n.contains('.') && name.rsplit_once('.').is_some_and(|(_, last)| last == n))
+                };
+                let found = graph.methods.iter().filter(|m| names.iter().any(|n| matches(n, &m.name))).map(|m| m.name.clone()).collect::<Vec<_>>();
+                if let Some(missing) = names.iter().find(|n| !found.iter().any(|f| matches(n, f))) {
                     return Err(CallgraphError::Usage(tf!(
                         "No such method: {}::{} (see --format outline for the file's full list)",
                         "Nincs ilyen metódus: {}::{} (lásd: --format outline a fájl teljes listájához)",
@@ -174,10 +180,16 @@ impl QueryEngine {
             return text.to_owned();
         }
         let prefix = format!("{root}{}", std::path::MAIN_SEPARATOR);
+        // Windowson a canonicalize `\\?\C:\…` alakot ad: a kiírt útból ezt elhagyjuk (az illesztés a teljes alakkal megy)
+        let shown = strip_verbatim(root);
         if text.matches(&prefix).count() < 2 {
-            return text.to_owned();
+            return if shown == root {
+                text.to_owned()
+            } else {
+                text.replace(&prefix, &format!("{shown}{}", std::path::MAIN_SEPARATOR))
+            };
         }
-        let mut out = tf!("root: {root}\n", "gyökér: {root}\n");
+        let mut out = tf!("root: {shown}\n", "gyökér: {shown}\n");
         out.push_str(&text.replace(&prefix, ""));
         out
     }
@@ -219,5 +231,26 @@ impl QueryEngine {
             "Not found: {path} (relative to the --project {label} root)",
             "Nem található: {path} (--project {label} gyökeréhez képest)"
         ))
+    }
+}
+
+/// `\\?\C:\x` → `C:\x` (a Windows-féle „verbatim” előtag a meghajtós utaknál; UNC- és más utak változatlanok).
+fn strip_verbatim(path: &str) -> &str {
+    match path.strip_prefix(r"\\?\") {
+        Some(rest) if rest.as_bytes().get(1) == Some(&b':') => rest,
+        _ => path,
+    }
+}
+
+#[cfg(test)]
+mod verbatim_tests {
+    #[test]
+    fn strips_only_the_drive_verbatim_prefix() {
+        assert_eq!(super::strip_verbatim(r"\\?\C:\Users\x"), r"C:\Users\x");
+        assert_eq!(
+            super::strip_verbatim(r"\\?\UNC\srv\share"),
+            r"\\?\UNC\srv\share"
+        );
+        assert_eq!(super::strip_verbatim("/home/x"), "/home/x");
     }
 }
