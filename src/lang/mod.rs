@@ -10,6 +10,7 @@ mod language;
 pub mod markdown;
 pub mod php;
 mod registry;
+pub mod rs;
 pub mod scss;
 pub(crate) mod stylesheet;
 

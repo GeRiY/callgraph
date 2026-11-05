@@ -2,12 +2,13 @@
 
 **English** | [Magyar](README.hu.md)
 
-A token-efficient code map for agents (a Claude Code skill). For PHP, JS / TS / Vue, CSS / SCSS, JSON and Markdown
+A token-efficient code map for agents (a Claude Code skill). For PHP, Rust, JS / TS / Vue, CSS / SCSS, JSON and Markdown
 files it gives you the structure, a categorized call graph, method bodies, "who calls this" search and impact
 analysis, without reading the file. The analyzer is a standalone Rust binary (`callgraph`); `skill/callgraph.sh` is a
 thin wrapper on top of it.
 
 - Usage and installation: [`skill/SKILL.md`](skill/SKILL.md), [`skill/README.md`](skill/README.md)
+- Rust (`.rs`, syn-based; macros are not expanded): [`docs/LANG-RUST.md`](docs/LANG-RUST.md)
 - Design: [`ARCHITECTURE.md`](ARCHITECTURE.md), the query layer: [`docs/QUERY.md`](docs/QUERY.md), adding a language: [`docs/UJ-NYELV.md`](docs/UJ-NYELV.md)
   (the detailed docs are currently in Hungarian)
 

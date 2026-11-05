@@ -7,6 +7,7 @@ use super::js::JsFrontend;
 use super::json::JsonDocument;
 use super::markdown::MdDocument;
 use super::php::PhpBackend;
+use super::rs::RustBackend;
 use super::scss::ScssFrontend;
 use super::{Language, LanguageBackend, LanguageDocument, LanguageFrontend};
 
@@ -24,10 +25,11 @@ impl LanguageRegistry {
         Self::default()
     }
 
-    /// Az alapértelmezett összeállítás: backend `PhpBackend`; frontend `CssFrontend`, `ScssFrontend`, `JsFrontend`; dokumentum `JsonDocument`, `MdDocument`.
+    /// Az alapértelmezett összeállítás: backend `PhpBackend`, `RustBackend`; frontend `CssFrontend`, `ScssFrontend`, `JsFrontend`; dokumentum `JsonDocument`, `MdDocument`.
     pub fn with_defaults() -> Self {
         let mut registry = Self::new();
         registry.register_backend(Box::new(PhpBackend::with_defaults()));
+        registry.register_backend(Box::new(RustBackend::with_defaults()));
         registry.register_frontend(Box::new(CssFrontend::new()));
         registry.register_frontend(Box::new(ScssFrontend::new()));
         registry.register_frontend(Box::new(JsFrontend::with_defaults()));
@@ -156,7 +158,8 @@ mod tests {
         assert_eq!(
             r.extensions(),
             vec![
-                "php", "css", "scss", "js", "mjs", "cjs", "ts", "tsx", "jsx", "vue", "json", "md"
+                "php", "rs", "css", "scss", "js", "mjs", "cjs", "ts", "tsx", "jsx", "vue", "json",
+                "md"
             ]
         );
         let php = r.for_path(Path::new("src/A.php")).unwrap();
