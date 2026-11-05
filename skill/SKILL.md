@@ -26,10 +26,10 @@ directory is the root.
 CG=<skill>/callgraph.sh
 bash $CG --project myapp app/Http/Controllers/X.php                  # outline: class, methods with line ranges, calls by category
 bash $CG --project myapp app/Http/Controllers/X.php::store           # only one method (several ::selectors, several files too)
-bash $CG --project myapp app/Http/Controllers/X.php::store --body    # the method's source, line-numbered, with docblock
+bash $CG --project myapp app/Http/Controllers/X.php::store --body    # the method's source, compact (no docblock / comment lines; --doc, --raw)
 bash $CG --project myapp app/Http/Controllers/X.php --lines 30-60    # any range, line-numbered (view, procedural file)
 bash $CG --project myapp app --strings 'Order not found'             # where a string literal (error message, key) is
-bash $CG --project myapp app --const STATUS_ACTIVE                   # constant references and definition
+bash $CG --project myapp app --const STATUS_ACTIVE                   # constant: definition, references, re-exports
 bash $CG --project myapp app --grep '(^|::|\.|->)cancel$'           # who calls it: EVERY call of the name, with the call line
 bash $CG --project myapp app --grep 'Order::cancel'                  # only calls resolved to Order (+ via interface / parent / trait)
 bash $CG --project myapp app --grep 'Order::cancel' --depth 3        # impact analysis: the callers' callers
@@ -49,6 +49,7 @@ calls through its interface / parent / trait), so it can miss callers; use it to
 - `L25 │ $this->repo->find($id)`: the call's own source line. You don't need `--body` just to see how something is
   called, only for the full logic.
 - `via Resolver`: the call goes through an interface, parent class or trait of the searched type.
+- `L12, L40 │ …`: the same call on several lines; at most 3 rows per caller, then `… +2 more: L55, L61`.
 - `?` / `?::name`: the receiver type is unknown, a name-only match; it may be wrong, check the line.
 
 ## Which `--format` is for what
@@ -73,7 +74,9 @@ calls through its interface / parent / trait), so it can miss callers; use it to
 Same switches. The "methods": `setup` (the top-level code of `<script setup>`), `template` (components,
 event handlers, `$t()` / `route()`), functions, `computed`, `watch@L<n>` / `onMounted@L<n>` hooks,
 a composable's inner functions (`useX.inner`), Options API `methods` / `computed.x`. Props = properties,
-emits = `emit:<name>`. Searchable keys for `--grep`:
+emits = `emit:<name>`. TS: a call on a typed parameter / property (`repo: Repo`, `constructor(private repo: Repo)`,
+`new Repo()`) resolves to `Repo::find`, so `Type::method` and `via <Interface>` work in TS too; untyped, `any` or
+union receivers stay unresolved (search those by name). Searchable keys for `--grep`:
 
 ```bash
 bash $CG --project myapp resources/js --grep 'useForm.js::submit'     # <file>::<export>, with import resolution and the @/ alias
@@ -140,9 +143,22 @@ bash <skill>/feedback.sh list --open
 
 The workaround (targeted Read, Grep) can still be used, but do not skip the feedback.
 
+## Notes (pilot)
+
+The outline and `--body` may show `📝 <time> · <text>` lines under a file or method: notes left by people or agents.
+Take them into account. Leave one when you learn something lasting (why something is so, a pitfall) — short, no task
+lists. `note list` marks `[orphaned]` notes (the method is gone; remove with `note rm <id>`).
+
+```bash
+bash $CG --project myapp note add app/Order.php::cancel "Refunds run in RefundJob, not here"
+bash $CG --project myapp note list app
+bash $CG --project myapp app --notes 'refund'
+```
+
 ## Data and cache
 
-All data goes into the project's own `.callgraph/` directory (cache, index; the directory is created automatically,
+All data goes into the project's own `.callgraph/` directory (cache, project map `index.jsonl`, notes; updated only
+for changed files, so repeated searches are fast; the directory is created automatically,
 with a `*` `.gitignore`, so it never gets into version control). Nothing is written outside the project. If the directory
 is not writable, it runs without a cache. Cleanup: `callgraph prune` (see README).
 
@@ -150,4 +166,4 @@ is not writable, it runs without a cache. Cleanup: `callgraph prune` (see README
 
 Static analysis: dynamic calls (`$this->$method()`, `obj[key]()`), magic methods and class names / registered components
 assembled at runtime cannot be resolved. By default `--depth` follows only the certain (resolved) callers;
-name-only matches are shown by `--guess` with a "?" mark. For the exact control logic you need `--body`.
+name-only matches are shown by `--guess` with a "?" mark. For the exact control logic you need `--body` (compact; `--raw` gives the exact text with comments).

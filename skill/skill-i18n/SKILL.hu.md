@@ -25,10 +25,10 @@ mappa a gyökér.
 CG=<skill>/callgraph.sh
 bash $CG --project myapp app/Http/Controllers/X.php                  # outline: osztály, metódusok sortartománnyal, hívások kategóriánként
 bash $CG --project myapp app/Http/Controllers/X.php::store           # csak egy metódus (több ::szelektor, több fájl is)
-bash $CG --project myapp app/Http/Controllers/X.php::store --body    # a metódus forrása sorszámozva, docblockkal
+bash $CG --project myapp app/Http/Controllers/X.php::store --body    # a metódus forrása, tömören (docblock és komment-sorok nélkül; --doc, --raw)
 bash $CG --project myapp app/Http/Controllers/X.php --lines 30-60    # tetszőleges sáv sorszámozva (view, procedurális fájl)
 bash $CG --project myapp app --strings 'Order not found'             # string-literál (hibaüzenet, kulcs) helye
-bash $CG --project myapp app --const STATUS_ACTIVE                   # konstans-hivatkozás és -definíció
+bash $CG --project myapp app --const STATUS_ACTIVE                   # konstans: definíció, hivatkozások, továbbexportálás
 bash $CG --project myapp app --grep '(^|::|\.|->)cancel$'           # ki hívja: a név MINDEN hívása, a hívás sorával
 bash $CG --project myapp app --grep 'Order::cancel'                  # csak az Order-re feloldott hívások (+ interfészen / szülőn / trait-en át)
 bash $CG --project myapp app --grep 'Order::cancel' --depth 3        # hatáselemzés: a hívók hívói
@@ -48,6 +48,7 @@ az interfészén / szülőjén / trait-jén át menőket), ezért hívók maradh
 - `L25 │ $this->repo->find($id)`: a hívás saját forrássora. Csak azért, hogy lásd, hogyan hívják, nem kell `--body`;
   a teljes logikához igen.
 - `via Resolver`: a hívás a keresett típus interfészén, szülőosztályán vagy trait-jén át megy.
+- `L12, L40 │ …`: ugyanaz a hívás több soron; hívónként legfeljebb 3 sor, utána `… +2 további: L55, L61`.
 - `?` / `?::név`: ismeretlen fogadó-típus, csak név szerinti egyezés; lehet téves, nézd meg a sort.
 
 ## Melyik `--format` mire való
@@ -71,7 +72,10 @@ az interfészén / szülőjén / trait-jén át menőket), ezért hívók maradh
 
 Ugyanazok a kapcsolók. A „metódusok”: `setup` (a `<script setup>` top-level kódja), `template` (komponensek,
 eseménykezelők, `$t()` / `route()`), függvények, `computed`, `watch@L<n>` / `onMounted@L<n>` hookok,
-composable belső függvényei (`useX.belso`), Options API `methods` / `computed.x`. Props = properties,
+composable belső függvényei (`useX.belso`), Options API `methods` / `computed.x`. TS: a típusos paraméteren /
+property-n (`repo: Repo`, `constructor(private repo: Repo)`, `new Repo()`) át hívott metódus `Repo::find` lesz, így a
+`Típus::metódus` keresés és a `via <Interfész>` TS-ben is működik; típus nélküli, `any` vagy unió fogadónál név szerint
+keress. Props = properties,
 emits = `emit:<név>`. Kereshető kulcsok a `--grep`-hez:
 
 ```bash
@@ -139,9 +143,22 @@ bash <skill>/feedback.sh list --open
 
 A kerülőút (célzott Read, Grep) ettől még használható, de a visszajelzés ne maradjon el.
 
+## Jegyzetek (pilot)
+
+Az outline-ban és a `--body`-nál egy fájl vagy metódus alatt `📝 <idő> · <szöveg>` sorok lehetnek: emberek vagy agentek
+jegyzetei. Vedd figyelembe őket. Hagyj jegyzetet, ha tartós tanulságot találsz (miért van így, buktató) — röviden,
+feladatlista nélkül. A `note list` az `[árva]` jegyzeteket is jelzi (a metódus már nincs meg; törlés: `note rm <id>`).
+
+```bash
+bash $CG --project myapp note add app/Order.php::cancel "A visszatérítés a RefundJob-ban fut, nem itt"
+bash $CG --project myapp note list app
+bash $CG --project myapp app --notes 'refund'
+```
+
 ## Adat és cache
 
-Minden adat a projekt saját `.callgraph/` mappájába kerül (cache, index; a mappa magától létrejön,
+Minden adat a projekt saját `.callgraph/` mappájába kerül (cache, projekt-térkép `index.jsonl`, jegyzetek; csak a
+változott fájlok frissülnek, így az ismételt keresés gyors; a mappa magától létrejön,
 `*`-os `.gitignore`-ral, így a verziókezelésbe nem kerül). A projekten kívül semmi nem íródik. Ha a mappa
 nem írható, cache nélkül fut. Takarítás: `callgraph prune` (lásd README).
 
@@ -149,4 +166,4 @@ nem írható, cache nélkül fut. Takarítás: `callgraph prune` (lásd README).
 
 Statikus elemzés: dinamikus hívás (`$this->$method()`, `obj[key]()`), magic method és futásidőben összeállított
 osztálynév / regisztrált komponens nem oldható fel. A `--depth` alapból csak a biztos (feloldott) hívókat követi;
-a név szerinti egyezést a `--guess` mutatja „?” jellel. A pontos vezérlési logikához a `--body` kell.
+a név szerinti egyezést a `--guess` mutatja „?” jellel. A pontos vezérlési logikához a `--body` kell (tömör; a `--raw` a pontos szöveget adja kommentekkel).
