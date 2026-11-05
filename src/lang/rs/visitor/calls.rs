@@ -163,7 +163,14 @@ impl Collector<'_, '_> {
     /// csak akkor, ha a fájl saját típusának tényleg van ilyen metódusa (különben marad `native_rust`).
     fn typed_verdict(&self, location: &Location, ty: Vec<String>, name: &str) -> Option<Verdict> {
         if is_std_method(name) {
-            let own = self.local_type(location, &ty)?;
+            // ismert, de nem saját típus (`names: Vec<String>` → `names.len()`): std-metódus, nem a fájl
+            // azonos nevű metódusa (a név szerinti szabály különben a saját `Cache::len`-re kötné)
+            let Some(own) = self.local_type(location, &ty) else {
+                return Some(Verdict {
+                    category: "native_rust",
+                    resolved: None,
+                });
+            };
             if !self.resolver.has_method(&own, name) {
                 return None;
             }
