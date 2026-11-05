@@ -39,7 +39,7 @@
 "offers":{"@type":"Offer","price":"0","priceCurrency":"HUF"}}
 </script>
 <script type="application/ld+json">
-{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Mi a callgraph?", "acceptedAnswer": {"@type": "Answer", "text": "Parancssori kód-térkép AI kódoló agenteknek. Elemzi a fájlt vagy mappát, és megmondja, mi van benne, melyik metódus melyik sorokon él, mit hív, ki hívja, és mit érint egy változtatás — pár tucat sorban a teljes fájl helyett."}}, {"@type": "Question", "name": "Milyen nyelveket támogat?", "acceptedAnswer": {"@type": "Answer", "text": "PHP (Laravel- és Yii-ismerettel), JavaScript, TypeScript, Vue, Rust, Swift és SwiftUI, CSS, SCSS, JSON és Markdown."}}, {"@type": "Question", "name": "Kell hozzá PHP, Node vagy Rust?", "acceptedAnswer": {"@type": "Answer", "text": "Nem. A callgraph egyetlen statikus bináris, futtatáshoz csak bash kell."}}, {"@type": "Question", "name": "Működik Claude Code nélkül is?", "acceptedAnswer": {"@type": "Answer", "text": "Igen. Claude Code skillként érkezik, de minden parancs bármilyen terminálból vagy szkriptből használható."}}, {"@type": "Question", "name": "Hogyan frissíthető?", "acceptedAnswer": {"@type": "Answer", "text": "A callgraph.sh update letölti a legfrissebb kiadást a GitHubról, a projektek és a beállítások megmaradnak."}}, {"@type": "Question", "name": "Hol jelezhetek hibát vagy kérhetek új funkciót?", "acceptedAnswer": {"@type": "Answer", "text": "GitHub issue-ban, a hibajelentő vagy az ötlet/észrevétel űrlappal. Biztonsági hibát privátban, GitHub security advisory-val jelezz."}}]}
+{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Mi a callgraph?", "acceptedAnswer": {"@type": "Answer", "text": "Parancssori kód-térkép AI kódoló agenteknek. Elemzi a fájlt vagy mappát, és megmondja, mi van benne, melyik metódus melyik sorokon él, mit hív, ki hívja, és mit érint egy változtatás — pár tucat sorban a teljes fájl helyett."}}, {"@type": "Question", "name": "Milyen nyelveket támogat?", "acceptedAnswer": {"@type": "Answer", "text": "PHP (Laravel- és Yii-ismerettel), JavaScript, TypeScript, Vue, Rust, Swift és SwiftUI, CSS, SCSS, JSON és Markdown."}}, {"@type": "Question", "name": "Kell hozzá PHP, Node vagy Rust?", "acceptedAnswer": {"@type": "Answer", "text": "Nem. A callgraph egyetlen statikus bináris, futtatáshoz csak bash kell."}}, {"@type": "Question", "name": "Működik Claude Code nélkül is?", "acceptedAnswer": {"@type": "Answer", "text": "Igen. Claude Code skillként érkezik, de minden parancs bármilyen terminálból vagy szkriptből használható, és bármely MCP-kliens (Claude Desktop, Cursor, VS Code) offline MCP-szerverként is használhatja: callgraph mcp."}}, {"@type": "Question", "name": "Hogyan frissíthető?", "acceptedAnswer": {"@type": "Answer", "text": "A callgraph.sh update letölti a legfrissebb kiadást a GitHubról, a projektek és a beállítások megmaradnak."}}, {"@type": "Question", "name": "Hol jelezhetek hibát vagy kérhetek új funkciót?", "acceptedAnswer": {"@type": "Answer", "text": "GitHub issue-ban, a hibajelentő vagy az ötlet/észrevétel űrlappal. Biztonsági hibát privátban, GitHub security advisory-val jelezz."}}]}
 </script>
 </head>
 <body>
@@ -49,7 +49,7 @@
   <a class="brand" href="./"><img src="../assets/favicon.svg" alt="" width="32" height="32">callgraph</a>
   <nav class="links" aria-label="Fő navigáció">
     <a href="#features">Előnyök</a><a href="#languages">Nyelvek</a><a href="#install">Telepítés</a>
-    <a href="#usage">Használat</a><a href="#feedback">Visszajelzés</a><a href="#faq">GYIK</a>
+    <a href="#usage">Használat</a><a href="#mcp">MCP</a><a href="#feedback">Visszajelzés</a><a href="#faq">GYIK</a>
     <a href="https://github.com/GeRiY/callgraph">GitHub</a><a href="../" hreflang="en" lang="en">English</a>
   </nav>
 </header>
@@ -169,6 +169,46 @@ callgraph.sh update             # letöltés és telepítés (a beállítások m
 callgraph.sh set-lang hu        # magyar kimenet (vissza: set-lang en)</code></pre>
 </section>
 
+<section id="mcp" aria-labelledby="h-mcp">
+  <h2 id="h-mcp">Bármely MCP-kliensből</h2>
+  <p class="sub">A callgraph MCP-szerver is: <code>callgraph mcp</code>. A Claude Desktop, a Cursor, a VS Code, a Claude Code
+    vagy bármely más MCP-kliens ugyanazokat a lekérdezéseket típusos eszközként hívja, ugyanazzal a tömör kimenettel.</p>
+  <div class="grid">
+    <div class="card"><h3>🔌 Teljesen offline</h3><p>A kliens a saját gépeden indítja el, és stdin/stdout-on beszélgetnek.
+      Nincs szerver, nincs hálózat: a kódod nem hagyja el a gépet.</p></div>
+    <div class="card"><h3>🔒 Csak olvas</h3><p>A forrásfájlokat soha nem írja, és csak a projekt mappáján belül olvas;
+      a kifelé mutató utakat elutasítja.</p></div>
+    <div class="card"><h3>🧰 Hat eszköz</h3><p><code>outline</code>, <code>method_body</code>, <code>find_callers</code>,
+      <code>search</code>, <code>framework_view</code>, <code>projects</code> — ugyanazok a lekérdezések, mint a fenti parancsok.</p></div>
+  </div>
+  <p>A bináris a skill-csomagban van: <code>~/.claude/skills/callgraph/bin/&lt;os&gt;-&lt;arch&gt;/callgraph</code>
+    (Windowson <code>callgraph.exe</code>). A JSON-konfigurációkban abszolút utat adj meg.</p>
+  <h3 style="margin-top:18px">Claude Code</h3>
+<pre class="code"><code>claude mcp add callgraph -- ~/.claude/skills/callgraph/bin/darwin-arm64/callgraph mcp</code></pre>
+  <h3 style="margin-top:18px">Claude Desktop (<code>claude_desktop_config.json</code>) · Cursor (<code>.cursor/mcp.json</code>)</h3>
+<pre class="code"><code>{
+  "mcpServers": {
+    "callgraph": {
+      "command": "/Users/me/.claude/skills/callgraph/bin/darwin-arm64/callgraph",
+      "args": ["mcp"]
+    }
+  }
+}</code></pre>
+  <h3 style="margin-top:18px">VS Code (<code>.vscode/mcp.json</code>)</h3>
+<pre class="code"><code>{
+  "servers": {
+    "callgraph": {
+      "type": "stdio",
+      "command": "/Users/me/.claude/skills/callgraph/bin/darwin-arm64/callgraph",
+      "args": ["mcp"],
+      "cwd": "${workspaceFolder}"
+    }
+  }
+}</code></pre>
+  <p class="sub" style="margin-top:14px">A skill és az MCP-szerver megfér egymás mellett. Ha a kliens nem a projektmappában indul (pl. Claude
+    Desktop), egy regisztrált projekt-aliast használ: <code>projects.sh add shop /út/a/shophoz</code>.</p>
+</section>
+
 <section id="feedback" aria-labelledby="h-feedback">
   <h2 id="h-feedback">Hibajelentés és visszajelzés</h2>
   <p class="sub">Hibát találtál, vagy ötleted van? Minden jelzést elolvasunk. Előbb nézd meg a <a href="https://github.com/GeRiY/callgraph/issues">meglévő issue-kat</a>.</p>
@@ -190,7 +230,7 @@ callgraph.sh set-lang hu        # magyar kimenet (vissza: set-lang en)</code></p
   <h2 id="h-faq">Gyakori kérdések</h2>
   <details><summary>Mi a callgraph?</summary><p>Parancssori kód-térkép AI kódoló agenteknek. Elemzi a fájlt vagy mappát, és megmondja, mi van benne, melyik metódus melyik sorokon él, mit hív, ki hívja, és mit érint egy változtatás — pár tucat sorban a teljes fájl helyett.</p></details>
   <details><summary>Kell hozzá PHP, Node vagy Rust?</summary><p>Nem. A callgraph egyetlen statikus bináris, futtatáshoz csak bash kell.</p></details>
-  <details><summary>Működik Claude Code nélkül is?</summary><p>Igen. Claude Code skillként érkezik, de minden parancs bármilyen terminálból vagy szkriptből használható.</p></details>
+  <details><summary>Működik Claude Code nélkül is?</summary><p>Igen. Claude Code skillként érkezik, de minden parancs bármilyen terminálból vagy szkriptből használható, és bármely MCP-kliens (Claude Desktop, Cursor, VS Code…) is használhatja a <code>callgraph mcp</code>-vel.</p></details>
   <details><summary>Elküldi valahova a kódomat?</summary><p>Nem. Minden helyben fut; az egyetlen hálózati hívás az opcionális <code>update</code>-ellenőrzés a GitHub Release-ek felé.</p></details>
   <details><summary>Hol jelezhetek hibát vagy kérhetek új funkciót?</summary><p>A GitHubon: <a href="https://github.com/GeRiY/callgraph/issues/new?template=bug_report.yml">hibajelentés</a> vagy <a href="https://github.com/GeRiY/callgraph/issues/new?template=feature_request.yml">ötlet / észrevétel</a>. Biztonsági hibát <a href="https://github.com/GeRiY/callgraph/security/advisories/new">privátban</a> jelezz.</p></details>
   <details><summary>Mennyibe kerül?</summary><p>Semmibe. A callgraph nyílt forrású, MIT licenccel.</p></details>
