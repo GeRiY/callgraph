@@ -8,11 +8,15 @@ struct TempDir(PathBuf);
 
 impl TempDir {
     fn new() -> Self {
+        // a macOS órája csak µs-os: párhuzamos tesztek ugyanazt a nevet kapnák (és egymás alól törölnék) — ezért számláló is
+        static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let id = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let path = std::env::temp_dir().join(format!("callgraph-index-{id}"));
+        let path =
+            std::env::temp_dir().join(format!("callgraph-index-{}-{n}-{id}", std::process::id()));
         fs::create_dir_all(&path).unwrap();
         Self(path)
     }

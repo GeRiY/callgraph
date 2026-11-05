@@ -214,7 +214,14 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let dir = std::env::temp_dir().join(format!("callgraph-lang-filter-{id}"));
+        let dir = std::env::temp_dir().join(format!(
+            "callgraph-lang-filter-{id}-{}-{}",
+            std::process::id(),
+            {
+                static N: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+                N.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+            }
+        ));
         fs::create_dir_all(&dir).unwrap();
         for (name, contents) in [
             ("a.php", "<?php echo 1;"),

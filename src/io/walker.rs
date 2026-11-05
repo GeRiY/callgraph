@@ -175,7 +175,15 @@ mod tests {
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
                 .as_nanos();
-            let path = std::env::temp_dir().join(format!("callgraph-walker-{id}"));
+            let path = std::env::temp_dir().join(format!(
+                "callgraph-walker-{id}-{}-{}",
+                std::process::id(),
+                {
+                    static N: std::sync::atomic::AtomicUsize =
+                        std::sync::atomic::AtomicUsize::new(0);
+                    N.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+                }
+            ));
             fs::create_dir_all(&path).unwrap();
             Self(path)
         }

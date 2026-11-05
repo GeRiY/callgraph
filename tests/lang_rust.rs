@@ -16,7 +16,11 @@ impl Sample {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let root = std::env::temp_dir().join(format!("callgraph-rust-{id}"));
+        let root =
+            std::env::temp_dir().join(format!("callgraph-rust-{id}-{}-{}", std::process::id(), {
+                static N: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+                N.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+            }));
         let samples = Path::new(env!("CARGO_MANIFEST_DIR")).join("golden/samples/rust");
         fs::create_dir_all(root.join("src")).unwrap();
         fs::copy(samples.join("Cargo.toml"), root.join("Cargo.toml")).unwrap();
