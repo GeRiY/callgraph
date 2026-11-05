@@ -40,8 +40,7 @@ pub(crate) struct TypeHierarchy {
 pub(crate) fn normalize(name: &str) -> String {
     let name = name.split('<').next().unwrap_or(name).trim();
     name.trim_start_matches('\\')
-        .replace('\\', "::")
-        .replace('.', "::")
+        .replace(['\\', '.'], "::")
         .trim_start_matches("::")
         .to_ascii_lowercase()
 }
