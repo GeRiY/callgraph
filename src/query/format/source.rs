@@ -12,8 +12,13 @@ pub(super) fn numbered(lines: &[String], start: u32, end: u32) -> String {
     let mut out = String::new();
     for number in start..=end {
         if let Some(line) = lines.get(number.saturating_sub(1) as usize) {
-            out.push_str(&format!("{number:>6}  {line}\n"));
+            out.push_str(&numbered_line(number, line));
         }
     }
     out
+}
+
+/// Egy számozott sor (`{sorszám:>6}  {sor}\n`), mint a `--lines` / `--body` kimenetében.
+pub(super) fn numbered_line(number: u32, line: &str) -> String {
+    format!("{number:>6}  {line}\n")
 }

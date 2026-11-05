@@ -5,6 +5,7 @@ use std::path::PathBuf;
 
 use crate::error::{CallgraphError, Result};
 use crate::lang::LanguageRegistry;
+use crate::query::format::BodyMode;
 
 fn usage() -> &'static str {
     crate::t!(
@@ -29,8 +30,8 @@ fn callers_usage() -> &'static str {
 
 fn show_usage() -> &'static str {
     crate::t!(
-        "callgraph show [--project <root>] [--label <name>] [--format <f>] [--body|--lines <n>-<m>|--strings <pattern>|--const <pattern>] [--grep <pattern>] [--category <cat,...>] [--depth N] [--guess] [--full] <path[::m]>...",
-        "callgraph show [--project <gyökér>] [--label <név>] [--format <f>] [--body|--lines <n>-<m>|--strings <minta>|--const <minta>] [--grep <minta>] [--category <kat,...>] [--depth N] [--guess] [--full] <út[::m]>..."
+        "callgraph show [--project <root>] [--label <name>] [--format <f>] [--body [--doc|--raw]|--lines <n>-<m>|--strings <pattern>|--const <pattern>] [--grep <pattern>] [--category <cat,...>] [--depth N] [--guess] [--full] <path[::m]>...",
+        "callgraph show [--project <gyökér>] [--label <név>] [--format <f>] [--body [--doc|--raw]|--lines <n>-<m>|--strings <minta>|--const <minta>] [--grep <minta>] [--category <kat,...>] [--depth N] [--guess] [--full] <út[::m]>..."
     )
 }
 
@@ -68,6 +69,8 @@ pub enum CliArgs {
         strings: Option<String>,
         const_filter: Option<String>,
         body: bool,
+        /// A `--body` nézete: tömör (alap), `--doc` (docblockkal) vagy `--raw` (szűretlen); mindkettő `--body`-t is jelent.
+        body_mode: BodyMode,
         grep: Option<String>,
         category: Option<Vec<String>>,
         depth: usize,
@@ -141,6 +144,7 @@ impl CliArgs {
         let mut strings = None;
         let mut const_filter = None;
         let mut body = false;
+        let mut body_mode = BodyMode::Compact;
         let mut grep = None;
         let mut category = None;
         let mut depth = 1;
@@ -158,6 +162,18 @@ impl CliArgs {
                 }
                 "--body" => {
                     body = true;
+                    i += 1;
+                }
+                "--doc" => {
+                    body = true;
+                    if body_mode != BodyMode::Raw {
+                        body_mode = BodyMode::Doc;
+                    }
+                    i += 1;
+                }
+                "--raw" => {
+                    body = true;
+                    body_mode = BodyMode::Raw;
                     i += 1;
                 }
                 "--guess" => {
@@ -261,6 +277,7 @@ impl CliArgs {
             strings,
             const_filter,
             body,
+            body_mode,
             grep,
             category,
             depth,
@@ -485,6 +502,31 @@ mod tests {
             }
         );
         assert!(parse(&["prune", "--bogus"]).is_err());
+    }
+
+    #[test]
+    fn parses_body_modes() {
+        let mode = |a: &[&str]| match parse(a).unwrap() {
+            CliArgs::Show {
+                body, body_mode, ..
+            } => (body, body_mode),
+            other => panic!("{other:?}"),
+        };
+        assert_eq!(mode(&["show", "a.php::m"]), (false, BodyMode::Compact));
+        assert_eq!(
+            mode(&["show", "--body", "a.php::m"]),
+            (true, BodyMode::Compact)
+        );
+        assert_eq!(
+            mode(&["show", "--body", "--doc", "a.php::m"]),
+            (true, BodyMode::Doc)
+        );
+        // a --doc / --raw magában is --body; a --raw erősebb
+        assert_eq!(mode(&["show", "--raw", "a.php::m"]), (true, BodyMode::Raw));
+        assert_eq!(
+            mode(&["show", "--raw", "--doc", "a.php::m"]),
+            (true, BodyMode::Raw)
+        );
     }
 
     #[test]

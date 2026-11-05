@@ -5,6 +5,26 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+### Changed
+- **Shorter method bodies:** `--body` now leaves out what an agent rarely needs: the docblock / doc comments above the
+  method, blank lines and lines that are only a comment. Code lines are printed exactly as written (a comment at the end
+  of a code line stays), and nothing inside a string, heredoc or template literal is ever removed. The line numbers are
+  still the real ones, so a gap shows where lines were skipped and you can still read an exact range. Attributes such as
+  `#[test]` / `#[Route(...)]` are kept. Works for PHP, JS / TS / Vue, Rust and Swift, for several methods at once and
+  for `--grep … --body`.
+- New `--doc` adds the docblock back; new `--raw` prints the exact, unfiltered source (as before, plus Rust / Swift
+  doc comments and attributes). The MCP `method_body` tool follows the same default and has `doc` / `raw` options.
+
+### Added
+- **`--const` lists re-exports:** besides references and definitions, `--const NAME` now shows where a name is passed
+  on, marked `[re-export]`: Rust `pub use state::{CheckState, STATE_FILE};` / `pub(crate) use …`, JS / TS
+  `export { NAME } from './x'` / `export { NAME }`, PHP `use const App\NAME;`.
+
+### Fixed
+- `--grep <pattern> --body` prints the source of the caller methods again (the option was ignored).
+- MCP `method_body`: `method` may be a single name as a plain string as well as a list (some clients send
+  `"method": "parse"`, which used to fail with an "expected a sequence" error).
+
 ## [0.2.0] — 2026-11-05
 
 ### Added

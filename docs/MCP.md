@@ -16,7 +16,7 @@ ugyanaz a tömör kimenet, amit a `callgraph show` kiír (ez a token-hatékony r
 | Eszköz | Paraméterek | Mit ad | CLI-megfelelő |
 |---|---|---|---|
 | `outline` | `path`, `project?`, `format?` (`outline`\|`api`\|`flow`\|`summary`\|`hotspots`\|`stats`), `method?`, `full?` | fájl / mappa szerkezete; `method`-dal egy metódus hívás-gráfja | `show <út>[::m] --format <f>` |
-| `method_body` | `path`, `method` (egy vagy több név), `project?`, `full?` | a metódus(ok) forrása sorszámozva | `show <út>::m --body` |
+| `method_body` | `path`, `method` (egy név stringként vagy névtömb), `project?`, `doc?`, `raw?`, `full?` | a metódus(ok) forrása sorszámozva, tömören (docblock, üres és megjegyzés-sorok nélkül); `doc: true`: docblockkal, `raw: true`: szűretlenül | `show <út>::m --body [--doc\|--raw]` |
 | `find_callers` | `pattern`, `path?`, `project?`, `depth?` (1–5), `guess?`, `full?` | ki hívja; `depth` > 1: hatáselemzés | `show <út> --grep <minta> --depth N [--guess]` |
 | `search` | `kind` (`strings`\|`constants`), `pattern`, `path?`, `project?`, `full?` | string-literál / konstans helye | `show <út> --strings` / `--const` |
 | `framework_view` | `view` (`routes`\|`middleware`\|`validation`\|`jobs`\|`events`\|`providers`\|`magic`\|`di`\|`views`), `path`, `project?`, `full?` | framework-nézet | `show <út> --format <nézet>` |

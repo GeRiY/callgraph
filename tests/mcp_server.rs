@@ -137,6 +137,26 @@ fn initialize_list_and_call_outline() {
         body.replace(&canonical, "<root>").replace(&plain, "<root>"),
         cli_text.replace(env!("CARGO_MANIFEST_DIR"), "<root>")
     );
+
+    // a `method` sima stringként is jó (az LLM-kliensek gyakran így küldik); alapból tömör, `doc: true`-val docblockkal
+    let single = s.call(
+        4,
+        "method_body",
+        json!({"path": "golden/samples/swift/Todo.swift", "method": "toggled"}),
+    );
+    assert_ne!(single["isError"], json!(true), "{single}");
+    let source = text(&single);
+    assert!(source.contains("flipped.done.toggle()"), "{source}");
+    assert!(!source.contains("A copy with"), "{source}");
+    let documented = s.call(
+        5,
+        "method_body",
+        json!({"path": "golden/samples/swift/Todo.swift", "method": ["toggled"], "doc": true}),
+    );
+    assert!(
+        text(&documented).contains("    25      /// A copy with the done flag flipped."),
+        "{documented}"
+    );
 }
 
 #[test]

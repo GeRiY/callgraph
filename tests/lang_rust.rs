@@ -252,3 +252,55 @@ fn method_callers_by_type_include_inferred_and_uncertain_receivers() {
     assert!(has("allocate", "AppState::next_id"), "{rows:?}");
     assert!(has("allocate_all", "?::next_id"), "{rows:?}");
 }
+
+#[test]
+fn body_is_compact_by_default_with_doc_and_raw_variants() {
+    let sample = Sample::new();
+    let target = "src/handlers.rs::create_order";
+    let compact = sample.show(target, &["--body"]);
+    assert!(
+        compact.contains("    29  pub async fn create_order(\n"),
+        "{compact}"
+    );
+    assert!(
+        compact.contains("    35      }\n    37      let id"),
+        "{compact}"
+    );
+    assert!(!compact.contains("TODO"), "{compact}");
+    assert!(!compact.contains("Creates an order"), "{compact}");
+    let doc = sample.show(target, &["--body", "--doc"]);
+    assert!(
+        doc.contains("    28  /// Creates an order and returns its id.\n    29  pub async fn"),
+        "{doc}"
+    );
+    assert!(!doc.contains("TODO"), "{doc}");
+    let raw = sample.show(target, &["--raw"]);
+    assert!(raw.contains("    28  /// Creates an order"), "{raw}");
+    assert!(raw.contains("    36      // TODO: validate"), "{raw}");
+}
+
+#[test]
+fn grep_with_body_prints_the_callers_source() {
+    let sample = Sample::new();
+    let out = sample.show("src", &["--grep", "AppState::next_id", "--body"]);
+    assert!(out.contains("create_order()  L29-40"), "{out}");
+    assert!(out.contains("let id = state.next_id();"), "{out}");
+    assert!(!out.contains("TODO"), "{out}");
+}
+
+#[test]
+fn const_search_lists_re_exports() {
+    let sample = Sample::new();
+    fs::write(
+        sample.0.join("src/lib.rs"),
+        "pub mod state;\npub use limits::{MAX_ITEMS, Client};\npub(crate) use limits::MAX_ITEMS as LIMIT;\n",
+    )
+    .unwrap();
+    let out = sample.show("src", &["--const", "MAX_ITEMS"]);
+    assert!(out.contains("[definition] = 50"), "{out}");
+    assert!(out.contains("[re-export] limits::MAX_ITEMS"), "{out}");
+    let lib = sample.show("src/lib.rs", &["--const", "MAX_ITEMS"]);
+    assert!(lib.contains("L2 "), "{lib}");
+    assert!(lib.contains("LIMIT"), "{lib}");
+    assert_eq!(lib.matches("[re-export]").count(), 2, "{lib}");
+}

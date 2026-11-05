@@ -2,7 +2,8 @@
 
 use crate::cli::Command;
 use crate::error::Result;
-use crate::query::{OutputLimit, QueryEngine, SelectorSet, format::FormatterRegistry};
+use crate::query::format::{BodyMode, FormatterRegistry};
+use crate::query::{OutputLimit, QueryEngine, SelectorSet};
 use std::io::Write;
 use std::path::PathBuf;
 pub struct ShowCommand {
@@ -16,6 +17,7 @@ pub struct ShowCommand {
     strings: Option<String>,
     const_filter: Option<String>,
     body: bool,
+    body_mode: BodyMode,
     grep: Option<String>,
     category: Option<Vec<String>>,
     depth: usize,
@@ -34,6 +36,7 @@ impl ShowCommand {
         strings: Option<String>,
         const_filter: Option<String>,
         body: bool,
+        body_mode: BodyMode,
         grep: Option<String>,
         category: Option<Vec<String>>,
         depth: usize,
@@ -50,6 +53,7 @@ impl ShowCommand {
             strings,
             const_filter,
             body,
+            body_mode,
             grep,
             category,
             depth,
@@ -81,6 +85,13 @@ impl Command for ShowCommand {
                     .into(),
                 ),
             );
+        }
+        // `--grep … --body`: a talált hívó metódusok forrása (a szűrt sorok a hívókat tartják meg);
+        // találat nélkül a `--grep` szokásos „nincs találat” kimenete marad
+        if self.grep.is_some() && self.body && self.depth <= 1 && !rows.is_empty() {
+            let text = FormatterRegistry::format_body(&rows, self.body_mode);
+            write!(out, "{}", engine.relativize(&text))?;
+            return Ok(0);
         }
         if let Some(pattern) = self.grep.as_deref() {
             let scope = engine.depth_scope();
@@ -137,7 +148,7 @@ impl Command for ShowCommand {
 impl ShowCommand {
     fn render(&self, rows: &[crate::query::QueryResult]) -> Result<String> {
         if self.body {
-            return FormatterRegistry::format("body", rows);
+            return Ok(FormatterRegistry::format_body(rows, self.body_mode));
         }
         if let Some(value) = &self.lines {
             let Some((start, end)) = value.split_once('-') else {

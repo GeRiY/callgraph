@@ -32,11 +32,14 @@ Használat:
                                                 csak név szerinti egyezéseket is ("?")
   Utak: ha a projekt-gyökér többször ismétlődne, az első sor "gyökér: /abs/projekt", utána minden út ehhez relatív
   (a következő hívásban ugyanazzal a --project-tel változatlanul használható).
-  bash ~/.claude/skills/callgraph/callgraph.sh <fájl>::<metódus> [...] --body   a metódus(ok) forrása sorszámozva, docblockkal
+  bash ~/.claude/skills/callgraph/callgraph.sh <fájl>::<metódus> [...] --body   a metódus(ok) forrása sorszámozva, tömören: docblock,
+                                                üres és csak megjegyzés sorok nélkül (a sorszámok pontosak maradnak)
+                                                --doc: docblockkal; --raw: a pontos, szűretlen forrás
   bash ~/.claude/skills/callgraph/callgraph.sh <mappa> --grep <minta> --body    a talált hívó metódusok forrása
   bash ~/.claude/skills/callgraph/callgraph.sh <fájl> --lines <n>-<m>           tetszőleges sáv sorszámozva (pl. view-fájl)
   bash ~/.claude/skills/callgraph/callgraph.sh <mappa|fájl> --strings <minta>   string-literálok (hibaüzenet, kulcs) helye
-  bash ~/.claude/skills/callgraph/callgraph.sh <mappa|fájl> --const <minta>     konstans-hivatkozások és -definíciók (PHP osztálykonstans, Rust const/static)
+  bash ~/.claude/skills/callgraph/callgraph.sh <mappa|fájl> --const <minta>     konstans-hivatkozások, -definíciók és továbbexportálások
+                                                (PHP osztálykonstans / use const, Rust const/static / pub use, JS/TS export { })
 
 Nyelv (a terminál-kimenet és a súgó nyelve: en = angol, alapértelmezett; hu = magyar):
   bash ~/.claude/skills/callgraph/callgraph.sh set-lang                 az aktuális nyelv és a forrása

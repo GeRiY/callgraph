@@ -56,7 +56,7 @@ impl CallgraphServer {
     }
 
     #[tool(
-        description = "Line-numbered source of one or more methods/functions (with docblock). Use after `outline` instead of reading the whole file."
+        description = "Line-numbered source of one or more methods/functions, compact: docblock, blank and comment-only lines dropped (line numbers stay exact; `doc: true` adds the docblock, `raw: true` = unfiltered). Use after `outline` instead of reading the whole file."
     )]
     async fn method_body(&self, Parameters(p): Parameters<MethodBodyParams>) -> CallToolResult {
         self.execute(ShowQuery::method_body(p)).await

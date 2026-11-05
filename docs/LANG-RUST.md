@@ -68,7 +68,8 @@ a felső szintű makróhívásokban (`thread_local! {…}`) `__top__`.
   (konstans-hivatkozás: az út utolsó szegmense `SCREAMING_CASE`, pl. `MAX`, `Self::LIMIT`, `config::PORT`, `u32::MAX`;
   nem hívás-pozícióban). A fájl saját `const` / `static`-jára `resolved` = `<container>::NÉV` (`users::MAX`,
   `internal_helper`), máskor az út-hívás szabályai szerint (`Típus::NÉV`, `config::PORT`, `std::f64::consts::PI`).
-  A `--const <minta>` ezeket és a `const` / `static` definíciókat (`[definition]`) listázza.
+  A `--const <minta>` ezeket, a `const` / `static` definíciókat (`[definition]`) és a `pub use` / `pub(crate) use`
+  továbbexportálásokat (`[re-export] state::STATE_FILE`) listázza.
 - **target**: a leírt alak (`Foo::new`, `bar`, `vec!`); **resolved**: a feloldott név, ha eltér.
 - **Makró-argumentumok**: a makró nincs kibontva, de a törzse vesszős kifejezés-listaként (`format!("{}", f(x))`), vagy
   utasítás-sorozatként (`vec![0; n]`, `thread_local! { static X: … = f(); }`) parse-olva bejárásra kerül (hívások,

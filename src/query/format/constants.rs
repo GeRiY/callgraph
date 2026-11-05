@@ -4,6 +4,8 @@ use crate::query::QueryResult;
 use std::fmt::Write as _;
 
 use super::Formatter;
+use super::body_filter::Syntax;
+use super::reexports;
 
 pub struct Constants {
     pub filter: String,
@@ -61,6 +63,16 @@ impl Formatter for Constants {
                     .unwrap_or_default();
                 let label = lang.pick("[definition]", "[definíció]");
                 lines.push((definition.line, name, format!("{label}{value}")));
+            }
+            // továbbexportálások (`pub use …`, `export { … } from`, `use const …`): a forrásszövegből
+            if let Some(syntax) = Syntax::for_path(&row.graph.file) {
+                let source = std::fs::read_to_string(&row.graph.file).unwrap_or_default();
+                if source.contains(&self.filter) {
+                    let label = lang.pick("[re-export]", "[továbbexportálás]");
+                    for found in reexports::find(&source, syntax, &self.filter) {
+                        lines.push((found.line, found.name, format!("{label} {}", found.origin)));
+                    }
+                }
             }
             if lines.is_empty() {
                 continue;
