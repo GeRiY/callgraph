@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 
 use callgraph::analysis::Analyzer;
 use callgraph::core::SourceFile;
-use callgraph::error::{Result, CallgraphError};
+use callgraph::error::{CallgraphError, Result};
 use callgraph::io::FileWalker;
 use callgraph::lang::{
     Analysis, Language, LanguageBackend, LanguageDocument, LanguageFrontend, LanguageRegistry,
@@ -76,7 +76,8 @@ fn registry() -> LanguageRegistry {
 
 /// Ideiglenes mappa; a teszt végén `fs::remove_dir_all`.
 fn temp_tree(tag: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("callgraph-languages-{}-{tag}", std::process::id()));
+    let dir =
+        std::env::temp_dir().join(format!("callgraph-languages-{}-{tag}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(dir.join("sub")).unwrap();
     for name in ["a.tb", "b.tf", "c.td", "d.txt", "sub/e.tb", "sub/f.php"] {
@@ -137,10 +138,10 @@ fn walker_visits_registered_extensions_only() {
     let mut names: Vec<String> = files
         .iter()
         .map(|p| {
-            p.strip_prefix(&root)
-                .unwrap()
-                .to_string_lossy()
-                .into_owned()
+            // `/`-rel fűzve, hogy Windowson (`\`) is ugyanazt adja
+            let rel = p.strip_prefix(&root).unwrap();
+            let parts: Vec<_> = rel.iter().map(|c| c.to_string_lossy()).collect();
+            parts.join("/")
         })
         .collect();
     names.sort();
