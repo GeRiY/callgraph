@@ -1,4 +1,5 @@
-//! Hibanapló (`errors.jsonl`) és a hibakimenet: üzenet + `[error-id: X]  visszajelzés: …` sor, kilépési kód 1.
+//! Hibanapló (`errors.jsonl`) és a hibakimenet: üzenet + `[error-id: X]  report: <GitHub issue-űrlap> …` sor, kilépési kód 1.
+//! A hibát GitHub issue-ban jelezzük (mint a weboldalon); a `feedback.sh show <id>` adja a bemásolandó naplóbejegyzést.
 
 use std::fs::OpenOptions;
 use std::io::Write;
@@ -85,12 +86,16 @@ pub fn fail(
         err,
         "{}",
         crate::tf!(
-            "[error-id: {id}]  feedback: {feedback} add {id} \"<what you expected, what happened>\"",
-            "[error-id: {id}]  visszajelzés: {feedback} add {id} \"<mit vártál, mi történt>\""
+            "[error-id: {id}]  report: {ISSUE_FORM}  (details to paste: {feedback} show {id})",
+            "[error-id: {id}]  hibajelentés: {ISSUE_FORM}  (bemásolandó részletek: {feedback} show {id})"
         )
     )?;
     Ok(1)
 }
+
+/// A GitHub hibajelentő űrlap (a projektoldal „Bugs and feedback” részével azonos).
+pub(crate) const ISSUE_FORM: &str =
+    "https://github.com/GeRiY/callgraph/issues/new?template=bug_report.yml";
 
 /// Egy skill-parancs hibája: a `fail` kontextusa (`usage` / `not_found`) és az üzenet.
 #[derive(Debug)]

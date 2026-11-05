@@ -43,6 +43,12 @@ body:
     validations:
       required: true
   - type: textarea
+    id: details
+    attributes:
+      label: "Error details (optional) · Hiba részletei (nem kötelező)"
+      description: "If the output has an `[error-id: …]` line, paste the output of `bash ~/.claude/skills/callgraph/feedback.sh show <error-id>` · Ha a kimenetben van `[error-id: …]` sor, másold be a `bash ~/.claude/skills/callgraph/feedback.sh show <error-id>` kimenetét"
+      render: text
+  - type: textarea
     id: expected
     attributes:
       label: "What you expected · Mit vártál"

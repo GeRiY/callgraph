@@ -104,11 +104,16 @@ a vizsgált kód része; az ellenőrzés a háttérben, naponta legfeljebb egysz
 
 ## Ha hibázik — visszajelzés
 
-Minden hibaüzenet mellé `[error-id: xxxxxxxx]` jár. Ha az eredmény hibás, hiányos vagy félrevezető:
+Minden hibaüzenet mellé `[error-id: xxxxxxxx]` jár, a GitHub hibajelentő űrlap linkjével. Ha az eredmény hibás,
+hiányos vagy félrevezető, **javasold a felhasználónak, hogy jelezze GitHub issue-ban**
+(https://github.com/GeRiY/callgraph/issues/new?template=bug_report.yml), és add meg neki, mit másoljon be: a parancsot, a kimenetet és a
+`bash <skill>/feedback.sh show <error_id>` kimenetét (ez a helyi naplóbejegyzés). Issue-t a felhasználó nevében magadtól ne nyiss.
+
+Helyi jegyzet (nem megy fel sehova, a gépen marad):
 
 ```bash
+bash <skill>/feedback.sh show <error_id>                # a naplózott hiba részletei (ezt kell az issue-ba másolni)
 bash <skill>/feedback.sh add <error_id> "<mit vártál, mi történt>"
-bash <skill>/feedback.sh add --note "<észrevétel>"     # error-id nélkül
 bash <skill>/feedback.sh list --open
 ```
 
