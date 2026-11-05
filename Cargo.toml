@@ -14,6 +14,8 @@ name = "callgraph"
 path = "src/main.rs"
 
 [dependencies]
+# gyors, szálbiztos allokátor: a musl beépített malloc-ja párhuzamos (rayon) terhelésnél szűk keresztmetszet
+mimalloc = { version = "=0.1.52", default-features = false }
 mago-syntax = "=1.59.0"
 mago-allocator = "=1.59.0"
 mago-database = "=1.59.0"

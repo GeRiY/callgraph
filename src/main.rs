@@ -5,6 +5,10 @@ use std::process::ExitCode;
 
 use callgraph::cli::{self, CliArgs};
 
+// a musl beépített allokátora sok szálon (rayon) zár-versengésbe fut: mimalloc minden platformon
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 fn main() -> ExitCode {
     callgraph::update::cleanup_stale_binary();
     let command = match CliArgs::parse(std::env::args().skip(1)).and_then(cli::build_command) {
