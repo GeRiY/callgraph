@@ -1,42 +1,48 @@
 //! `callgraph self-update [--check] [--force] [--from <zip|URL>]` — frissítés a GitHub Releases-ből.
 //! `--check`: csak összeveti a legutóbbi kiadást a saját verzióval; anélkül letölti és a skill-mappába telepíti a
 //! platform zipjét (`callgraph-<os>-<arch>.zip`). `--force`: akkor is, ha nem újabb; `--from`: helyi zipből / címről.
-//! A kiadás-lekérdezés címe felülírható: `CALLGRAPH_UPDATE_API` (tükör, teszt; `file://` is lehet).
+//! A legutóbbi kiadás forrása: a `releases/latest` webes átirányítása (tartalék: a GitHub API); felülírható:
+//! `CALLGRAPH_UPDATE_API` (API-formátumú tükör, teszt; `file://` is lehet). Rejtett mód: `--check --background`
+//! — a `wrap` indítja leválasztva; rövid időkorláttal lekérdez, az eredményt az `update-check.json`-ba írja, és
+//! bármi történjék, csendben kilép.
+
+mod messages;
 
 use std::io::Write;
-use std::path::Path;
+use std::time::Duration;
 
 use crate::cli::Command;
 use crate::error::Result;
 use crate::skill::{SkillFailure, SkillHome, finish};
+use crate::tf;
+use crate::update::check::{BACKGROUND_ARGS, now_secs, record_latest};
 use crate::update::{
-    API_LIMIT, ASSET_LIMIT, DEFAULT_API, FetchError, Fetcher, HttpFetcher, InstallError,
-    InstallTarget, Installer, Platform, Release, ReleaseError, Version,
+    ASSET_LIMIT, BACKGROUND_TIMEOUT, FOREGROUND_TIMEOUT, Fetcher, HttpFetcher, InstallTarget,
+    Installer, Platform, Release, ReleaseSource, Version, default_source,
 };
-use crate::{t, tf};
+use messages::{failure, fetch_failure, install_failure, source_failure, usage};
 
 const SOURCE: &str = "callgraph self-update";
 
-/// A frissítés külső függőségei (DI): letöltő, API-cím, telepítési cél, platform, saját verzió.
+/// A frissítés külső függőségei (DI): letöltő, kiadás-forrás, telepítési cél, platform, saját verzió.
 pub(crate) struct UpdateEnv {
     pub(crate) fetcher: Box<dyn Fetcher>,
-    pub(crate) api: String,
+    pub(crate) source: Box<dyn ReleaseSource>,
     pub(crate) target: Option<InstallTarget>,
     pub(crate) platform: Platform,
     pub(crate) current: Version,
 }
 
 impl UpdateEnv {
-    /// A valódi környezet: HTTPS-letöltő, `CALLGRAPH_UPDATE_API` › GitHub, a futó bináris skill-mappája.
-    pub(crate) fn from_env() -> Self {
+    /// A valódi környezet: HTTPS-letöltő a megadott időkorláttal, `CALLGRAPH_UPDATE_API` › GitHub,
+    /// a futó bináris skill-mappája.
+    pub(crate) fn from_env(timeout: Duration) -> Self {
+        let platform = Platform::current();
         Self {
-            fetcher: Box::new(HttpFetcher::new()),
-            api: std::env::var("CALLGRAPH_UPDATE_API")
-                .ok()
-                .filter(|v| !v.is_empty())
-                .unwrap_or_else(|| DEFAULT_API.to_owned()),
+            fetcher: Box::new(HttpFetcher::new(timeout)),
+            source: default_source(&platform),
             target: InstallTarget::current(),
-            platform: Platform::current(),
+            platform,
             current: Version::current(),
         }
     }
@@ -47,6 +53,7 @@ struct Options {
     help: bool,
     check: bool,
     force: bool,
+    background: bool,
     from: Option<String>,
 }
 
@@ -59,7 +66,13 @@ pub struct SelfUpdateCommand {
 
 impl SelfUpdateCommand {
     pub fn new(args: Vec<String>, home: SkillHome) -> Self {
-        Self::with_env(args, home, UpdateEnv::from_env())
+        let background = args.iter().any(|a| a == BACKGROUND_ARGS[2]);
+        let timeout = if background {
+            BACKGROUND_TIMEOUT
+        } else {
+            FOREGROUND_TIMEOUT
+        };
+        Self::with_env(args, home, UpdateEnv::from_env(timeout))
     }
 
     pub(crate) fn with_env(args: Vec<String>, home: SkillHome, env: UpdateEnv) -> Self {
@@ -74,12 +87,13 @@ impl SelfUpdateCommand {
                 "--help" | "-h" => o.help = true,
                 "--check" => o.check = true,
                 "--force" => o.force = true,
+                "--background" => o.background = true,
                 "--from" => o.from = Some(it.next().ok_or_else(usage)?.clone()),
                 x if x.starts_with("--from=") => o.from = Some(x[7..].to_owned()),
                 _ => return Err(usage()),
             }
         }
-        if o.check && o.from.is_some() {
+        if (o.check && o.from.is_some()) || (o.background && !o.check) {
             return Err(usage());
         }
         Ok(o)
@@ -113,7 +127,7 @@ impl SelfUpdateCommand {
                 tf!(
                     "No release published yet ({}); current version: {current}",
                     "Még nincs kiadás ({}); a jelenlegi verzió: {current}",
-                    self.env.api
+                    self.env.source.url()
                 )
             )?;
             return Ok(());
@@ -171,31 +185,16 @@ impl SelfUpdateCommand {
 
     /// A legutóbbi stabil kiadás; `None`, ha még nincs (404).
     fn latest(&self) -> std::result::Result<Option<Release>, SkillFailure> {
-        let body = match self.env.fetcher.get(&self.env.api, API_LIMIT) {
-            Ok(body) => body,
-            Err(FetchError::NotFound) => return Ok(None),
-            Err(e) => return Err(fetch_failure(&self.env.api, e)),
-        };
-        Release::from_json(&body).map(Some).map_err(|e| {
-            let api = &self.env.api;
-            failure(
-                "bad_release",
-                match e {
-                    ReleaseError::Json(e) => tf!(
-                        "unexpected release response from {api}: {e}",
-                        "váratlan kiadás-válasz innen: {api}: {e}"
-                    ),
-                    ReleaseError::BadTag(tag) => tf!(
-                        "the latest release tag is not a version: {tag}",
-                        "a legutóbbi kiadás tagje nem verzió: {tag}"
-                    ),
-                    ReleaseError::NotStable(tag) => tf!(
-                        "the latest release is a draft or pre-release: {tag}",
-                        "a legutóbbi kiadás vázlat vagy előzetes: {tag}"
-                    ),
-                },
-            )
-        })
+        let source = &self.env.source;
+        source
+            .latest(self.env.fetcher.as_ref())
+            .map_err(|e| source_failure(source.url(), e))
+    }
+
+    /// A háttér-ellenőrzés (`--check --background`): az eredmény az állapotfájlba, kimenet és hibanapló nélkül.
+    fn run_background(&self) {
+        let latest = self.latest().map(|r| r.map(|r| r.version)).map_err(|_| ());
+        record_latest(&self.home, now_secs(), latest);
     }
 
     fn download(&self, url: &str) -> std::result::Result<Vec<u8>, SkillFailure> {
@@ -240,58 +239,13 @@ impl SelfUpdateCommand {
 
 impl Command for SelfUpdateCommand {
     fn run(&self, out: &mut dyn Write, err: &mut dyn Write) -> Result<i32> {
+        if self.options().is_ok_and(|o| o.background) {
+            self.run_background();
+            return Ok(0);
+        }
         let result = self.run_update(out);
         finish(&self.home, SOURCE, result, err)
     }
-}
-
-fn usage() -> SkillFailure {
-    SkillFailure::usage(t!(
-        "usage: callgraph self-update [--check] [--force] [--from <zip|URL>]",
-        "használat: callgraph self-update [--check] [--force] [--from <zip|URL>]"
-    ))
-}
-
-fn failure(context: &'static str, message: String) -> SkillFailure {
-    SkillFailure { context, message }
-}
-
-fn fetch_failure(url: &str, e: FetchError) -> SkillFailure {
-    let message = match e {
-        FetchError::NotFound => tf!("not found: {url}", "nem található: {url}"),
-        FetchError::Status(code) => tf!(
-            "download failed (HTTP {code}): {url}",
-            "a letöltés sikertelen (HTTP {code}): {url}"
-        ),
-        FetchError::Other(e) => tf!(
-            "download failed: {url}: {e}",
-            "a letöltés sikertelen: {url}: {e}"
-        ),
-    };
-    failure("network", message)
-}
-
-fn install_failure(e: InstallError, dir: &Path) -> SkillFailure {
-    let message = match e {
-        InstallError::NotZip(e) => tf!(
-            "the package is not a valid zip: {e}",
-            "a csomag nem érvényes zip: {e}"
-        ),
-        InstallError::MissingBinary(path) => tf!(
-            "the package has no binary for this platform: {path}",
-            "a csomagban nincs bináris ehhez a platformhoz: {path}"
-        ),
-        InstallError::UnsafeEntry(name) => tf!(
-            "the package has an entry outside callgraph/: {name}",
-            "a csomagban callgraph/ mappán kívüli bejegyzés van: {name}"
-        ),
-        InstallError::Io(e) => tf!(
-            "installing into {} failed: {e}",
-            "a telepítés sikertelen ide: {}: {e}",
-            dir.display()
-        ),
-    };
-    failure("bad_package", message)
 }
 
 #[cfg(test)]

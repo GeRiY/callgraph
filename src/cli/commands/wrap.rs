@@ -1,11 +1,13 @@
 //! `callgraph wrap …` — a `callgraph.sh` burok logikája: projekt-alias feloldása, `show` futtatása,
-//! hibánál error-id-s naplózás. A burok csak a súgót írja ki és ide továbbít.
+//! hibánál error-id-s naplózás, utána az automatikus frissítés-ellenőrzés (`update::check`: naponta legfeljebb
+//! egy háttérfolyamat, újabb verziónál egysoros értesítés a kimenet végén). A burok csak a súgót írja ki és ide továbbít.
 
 use std::io::Write;
 
 use crate::cli::{CliArgs, Command, build_command};
 use crate::error::Result;
 use crate::skill::{ProjectRegistry, SkillFailure, SkillHome, finish};
+use crate::update::check::{UpdateCheck, now_secs};
 
 const SOURCE: &str = "callgraph.sh";
 fn usage() -> &'static str {
@@ -23,9 +25,11 @@ const NOT_FOUND_PREFIXES: [&str; 4] = [
     "Nincs ilyen metódus",
 ];
 
+/// A `wrap` parancs; a frissítés-ellenőrzés DI-vel cserélhető.
 pub struct WrapCommand {
     args: Vec<String>,
     home: SkillHome,
+    update_check: UpdateCheck,
 }
 
 /// A burok-argumentumok szétválogatva: alias, a `show`-nak továbbadott kapcsolók és a célok.
@@ -80,7 +84,12 @@ fn is_env_assignment(a: &str) -> bool {
 
 impl WrapCommand {
     pub fn new(args: Vec<String>, home: SkillHome) -> Self {
-        Self { args, home }
+        let update_check = UpdateCheck::from_env(&home);
+        Self {
+            args,
+            home,
+            update_check,
+        }
     }
 
     fn exec(&self, out: &mut dyn Write) -> std::result::Result<(), SkillFailure> {
@@ -156,6 +165,8 @@ impl WrapCommand {
 impl Command for WrapCommand {
     fn run(&self, out: &mut dyn Write, err: &mut dyn Write) -> Result<i32> {
         let result = self.exec(out);
+        self.update_check
+            .after_command(now_secs(), result.is_ok(), out);
         finish(&self.home, SOURCE, result, err)
     }
 }

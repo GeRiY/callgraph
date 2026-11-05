@@ -95,6 +95,13 @@ property típusa előtt látszik. Hívás-kategóriák: `swiftui_view`, `swiftui
 almappa); a `--full` kikapcsolja a korlátot, csak indokolt esetben. A küszöb: `CALLGRAPH_OUT_LIMIT`. Elöl álló `KULCS=érték` argumentum környezeti változóként él tovább
 (pl. `bash $CG CALLGRAPH_OUT_LIMIT=100 …`).
 
+## Új verzió jelzése
+
+Ha egy `callgraph` kimenet utolsó sora `ℹ callgraph X.Y.Z is available (installed: …) — update: …` vagy
+`ℹ callgraph X.Y.Z elérhető (telepítve: …) — frissítés: …`, szólj a felhasználónak (egyszer), hogy új verzió érhető el,
+és ajánld fel a `bash <skill>/callgraph.sh update` futtatását. A felhasználó beleegyezése nélkül ne frissíts. A sor nem
+a vizsgált kód része; az ellenőrzés a háttérben, naponta legfeljebb egyszer fut (kikapcsolás: `CALLGRAPH_UPDATE_CHECK=0`).
+
 ## Ha hibázik — visszajelzés
 
 Minden hibaüzenet mellé `[error-id: xxxxxxxx]` jár. Ha az eredmény hibás, hiányos vagy félrevezető:

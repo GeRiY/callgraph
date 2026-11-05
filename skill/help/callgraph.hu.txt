@@ -37,11 +37,13 @@ Nyelv (a terminál-kimenet és a súgó nyelve: en = angol, alapértelmezett; hu
   bash ~/.claude/skills/callgraph/callgraph.sh set-lang <en|hu>         a nyelv elmentése (a skill-mappa lang fájljába)
   CALLGRAPH_LANG=<en|hu> bash ~/.claude/skills/callgraph/callgraph.sh …   egy futásra (felülírja az elmentettet)
 
-Frissítés (a GitHub Releases-ből; a projects.json, a lang, az errors.jsonl és a feedback.jsonl megmarad):
+Frissítés (a GitHub Releases-ből; a projects.json, a lang, az errors.jsonl, a feedback.jsonl és az update-check.json megmarad):
   bash ~/.claude/skills/callgraph/callgraph.sh update --check         van-e újabb kiadás? (nem változtat semmit)
   bash ~/.claude/skills/callgraph/callgraph.sh update                 az újabb kiadás letöltése és telepítése
   bash ~/.claude/skills/callgraph/callgraph.sh update --force         újratelepítés akkor is, ha naprakész
   bash ~/.claude/skills/callgraph/callgraph.sh update --from <zip>    telepítés helyi zipből / címről (callgraph-<os>-<arch>.zip)
+  Automatikus ellenőrzés: naponta legfeljebb egyszer, a háttérben; újabb kiadásnál egy „ℹ callgraph X elérhető” sor
+  kerül a kimenet végére. Kikapcsolás: CALLGRAPH_UPDATE_CHECK=0 (CI mellett és skill-telepítésen kívül magától ki van kapcsolva).
 
 Kimenet-korlát: 400 sor fölött a mappás outline summary-ra, az egyfájlos metódus-indexre vált;
 

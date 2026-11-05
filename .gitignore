@@ -22,8 +22,9 @@
 /tools/local.env
 /.claude/
 
-# a skill futásidejű adatai (projekt-aliasok, hibanapló, visszajelzések)
+# a skill futásidejű adatai (projekt-aliasok, hibanapló, visszajelzések, nyelv, frissítés-ellenőrzés)
 /skill/projects.json
 /skill/errors.jsonl
 /skill/feedback.jsonl
 /skill/lang
+/skill/update-check.json

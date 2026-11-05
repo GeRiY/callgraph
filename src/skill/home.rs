@@ -1,4 +1,5 @@
-//! A skill-mappa helye: itt él a `projects.json`, az `errors.jsonl` és a `feedback.jsonl` (felhasználói döntés).
+//! A skill-mappa helye: itt él a `projects.json`, az `errors.jsonl`, a `feedback.jsonl` és az `update-check.json`
+//! (felhasználói döntés).
 
 use std::path::{Path, PathBuf};
 
@@ -42,6 +43,11 @@ impl SkillHome {
 
     pub fn feedback_file(&self) -> PathBuf {
         self.dir.join("feedback.jsonl")
+    }
+
+    /// Az automatikus frissítés-ellenőrzés állapota (`update::check`).
+    pub fn update_check_file(&self) -> PathBuf {
+        self.dir.join("update-check.json")
     }
 
     /// A kiválasztott nyelv (`en` / `hu`) — a `callgraph set-lang <en|hu>` írja.

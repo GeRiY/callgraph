@@ -33,6 +33,7 @@ pub(crate) fn release_zip(binary: &[u8]) -> Vec<u8> {
         // felhasználói adat a zipben: soha nem írhatja felül a meglévőt
         ("callgraph/projects.json", b"{\"evil\": \"/\"}"),
         ("callgraph/lang", b"en\n"),
+        ("callgraph/update-check.json", b"{\"checked_at\": 1}"),
         ("callgraph/bin/linux-x86_64/callgraph", binary),
     ])
 }
@@ -49,6 +50,7 @@ pub(crate) fn fake_skill(tag: &str) -> PathBuf {
         ("lang", "hu\n"),
         ("errors.jsonl", "{\"id\":\"x\"}\n"),
         ("feedback.jsonl", "{\"id\":\"y\"}\n"),
+        ("update-check.json", "{\"latest\": \"0.2.0\"}\n"),
         ("mine.txt", "user file"),
         ("bin/linux-x86_64/callgraph", "OLD"),
     ] {
@@ -91,6 +93,10 @@ fn installs_skill_files_and_binary_but_keeps_user_data() {
     assert_eq!(read(skill.join("lang")), "hu\n");
     assert_eq!(read(skill.join("errors.jsonl")), "{\"id\":\"x\"}\n");
     assert_eq!(read(skill.join("feedback.jsonl")), "{\"id\":\"y\"}\n");
+    assert_eq!(
+        read(skill.join("update-check.json")),
+        "{\"latest\": \"0.2.0\"}\n"
+    );
     assert_eq!(read(skill.join("mine.txt")), "user file");
     // nem marad ideiglenes mappa
     let leftovers: Vec<_> = std::fs::read_dir(&skill)
