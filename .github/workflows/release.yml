@@ -1,11 +1,19 @@
-# Build + teszt minden push / PR-en; `v*` tagnél a négy platform binárisaiból skill-csomag és GitHub Release.
+# Build + teszt a main- és develop-pushoknál és PR-en; `v*` tagnél a négy platform binárisaiból skill-csomag és GitHub Release.
 name: build
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
     tags: ["v*"]
+    # csak dokumentáció változott → nincs build (a tag-pusholásra a paths-ignore nem vonatkozik)
+    paths-ignore: ["**/*.md", "docs/**", ".github/ISSUE_TEMPLATE/**", "LICENSE"]
   pull_request:
+    paths-ignore: ["**/*.md", "docs/**", ".github/ISSUE_TEMPLATE/**", "LICENSE"]
+
+# egymás utáni pusholásnál a régi futás leáll; a release-t készítő tag-futás soha
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 permissions:
   contents: write
@@ -28,6 +36,10 @@ jobs:
         with:
           targets: ${{ matrix.target }}
           components: clippy
+      # a függőségek fordítása (target/) cache-ben platformonként: nem fordul le minden futásnál újra a ~300 crate
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
       # musl-tools: natív musl-gcc. A C-kódos crate-ek (tree-sitter, ring) cc-je aarch64-en a nem létező
       # `aarch64-linux-musl-gcc`-t keresné (x86_64-en a musl-gcc-t magától megtalálja) — ezért explicit CC.
       - name: musl-tools
@@ -37,12 +49,13 @@ jobs:
           sudo apt-get update -qq && sudo apt-get install -y -qq musl-tools
           t="${{ matrix.target }}"
           echo "CC_${t//-/_}=musl-gcc" >> "$GITHUB_ENV"
+      # debug profillal (LTO nélkül): a tesztekhez nem kell a release-optimalizálás; a kiadott bináris lent, release+LTO
       - name: clippy + test (natív target)
         if: matrix.target != 'x86_64-apple-darwin'
         shell: bash
         run: |
-          cargo clippy --release --all-targets --target ${{ matrix.target }} -- -D warnings
-          cargo test --release --target ${{ matrix.target }}
+          cargo clippy --all-targets --target ${{ matrix.target }} -- -D warnings
+          cargo test --target ${{ matrix.target }}
       - name: build
         shell: bash
         # a binárisba ne égjen be a runner útvonala (home: cargo registry; workspace: a mi forrásunk — az utolsó egyező nyer)
@@ -77,6 +90,7 @@ jobs:
           mkdir -p $p/bin
           cp skill/SKILL.md skill/README.md skill/TELEPITES.md skill/*.sh LICENSE $p/
           cp -R skill/extras $p/extras
+          cp -R skill/skill-i18n $p/skill-i18n
           cp -R skill/help $p/help
           cp -R out/${{ matrix.dir }} $p/bin/
       - uses: actions/upload-artifact@v4
@@ -117,8 +131,16 @@ jobs:
             (cd "$d" && zip -qr "../../$n.zip" callgraph)
           done
           ls -l dist/*.zip
+      # a frissítő (self-update) ezzel ellenőrzi a letöltött zipet; `sha256sum -c SHA256SUMS` kézzel is
+      - name: SHA256SUMS
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          cd dist
+          sha256sum callgraph-*.tar.gz callgraph-*.zip > SHA256SUMS
+          cat SHA256SUMS
+          sha256sum -c SHA256SUMS
       - name: GitHub Release (csak tagnél)
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${GITHUB_REF_NAME}" dist/callgraph-*.tar.gz dist/callgraph-*.zip --title "${GITHUB_REF_NAME}" --generate-notes
+        run: gh release create "${GITHUB_REF_NAME}" dist/callgraph-*.tar.gz dist/callgraph-*.zip dist/SHA256SUMS --title "${GITHUB_REF_NAME}" --generate-notes

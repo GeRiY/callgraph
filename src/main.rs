@@ -14,8 +14,9 @@ fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     };
-    let mut out = BufWriter::new(std::io::stdout().lock());
-    let mut err = std::io::stderr().lock();
+    // zár nélkül: a `callgraph mcp` a stdout-ot más szálról (tokio) írja, egy itt tartott zár holtpontot okozna
+    let mut out = BufWriter::new(std::io::stdout());
+    let mut err = std::io::stderr();
     let code = match command.run(&mut out, &mut err) {
         Ok(code) => code,
         Err(e) => {

@@ -1,12 +1,15 @@
-//! `callgraph self-update [--check] [--force] [--from <zip|URL>]` — frissítés a GitHub Releases-ből.
-//! `--check`: csak összeveti a legutóbbi kiadást a saját verzióval; anélkül letölti és a skill-mappába telepíti a
-//! platform zipjét (`callgraph-<os>-<arch>.zip`). `--force`: akkor is, ha nem újabb; `--from`: helyi zipből / címről.
+//! `callgraph self-update [--check] [--force] [--from <zip|URL> [--sha256 <hex>]] [--insecure-skip-checksum]` —
+//! frissítés a GitHub Releases-ből. `--check`: csak összeveti a legutóbbi kiadást a saját verzióval (az eredményt a
+//! háttér-ellenőrzés állapotfájljába is írja); anélkül letölti, a kiadás `SHA256SUMS`-a szerint ellenőrzi és a
+//! skill-mappába telepíti a platform zipjét (`callgraph-<os>-<arch>.zip`). `--force`: akkor is, ha nem újabb;
+//! `--from`: helyi zipből / címről (ellenőrzés: `--sha256`, vagy a mellette lévő `SHA256SUMS`; lásd `verify`).
 //! A legutóbbi kiadás forrása: a `releases/latest` webes átirányítása (tartalék: a GitHub API); felülírható:
 //! `CALLGRAPH_UPDATE_API` (API-formátumú tükör, teszt; `file://` is lehet). Rejtett mód: `--check --background`
 //! — a `wrap` indítja leválasztva; rövid időkorláttal lekérdez, az eredményt az `update-check.json`-ba írja, és
 //! bármi történjék, csendben kilép.
 
 mod messages;
+mod verify;
 
 use std::io::Write;
 use std::time::Duration;
@@ -16,6 +19,7 @@ use crate::error::Result;
 use crate::skill::{SkillFailure, SkillHome, finish};
 use crate::tf;
 use crate::update::check::{BACKGROUND_ARGS, now_secs, record_latest};
+use crate::update::checksum::normalize_hex;
 use crate::update::{
     ASSET_LIMIT, BACKGROUND_TIMEOUT, FOREGROUND_TIMEOUT, Fetcher, HttpFetcher, InstallTarget,
     Installer, Platform, Release, ReleaseSource, Version, default_source,
@@ -55,6 +59,15 @@ struct Options {
     force: bool,
     background: bool,
     from: Option<String>,
+    /// `--sha256 <hex>`: a `--from` zip várt összege (kisbetűs hexa).
+    sha256: Option<String>,
+    /// `--insecure-skip-checksum`: nincs SHA-256-ellenőrzés (pl. a `SHA256SUMS` nélküli v0.1.0-hoz).
+    skip_checksum: bool,
+}
+
+/// A `--sha256` értéke: 64 hexa számjegy, különben használati hiba.
+fn sha256_arg(value: Option<&str>) -> std::result::Result<String, SkillFailure> {
+    value.and_then(normalize_hex).ok_or_else(usage)
 }
 
 /// A `self-update` parancs.
@@ -90,16 +103,24 @@ impl SelfUpdateCommand {
                 "--background" => o.background = true,
                 "--from" => o.from = Some(it.next().ok_or_else(usage)?.clone()),
                 x if x.starts_with("--from=") => o.from = Some(x[7..].to_owned()),
+                "--sha256" => o.sha256 = Some(sha256_arg(it.next().map(String::as_str))?),
+                x if x.starts_with("--sha256=") => o.sha256 = Some(sha256_arg(Some(&x[9..]))?),
+                "--insecure-skip-checksum" => o.skip_checksum = true,
                 _ => return Err(usage()),
             }
         }
-        if (o.check && o.from.is_some()) || (o.background && !o.check) {
+        let bad_sha = o.sha256.is_some() && (o.from.is_none() || o.skip_checksum);
+        if (o.check && o.from.is_some()) || (o.background && !o.check) || bad_sha {
             return Err(usage());
         }
         Ok(o)
     }
 
-    fn run_update(&self, out: &mut dyn Write) -> std::result::Result<(), SkillFailure> {
+    fn run_update(
+        &self,
+        out: &mut dyn Write,
+        err: &mut dyn Write,
+    ) -> std::result::Result<(), SkillFailure> {
         let o = self.options()?;
         if o.help {
             writeln!(out, "{}", usage().message)?;
@@ -109,6 +130,7 @@ impl SelfUpdateCommand {
         if let Some(from) = &o.from {
             let target = self.target()?;
             let zip = self.download(from)?;
+            self.verify_local(&o, from, &zip, err)?;
             let summary = self.install(&zip, target)?;
             writeln!(
                 out,
@@ -120,7 +142,13 @@ impl SelfUpdateCommand {
             )?;
             return Ok(());
         }
-        let Some(release) = self.latest()? else {
+        let release = self.latest()?;
+        if self.env.target.is_some() {
+            // a kézi lekérdezés is frissíti a háttér-ellenőrzés állapotát (ne ismételje meg; a notice lássa)
+            let latest = release.as_ref().map(|r| r.version.clone());
+            record_latest(&self.home, now_secs(), Ok(latest));
+        }
+        let Some(release) = release else {
             writeln!(
                 out,
                 "{}",
@@ -170,6 +198,14 @@ impl SelfUpdateCommand {
             ));
         };
         let zip = self.download(&asset.browser_download_url)?;
+        self.verify_release_asset(
+            &o,
+            &release,
+            &asset.browser_download_url,
+            &asset_name,
+            &zip,
+            err,
+        )?;
         let summary = self.install(&zip, target)?;
         let line = if latest == current {
             tf!("Reinstalled: {latest}", "Újratelepítve: {latest}")
@@ -228,6 +264,7 @@ impl SelfUpdateCommand {
         let report = Installer::new(self.env.platform.clone())
             .install(zip, target)
             .map_err(|e| install_failure(e, target.skill_dir()))?;
+        crate::skill::sync_installed_skill(target.skill_dir()); // a SKILL.md a felhasználó nyelvén (a zipben angol)
         Ok(tf!(
             "{} files, binary: {}",
             "{} fájl, bináris: {}",
@@ -243,7 +280,7 @@ impl Command for SelfUpdateCommand {
             self.run_background();
             return Ok(0);
         }
-        let result = self.run_update(out);
+        let result = self.run_update(out, err);
         finish(&self.home, SOURCE, result, err)
     }
 }

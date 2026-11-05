@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 
 use super::entities::decode;
-use super::expr::{expr_calls, pascal};
+use super::expr::{expr_calls, expr_strings, pascal};
 use super::node::{Element, Node, Prop};
 use crate::model::{Branch, Call, ControlFlow, Imports, StringLit};
 
@@ -38,7 +38,10 @@ impl Emitter<'_> {
         for node in nodes {
             match node {
                 Node::Element(el) => self.element(el),
-                Node::Interpolation { line, content } => self.expr_calls(content, *line, false),
+                Node::Interpolation { line, content } => {
+                    self.expr_calls(content, *line, false);
+                    self.expr_strings(content, *line);
+                }
                 Node::Text {
                     line,
                     raw,
@@ -99,6 +102,7 @@ impl Emitter<'_> {
         let exp = exp.as_deref().filter(|e| !e.is_empty());
         if let Some(exp) = exp {
             self.expr_calls(exp, line, name == "on");
+            self.expr_strings(exp, line);
         }
         if name == "on"
             && let Some(a) = arg.as_deref().filter(|a| !a.is_empty())
@@ -165,6 +169,15 @@ impl Emitter<'_> {
             let mut call = self.call(line, "func_call", trimmed.to_string(), "internal_helper");
             call.handler = Some(true);
             self.out.calls.push(call);
+        }
+    }
+
+    /// A kifejezés (`{{ … }}`, `:attr="…"`, `@x="…"`, `v-if="…"`) string-literáljai; a sor a kifejezés
+    /// kezdősora + a literál előtti sortörések.
+    fn expr_strings(&mut self, exp: &str, line: u32) {
+        for (offset, value) in expr_strings(exp) {
+            let breaks = exp[..offset].matches('\n').count() as u32;
+            self.string(line + breaks, truncate(&value, 300));
         }
     }
 

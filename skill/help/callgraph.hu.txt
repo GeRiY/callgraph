@@ -22,19 +22,27 @@ Használat:
                                                 nagy fájloknál, ha egy konkrét metódus érdekel
                                                 (bármelyik --format-tal kombinálható)
   bash ~/.claude/skills/callgraph/callgraph.sh <fájl|mappa> --grep <minta>       csak a mintára illeszkedő célú hívások
-                                                (csak az illeszkedő hívást tartalmazó metódusok/fájlok — "hol hívják")
+                                                (csak az illeszkedő hívást tartalmazó metódusok/fájlok — "hol hívják");
+                                                minden hívás a forrássorával: "L25 │ $this->repo->find($id)";
+                                                "via Resolver" = interfészen / trait-en / szülő-típuson át hívva
+                                                (a Típus::metódus minta ezeket a hívásokat is megtalálja)
+                                                Rust: "?::m" = ismeretlen fogadó-típus; a Típus::m minta név szerint is megtalálja
   bash ~/.claude/skills/callgraph/callgraph.sh <mappa> --grep <minta> --depth N [--guess]
                                                 hívók hívói N szintig (hatáselemzés); --guess: a feloldatlan,
                                                 csak név szerinti egyezéseket is ("?")
+  Utak: ha a projekt-gyökér többször ismétlődne, az első sor "gyökér: /abs/projekt", utána minden út ehhez relatív
+  (a következő hívásban ugyanazzal a --project-tel változatlanul használható).
   bash ~/.claude/skills/callgraph/callgraph.sh <fájl>::<metódus> [...] --body   a metódus(ok) forrása sorszámozva, docblockkal
   bash ~/.claude/skills/callgraph/callgraph.sh <mappa> --grep <minta> --body    a talált hívó metódusok forrása
   bash ~/.claude/skills/callgraph/callgraph.sh <fájl> --lines <n>-<m>           tetszőleges sáv sorszámozva (pl. view-fájl)
   bash ~/.claude/skills/callgraph/callgraph.sh <mappa|fájl> --strings <minta>   string-literálok (hibaüzenet, kulcs) helye
-  bash ~/.claude/skills/callgraph/callgraph.sh <mappa|fájl> --const <minta>     osztálykonstans-hivatkozások és -definíciók
+  bash ~/.claude/skills/callgraph/callgraph.sh <mappa|fájl> --const <minta>     konstans-hivatkozások és -definíciók (PHP osztálykonstans, Rust const/static)
 
 Nyelv (a terminál-kimenet és a súgó nyelve: en = angol, alapértelmezett; hu = magyar):
   bash ~/.claude/skills/callgraph/callgraph.sh set-lang                 az aktuális nyelv és a forrása
   bash ~/.claude/skills/callgraph/callgraph.sh set-lang <en|hu>         a nyelv elmentése (a skill-mappa lang fájljába)
+                                                a skill-utasítást (SKILL.md) is erre a nyelvre cseréli;
+                                                a skill újratöltéséhez indítsd újra a Claude Code-ot
   CALLGRAPH_LANG=<en|hu> bash ~/.claude/skills/callgraph/callgraph.sh …   egy futásra (felülírja az elmentettet)
 
 Frissítés (a GitHub Releases-ből; a projects.json, a lang, az errors.jsonl, a feedback.jsonl és az update-check.json megmarad):
@@ -42,6 +50,8 @@ Frissítés (a GitHub Releases-ből; a projects.json, a lang, az errors.jsonl, a
   bash ~/.claude/skills/callgraph/callgraph.sh update                 az újabb kiadás letöltése és telepítése
   bash ~/.claude/skills/callgraph/callgraph.sh update --force         újratelepítés akkor is, ha naprakész
   bash ~/.claude/skills/callgraph/callgraph.sh update --from <zip>    telepítés helyi zipből / címről (callgraph-<os>-<arch>.zip)
+  A letöltést a kiadás SHA256SUMS fájlja szerint ellenőrzi (eltérésnél vagy ha hiányzik, semmit nem telepít);
+  --insecure-skip-checksum kihagyja. --from: a --sha256 <hex> vagy a zip melletti SHA256SUMS szerint, különben figyelmeztet.
   Automatikus ellenőrzés: naponta legfeljebb egyszer, a háttérben; újabb kiadásnál egy „ℹ callgraph X elérhető” sor
   kerül a kimenet végére. Kikapcsolás: CALLGRAPH_UPDATE_CHECK=0 (CI mellett és skill-telepítésen kívül magától ki van kapcsolva).
 

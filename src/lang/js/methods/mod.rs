@@ -14,6 +14,7 @@ use crate::model::Method;
 use collector::{Collector, FnRef, Opts};
 
 pub use docs::{Docs, container_doc};
+pub(crate) use options::is_options_api;
 
 /// Metódus-gyűjtő passz.
 #[derive(Default)]
@@ -88,7 +89,11 @@ fn export_default(
     d: &ExportDefaultDeclarationKind<'_>,
 ) {
     match d {
-        ExportDefaultDeclarationKind::ObjectExpression(o) => c.options_api(o),
+        ExportDefaultDeclarationKind::ObjectExpression(o) if options::is_options_api(o) => {
+            c.options_api(o)
+        }
+        // Vue-kulcsok nélküli `export default { … }`: sima objektum-literál (a kulcsok metódusok)
+        ExportDefaultDeclarationKind::ObjectExpression(o) => c.object_methods("", o, "public", 0),
         ExportDefaultDeclarationKind::CallExpression(call) => {
             if let Some(Expression::ObjectExpression(o)) =
                 call.arguments.first().and_then(|a| a.as_expression())

@@ -5,7 +5,7 @@ Modul: `src/lang/rs/` (`RustBackend`, szerep: backend, azonosító: `rust`, kite
 Parser: `syn = "=2.0.119"` (`full`, `parsing`, `printing`, `visit`) + `proc-macro2 = "=1.0.107"` (`span-locations` a
 sorszámokhoz és a pontos forrás-szövegekhez). Tiszta Rust, nincs C-toolchain (musl / Windows / macOS build egyszerű).
 A syn-típusok csak a `parser/` (Adapter: `SynAdapter`, `RustParser`) és a `visitor/` alatt jelennek meg.
-Minták: `golden/samples/rust/` (saját `Cargo.toml` axum-mal, `src/{handlers,shapes,state,aliases}.rs`).
+Minták: `golden/samples/rust/` (saját `Cargo.toml` axum-mal, `src/{handlers,shapes,state,aliases,limits}.rs`).
 
 ## Csővezeték
 `SynAdapter::parse` (`syn::parse_file`; utána `proc_macro2::extra::invalidate_current_thread_spans()`, hogy a szálankénti
@@ -39,6 +39,9 @@ A `line` a láthatóság (`pub`) vagy a kulcsszó sora (az attribútumok és a d
 `{container, name, line, endLine, visibility, static, abstract, kind, params, returnType, doc, body:null}`
 - Szabad `fn` → a fájl- / inline-modul containere; `impl`- és trait-metódus → a típus / trait.
 - **visibility**: `pub`, `pub(crate)`, `pub(super)`, `pub(in …)`, különben `private`; trait-metódus és trait-implementáció: `pub`.
+  A `--format api` a `pub` elemeket listázza (a `pub(crate)` / `pub(super)` nem publikus API): a szabad `pub fn`-eket, az
+  `impl`-blokkok `pub fn`-jeit, és a trait-implementációk metódusait is (ezek a trait-en át hívhatók; a container
+  fejléce `implements …`-ként mutatja, melyik trait-ből jönnek), valamint a `pub const` / `pub static` / `pub` mezőket.
 - **kind**: `fn` (szabad), `method` (van `self`), `assoc` (társított, `self` nélkül); aszinkronnál `async ` előtag.
 - **static**: társított függvény `self` nélkül. **abstract**: trait-metódus alapértelmezett törzs nélkül.
 - **params**: a paraméterek forrása egy sorba vonva (`&self`, `&mut self`, `id: u64`), ≤60 karakter. **returnType**: a `->` utáni típus.
@@ -61,7 +64,11 @@ A kimenet a leírt utat adja (`super::X`); a névtáblába a kanonikus kerül (`
 `{container, caller, line, type, target, resolved?, on?, category}`; `caller` = a függvény neve, a konstans-értékekben és
 a felső szintű makróhívásokban (`thread_local! {…}`) `__top__`.
 - **type**: `func_call` (`f()`, `std::fs::read()`), `static_call` (`Foo::new()`, `Self::x()` — az utolsó előtti szegmens
-  nagybetűs), `method_call` (`x.bar()`, `on` = a fogadó forrása ≤40), `macro` (`println!`).
+  nagybetűs), `method_call` (`x.bar()`, `on` = a fogadó forrása ≤40), `macro` (`println!`), `const_fetch`
+  (konstans-hivatkozás: az út utolsó szegmense `SCREAMING_CASE`, pl. `MAX`, `Self::LIMIT`, `config::PORT`, `u32::MAX`;
+  nem hívás-pozícióban). A fájl saját `const` / `static`-jára `resolved` = `<container>::NÉV` (`users::MAX`,
+  `internal_helper`), máskor az út-hívás szabályai szerint (`Típus::NÉV`, `config::PORT`, `std::f64::consts::PI`).
+  A `--const <minta>` ezeket és a `const` / `static` definíciókat (`[definition]`) listázza.
 - **target**: a leírt alak (`Foo::new`, `bar`, `vec!`); **resolved**: a feloldott név, ha eltér.
 - **Makró-argumentumok**: a makró nincs kibontva, de a törzse vesszős kifejezés-listaként (`format!("{}", f(x))`), vagy
   utasítás-sorozatként (`vec![0; n]`, `thread_local! { static X: … = f(); }`) parse-olva bejárásra kerül (hívások,
@@ -78,7 +85,21 @@ a felső szintű makróhívásokban (`thread_local! {…}`) `__top__`.
 | `framework_use` | ismert framework crate (axum, tower, hyper, actix_web, rocket, tokio, serde, serde_json, clap, diesel, sqlx, bevy…) | a teljes út |
 | `module_use` | a crate saját eleme (`crate::` / `super::` / `self::` út vagy ilyen import), illetve feloldhatatlan név (glob-import, szülő-modul) | a rövid kulcs: az utolsó két szegmens (`args::parse`, `Method::new`) |
 | `package_use` | más crate (külső függőség) | a teljes út (`regex::Regex::new`) |
-| `external_call` (tartalék) | ismeretlen fogadójú metódushívás | — |
+| `external_call` (tartalék) | ismeretlen fogadójú metódushívás | `?::név` |
+
+### Metódushívás fogadó-típussal (`receivers.rs`)
+`x.bar()`-nál a fogadó típusa olcsó, megbízható forrásokból: a paraméter típusa (`x: &Repo`, `Box<Repo>` / `Rc` / `Arc`
+→ `Repo`, `dyn Trait` / `impl Trait` → a trait, az extractor-szerű `State(s): State<App>` → `s: App`), a `let` típusa
+(`let x: Repo = …`), a konstruktor-szerű hívás (`Repo::new(…)`, `default`, `from`, `new_*`, `with_*`, `from_*`; `?`,
+`.unwrap()`, `.expect()`, `.await` átlátszó), a struct-literál (`Repo { … }`), a `self` (a container), és a fájl saját
+structjának mezője (`self.repo.load()` → a `repo` mező típusa). Egy név csak akkor kap típust, ha a függvényben minden
+kötése (paraméter, `let`, `for`, `match`-minta, closure-paraméter) ugyanazt a típust adja; generikus paraméter (`T`) és
+egybetűs típusnév nem számít. Ismert típusnál a hívás `Típus::bar` útként kategorizálódik (`Repo::load`: `module_use`,
+saját típusnál `internal_helper`, std-típusnál `native_rust`). Gyakori std-metódusnévnél (`len`, `clone`, `iter`…) csak
+akkor, ha a fájl saját típusának tényleg van ilyen metódusa.
+Ha a fogadó típusa nem következtethető, és más szabály sem oldja fel, a hívás `resolved` mezője `?::bar` (feloldatlan
+fogadó). A `Típus::bar` alakú hívó-keresés (`--grep`, `callers`) ezeket név szerint, bizonytalanként találja meg (a
+`--depth` nézetben `?` jelöléssel), így nem esnek ki csendben.
 
 A `module_use` rövid kulcsa szándékosan egyezik a másik fájl container-nevével (`crate::cli::args::parse` → `args::parse`,
 a `src/cli/args.rs` fájl-containere `args`), így a `callers --depth` fájlokon át is lánc-ol.
@@ -89,7 +110,8 @@ a `src/cli/args.rs` fájl-containere `args`), így a `callers --depth` fájlokon
 törzsének sortartományával). A `cond` ≤80. Ciklus (`for`, `while`, `loop`), `let … else` és `?` nem kerül be.
 
 ## strings
-`StringLit`: a törzsekben és a makró-argumentumokban lévő string-literálok (`"…"`, raw string is), az átlátszatlan
+`StringLit`: a törzsekben, a `const` / `static` kezdőértékekben és a makró-argumentumokban lévő string-literálok (`"…"`,
+raw string, bájtstring `b"…"` is — UTF-8-ként, a hibás bájt `�`), az átlátszatlan
 makrók tokenjeiben lévők, valamint a függvények és típusok (nem doc) attribútumaiban lévők (`#[get("/users/{id}")]`,
 `#[serde(rename = "x")]`). Üres / csak whitespace kimarad; ≤300 karakter; többsoros literálnál `endLine`.
 
@@ -102,9 +124,12 @@ kimaradnak (azok a `doc` mezőkbe kerülnek). Felvétel: `TODO` / `FIXME` / `XXX
 ## Ismert korlátok
 - **Makrók nincsenek kibontva**: a derive-, attribútum- és függvényszerű makrók által generált kód nem látszik; a makró
   törzse csak akkor elemzett, ha kifejezés-lista vagy utasítás-sorozat.
-- **Nincs típus-következtetés**: `x.bar()` ismeretlen fogadónál `external_call`; a gyakori std-metódusnevek
-  (`len`, `push`, `get`…) `native_rust`-ok akkor is, ha egy saját típus metódusai — kivéve, ha a név pontosan egy
-  saját containerben létezik `self`-es metódusként, mert az elsőbbséget kap.
+- **Csak egyszerű típus-következtetés** (lásd fent): a visszatérési típusok (`let x = repo.find()`), a láncolt hívások
+  (`a.b().c()`), a closure- és minta-kötések nem kapnak típust; ilyenkor `?::bar` (`external_call`). Ismeretlen
+  fogadónál a gyakori std-metódusnevek (`len`, `push`, `get`…) `native_rust`-ok akkor is, ha egy saját típus metódusai —
+  kivéve, ha a név pontosan egy saját containerben létezik `self`-es metódusként, mert az elsőbbséget kap.
+- A konstans-hivatkozás felismerése név-alapú (`SCREAMING_CASE`); a függvénytörzsben definiált `const` nem kerül a
+  `constants` közé, a rá mutató hivatkozás `module_use` (`resolved` nélkül).
 - **Glob-import** (`use crate::x::*`, `use super::*`) tartalma nem ismert: a nagybetűs / egyszegmensű ismeretlen név
   `module_use` (`resolved` nélkül), kivéve a prelude- és gyakori std-neveket.
 - A `cfg`-attribútumok nem értékelődnek ki: minden ág (pl. `#[cfg(test)] mod tests`) bekerül.

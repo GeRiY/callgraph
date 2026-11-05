@@ -16,7 +16,11 @@ impl Sample {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let root = std::env::temp_dir().join(format!("callgraph-rust-{id}"));
+        let root =
+            std::env::temp_dir().join(format!("callgraph-rust-{id}-{}-{}", std::process::id(), {
+                static N: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+                N.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+            }));
         let samples = Path::new(env!("CARGO_MANIFEST_DIR")).join("golden/samples/rust");
         fs::create_dir_all(root.join("src")).unwrap();
         fs::copy(samples.join("Cargo.toml"), root.join("Cargo.toml")).unwrap();
@@ -71,7 +75,8 @@ fn outline_of_axum_handlers() {
         "axum::routing::post",
         "macro_use",
         "tracing::info!",
-        "external_call     next_id",
+        // `State(state): State<AppState>` → a fogadó típusa ismert
+        "AppState::next_id",
         "[TODO] TODO: validate the item against the catalogue",
     ] {
         assert!(out.contains(expected), "missing {expected:?} in:\n{out}");
@@ -143,4 +148,107 @@ fn method_selector_with_duplicate_names_does_not_panic() {
     assert!(!flow.is_empty());
     let outline = sample.show("src/dup.rs::new", &[]);
     assert_eq!(outline.matches("new()").count(), 2, "{outline}");
+}
+
+/// A projekt `callers` parancsa: a JSONL-sorok.
+fn callers(sample: &Sample, pattern: &str) -> Vec<serde_json::Value> {
+    let args = CliArgs::parse([
+        "callers".to_owned(),
+        pattern.to_owned(),
+        "--project".to_owned(),
+        sample.0.to_string_lossy().into_owned(),
+    ])
+    .unwrap();
+    let command = build_command(args).unwrap();
+    let (mut out, mut err) = (Vec::new(), Vec::new());
+    assert_eq!(command.run(&mut out, &mut err).unwrap(), 0, "{err:?}");
+    String::from_utf8(out)
+        .unwrap()
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect()
+}
+
+#[test]
+fn api_lists_pub_methods_of_impl_blocks() {
+    let sample = Sample::new();
+    let out = sample.show("src/limits.rs", &["--format", "api"]);
+    for expected in [
+        "struct Client  L15-17",
+        "  public constants (1):\n    RETRIES = 3",
+        "  public API (3):",
+        "    new(state: AppState): Self  L23 [static]",
+        "    allocate(&self): u64  L28",
+        "      Allocates an order id (retried a few times).",
+        "    within_limit(&self, quantity: u32): bool  L37",
+        "    allocate_all(clients: &[Client]): Vec<u64>  L47",
+        "    MAX_ITEMS = 50",
+    ] {
+        assert!(out.contains(expected), "missing {expected:?} in:\n{out}");
+    }
+    // privát: a `fn banner_len` és a `const GREETING`
+    assert!(!out.contains("banner_len"), "{out}");
+    assert!(!out.contains("GREETING"), "{out}");
+    // trait-implementáció metódusa is publikus (a trait-en át hívható)
+    let shapes = sample.show("src/shapes.rs", &["--format", "api"]);
+    assert!(shapes.contains("    area(&self): f64  L36"), "{shapes}");
+    assert!(
+        shapes.contains("    fmt(&self, f: &mut fmt::Formatter<'_>): fmt::Result  L56"),
+        "{shapes}"
+    );
+}
+
+#[test]
+fn const_search_finds_rust_definitions_and_references() {
+    let sample = Sample::new();
+    let out = sample.show("src", &["--const", "MAX_ITEMS"]);
+    assert!(out.contains("limits.rs"), "{out}");
+    assert!(
+        out.contains("limits::MAX_ITEMS") && out.contains("[definition] = 50"),
+        "{out}"
+    );
+    assert!(out.contains("L38"), "{out}");
+    assert!(out.contains("Client::within_limit"), "{out}");
+    let assoc = sample.show("src/limits.rs", &["--const", "RETRIES"]);
+    assert!(assoc.contains("Client::allocate"), "{assoc}");
+    assert!(assoc.contains("Client::RETRIES"), "{assoc}");
+    assert!(assoc.contains("[definition] = 3"), "{assoc}");
+    let framework = sample.show("src/handlers.rs", &["--const", "BAD_REQUEST"]);
+    assert!(
+        framework.contains("axum::http::StatusCode::BAD_REQUEST"),
+        "{framework}"
+    );
+}
+
+#[test]
+fn strings_include_const_and_static_initializers() {
+    let sample = Sample::new();
+    let bytes = sample.show("src/limits.rs", &["--strings", "raw bytes"]);
+    assert!(bytes.contains("L12"), "{bytes}");
+    assert!(bytes.contains("\"Hello from the raw bytes\""), "{bytes}");
+    let banner = sample.show("src/limits.rs", &["--strings", "open for business"]);
+    assert!(banner.contains("L9"), "{banner}");
+}
+
+#[test]
+fn method_callers_by_type_include_inferred_and_uncertain_receivers() {
+    let sample = Sample::new();
+    let out = sample.show("src", &["--grep", "AppState::next_id"]);
+    for expected in [
+        "create_order()",
+        "allocate()",
+        "report()",
+        "allocate_all()",
+        "?::next_id",
+    ] {
+        assert!(out.contains(expected), "missing {expected:?} in:\n{out}");
+    }
+    let rows = callers(&sample, "AppState::next_id");
+    let has = |caller: &str, target: &str| {
+        rows.iter()
+            .any(|r| r["caller"] == caller && r["target"] == target)
+    };
+    assert!(has("create_order", "AppState::next_id"), "{rows:?}");
+    assert!(has("allocate", "AppState::next_id"), "{rows:?}");
+    assert!(has("allocate_all", "?::next_id"), "{rows:?}");
 }

@@ -17,10 +17,7 @@ fn row(path: &str, text: &str) -> QueryResult {
         .analyze(&SourceFile::new(path, text.as_bytes().to_vec(), None))
         .unwrap()
         .graph;
-    QueryResult {
-        graph,
-        methods: None,
-    }
+    QueryResult::new(graph, None)
 }
 
 fn render(lang: Lang, name: &str, rows: &[QueryResult]) -> String {

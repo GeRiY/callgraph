@@ -81,3 +81,29 @@ fn pseudo_method_only_with_top_level_call() {
     let without = methods("/p/S.vue", "const a = 1\nfunction f() { g() }\n", true);
     assert_eq!(names(&without), ["f"]);
 }
+
+#[test]
+fn object_literal_methods() {
+    let src = "export const api = {\n  fetch() { return 1 },\n  save: () => 2,\n  load: function () {},\n  nested: { deep() {} },\n  value: 3,\n}\nconst other = { run() {} }\n";
+    let m = methods("/p/api.js", src, false);
+    assert_eq!(
+        names(&m),
+        [
+            "api.fetch",
+            "api.save",
+            "api.load",
+            "api.nested.deep",
+            "other.run"
+        ]
+    );
+    assert_eq!(m[0].1, "method");
+    assert_eq!((m[0].2, m[0].3), (2, 2));
+}
+
+#[test]
+fn plain_export_default_object_is_not_options_api() {
+    let src = "export default {\n  fetch() {},\n  helpers: { fmt() {} },\n}\n";
+    let m = methods("/p/svc.ts", src, false);
+    assert_eq!(names(&m), ["fetch", "helpers.fmt"]);
+    assert_eq!(m[0].1, "method");
+}

@@ -151,6 +151,9 @@ bash ~/.claude/skills/callgraph/callgraph.sh update           # download and ins
 The update downloads your platform's zip from the latest GitHub Release and overwrites the skill files and `bin/`;
 `projects.json`, `errors.jsonl`, `feedback.jsonl` and the language setting are kept. `--force` reinstalls the current
 version; `callgraph --version` shows the installed one.
+Every release ships a `SHA256SUMS` file; the update verifies the downloaded zip against it and installs nothing on a
+mismatch. Releases without it (v0.1.0) are refused unless you pass `--insecure-skip-checksum`. With `--from <zip>` the
+zip is checked against `--sha256 <hex>` or a `SHA256SUMS` next to it (otherwise a one-line warning).
 `callgraph.sh` also checks for a new release in the background at most once a day (without slowing queries down) and,
 if there is one, ends its output with a one-line `ℹ callgraph X is available` notice; `CALLGRAPH_UPDATE_CHECK=0`
 turns this off (it is also off when `CI` is set).
@@ -199,6 +202,20 @@ bash ~/.claude/skills/callgraph/callgraph.sh set-lang       # show current langu
 CALLGRAPH_LANG=hu bash ~/.claude/skills/callgraph/callgraph.sh app/Models/Order.php   # one run only
 ```
 
+### Use with other AI tools (MCP)
+
+Besides the Claude Code skill (unchanged, fully supported), the same binary is also an
+[MCP](https://modelcontextprotocol.io) server on stdio, so any MCP client can use it: `callgraph mcp`.
+Tools: `outline`, `method_body`, `find_callers`, `search`, `framework_view`, `projects`. They return the same compact
+text as the CLI, with the same output cap; read-only, no network, paths are confined to the project root.
+
+```bash
+claude mcp add callgraph -- ~/.claude/skills/callgraph/bin/linux-x86_64/callgraph mcp   # Claude Code
+```
+
+Claude Desktop, Cursor and VS Code use a JSON entry with `"command": "<absolute path to the binary>", "args": ["mcp"]`.
+Recipes, tool parameters and safety notes (Hungarian): [`docs/MCP.md`](docs/MCP.md).
+
 ### Feedback from agents
 
 Every error message carries an `[error-id: …]`. Agents (or you) can attach a note to it, which makes broken
@@ -236,14 +253,17 @@ Only Docker is needed locally; the toolchain (Rust stable, rustfmt, clippy, musl
 dev image (`docker/dev.Dockerfile`):
 
 ```bash
-bash tools/dev.sh check     # fmt --check + clippy -D warnings + tests — run before every commit
-bash tools/dev.sh build     # target/docker/release/callgraph
+bash tools/dev.sh check     # fmt --check + clippy -D warnings + tests (debug profile, like CI) — run before every commit
+bash tools/dev.sh build     # release binary: ~/.cache/callgraph-dev/target/release/callgraph
 bash tools/dev.sh test      # tests only
 bash tools/dev.sh skill     # dist/callgraph-<version>.tar.gz (skill package, Linux)
 bash tools/dev.sh shell     # shell inside the container
 ```
 
-With a local toolchain the usual `cargo build --release` / `cargo test --release` work too. CI
+The build output is shared by all checkouts / worktrees (`CALLGRAPH_DEV_TARGET`, default
+`~/.cache/callgraph-dev/target`; `CALLGRAPH_DEV_TARGET=local` keeps a per-checkout `target/docker/`), so a new branch
+doesn't rebuild every dependency. `check-release` runs the same checks with the release profile (LTO, slow).
+With a local toolchain the usual `cargo build --release` / `cargo test` work too. CI
 ([`.github/workflows/release.yml`](.github/workflows/release.yml)) builds and tests macOS (arm64, x86_64),
 Linux (arm64, x86_64, static musl) and Windows on every push, and publishes a GitHub Release on `v*` tags.
 

@@ -44,6 +44,12 @@ Alak: `{container,name,line,endLine,visibility,static,abstract:false,kind,params
 - **Beágyazott** (`nested`): a függvény törzsében közvetlen `function`/`const x = fn` → `külső.belső`, `kind:'inner'` (csak egy szint).
 - **Options API** (`optionsApi`, `export default {}` vagy `export default call({…})`): `props`/`emits` külön; függvényes kulcs → név = kulcs, `kind:'option'` (`setup` → `kind:'setup'` + nested); `methods.x` → `x` (`kind:'methods'`); `computed.x`, `watch.x` (`kind` = `computed`/`watch`), objektum-értéknél az első függvény (get/handler).
 - **Osztály**: `ClassMethod`/függvény-értékű `ClassProperty` → `container` = osztálynév, `kind:'method'`, `static`.
+- **Objektum-literál** (Rust-port bővítés, a régi motorban nincs): top-level `const api = { fetch() {…}, save: () => …,
+  load: function () {…} }` (export-tal is) → `api.fetch`, `api.save`, `api.load` (`kind:'method'`, a tulajdonság
+  sortartományával; láthatóság mint a deklarációé), a beágyazott objektum egy szintig (`api.users.list`). A
+  Vue-kulcs nélküli `export default { … }` (nincs `name`/`props`/`data`/`methods`/`computed`/`watch`/`setup`/hook… kulcs)
+  ugyanígy, előtag nélkül (`fetch`, `helpers.fmt`); Vue-kulccsal az Options API szabálya él. A fájlon belüli
+  `api.fetch()` hívás `internal_helper` (`target:'api.fetch'`), a metódus törzsében lévő hívások `caller`-e `api.fetch`.
 - `export default function` → `default`/névvel; `export default class` → topStmt.
 - **Pszeudo-metódusok**: `setup` (`<script setup>` blokk) vagy `__module__` (egyéb blokk) — csak ha van benne top-level `caller`-es hívás/elágazás; `kind:'top-level'`, a blokk sortartományával. `template` (`.vue` template, `kind:'template'`, a template sortartománya) — mindig, ha van template. A lista `line` szerint rendezett (stabil).
 
@@ -60,7 +66,9 @@ Alak: `{container,caller,line,type,target,on?,category,resolved?,args?,handler?}
 `{container,caller,type,line,cond,branches[{label,startLine,endLine,fallThrough?}]}`. `if` (az `else if` lánc a külső if-nél, ágak: `if (…)`, `elseif (…)`, `else`), `switch` (`case …`/`default`, `fallThrough` üres case-re). Template: `v-if` / `v-else-if` (`cond` ≤100, ág-címke `v-if="…"` ≤60, sor = az elem sortartománya). Más vezérlés (for, ternary, try) nincs.
 
 ## strings
-`{container,caller,line,value}`: `StringLiteral` (nem import/export-forrás, nem objektum-kulcs, nem üres-trim; ≤300), `TemplateLiteral` (a kifejezések `${…}`-re cserélve, csak ha marad nem-üres szöveg). Template: szöveg-csomópont (whitespace összevonva), statikus attribútumérték, `@esemény` név.
+`{container,caller,line,value}`: `StringLiteral` (nem import/export-forrás, nem objektum-kulcs, nem üres-trim; ≤300), `TemplateLiteral` (a kifejezések `${…}`-re cserélve, csak ha marad nem-üres szöveg). Template: szöveg-csomópont (whitespace összevonva), statikus attribútumérték, `@esemény` név, valamint (Rust-port
+bővítés) a `{{ … }}` interpolációk és a direktíva-kifejezések (`:attr="…"`, `@x="…"`, `v-if="…"`…) string-literáljai
+(`'…'`, `"…"`, a `` `…` `` sablon statikus részei `${…}`-vel).
 
 ## comments
 Babel `comments` — a `/** */` docblock kimarad; felvétel: `TODO|FIXME|XXX|HACK` kezdet (`tag`) vagy ≥15 kar. szöveg. `caller` = a legszűkebb tartalmazó metódus (`line < ln <= endLine`), különben `__top__`; `text` ≤200.

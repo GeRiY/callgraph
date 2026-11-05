@@ -4,8 +4,12 @@ use super::*;
 
 fn home_with(lang_file: Option<&str>) -> (SkillHome, PathBuf) {
     let dir = std::env::temp_dir().join(format!(
-        "callgraph-i18n-{}-{}",
+        "callgraph-i18n-{}-{}-{}",
         std::process::id(),
+        {
+            static N: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+            N.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        },
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()

@@ -3,18 +3,49 @@
 mod grep_text;
 mod loader;
 
-use super::filter::FilterChain;
+use super::filter::{FilterChain, pattern_regex};
 use super::selector::SelectorSet;
 use crate::analysis::Analyzer;
 use crate::error::{CallgraphError, Result};
+use crate::index::{TypeHierarchy, ViaMatcher};
 use crate::io::FileWalker;
-use crate::model::FileGraph;
+use crate::model::{Call, FileGraph};
 use crate::tf;
 use std::path::{Path, PathBuf};
 
 pub struct QueryResult {
     pub graph: FileGraph,
     pub methods: Option<Vec<String>>,
+    /// A `--grep` találatai közül azok, amelyek a mintára nem, csak rokon típuson (interfész, trait, szülő)
+    /// át illeszkedtek.
+    pub via: Vec<ViaCall>,
+}
+
+/// Egy rokon típuson át illesztett hívás: sor + cél (a `resolved` / `target`), és a hívás típusának rövid neve.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ViaCall {
+    pub line: u32,
+    pub target: String,
+    pub via: String,
+}
+
+impl QueryResult {
+    pub fn new(graph: FileGraph, methods: Option<Vec<String>>) -> Self {
+        Self {
+            graph,
+            methods,
+            via: Vec::new(),
+        }
+    }
+
+    /// Ha a hívás rokon típuson át illeszkedett a mintára: a típus rövid neve (`via Resolver`).
+    pub fn via_of(&self, call: &Call) -> Option<&str> {
+        let target = call.resolved.as_deref().unwrap_or(&call.target);
+        self.via
+            .iter()
+            .find(|v| v.line == call.line && v.target == target)
+            .map(|v| v.via.as_str())
+    }
 }
 pub struct QueryEngine {
     root: PathBuf,
@@ -47,6 +78,11 @@ impl QueryEngine {
     pub fn label(&self) -> &str {
         &self.label
     }
+    /// A `--depth` 2. szinttől kezdve keresett hatókör: a teljes projektgyökér (`--project`, különben a munkamappa).
+    /// A hívók hívói bárhol lehetnek a projektben, nem csak a lekérdezett mappában (pl. `app/Services` → `routes/`).
+    pub fn depth_scope(&self) -> Vec<PathBuf> {
+        vec![self.root.clone()]
+    }
     pub fn query(&self, selectors: &SelectorSet) -> Result<Vec<QueryResult>> {
         let files = self.files(selectors)?;
         let mut out = Vec::new();
@@ -60,8 +96,14 @@ impl QueryEngine {
             let methods = methods.map(|names| {
                 // névegyezés: egy név több metódusra is illeszkedhet (Rust: több impl, PHP/Swift: túlterhelés),
                 // ezért a hiányt név szerint nézzük, nem darabszámra
-                let found = graph.methods.iter().filter(|m| names.iter().any(|n| n == &m.name)).map(|m| m.name.clone()).collect::<Vec<_>>();
-                if let Some(missing) = names.iter().find(|n| !found.contains(n)) {
+                // pontos név; ha nincs ilyen, a pont nélküli név az objektum-literál metódusára is illeszkedik
+                // (`store.ts::updateSongs` → `playableStore.updateSongs`)
+                let exact = |n: &String| graph.methods.iter().any(|m| &m.name == n);
+                let matches = |n: &String, name: &str| {
+                    name == n || (!exact(n) && !n.contains('.') && name.rsplit_once('.').is_some_and(|(_, last)| last == n))
+                };
+                let found = graph.methods.iter().filter(|m| names.iter().any(|n| matches(n, &m.name))).map(|m| m.name.clone()).collect::<Vec<_>>();
+                if let Some(missing) = names.iter().find(|n| !found.iter().any(|f| matches(n, f))) {
                     return Err(CallgraphError::Usage(tf!(
                         "No such method: {}::{} (see --format outline for the file's full list)",
                         "Nincs ilyen metódus: {}::{} (lásd: --format outline a fájl teljes listájához)",
@@ -71,7 +113,7 @@ impl QueryEngine {
                 }
                 Ok(found)
             }).transpose()?;
-            out.push(QueryResult { graph, methods });
+            out.push(QueryResult::new(graph, methods));
         }
         Ok(out)
     }
@@ -82,19 +124,74 @@ impl QueryEngine {
         categories: Option<&[String]>,
     ) -> Result<Vec<QueryResult>> {
         let rows = self.query(selectors)?;
-        let chain = FilterChain::new(pattern, categories)
-            .map_err(|e| CallgraphError::Usage(tf!("invalid pattern: {e}", "hibás minta: {e}")))?;
         if pattern.is_none() && categories.is_none() {
             return Ok(rows);
         }
+        let invalid = |e: regex::Error| {
+            CallgraphError::Usage(tf!("invalid pattern: {e}", "hibás minta: {e}"))
+        };
+        // Interfészen át: a hatókör típus-hierarchiájából (a mintára nem illeszkedő, de rokon típuson át hívott metódus).
+        let via = match pattern {
+            // csak `Típus::metódus` alakú mintára van értelme (lásd `ViaMatcher::new`)
+            Some(pattern) if pattern.contains("::") => {
+                let regex = pattern_regex(pattern).map_err(invalid)?;
+                let hierarchy = TypeHierarchy::from_graphs(rows.iter().map(|row| &row.graph));
+                ViaMatcher::new(&hierarchy, pattern, &regex).map(|via| (regex, via))
+            }
+            _ => None,
+        };
+        let chain = FilterChain::new(pattern, categories, via.as_ref().map(|(_, v)| v.clone()))
+            .map_err(invalid)?;
         Ok(rows
             .into_iter()
             .filter_map(|mut row| {
                 row.graph = chain.apply(&row.graph)?;
                 row.methods = None;
+                if let Some((regex, matcher)) = &via {
+                    row.via = row
+                        .graph
+                        .calls
+                        .iter()
+                        .filter_map(|call| {
+                            let target = call.resolved.as_deref().unwrap_or(&call.target);
+                            if regex.is_match(target) {
+                                return None;
+                            }
+                            Some(ViaCall {
+                                line: call.line,
+                                target: target.to_owned(),
+                                via: matcher.via(target)?.to_owned(),
+                            })
+                        })
+                        .collect();
+                }
                 Some(row)
             })
             .collect())
+    }
+
+    /// A szöveges kimenet útvonalai a projekt-gyökérhez relatívan: ha az abszolút gyökér legalább kétszer
+    /// szerepelne, egyszer, az első sorban (`root: /abs/projekt`) áll, utána minden út relatív. Egyetlen út
+    /// változatlan marad (az önmagában is egyszer írja ki a gyökeret). A gépi formátumokra (json, mermaid…) nem kell.
+    pub fn relativize(&self, text: &str) -> String {
+        let root = self.root.to_string_lossy();
+        let root = root.trim_end_matches(std::path::MAIN_SEPARATOR);
+        if root.is_empty() {
+            return text.to_owned();
+        }
+        let prefix = format!("{root}{}", std::path::MAIN_SEPARATOR);
+        // Windowson a canonicalize `\\?\C:\…` alakot ad: a kiírt útból ezt elhagyjuk (az illesztés a teljes alakkal megy)
+        let shown = strip_verbatim(root);
+        if text.matches(&prefix).count() < 2 {
+            return if shown == root {
+                text.to_owned()
+            } else {
+                text.replace(&prefix, &format!("{shown}{}", std::path::MAIN_SEPARATOR))
+            };
+        }
+        let mut out = tf!("root: {shown}\n", "gyökér: {shown}\n");
+        out.push_str(&text.replace(&prefix, ""));
+        out
     }
     fn files(&self, selectors: &SelectorSet) -> Result<Vec<(PathBuf, Option<Vec<String>>)>> {
         let mut result: Vec<(PathBuf, Option<Vec<String>>)> = Vec::new();
@@ -134,5 +231,26 @@ impl QueryEngine {
             "Not found: {path} (relative to the --project {label} root)",
             "Nem található: {path} (--project {label} gyökeréhez képest)"
         ))
+    }
+}
+
+/// `\\?\C:\x` → `C:\x` (a Windows-féle „verbatim” előtag a meghajtós utaknál; UNC- és más utak változatlanok).
+fn strip_verbatim(path: &str) -> &str {
+    match path.strip_prefix(r"\\?\") {
+        Some(rest) if rest.as_bytes().get(1) == Some(&b':') => rest,
+        _ => path,
+    }
+}
+
+#[cfg(test)]
+mod verbatim_tests {
+    #[test]
+    fn strips_only_the_drive_verbatim_prefix() {
+        assert_eq!(super::strip_verbatim(r"\\?\C:\Users\x"), r"C:\Users\x");
+        assert_eq!(
+            super::strip_verbatim(r"\\?\UNC\srv\share"),
+            r"\\?\UNC\srv\share"
+        );
+        assert_eq!(super::strip_verbatim("/home/x"), "/home/x");
     }
 }

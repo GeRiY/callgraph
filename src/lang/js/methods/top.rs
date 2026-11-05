@@ -1,7 +1,8 @@
 //! A top-level utasítások metódusai: függvény, `const x = fn`, wrapper, hook, osztály.
 
 use oxc_ast::ast::{
-    Argument, ClassElement, Declaration, Expression, PropertyKey, Statement, VariableDeclaration,
+    Argument, ClassElement, Declaration, Expression, ObjectExpression, ObjectPropertyKind,
+    PropertyKey, Statement, VariableDeclaration,
 };
 use oxc_span::{GetSpan, Span};
 
@@ -88,6 +89,31 @@ impl Collector<'_> {
                     .and_then(FnRef::of_expr)
             {
                 self.add(&id.name, f, span, Opts::new(vis, &callee.name));
+            } else if let Expression::ObjectExpression(o) = init.without_parentheses() {
+                self.object_methods(&id.name, o, vis, 0);
+            }
+        }
+    }
+
+    /// Objektum-literál függvény-értékű kulcsai (`fetch() {}`, `save: () => …`, `load: function () {}`)
+    /// metódusként: `<előtag>.<kulcs>` (üres előtagnál a kulcs); a beágyazott objektum egy szintig.
+    pub fn object_methods(&mut self, prefix: &str, o: &ObjectExpression<'_>, vis: &str, depth: u8) {
+        for p in &o.properties {
+            let ObjectPropertyKind::ObjectProperty(p) = p else {
+                continue;
+            };
+            let Some(k) = key_name(&p.key) else { continue };
+            let name = if prefix.is_empty() {
+                k
+            } else {
+                format!("{prefix}.{k}")
+            };
+            if let Some(f) = FnRef::of_expr(p.value.without_parentheses()) {
+                self.add(&name, f, p.span, Opts::new(vis, "method"));
+            } else if depth == 0
+                && let Expression::ObjectExpression(inner) = p.value.without_parentheses()
+            {
+                self.object_methods(&name, inner, vis, depth + 1);
             }
         }
     }

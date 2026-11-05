@@ -22,19 +22,27 @@ Usage:
                                                 for large files, when you care about one specific method
                                                 (combinable with any --format)
   bash ~/.claude/skills/callgraph/callgraph.sh <file|dir> --grep <pattern>       only calls whose target matches the pattern
-                                                (only the methods/files containing a matching call — "where is it called")
+                                                (only the methods/files containing a matching call — "where is it called");
+                                                each call with its source line: "L25 │ $this->repo->find($id)";
+                                                "via Resolver" = called through an interface / trait / parent type
+                                                (a Type::method pattern also finds those calls)
+                                                Rust: "?::m" = receiver type unknown; a Type::m pattern still finds it (by name)
   bash ~/.claude/skills/callgraph/callgraph.sh <dir> --grep <pattern> --depth N [--guess]
                                                 callers of callers up to N levels (impact analysis); --guess: also the
                                                 unresolved, name-only matches ("?")
+  Paths: when several would repeat the project root, the first line is "root: /abs/project" and every path after it is
+  relative to that root (usable as-is in the next call with the same --project).
   bash ~/.claude/skills/callgraph/callgraph.sh <file>::<method> [...] --body   source of the method(s), line-numbered, with docblock
   bash ~/.claude/skills/callgraph/callgraph.sh <dir> --grep <pattern> --body    source of the caller methods found
   bash ~/.claude/skills/callgraph/callgraph.sh <file> --lines <n>-<m>           any line range, line-numbered (e.g. a view file)
   bash ~/.claude/skills/callgraph/callgraph.sh <dir|file> --strings <pattern>   where string literals (error message, key) occur
-  bash ~/.claude/skills/callgraph/callgraph.sh <dir|file> --const <pattern>     class constant references and definitions
+  bash ~/.claude/skills/callgraph/callgraph.sh <dir|file> --const <pattern>     constant references and definitions (PHP class constants, Rust const/static)
 
 Language (of the terminal output and the help: en = English, default; hu = Hungarian):
   bash ~/.claude/skills/callgraph/callgraph.sh set-lang                 the current language and where it comes from
   bash ~/.claude/skills/callgraph/callgraph.sh set-lang <en|hu>         save the language (to the skill dir's lang file)
+                                                also switches the skill instructions (SKILL.md) to that language;
+                                                restart Claude Code to reload the skill
   CALLGRAPH_LANG=<en|hu> bash ~/.claude/skills/callgraph/callgraph.sh …   for one run (overrides the saved one)
 
 Update (from GitHub Releases; projects.json, lang, errors.jsonl, feedback.jsonl, update-check.json are kept):
@@ -42,6 +50,8 @@ Update (from GitHub Releases; projects.json, lang, errors.jsonl, feedback.jsonl,
   bash ~/.claude/skills/callgraph/callgraph.sh update                 download and install the newer release
   bash ~/.claude/skills/callgraph/callgraph.sh update --force         reinstall even if up to date
   bash ~/.claude/skills/callgraph/callgraph.sh update --from <zip>    install from a local zip / URL (callgraph-<os>-<arch>.zip)
+  The download is verified against the release's SHA256SUMS (nothing is installed on a mismatch or if it is missing);
+  --insecure-skip-checksum skips this. --from: verified by --sha256 <hex> or a SHA256SUMS next to the zip, else a warning.
   Automatic check: at most once a day, in the background; a newer release adds one "ℹ callgraph X is available" line
   to the end of the output. Off: CALLGRAPH_UPDATE_CHECK=0 (also off when CI is set or outside a skill installation).
 

@@ -11,6 +11,15 @@ use crate::update::{ApiSource, FetchError, RedirectSource};
 const API: &str = "https://example.invalid/releases/latest";
 const ASSET: &str = "https://example.invalid/download/callgraph-linux-x86_64.zip";
 const WEB: &str = "https://example.invalid/o/callgraph/releases/latest";
+const SUMS: &str = "https://example.invalid/download/SHA256SUMS";
+const NAME: &str = "callgraph-linux-x86_64.zip";
+
+/// Egy `SHA256SUMS` a megadott zipre (és egy másik sorra), `sha256sum` formátumban.
+fn sums(zip: &[u8], name: &str) -> Vec<u8> {
+    let other = crate::update::checksum::sha256_hex(b"other");
+    let own = crate::update::checksum::sha256_hex(zip);
+    format!("{other}  callgraph-0.0.0.tar.gz\n{own}  {name}\n").into_bytes()
+}
 
 /// URL → válasz; ami nincs benne, az 404. Az átirányítás célja a `redirect:<url>` kulcs alatti szöveg.
 struct FakeFetcher(HashMap<String, std::result::Result<Vec<u8>, FetchError>>);
@@ -143,6 +152,7 @@ fn update_installs_newer_release_and_keeps_user_data() {
         vec![
             (API, Ok(release_json("v0.2.0"))),
             (ASSET, Ok(release_zip(b"NEW"))),
+            (SUMS, Ok(sums(&release_zip(b"NEW"), NAME))),
         ]
     };
     let (code, out, err) = run(&[], &skill, responses(), true);
@@ -161,6 +171,7 @@ fn update_installs_newer_release_and_keeps_user_data() {
         vec![
             (API, Ok(release_json("v0.1.0"))),
             (ASSET, Ok(release_zip(b"SAME"))),
+            (SUMS, Ok(sums(&release_zip(b"SAME"), NAME))),
         ]
     };
     let (code, _, _) = run(&[], &skill, same(), true);
@@ -210,12 +221,14 @@ fn redirect_source_finds_and_installs_the_latest_release() {
     let tag = "https://example.invalid/o/callgraph/releases/tag/v0.2.0";
     let zip =
         "https://example.invalid/o/callgraph/releases/download/v0.2.0/callgraph-linux-x86_64.zip";
+    let sums_url = "https://example.invalid/o/callgraph/releases/download/v0.2.0/SHA256SUMS";
     let redirect_key = format!("redirect:{WEB}");
     let source = || Box::new(RedirectSource::new(WEB, &test_platform()));
     let responses = || {
         vec![
             (redirect_key.as_str(), Ok(tag.as_bytes().to_vec())),
             (zip, Ok(release_zip(b"WEB"))),
+            (sums_url, Ok(sums(&release_zip(b"WEB"), NAME))),
         ]
     };
     let (code, out, _) = run_with(&["--check"], &skill, responses(), true, source());
@@ -259,5 +272,184 @@ fn background_check_records_latest_silently() {
     // --background csak --check-kel
     let (code, _, _) = run(&["--background"], &skill, vec![], true);
     assert_eq!(code, 1);
+    let _ = std::fs::remove_dir_all(skill);
+}
+
+#[test]
+fn release_without_sha256sums_is_refused_unless_skipped() {
+    let skill = fake_skill("cmd-nosums");
+    let responses = || {
+        vec![
+            (API, Ok(release_json("v0.2.0"))),
+            (ASSET, Ok(release_zip(b"NEW"))),
+        ]
+    };
+    let (code, _, err) = run(&[], &skill, responses(), true);
+    assert_eq!(code, 1);
+    assert!(
+        err.contains("SHA256SUMS") && err.contains("--insecure-skip-checksum"),
+        "{err}"
+    );
+    assert_eq!(read(skill.join("bin/linux-x86_64/callgraph")), "OLD");
+
+    let (code, out, err) = run(&["--insecure-skip-checksum"], &skill, responses(), true);
+    assert_eq!(code, 0, "{err}");
+    assert!(out.contains("0.1.0 → 0.2.0"), "{out}");
+    assert!(err.contains("--insecure-skip-checksum"), "{err}");
+    assert_eq!(read(skill.join("bin/linux-x86_64/callgraph")), "NEW");
+    let _ = std::fs::remove_dir_all(skill);
+}
+
+#[test]
+fn checksum_mismatch_or_missing_entry_installs_nothing() {
+    let skill = fake_skill("cmd-badsum");
+    for bad in [
+        sums(&release_zip(b"TAMPERED"), NAME),
+        sums(&release_zip(b"NEW"), "callgraph-darwin-arm64.zip"),
+    ] {
+        let responses = vec![
+            (API, Ok(release_json("v0.2.0"))),
+            (ASSET, Ok(release_zip(b"NEW"))),
+            (SUMS, Ok(bad)),
+        ];
+        let (code, _, err) = run(&[], &skill, responses, true);
+        assert_eq!(code, 1);
+        assert!(err.contains(NAME) && err.contains("[error-id: "), "{err}");
+        assert_eq!(read(skill.join("bin/linux-x86_64/callgraph")), "OLD");
+    }
+    let _ = std::fs::remove_dir_all(skill);
+}
+
+#[test]
+fn sha256sums_asset_listed_by_the_api_is_used() {
+    let skill = fake_skill("cmd-sumasset");
+    let listed = "https://example.invalid/elsewhere/SHA256SUMS";
+    let json = String::from_utf8(release_json("v0.2.0")).unwrap().replace(
+        "]}",
+        &format!(r#", {{"name": "SHA256SUMS", "browser_download_url": "{listed}"}}]}}"#),
+    );
+    let responses = vec![
+        (API, Ok(json.into_bytes())),
+        (ASSET, Ok(release_zip(b"NEW"))),
+        (listed, Ok(sums(&release_zip(b"NEW"), NAME))),
+    ];
+    let (code, _, err) = run(&[], &skill, responses, true);
+    assert_eq!(code, 0, "{err}");
+    assert_eq!(read(skill.join("bin/linux-x86_64/callgraph")), "NEW");
+    let _ = std::fs::remove_dir_all(skill);
+}
+
+#[test]
+fn local_zip_is_verified_by_sha256_or_sibling_sums_else_warned() {
+    let skill = fake_skill("cmd-fromsum");
+    let zip = "/tmp/dl/callgraph-linux-x86_64.zip";
+    let good = crate::update::checksum::sha256_hex(&release_zip(b"LOCAL"));
+    let bad = crate::update::checksum::sha256_hex(b"x");
+
+    // nincs mellette SHA256SUMS: figyelmeztetés, telepít
+    let only_zip = || vec![(zip, Ok(release_zip(b"LOCAL")))];
+    let (code, _, err) = run(&["--from", zip], &skill, only_zip(), true);
+    assert_eq!(code, 0, "{err}");
+    assert_eq!(err.lines().count(), 1, "{err}");
+    assert!(err.contains("SHA256SUMS"), "{err}");
+    assert_eq!(read(skill.join("bin/linux-x86_64/callgraph")), "LOCAL");
+
+    // --sha256: egyezés telepít, eltérés nem
+    let (code, _, err) = run(
+        &["--from", zip, "--sha256", &good],
+        &skill,
+        only_zip(),
+        true,
+    );
+    assert_eq!((code, err.as_str()), (0, ""));
+    std::fs::write(skill.join("bin/linux-x86_64/callgraph"), "OLD").unwrap();
+    let arg = format!("--sha256={bad}");
+    let (code, _, err) = run(&["--from", zip, &arg], &skill, only_zip(), true);
+    assert_eq!(code, 1);
+    assert!(err.contains(&bad) && err.contains(&good), "{err}");
+    assert_eq!(read(skill.join("bin/linux-x86_64/callgraph")), "OLD");
+
+    // a mellette lévő SHA256SUMS szerint
+    let with_sums = |zip_bytes: &[u8]| {
+        vec![
+            (zip, Ok(release_zip(b"LOCAL"))),
+            ("/tmp/dl/SHA256SUMS", Ok(sums(zip_bytes, NAME))),
+        ]
+    };
+    let (code, _, err) = run(&["--from", zip], &skill, with_sums(b"other"), true);
+    assert_eq!(code, 1, "{err}");
+    assert_eq!(read(skill.join("bin/linux-x86_64/callgraph")), "OLD");
+    let (code, _, err) = run(
+        &["--from", zip],
+        &skill,
+        with_sums(&release_zip(b"LOCAL")),
+        true,
+    );
+    assert_eq!((code, err.as_str()), (0, ""));
+    assert_eq!(read(skill.join("bin/linux-x86_64/callgraph")), "LOCAL");
+
+    // --sha256 csak --from-mal, érvényes hexával
+    for args in [
+        vec!["--sha256", good.as_str()],
+        vec!["--from", zip, "--sha256", "abc"],
+        vec!["--from", zip, "--sha256"],
+    ] {
+        let (code, _, err) = run(&args, &skill, only_zip(), true);
+        assert_eq!(code, 1);
+        assert!(err.contains("--sha256"), "{err}");
+    }
+    let _ = std::fs::remove_dir_all(skill);
+}
+
+#[test]
+fn manual_check_refreshes_the_background_state() {
+    let skill = fake_skill("cmd-check-state");
+    let file = skill.join("update-check.json");
+    let old = CheckState {
+        checked_at: 5,
+        latest: Some("0.1.0".into()),
+        notified_at: Some(7),
+        notified_version: Some("0.1.0".into()),
+    };
+    old.save(&file).unwrap();
+    let (code, _, _) = run(
+        &["--check"],
+        &skill,
+        vec![(API, Ok(release_json("v0.2.0")))],
+        true,
+    );
+    assert_eq!(code, 0);
+    let state = CheckState::load(&file);
+    assert_eq!(state.latest.as_deref(), Some("0.2.0"));
+    assert!(state.checked_at > 5);
+    assert_eq!(
+        (state.notified_at, state.notified_version.as_deref()),
+        (Some(7), Some("0.1.0"))
+    );
+
+    // nincs kiadás: latest = null; hálózati hiba: nem ír
+    let (code, _, _) = run(&["--check"], &skill, vec![], true);
+    assert_eq!(code, 0);
+    assert_eq!(CheckState::load(&file).latest, None);
+    old.save(&file).unwrap();
+    let (code, _, _) = run(
+        &["--check"],
+        &skill,
+        vec![(API, Err(FetchError::Status(500)))],
+        true,
+    );
+    assert_eq!(code, 1);
+    assert_eq!(CheckState::load(&file), old);
+
+    // skill-telepítésen kívül nem ír állapotot
+    std::fs::remove_file(&file).unwrap();
+    let (code, _, _) = run(
+        &["--check"],
+        &skill,
+        vec![(API, Ok(release_json("v0.2.0")))],
+        false,
+    );
+    assert_eq!(code, 0);
+    assert!(!file.exists());
     let _ = std::fs::remove_dir_all(skill);
 }

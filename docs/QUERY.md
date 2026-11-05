@@ -36,6 +36,12 @@ A szkript `CALLGRAPH_LANG=hu`-val futtat: a golden a régi, magyar skill kimenet
 | `--grep <minta>` / `--category <k,...>` | `src/query/filter/` (Specification) + `QueryEngine::query_filtered` | 400 sor fölött találatonként 1 sor (`⚠ A --grep outline N sor lenne …`) |
 | `--depth N` / `--guess` | `QueryEngine::grep_text` + `index::CallerIndex` | a csak név szerinti egyezést „?” jelöli; `--guess` nélkül a szint végén „(+N feloldatlan …)” |
 Ismert maradék (99%+ FileGraph-eltérés, halasztva): a grep-outline sorszáma és néhány feloldatlan hívó a calls-mezőből.
+0.2.0 (szándékos eltérés a régi skilltől): a `--grep` a `grep-outline` formázóval fut — metódusonként a találat-hívások
+helye és forrássora (`L25 │ kód`, `query/snippet.rs`, metódusonként ≤ 5 sor); a `--depth` szintjein is. Rokon típuson át
+(interfész / szülő / trait, felül nem definiáló leszármazott) illesztett hívás: `L25 via Resolver │ …`
+(`index::TypeHierarchy` + `ViaMatcher`, csak `::`-os mintára; `QueryResult::via`, `CallerRow::via`). A szöveges kimenetben,
+ha az abszolút gyökér ≥ 2-szer szerepelne, az első sor `root: <gyökér>`, utána relatív utak (`QueryEngine::relativize`;
+a json / jsonl / mermaid / dot kivétel).
 Hibaüzenetek: az `[error-id]` sort a callgraph-burok (R6g) teszi hozzá — az callgraph csak az üzenetsort írja.
 
 ### R6c: `flow`, `hotspots`, `coverage`, `mermaid`, `dot`

@@ -31,12 +31,20 @@ A terminál-kimenet és a súgó angol (alapértelmezés) vagy magyar. Váltás:
 lekérdezés: `set-lang` argumentum nélkül) — a skill-mappa `lang` fájljába menti, frissítéskor megmarad. Egy futásra: `CALLGRAPH_LANG=hu bash callgraph.sh …`
 (a környezeti változó erősebb az elmentett beállításnál).
 
+A nyelvváltás a skill-utasítást is cseréli: a `set-lang` a `skill-i18n/SKILL.<en|hu>.md`-ből újraírja a `SKILL.md`-t
+(a másik nyelvű eltűnik); az első telepítés (`install.sh` → `callgraph skill-sync`) és a frissítés is az érvényes nyelvűt
+hagyja ott. Az új utasítás betöltéséhez indítsd újra a Claude Code-ot. A `SKILL.md` generált fájl — a `skill-i18n/` forrásokat szerkeszd.
+
 ## Frissítés
 
 `bash callgraph.sh update --check` megnézi, van-e újabb kiadás a GitHub Releases-en; `bash callgraph.sh update` letölti a
 platform csomagját (`callgraph-<os>-<arch>.zip`) és a skill-mappába telepíti: a skill-fájlok és a `bin/` frissülnek, a
 `projects.json`, a `lang`, az `errors.jsonl`, a `feedback.jsonl`, az `update-check.json` és a csomagban nem szereplő fájlok érintetlenek.
 `--force`: újratelepítés akkor is, ha naprakész; `--from <zip|URL>`: helyi zipből / tükörről. A verzió: `callgraph --version`.
+Ellenőrzés: a letöltött zip SHA-256-ját a kiadás `SHA256SUMS` fájljához veti; eltérésnél vagy ha a kiadásnak nincs ilyen
+fájlja (v0.1.0), semmit nem telepít — `--insecure-skip-checksum` kihagyja az ellenőrzést. `--from` mellett a
+`--sha256 <hex>` vagy a zip melletti `SHA256SUMS` szerint ellenőriz; ha egyik sincs, egysoros figyelmeztetéssel telepít.
+Az `update --check` az `update-check.json`-t is frissíti (a napi háttér-ellenőrzés nem ismétli meg).
 Csak skill-telepítésben fut (a bináris a `<skill>/bin/<os>-<arch>/` alatt); egy `target/release/callgraph`-ot nem ír felül.
 A legutóbbi kiadást a `github.com/GeRiY/callgraph/releases/latest` átirányításából olvassa ki (nincs API-korlát; tartalék: a GitHub API).
 
@@ -69,7 +77,7 @@ callgraph project add|list|remove|resolve|get|set-config …              # amit
 callgraph feedback add|resolve|list|show …                              # amit a feedback.sh hív
 callgraph callers <minta> --depth N          # a hívók hívói N szintig
 callgraph set-lang [en|hu]                  # a kimenet nyelve (argumentum nélkül: az aktuális)
-callgraph self-update [--check|--force] [--from <zip|URL>]   # amit a callgraph.sh update hív
+callgraph self-update [--check|--force] [--from <zip|URL> [--sha256 <hex>]] [--insecure-skip-checksum]   # amit a callgraph.sh update hív
 callgraph --version                         # verzió és platform (pl. callgraph 0.1.0 (linux-x86_64))
 callgraph prune [--dry-run]                  # a cache-ből törli a nem létező fájlok és a régi verzió bejegyzéseit
 callgraph --lang php,css <fájl|mappa>…       # csak a megadott nyelvek fájljait elemzi (a többit kihagyja)

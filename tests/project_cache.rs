@@ -11,7 +11,14 @@ impl TempDir {
             .duration_since(UNIX_EPOCH)
             .expect("system clock")
             .as_nanos();
-        let path = std::env::temp_dir().join(format!("callgraph-project-cache-{id}"));
+        let path = std::env::temp_dir().join(format!(
+            "callgraph-project-cache-{id}-{}-{}",
+            std::process::id(),
+            {
+                static N: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+                N.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+            }
+        ));
         fs::create_dir_all(&path).unwrap();
         Self(path)
     }

@@ -1,16 +1,21 @@
 use regex::Regex;
 
+use crate::index::ViaMatcher;
 use crate::model::{Call, FileGraph};
 
 pub(crate) trait CallFilter {
     fn matches(&self, call: &Call) -> bool;
 }
 
-struct RegexSpec(Regex);
+/// A minta: a hívás-célra illeszkedő regex, vagy (ha van) a rokon típuson át hívott keresett metódus.
+struct RegexSpec(Regex, Option<ViaMatcher>);
 impl CallFilter for RegexSpec {
     fn matches(&self, call: &Call) -> bool {
-        self.0
-            .is_match(call.resolved.as_deref().unwrap_or(&call.target))
+        let target = call.resolved.as_deref().unwrap_or(&call.target);
+        // `?::név` (feloldatlan fogadó): a `Típus::név` minta név szerint illeszkedik rá
+        self.0.is_match(target)
+            || crate::index::uncertain_match(&self.0, target)
+            || self.1.as_ref().is_some_and(|via| via.via(target).is_some())
     }
 }
 
@@ -21,21 +26,26 @@ impl CallFilter for CategorySpec {
     }
 }
 
+/// A `--grep` minta regexe: a callgraph jq-szűrője, `test($pattern; "i")` — kis-/nagybetű-független.
+pub(crate) fn pattern_regex(pattern: &str) -> Result<Regex, regex::Error> {
+    regex::RegexBuilder::new(pattern)
+        .case_insensitive(true)
+        .build()
+}
+
 pub(crate) struct FilterChain {
     specs: Vec<Box<dyn CallFilter>>,
 }
 impl FilterChain {
+    /// A szűrőlánc; a `via` a mintát kiegészítő „interfészen át” illesztés (lásd `index::ViaMatcher`).
     pub(crate) fn new(
         pattern: Option<&str>,
         categories: Option<&[String]>,
+        via: Option<ViaMatcher>,
     ) -> Result<Self, regex::Error> {
         let mut specs: Vec<Box<dyn CallFilter>> = Vec::new();
         if let Some(pattern) = pattern {
-            // a callgraph jq-szűrője: test($pattern; "i") — kis-/nagybetű-független
-            let regex = regex::RegexBuilder::new(pattern)
-                .case_insensitive(true)
-                .build()?;
-            specs.push(Box::new(RegexSpec(regex)));
+            specs.push(Box::new(RegexSpec(pattern_regex(pattern)?, via)));
         }
         if let Some(categories) = categories {
             specs.push(Box::new(CategorySpec(categories.to_vec())));

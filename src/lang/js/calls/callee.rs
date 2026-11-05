@@ -229,6 +229,10 @@ impl Scope {
                 if is_native(nm) {
                     return Callee::new(&tgt, Some(nm), None, "native_js", m);
                 }
+                // a fájl objektum-literáljának metódusa (`api.fetch()` → `api.fetch`)
+                if self.names.contains(&tgt) {
+                    return Callee::new(&tgt, Some(nm), None, "internal_helper", m);
+                }
                 Callee::new(&last, Some(nm), None, "external_call", m)
             }
             Root::This => {

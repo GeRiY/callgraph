@@ -1,27 +1,42 @@
 //! `outline` formázó (a callgraph alapnézete).
 
-use crate::model::{FileGraph, Method};
+use crate::i18n::Lang;
+use crate::model::{Call, FileGraph, Method};
 use crate::query::QueryResult;
+use crate::query::snippet::{self, SourceLines};
 use std::fmt::Write as _;
 
 use super::Formatter;
 
 pub struct Outline;
 impl Formatter for Outline {
-    fn format(&self, rows: &[QueryResult], lang: crate::i18n::Lang) -> String {
-        let mut text = rows
-            .iter()
-            .map(|row| outline(row, lang))
-            .collect::<Vec<_>>()
-            .join("\n---\n");
-        text.push_str(lang.pick(
-            "\n---\n💡 for the body logic (conditions, string literals, exact order): Read the L<n>-<m> line range above (offset=<n>, limit=<m-n+1>) — not the whole file.\n",
-            "\n---\n💡 a törzs-logikához (feltételek, string-literálok, pontos sorrend): Read a fenti L<n>-<m> sortartományra (offset=<n>, limit=<m-n+1>) — ne a teljes fájlt.\n",
-        ));
-        text
+    fn format(&self, rows: &[QueryResult], lang: Lang) -> String {
+        render(rows, lang, None)
     }
 }
-fn outline(row: &QueryResult, lang: crate::i18n::Lang) -> String {
+
+/// A `--grep` outline: mint az `outline`, plusz metódusonként a találat-hívások helye és forrássora
+/// (`L25 │ $this->run($x)`, interfészen át illesztettnél `L25 via Resolver │ …`).
+pub struct GrepOutline;
+impl Formatter for GrepOutline {
+    fn format(&self, rows: &[QueryResult], lang: Lang) -> String {
+        render(rows, lang, Some(&SourceLines::default()))
+    }
+}
+
+fn render(rows: &[QueryResult], lang: Lang, source: Option<&SourceLines>) -> String {
+    let mut text = rows
+        .iter()
+        .map(|row| outline(row, lang, source))
+        .collect::<Vec<_>>()
+        .join("\n---\n");
+    text.push_str(lang.pick(
+        "\n---\n💡 for the body logic (conditions, string literals, exact order): Read the L<n>-<m> line range above (offset=<n>, limit=<m-n+1>) — not the whole file.\n",
+        "\n---\n💡 a törzs-logikához (feltételek, string-literálok, pontos sorrend): Read a fenti L<n>-<m> sortartományra (offset=<n>, limit=<m-n+1>) — ne a teljes fájlt.\n",
+    ));
+    text
+}
+fn outline(row: &QueryResult, lang: Lang, source: Option<&SourceLines>) -> String {
     let g = &row.graph;
     let mut s = String::new();
     writeln!(
@@ -36,7 +51,7 @@ fn outline(row: &QueryResult, lang: crate::i18n::Lang) -> String {
     .unwrap();
     writeln!(s).unwrap();
     if g.containers.is_empty() {
-        super::outline_procedural::procedural(g, &mut s, lang);
+        super::outline_procedural::procedural(g, &mut s, lang, source.map(|lines| (row, lines)));
         return s;
     }
     for (i, c) in g.containers.iter().enumerate() {
@@ -120,6 +135,9 @@ fn outline(row: &QueryResult, lang: crate::i18n::Lang) -> String {
             for cat in categories(g, m) {
                 writeln!(s, "    {:<18}{}", cat.0, cat.1).unwrap();
             }
+            if let Some(lines) = source {
+                call_lines(&mut s, row, &method_calls(g, m), lines, lang, "    ");
+            }
             for comment in g
                 .comments
                 .iter()
@@ -148,6 +166,50 @@ pub(super) fn method_line(s: &mut String, m: &Method) {
     )
     .unwrap();
 }
+/// A metódus hívásai (a `categories` szűrőjével).
+pub(crate) fn method_calls<'g>(g: &'g FileGraph, m: &Method) -> Vec<&'g Call> {
+    g.calls
+        .iter()
+        .filter(|c| c.caller.as_deref() == Some(&m.name))
+        .filter(|c| c.container.as_deref() == m.container.as_deref())
+        .collect()
+}
+
+/// A hívások helye soronként egyszer (`L25 [via X] │ kód`), legfeljebb `snippet::MAX_PER_METHOD`, a többi `… +N`.
+pub(crate) fn call_lines(
+    s: &mut String,
+    row: &QueryResult,
+    calls: &[&Call],
+    source: &SourceLines,
+    lang: Lang,
+    indent: &str,
+) {
+    let mut lines: Vec<u32> = calls.iter().map(|c| c.line).collect();
+    lines.sort_unstable();
+    lines.dedup();
+    for &line in lines.iter().take(snippet::MAX_PER_METHOD) {
+        let via = calls
+            .iter()
+            .filter(|c| c.line == line)
+            .find_map(|c| row.via_of(c));
+        let code = source.get(&row.graph.file, line);
+        writeln!(
+            s,
+            "{indent}{}",
+            snippet::call_line(lang, line, via, code.as_deref())
+        )
+        .unwrap();
+    }
+    if lines.len() > snippet::MAX_PER_METHOD {
+        writeln!(
+            s,
+            "{indent}{}",
+            snippet::more(lang, lines.len() - snippet::MAX_PER_METHOD)
+        )
+        .unwrap();
+    }
+}
+
 pub(super) fn categories(g: &FileGraph, m: &Method) -> Vec<(String, String)> {
     let mut grouped: std::collections::BTreeMap<String, Vec<String>> =
         std::collections::BTreeMap::new();

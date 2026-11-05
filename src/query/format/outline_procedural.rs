@@ -7,8 +7,16 @@ use std::fmt::Write as _;
 use super::selection::pad;
 use crate::i18n::Lang;
 use crate::model::FileGraph;
+use crate::query::QueryResult;
+use crate::query::snippet::{self, SourceLines};
 
-pub(super) fn procedural(g: &FileGraph, s: &mut String, lang: Lang) {
+/// `calls`: a `--grep` nézetben a sor + a forrássor (`L12  f │ f($x);`) a „hívások sorrendben” listában.
+pub(super) fn procedural(
+    g: &FileGraph,
+    s: &mut String,
+    lang: Lang,
+    calls: Option<(&QueryResult, &SourceLines)>,
+) {
     if g.calls.is_empty() {
         s.push_str(lang.pick(
             "(no class/interface/trait, and no calls either)\n",
@@ -64,6 +72,19 @@ pub(super) fn procedural(g: &FileGraph, s: &mut String, lang: Lang) {
     }
     for (line, targets) in by_line {
         let list: Vec<&str> = targets.iter().map(String::as_str).collect();
-        writeln!(s, "    L{line}  {}", list.join(", ")).unwrap();
+        let Some((row, source)) = calls else {
+            writeln!(s, "    L{line}  {}", list.join(", ")).unwrap();
+            continue;
+        };
+        let via = g
+            .calls
+            .iter()
+            .filter(|c| c.line == line)
+            .find_map(|c| row.via_of(c));
+        let code = source.get(&g.file, line);
+        let marks = snippet::call_line(lang, line, via, code.as_deref());
+        // `L12 via X │ kód` → `L12  célok via X │ kód` (a célok a sor után, mint a sima nézetben)
+        let rest = marks.strip_prefix(&format!("L{line}")).unwrap_or("");
+        writeln!(s, "    L{line}  {}{rest}", list.join(", ")).unwrap();
     }
 }

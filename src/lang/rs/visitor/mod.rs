@@ -8,6 +8,7 @@ mod comments;
 mod control_flow;
 mod imports;
 mod macros;
+mod receivers;
 mod scopes;
 mod strings;
 mod structure;
