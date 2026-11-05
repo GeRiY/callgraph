@@ -56,6 +56,20 @@ jobs:
           name: bin-${{ matrix.dir }}
           path: out/
           retention-days: 1
+      # a letölthető, telepíthető csomag: skill-fájlok + útmutató + ennek a platformnak a binárisa
+      - name: telepíthető csomag
+        shell: bash
+        run: |
+          p=pkg/callgraph
+          mkdir -p $p/bin
+          cp skill/SKILL.md skill/README.md skill/TELEPITES.md skill/*.sh LICENSE $p/
+          cp -R skill/extras $p/extras
+          cp -R out/${{ matrix.dir }} $p/bin/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: callgraph-${{ matrix.dir }}
+          path: pkg/
+          retention-days: 7
 
   package:
     needs: build

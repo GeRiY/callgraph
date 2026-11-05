@@ -6,7 +6,7 @@ A használat leírása a `SKILL.md`-ben van.
 
 ## Csomag
 
-`SKILL.md`, `README.md`, `install.sh`, `callgraph.sh`, `lib.sh`, `projects.sh`, `feedback.sh`, `extras/`,
+`SKILL.md`, `README.md`, `TELEPITES.md` (lépésenkénti telepítés), `install.sh`, `callgraph.sh`, `lib.sh`, `projects.sh`, `feedback.sh`, `extras/`,
 `bin/<os>-<arch>/callgraph`.
 
 ## Telepítés
