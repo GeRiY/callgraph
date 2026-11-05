@@ -535,6 +535,8 @@ def cg_hits(corpus, out):
 def cg_files_any(corpus, out):
     """Fájlutak bármilyen callgraph-kimenetből (strings / const / outline-fejlécek)."""
     files = set()
+    # az első „root: /abs” sor maga nem találat (utána az utak ehhez relatívak)
+    out = "\n".join(ln for ln in out.splitlines() if not re.match(r"^(?:root|gyökér): ", ln))
     for tok in re.findall(r"(?:^|\s|\()((?:/|\.?[\w-]+/)[\w./@-]+\.\w+)(?::\d+)?", out, re.M):
         f = os.path.relpath(tok, corpus.root) if os.path.isabs(tok) else tok
         if os.path.exists(os.path.join(corpus.root, f)):

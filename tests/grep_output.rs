@@ -59,9 +59,19 @@ impl Project {
         String::from_utf8(out.stdout).unwrap()
     }
 
+    /// A kiírt gyökér: Windowson a `\\?\` előtag nélkül (ahogy a callgraph is kiírja).
     fn root(&self) -> String {
-        self.0.to_string_lossy().into_owned()
+        let root = self.0.to_string_lossy().into_owned();
+        match root.strip_prefix(r"\\?\") {
+            Some(rest) if rest.as_bytes().get(1) == Some(&b':') => rest.to_owned(),
+            _ => root,
+        }
     }
+}
+
+/// `src/a/B.php` a platform elválasztójával (Windowson `src\a\B.php`).
+fn sep(path: &str) -> String {
+    path.replace('/', std::path::MAIN_SEPARATOR_STR)
 }
 
 impl Drop for Project {
@@ -82,10 +92,16 @@ fn grep_prints_root_once_and_relative_paths() {
     );
     assert_eq!(out.matches(root.as_str()).count(), 1, "{out}");
     assert!(
-        out.contains("FILE  src/Controller.php  NS:App\\Http"),
+        out.contains(&format!(
+            "FILE  {}  NS:App\\Http",
+            sep("src/Controller.php")
+        )),
         "{out}"
     );
-    assert!(out.contains("FILE  src/PlaylistResolver.php"), "{out}");
+    assert!(
+        out.contains(&format!("FILE  {}", sep("src/PlaylistResolver.php"))),
+        "{out}"
+    );
 }
 
 #[test]
@@ -95,7 +111,7 @@ fn single_path_output_stays_absolute_without_root_line() {
     let root = project.root();
     assert!(!out.starts_with("root: "), "{out}");
     assert!(
-        out.contains(&format!("FILE  {root}/src/Controller.php")),
+        out.contains(&format!("FILE  {root}{}", sep("/src/Controller.php"))),
         "{out}"
     );
 }
@@ -136,18 +152,16 @@ fn depth_lists_call_lines_and_follows_the_interface_upwards() {
     let root = project.root();
     assert!(out.starts_with(&format!("root: {root}\n")), "{out}");
     assert!(
-        out.contains(
-            "  src/PlaylistResolver.php  PlaylistResolver::getPlayables()  L10-13\n    L12 │ return $this->repo->find($id);\n"
-        ),
+        out.contains(&format!("  {}  PlaylistResolver::getPlayables()  L10-13\n    L12 │ return $this->repo->find($id);\n", sep("src/PlaylistResolver.php"))),
         "{out}"
     );
     // 2. szint: a controller a Resolver interfészen át hívja a PlaylistResolver::getPlayables-t
     assert!(
-        out.contains("  src/Controller.php  Controller::index()  L12-15  ← App\\Contracts\\Resolver::getPlayables\n    L14 via Resolver │ return $this->resolver->getPlayables($id);\n"),
+        out.contains(&format!("  {}  Controller::index()  L12-15  ← App\\Contracts\\Resolver::getPlayables\n    L14 via Resolver │ return $this->resolver->getPlayables($id);\n", sep("src/Controller.php"))),
         "{out}"
     );
     assert!(
-        out.contains("  src/Controller.php  Controller::direct()  L17-21  ← App\\Services\\PlaylistResolver::getPlayables\n    L19 │ $items"),
+        out.contains(&format!("  {}  Controller::direct()  L17-21  ← App\\Services\\PlaylistResolver::getPlayables\n    L19 │ $items", sep("src/Controller.php"))),
         "{out}"
     );
 }
@@ -197,11 +211,17 @@ fn depth_searches_the_whole_project_from_level_two() {
         "2",
     ]);
     assert!(
-        out.contains("  src/Services/Lookup.php  Lookup::run()  L8-11\n"),
+        out.contains(&format!(
+            "  {}  Lookup::run()  L8-11\n",
+            sep("src/Services/Lookup.php")
+        )),
         "{out}"
     );
     assert!(
-        out.contains("  src/Http/Admin.php  Admin::show()  L10-13  ← App\\Services\\Lookup::run\n"),
+        out.contains(&format!(
+            "  {}  Admin::show()  L10-13  ← App\\Services\\Lookup::run\n",
+            sep("src/Http/Admin.php")
+        )),
         "{out}"
     );
 }
