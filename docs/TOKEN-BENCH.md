@@ -70,29 +70,6 @@ A Read kimenete `cat -n` formátum (6 széles sorszám + tab), a grep-é `út:so
   hívók — a grep-pel talált hívó fájlok közül hányat ad vissza a callgraph (≥ 90%), és a grep-sorok hány %-át fedi le metódus-sáv;
   string/konstans — fájlszintű visszahívás a grep-hez képest (≥ 90%).
 
-## Eredmény (2026-11-05, develop @ 0baa09f, musl release-build)
+## Eredmények
 
-Korpuszok: laravel/framework `src` (1748 PHP-fájl), koel `app` (1067 PHP) és `resources/assets/js` (1014 TS/Vue), axum (305 .rs),
-ripgrep `crates` (90 .rs), a callgraph saját `src`-je (266 .rs), `golden/samples/swift` (4 fájl). 60 feladat, 5 futás.
-
-| Típus | n | × okos (tényleges) | × naiv | lépés okos → cg | cg meleg / hideg (ms) | helyes |
-|---|---|---|---|---|---|---|
-| outline | 13 | 4,5× | 4,5× | 1 → 1 | 7 / 20 | 12/13 |
-| api | 7 | 7,7× | 7,7× | 1 → 1 | 6 / 26 | 6/7 |
-| body | 12 | **0,96×** | 18,1× | 2 → 1 | 10 / 49 | 11/12 |
-| callers (1 szint) | 12 | 10,7× | 43× | 19 → 1 | 132 / 1200 | 12/12 |
-| callers_d2 | 6 | 55× | 130× | 53,5 → 1 | 370 / 1484 | 6/6 (1. szint) |
-| strings | 5 | 2,6× | 6,1× | 1 → 1 | 238 / 1144 | 3/5 |
-| const | 5 | 1,0× | 26,9× | 1 → 2 | 148 / 1031 | 2/5 |
-| **összes** | 60 | **4,5×** (Σ-arány 6,4×) | 17,7× | 1,5 → 1 | 30 / 70 | 52/60 |
-
-Tanulságok (részletesen a riport „Korlátok” részében):
-
-- A hívó-keresés és a hatáselemzés a nagy nyereség; a 2. szint viszont mindkét oldalon pontatlan (a grep név-ütközésekkel
-  felfújt, a callgraph az interfészen át hívott metódust nem köti be, Rustban a feloldatlanokat `--guess` nélkül kihagyja).
-- A metódus-törzs **nem** olcsóbb a célzott Read-nél (a docblock miatt 0,82–1,03×); a nyereség csak a lépés.
-- A SKILL.md-stílusú `Típus::metódus` minta 14 hívó-feladatból 12-ben legfeljebb 1 hívó fájlt adott (Rust: fogadón át hívott
-  metódus; PHP: trait- és örökölt metódus a hívott osztály nevén); a név szerinti minta mindenhol teljes volt.
-- `--const` Rust `const`-ra nem ad találatot; `--strings` nem látja a Vue-template `{{ }}`-beli és a Rust `const`-beli stringeket;
-  Rust `--format api` az `impl`-ek `pub fn`-jeit nem listázza; JS/TS objektum-literálos metódus nem külön metódus.
-- A keresés-kimenetek bájtjainak ~17%-a az abszolút gyökér-előtag.
+A mérési eredmények (számok, riport) **nem kerülnek a repóba**: a `--out` / `--html` fájlokat a repón kívülre írd.
