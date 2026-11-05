@@ -28,7 +28,7 @@ A használat leírása a `SKILL.md`-ben van.
 ## Nyelv
 
 A terminál-kimenet és a súgó angol (alapértelmezés) vagy magyar. Váltás: `bash callgraph.sh set-lang hu` (vissza: `set-lang en`,
-lekérdezés: `lang`) — a skill-mappa `lang` fájljába menti, frissítéskor megmarad. Egy futásra: `CALLGRAPH_LANG=hu bash callgraph.sh …`
+lekérdezés: `set-lang` argumentum nélkül) — a skill-mappa `lang` fájljába menti, frissítéskor megmarad. Egy futásra: `CALLGRAPH_LANG=hu bash callgraph.sh …`
 (a környezeti változó erősebb az elmentett beállításnál).
 
 ## Környezeti változók
@@ -52,6 +52,7 @@ callgraph wrap [--project alias] [kapcsolók] <fájl|mappa>[::metódus]   # amit
 callgraph project add|list|remove|resolve|get|set-config …              # amit a projects.sh hív
 callgraph feedback add|resolve|list|show …                              # amit a feedback.sh hív
 callgraph callers <minta> --depth N          # a hívók hívói N szintig
+callgraph set-lang [en|hu]                  # a kimenet nyelve (argumentum nélkül: az aktuális)
 callgraph prune [--dry-run]                  # a cache-ből törli a nem létező fájlok és a régi verzió bejegyzéseit
 callgraph --lang php,css <fájl|mappa>…       # csak a megadott nyelvek fájljait elemzi (a többit kihagyja)
 ```
