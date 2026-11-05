@@ -11,7 +11,7 @@ pub struct Lines {
 }
 
 impl Formatter for Lines {
-    fn format(&self, rows: &[QueryResult]) -> String {
+    fn format(&self, rows: &[QueryResult], _lang: crate::i18n::Lang) -> String {
         let mut out = String::new();
         for row in rows {
             let (start, end) = self.range;

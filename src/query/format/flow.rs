@@ -7,12 +7,13 @@ use super::Formatter;
 use super::selection::{pad, selected};
 use crate::query::QueryResult;
 
-const EMPTY: &str = "(nincs if/match/switch elágazás a kiválasztott részben — a törzshöz: --format outline, utána célzott Read)\n";
+const EMPTY_EN: &str = "(no if/match/switch branches in the selected part — for the body: --format outline, then a targeted Read)\n";
+const EMPTY_HU: &str = "(nincs if/match/switch elágazás a kiválasztott részben — a törzshöz: --format outline, utána célzott Read)\n";
 
 pub struct Flow;
 
 impl Formatter for Flow {
-    fn format(&self, rows: &[QueryResult]) -> String {
+    fn format(&self, rows: &[QueryResult], lang: crate::i18n::Lang) -> String {
         let mut out = String::new();
         for row in rows {
             let graph = selected(row);
@@ -60,7 +61,7 @@ impl Formatter for Flow {
         // A callgraph a kimenet végi üres sorokat levágja ($(cat)), és egy sortöréssel zár.
         let trimmed = out.trim_end_matches('\n');
         if trimmed.is_empty() {
-            EMPTY.to_string()
+            lang.pick(EMPTY_EN, EMPTY_HU).to_string()
         } else {
             format!("{trimmed}\n")
         }

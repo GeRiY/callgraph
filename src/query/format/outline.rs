@@ -8,13 +8,20 @@ use super::Formatter;
 
 pub struct Outline;
 impl Formatter for Outline {
-    fn format(&self, rows: &[QueryResult]) -> String {
-        let mut text = rows.iter().map(outline).collect::<Vec<_>>().join("\n---\n");
-        text.push_str("\n---\n💡 a törzs-logikához (feltételek, string-literálok, pontos sorrend): Read a fenti L<n>-<m> sortartományra (offset=<n>, limit=<m-n+1>) — ne a teljes fájlt.\n");
+    fn format(&self, rows: &[QueryResult], lang: crate::i18n::Lang) -> String {
+        let mut text = rows
+            .iter()
+            .map(|row| outline(row, lang))
+            .collect::<Vec<_>>()
+            .join("\n---\n");
+        text.push_str(lang.pick(
+            "\n---\n💡 for the body logic (conditions, string literals, exact order): Read the L<n>-<m> line range above (offset=<n>, limit=<m-n+1>) — not the whole file.\n",
+            "\n---\n💡 a törzs-logikához (feltételek, string-literálok, pontos sorrend): Read a fenti L<n>-<m> sortartományra (offset=<n>, limit=<m-n+1>) — ne a teljes fájlt.\n",
+        ));
         text
     }
 }
-fn outline(row: &QueryResult) -> String {
+fn outline(row: &QueryResult, lang: crate::i18n::Lang) -> String {
     let g = &row.graph;
     let mut s = String::new();
     writeln!(
@@ -29,7 +36,7 @@ fn outline(row: &QueryResult) -> String {
     .unwrap();
     writeln!(s).unwrap();
     if g.containers.is_empty() {
-        super::outline_procedural::procedural(g, &mut s);
+        super::outline_procedural::procedural(g, &mut s, lang);
         return s;
     }
     for (i, c) in g.containers.iter().enumerate() {

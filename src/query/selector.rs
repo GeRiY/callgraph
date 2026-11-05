@@ -1,6 +1,7 @@
 //! A `fájl[::metódus]` lekérdezési argumentumok értelmezése.
 
 use crate::error::{CallgraphError, Result};
+use crate::t;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -20,7 +21,11 @@ impl SelectorSet {
         let selected = paths.iter().any(|p| p.to_string_lossy().contains("::"));
         if selected && paths.iter().any(|p| !p.to_string_lossy().contains("::")) {
             return Err(CallgraphError::Usage(
-                "Ne keverd a :: szelektoros és a sima fájl-argumentumokat egy hívásban.".into(),
+                t!(
+                    "Don't mix :: selector and plain file arguments in one call.",
+                    "Ne keverd a :: szelektoros és a sima fájl-argumentumokat egy hívásban."
+                )
+                .into(),
             ));
         }
         let items = paths
@@ -36,7 +41,9 @@ impl SelectorSet {
                     },
                     |(file, method)| {
                         if method.is_empty() {
-                            Err(CallgraphError::Usage("üres metódus-szelektor".into()))
+                            Err(CallgraphError::Usage(
+                                t!("empty method selector", "üres metódus-szelektor").into(),
+                            ))
                         } else {
                             Ok(Selector {
                                 file: PathBuf::from(file),

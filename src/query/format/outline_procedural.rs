@@ -5,14 +5,21 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 
 use super::selection::pad;
+use crate::i18n::Lang;
 use crate::model::FileGraph;
 
-pub(super) fn procedural(g: &FileGraph, s: &mut String) {
+pub(super) fn procedural(g: &FileGraph, s: &mut String, lang: Lang) {
     if g.calls.is_empty() {
-        s.push_str("(nincs class/interface/trait, és nincs hívás sem)\n");
+        s.push_str(lang.pick(
+            "(no class/interface/trait, and no calls either)\n",
+            "(nincs class/interface/trait, és nincs hívás sem)\n",
+        ));
         return;
     }
-    s.push_str("(procedurális fájl — nincs class/interface/trait)\n\n");
+    s.push_str(lang.pick(
+        "(procedural file — no class/interface/trait)\n\n",
+        "(procedurális fájl — nincs class/interface/trait)\n\n",
+    ));
     let target = |c: &crate::model::Call| c.resolved.clone().unwrap_or_else(|| c.target.clone());
     let mut groups: BTreeMap<&str, BTreeSet<String>> = BTreeMap::new();
     for c in &g.calls {
@@ -30,7 +37,7 @@ pub(super) fn procedural(g: &FileGraph, s: &mut String) {
         .collect();
     flows.sort_by_key(|cf| cf.line);
     if !flows.is_empty() {
-        s.push_str("  elágazások:\n");
+        s.push_str(lang.pick("  conditionals:\n", "  elágazások:\n"));
         for cf in flows {
             let branches: Vec<String> = cf
                 .branches
@@ -39,16 +46,17 @@ pub(super) fn procedural(g: &FileGraph, s: &mut String) {
                 .collect();
             writeln!(
                 s,
-                "    L{}  {} ({})  ágak: {}",
+                "    L{}  {} ({})  {} {}",
                 cf.line,
                 cf.kind,
                 cf.cond.as_deref().unwrap_or(""),
+                lang.pick("branches:", "ágak:"),
                 branches.join(", ")
             )
             .unwrap();
         }
     }
-    s.push_str("  hívások sorrendben:\n");
+    s.push_str(lang.pick("  calls in order:\n", "  hívások sorrendben:\n"));
     // jq: unique_by([.line, .t]) | group_by(.line) — soronként a célok rendezve, ismétlés nélkül
     let mut by_line: BTreeMap<u32, BTreeSet<String>> = BTreeMap::new();
     for c in &g.calls {

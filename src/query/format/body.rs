@@ -9,7 +9,7 @@ use super::source::{numbered, source_lines};
 pub struct Body;
 
 impl Formatter for Body {
-    fn format(&self, rows: &[QueryResult]) -> String {
+    fn format(&self, rows: &[QueryResult], _lang: crate::i18n::Lang) -> String {
         let mut out = String::new();
         for row in rows {
             let lines = source_lines(row);

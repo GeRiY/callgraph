@@ -9,6 +9,7 @@ use crate::analysis::Analyzer;
 use crate::error::{CallgraphError, Result};
 use crate::io::FileWalker;
 use crate::model::FileGraph;
+use crate::tf;
 use std::path::{Path, PathBuf};
 
 pub struct QueryResult {
@@ -53,16 +54,20 @@ impl QueryEngine {
         for (file, methods) in files {
             let abs = self.root.join(&file);
             if !abs.is_file() {
-                return Err(CallgraphError::Usage(format!(
-                    "Nem található: {} (--project {} gyökeréhez képest)",
-                    abs.display(),
-                    self.label
-                )));
+                return Err(self.not_found(&abs));
             }
             let graph = self.load(&mut cache, &abs)?;
             let methods = methods.map(|names| {
                 let found = graph.methods.iter().filter(|m| names.iter().any(|n| n == &m.name)).map(|m| m.name.clone()).collect::<Vec<_>>();
-                if found.len() != names.len() { let missing = names.into_iter().find(|n| !found.contains(n)).unwrap(); return Err(CallgraphError::Usage(format!("Nincs ilyen metódus: {}::{} (lásd: --format outline a fájl teljes listájához)", abs.display(), missing))); }
+                if found.len() != names.len() {
+                    let missing = names.into_iter().find(|n| !found.contains(n)).unwrap();
+                    return Err(CallgraphError::Usage(tf!(
+                        "No such method: {}::{} (see --format outline for the file's full list)",
+                        "Nincs ilyen metódus: {}::{} (lásd: --format outline a fájl teljes listájához)",
+                        abs.display(),
+                        missing
+                    )));
+                }
                 Ok(found)
             }).transpose()?;
             out.push(QueryResult { graph, methods });
@@ -77,7 +82,7 @@ impl QueryEngine {
     ) -> Result<Vec<QueryResult>> {
         let rows = self.query(selectors)?;
         let chain = FilterChain::new(pattern, categories)
-            .map_err(|e| CallgraphError::Usage(format!("hibás minta: {e}")))?;
+            .map_err(|e| CallgraphError::Usage(tf!("invalid pattern: {e}", "hibás minta: {e}")))?;
         if pattern.is_none() && categories.is_none() {
             return Ok(rows);
         }
@@ -115,14 +120,18 @@ impl QueryEngine {
                         result.push((f.strip_prefix(&self.root).unwrap_or(&f).to_path_buf(), None));
                     }
                 } else {
-                    return Err(CallgraphError::Usage(format!(
-                        "Nem található: {} (--project {} gyökeréhez képest)",
-                        abs.display(),
-                        self.label
-                    )));
+                    return Err(self.not_found(&abs));
                 }
             }
         }
         Ok(result)
+    }
+    /// A „nincs ilyen fájl/mappa” hiba (a `Not found: ` / `Nem található: ` előtagot a CLI hibaosztályozója figyeli).
+    fn not_found(&self, abs: &Path) -> CallgraphError {
+        let (path, label) = (abs.display(), &self.label);
+        CallgraphError::Usage(tf!(
+            "Not found: {path} (relative to the --project {label} root)",
+            "Nem található: {path} (--project {label} gyökeréhez képest)"
+        ))
     }
 }

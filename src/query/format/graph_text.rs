@@ -24,7 +24,7 @@ fn inherits(c: &Container) -> impl Iterator<Item = (&'static str, &String)> {
 pub struct Mermaid;
 
 impl Formatter for Mermaid {
-    fn format(&self, rows: &[QueryResult]) -> String {
+    fn format(&self, rows: &[QueryResult], _lang: crate::i18n::Lang) -> String {
         let mut lines = BTreeSet::new();
         for row in rows {
             let graph = selected(row);
@@ -58,7 +58,7 @@ impl Formatter for Mermaid {
 pub struct Dot;
 
 impl Formatter for Dot {
-    fn format(&self, rows: &[QueryResult]) -> String {
+    fn format(&self, rows: &[QueryResult], _lang: crate::i18n::Lang) -> String {
         let mut lines = BTreeSet::new();
         for row in rows {
             let graph = selected(row);

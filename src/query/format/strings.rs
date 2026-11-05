@@ -66,10 +66,10 @@ fn flatten(text: &str) -> String {
 }
 
 impl Formatter for Strings {
-    fn format(&self, rows: &[QueryResult]) -> String {
+    fn format(&self, rows: &[QueryResult], lang: crate::i18n::Lang) -> String {
         let hits = self.collect(rows);
         if hits.is_empty() {
-            return "(nincs találat)\n".to_owned();
+            return lang.pick("(no matches)\n", "(nincs találat)\n").to_owned();
         }
         let mut out = String::new();
         let mut prev: Option<&str> = None;

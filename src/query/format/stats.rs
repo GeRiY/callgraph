@@ -8,7 +8,7 @@ use super::Formatter;
 pub struct Stats;
 
 impl Formatter for Stats {
-    fn format(&self, rows: &[QueryResult]) -> String {
+    fn format(&self, rows: &[QueryResult], lang: crate::i18n::Lang) -> String {
         let mut out = String::new();
         for row in rows {
             let graph = &row.graph;
@@ -29,13 +29,28 @@ impl Formatter for Stats {
                     .unwrap_or_default()
             )
             .unwrap();
-            writeln!(out, "containerek: {} ({kinds})", graph.containers.len()).unwrap();
-            writeln!(out, "property-k: {}", graph.properties.len()).unwrap();
-            writeln!(out, "konstansok: {}", graph.constants.len()).unwrap();
-            writeln!(out, "metódusok: {}", graph.methods.len()).unwrap();
-            writeln!(out, "hívások összesen: {}", graph.calls.len()).unwrap();
+            let label = |en: &'static str, hu: &'static str| lang.pick(en, hu);
+            writeln!(
+                out,
+                "{} {} ({kinds})",
+                label("containers:", "containerek:"),
+                graph.containers.len()
+            )
+            .unwrap();
+            let counts = [
+                (label("properties:", "property-k:"), graph.properties.len()),
+                (label("constants:", "konstansok:"), graph.constants.len()),
+                (label("methods:", "metódusok:"), graph.methods.len()),
+                (
+                    label("total calls:", "hívások összesen:"),
+                    graph.calls.len(),
+                ),
+            ];
+            for (name, count) in counts {
+                writeln!(out, "{name} {count}").unwrap();
+            }
             if !graph.calls.is_empty() {
-                out.push_str("kategória szerint:\n");
+                out.push_str(label("by category:\n", "kategória szerint:\n"));
                 let mut counts = std::collections::BTreeMap::<&str, usize>::new();
                 for call in &graph.calls {
                     *counts.entry(&call.category).or_default() += 1;
