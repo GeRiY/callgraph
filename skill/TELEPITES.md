@@ -3,6 +3,8 @@
 1. Csomagold ki a zipet; a benne lévő `callgraph/` mappát másold a Claude Code skill-mappájába:
    `~/.claude/skills/callgraph/` (Windows: `%USERPROFILE%\.claude\skills\callgraph\`).
    Frissítésnél a meglévő mappa fölé másold: a `projects.json`, az `errors.jsonl`, a `feedback.jsonl` és a `lang` (nyelvi beállítás) megmarad.
+   Egyszerűbb: `bash ~/.claude/skills/callgraph/callgraph.sh update` — letölti és telepíti a legújabb kiadást
+   (`update --check`: csak megnézi, van-e újabb; a felhasználói adatok itt is megmaradnak).
 2. Futtasd a skill-mappában: `bash install.sh` — futtathatóvá teszi a scripteket és a binárist, macOS-en leveszi
    a letöltés karantén-jelzőjét, és ellenőrzi, hogy van-e a gépedhez illő bináris (`bin/<os>-<arch>/callgraph`).
 3. Regisztrálj egy projektet: `bash ~/.claude/skills/callgraph/projects.sh add myapp /abszolút/út/a/projekthez`

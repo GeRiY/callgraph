@@ -7,7 +7,9 @@ mod feedback;
 mod lang;
 mod project;
 mod prune;
+mod self_update;
 mod show;
+mod version;
 mod wrap;
 
 pub use analyze::AnalyzeCommand;
@@ -17,5 +19,7 @@ pub use feedback::FeedbackCommand;
 pub use lang::LangCommand;
 pub use project::ProjectCommand;
 pub use prune::PruneCommand;
+pub use self_update::SelfUpdateCommand;
 pub use show::ShowCommand;
+pub use version::VersionCommand;
 pub use wrap::WrapCommand;

@@ -142,6 +142,17 @@ a letöltés karantén-jelzőjét is leveszi. Lépésenkénti útmutató: [`skil
 
 Futtatáshoz csak `bash` kell.
 
+### Frissítés
+
+```bash
+bash ~/.claude/skills/callgraph/callgraph.sh update --check   # van-e újabb kiadás? (nem változtat semmit)
+bash ~/.claude/skills/callgraph/callgraph.sh update           # letöltés és telepítés
+```
+
+A frissítés a legújabb GitHub Release-ből letölti a platformod zipjét, és felülírja a skill-fájlokat és a `bin/`-t;
+a `projects.json`, az `errors.jsonl`, a `feedback.jsonl` és a nyelvbeállítás megmarad. `--force`: a jelenlegi verzió
+újratelepítése; `callgraph --version`: a telepített verzió.
+
 ## Használat
 
 Minden parancs a `callgraph.sh`-n át megy (vagy közvetlenül a binárissal: `callgraph show …`). A `--project <alias>`

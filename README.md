@@ -141,6 +141,17 @@ clears the download quarantine flag. Step-by-step guide (Hungarian): [`skill/TEL
 
 The only runtime requirement is `bash`.
 
+### Updating
+
+```bash
+bash ~/.claude/skills/callgraph/callgraph.sh update --check   # is there a newer release? (changes nothing)
+bash ~/.claude/skills/callgraph/callgraph.sh update           # download and install it
+```
+
+The update downloads your platform's zip from the latest GitHub Release and overwrites the skill files and `bin/`;
+`projects.json`, `errors.jsonl`, `feedback.jsonl` and the language setting are kept. `--force` reinstalls the current
+version; `callgraph --version` shows the installed one.
+
 ## Usage
 
 All commands go through `callgraph.sh` (or the binary directly: `callgraph show …`). `--project <alias>` makes paths

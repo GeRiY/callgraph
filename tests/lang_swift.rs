@@ -62,7 +62,7 @@ fn registry_routes_swift_to_frontend() {
 fn walker_visits_swift_files() {
     let project = TempDir::with_samples();
     let r = LanguageRegistry::with_defaults();
-    let files = FileWalker::for_registry(&r).collect(&[project.0.clone()], &mut |_| {});
+    let files = FileWalker::for_registry(&r).collect(std::slice::from_ref(&project.0), &mut |_| {});
     let names: Vec<_> = files
         .iter()
         .filter_map(|f| f.file_name()?.to_str().map(str::to_string))

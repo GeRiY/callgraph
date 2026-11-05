@@ -3,9 +3,9 @@
 # Használat: bash tools/dev.sh <parancs> [argumentumok]
 #   build              cargo build --release
 #   test [arg…]        cargo test --release [arg…]
-#   clippy             cargo clippy --release -- -D warnings
+#   clippy             cargo clippy --release --all-targets -- -D warnings (a tesztkód is, mint a CI)
 #   fmt                cargo fmt
-#   check              cargo fmt --check + clippy + test (a commit előtti kör)
+#   check              cargo fmt --check + clippy --all-targets + test (a commit előtti kör, a CI-vel azonos)
 #   skill              bash tools/build-skill.sh (a natív Linux-csomag)
 #   run <cmd…>         tetszőleges parancs a konténerben (pl. run target/docker/release/callgraph src/main.rs)
 #   shell              interaktív shell a konténerben
@@ -36,9 +36,9 @@ cmd="${1:-}"
 case "$cmd" in
     build)  in_container cargo build --release "$@" ;;
     test)   in_container cargo test --release "$@" ;;
-    clippy) in_container cargo clippy --release "$@" -- -D warnings ;;
+    clippy) in_container cargo clippy --release --all-targets "$@" -- -D warnings ;;
     fmt)    in_container cargo fmt "$@" ;;
-    check)  in_container bash -c 'cargo fmt --check && cargo clippy --release -- -D warnings && cargo test --release' ;;
+    check)  in_container bash -c 'cargo fmt --check && cargo clippy --release --all-targets -- -D warnings && cargo test --release' ;;
     skill)  in_container bash tools/build-skill.sh "$@" ;;
     run)    [[ $# -gt 0 ]] || { echo "dev.sh run: add meg a parancsot" >&2; exit 2; }; in_container "$@" ;;
     shell)  in_container bash ;;

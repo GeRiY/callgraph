@@ -37,6 +37,12 @@ Language (of the terminal output and the help: en = English, default; hu = Hunga
   bash ~/.claude/skills/callgraph/callgraph.sh set-lang <en|hu>         save the language (to the skill dir's lang file)
   CALLGRAPH_LANG=<en|hu> bash ~/.claude/skills/callgraph/callgraph.sh …   for one run (overrides the saved one)
 
+Update (from GitHub Releases; projects.json, lang, errors.jsonl, feedback.jsonl are kept):
+  bash ~/.claude/skills/callgraph/callgraph.sh update --check         is there a newer release? (changes nothing)
+  bash ~/.claude/skills/callgraph/callgraph.sh update                 download and install the newer release
+  bash ~/.claude/skills/callgraph/callgraph.sh update --force         reinstall even if up to date
+  bash ~/.claude/skills/callgraph/callgraph.sh update --from <zip>    install from a local zip / URL (callgraph-<os>-<arch>.zip)
+
 Output limit: above 400 lines the directory outline switches to summary, the single-file one to a method index;
 
 Engine: the logic (project alias resolution, `show`, error ids) lives in the `callgraph wrap` subcommand;

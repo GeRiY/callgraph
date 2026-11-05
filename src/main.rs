@@ -6,6 +6,7 @@ use std::process::ExitCode;
 use callgraph::cli::{self, CliArgs};
 
 fn main() -> ExitCode {
+    callgraph::update::cleanup_stale_binary();
     let command = match CliArgs::parse(std::env::args().skip(1)).and_then(cli::build_command) {
         Ok(c) => c,
         Err(e) => {
