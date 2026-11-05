@@ -1,18 +1,22 @@
 # callgraph
 
-Token-hatékony kód-térkép agenteknek (Claude Code skill): PHP, JS / TS / Vue, CSS / SCSS, JSON és Markdown fájlok
-szerkezete, kategorizált hívás-gráfja, metódus-törzse, „ki hívja” keresése és hatáselemzése — a fájl beolvasása nélkül.
-Az elemző egy önálló Rust-bináris (`callgraph`); a `skill/callgraph.sh` vékony burok fölötte.
+**English** | [Magyar](README.hu.md)
 
-- Használat és telepítés: [`skill/SKILL.md`](skill/SKILL.md), [`skill/README.md`](skill/README.md)
-- Felépítés: [`ARCHITECTURE.md`](ARCHITECTURE.md), a lekérdező réteg: [`docs/QUERY.md`](docs/QUERY.md), új nyelv: [`docs/UJ-NYELV.md`](docs/UJ-NYELV.md)
+A token-efficient code map for agents (a Claude Code skill). For PHP, JS / TS / Vue, CSS / SCSS, JSON and Markdown
+files it gives you the structure, a categorized call graph, method bodies, "who calls this" search and impact
+analysis, without reading the file. The analyzer is a standalone Rust binary (`callgraph`); `skill/callgraph.sh` is a
+thin wrapper on top of it.
 
-## Letöltés és telepítés
+- Usage and installation: [`skill/SKILL.md`](skill/SKILL.md), [`skill/README.md`](skill/README.md)
+- Design: [`ARCHITECTURE.md`](ARCHITECTURE.md), the query layer: [`docs/QUERY.md`](docs/QUERY.md), adding a language: [`docs/UJ-NYELV.md`](docs/UJ-NYELV.md)
+  (the detailed docs are currently in Hungarian)
 
-A kész, telepíthető csomag (skill-fájlok, az adott gép binárisa, útmutató) a legfrissebb
-[GitHub Release](https://github.com/GeRiY/callgraph/releases/latest)-ből tölthető le:
+## Download and install
 
-| Gép | Letöltés |
+The ready-to-install package (skill files, the binary for your machine, install guide) is available from the latest
+[GitHub Release](https://github.com/GeRiY/callgraph/releases/latest):
+
+| Machine | Download |
 |---|---|
 | Mac, Apple Silicon (M1–M4) | [callgraph-darwin-arm64.zip](https://github.com/GeRiY/callgraph/releases/latest/download/callgraph-darwin-arm64.zip) |
 | Mac, Intel | [callgraph-darwin-x86_64.zip](https://github.com/GeRiY/callgraph/releases/latest/download/callgraph-darwin-x86_64.zip) |
@@ -20,10 +24,10 @@ A kész, telepíthető csomag (skill-fájlok, az adott gép binárisa, útmutat�
 | Linux ARM64 | [callgraph-linux-aarch64.zip](https://github.com/GeRiY/callgraph/releases/latest/download/callgraph-linux-aarch64.zip) |
 | Windows x86_64 (Git Bash) | [callgraph-windows-x86_64.zip](https://github.com/GeRiY/callgraph/releases/latest/download/callgraph-windows-x86_64.zip) |
 
-Mind az öt bináris egy csomagban: a Release `callgraph-<verzió>.tar.gz` fájlja.
+All five binaries in one package: the Release's `callgraph-<version>.tar.gz` file.
 
-**Gyors telepítés (macOS / Linux).** Letölti a géphez illő csomagot a `~/.claude/skills/callgraph/` mappába, és
-lefuttatja az `install.sh`-t. Frissítésnél a `projects.json`, az `errors.jsonl` és a `feedback.jsonl` megmarad.
+**Quick install (macOS / Linux).** This downloads the package for your machine into `~/.claude/skills/callgraph/` and
+runs `install.sh`. On update, `projects.json`, `errors.jsonl` and `feedback.jsonl` are kept.
 
 ```bash
 p="$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)" && t="$(mktemp -d)" \
@@ -32,30 +36,30 @@ p="$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)" && t="$(mktemp -d)" \
   && bash ~/.claude/skills/callgraph/install.sh && rm -rf "$t"
 ```
 
-**Kézzel (Windows-on is):** csomagold ki a zipet, a benne lévő `callgraph/` mappát másold a `~/.claude/skills/` alá
-(Windows: `%USERPROFILE%\.claude\skills\`), majd futtasd ott a `bash install.sh`-t. Részletek: [`skill/TELEPITES.md`](skill/TELEPITES.md).
+**Manually (also on Windows):** unzip the package, copy the `callgraph/` folder inside it under `~/.claude/skills/`
+(Windows: `%USERPROFILE%\.claude\skills\`), then run `bash install.sh` there. Details (in Hungarian): [`skill/TELEPITES.md`](skill/TELEPITES.md).
 
-Utána regisztráld a projektet (`bash ~/.claude/skills/callgraph/projects.sh add myapp /abszolút/út/a/projekthez`),
-és indítsd újra a Claude Code-ot.
+Then register your project (`bash ~/.claude/skills/callgraph/projects.sh add myapp /absolute/path/to/project`) and
+restart Claude Code.
 
 ## Build
 
-Fejlesztés Dockerben (helyben csak Docker kell; a Rust toolchain, a clippy, a rustfmt, a python3 és a php a konténerben van,
-az image a `docker/dev.Dockerfile`):
+Develop in Docker (only Docker is needed locally; the Rust toolchain, clippy, rustfmt, python3 and php are in the
+container, the image is `docker/dev.Dockerfile`):
 
 ```bash
 bash tools/dev.sh build        # target/docker/release/callgraph
 bash tools/dev.sh test
-bash tools/dev.sh check        # fmt --check + clippy -D warnings + test (commit előtt)
-bash tools/dev.sh skill        # dist/callgraph-<verzió>.tar.gz (a skill-csomag, Linux)
-bash tools/dev.sh shell        # interaktív shell a konténerben
+bash tools/dev.sh check        # fmt --check + clippy -D warnings + test (before committing)
+bash tools/dev.sh skill        # dist/callgraph-<version>.tar.gz (the skill package, Linux)
+bash tools/dev.sh shell        # interactive shell in the container
 ```
 
-Helyi toolchainnel ugyanez: `cargo build --release`, `cargo test --release`, `bash tools/build-skill.sh`.
+With a local toolchain: `cargo build --release`, `cargo test --release`, `bash tools/build-skill.sh`.
 
-A több platformos csomagot (macOS arm64 / x86_64, Linux arm64 / x86_64 musl, Windows x86_64) a GitHub Actions
-készíti (`.github/workflows/release.yml`); `v*` tagnél GitHub Release-be teszi.
+The multi-platform package (macOS arm64 / x86_64, Linux arm64 / x86_64 musl, Windows x86_64) is built by GitHub
+Actions (`.github/workflows/release.yml`); on a `v*` tag it is published as a GitHub Release.
 
-## Licenc
+## License
 
-MIT — lásd [`LICENSE`](LICENSE).
+MIT — see [`LICENSE`](LICENSE).
