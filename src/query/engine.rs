@@ -78,6 +78,24 @@ impl QueryEngine {
     pub fn label(&self) -> &str {
         &self.label
     }
+    /// A `--depth` 2. szinttől kezdve keresett hatókör: a megadott mappák; ha fájl (vagy `fájl::metódus`) is van köztük,
+    /// a projektgyökér — a hívók jellemzően máshol vannak, mint a keresett fájl.
+    pub fn depth_scope(&self, selectors: &SelectorSet) -> Vec<PathBuf> {
+        let mut dirs = Vec::new();
+        for item in &selectors.items {
+            let abs = self.root.join(&item.file);
+            if item.method.is_some() || !abs.is_dir() {
+                return vec![self.root.clone()];
+            }
+            if !dirs.contains(&abs) {
+                dirs.push(abs);
+            }
+        }
+        if dirs.is_empty() {
+            dirs.push(self.root.clone());
+        }
+        dirs
+    }
     pub fn query(&self, selectors: &SelectorSet) -> Result<Vec<QueryResult>> {
         let files = self.files(selectors)?;
         let mut out = Vec::new();

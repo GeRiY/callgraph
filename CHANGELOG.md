@@ -48,12 +48,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   it is relative to that root. Outputs with a single path, and the machine formats (`json`, `mermaid`, `dot`, `callers`),
   are unchanged.
 - The committed / packaged default `SKILL.md` is now English (generated from `skill-i18n/SKILL.en.md`).
+- `SKILL.md` now recommends finding callers by name (`--grep '(^|::|\.|->)name$'`), which also catches inherited,
+  trait and unknown-receiver calls; `Type::method` is for narrowing a common name. It also explains the new search
+  output (`root:` line, `L<n> │ code`, `via`, `?::`) and the new Rust / JS options.
 - `--const` also lists the matching constant definitions (marked `[definition]`), not only the references.
 - Version lookup for `update` / `update --check` uses the `releases/latest` redirect instead of the GitHub API, so the
   API rate limit (HTTP 403) no longer applies.
 - The project page moved to the `gh-pages` branch (https://geriy.github.io/callgraph/); page edits no longer touch `main`.
 
 ### Fixed
+- `--grep … --depth`: from level 2 on, callers are searched in the whole scope of the query (the folders given, or the
+  project root for a file argument), not only in the folders of the level-1 matches — callers in other folders were missed.
 - Rust `--format api` now lists the `pub fn` methods of `impl` blocks (and trait implementations), the `pub` constants
   and fields — before, it showed no public methods for Rust types.
 - `--strings` now finds texts inside Vue template expressions (`{{ … }}`, `:title="…"`, `@click="…"`) and in Rust

@@ -29,12 +29,26 @@ bash $CG --project myapp app/Http/Controllers/X.php::store --body    # a metódu
 bash $CG --project myapp app/Http/Controllers/X.php --lines 30-60    # tetszőleges sáv sorszámozva (view, procedurális fájl)
 bash $CG --project myapp app --strings 'Order not found'             # string-literál (hibaüzenet, kulcs) helye
 bash $CG --project myapp app --const STATUS_ACTIVE                   # konstans-hivatkozás és -definíció
-bash $CG --project myapp app --grep 'Order::cancel'                  # hol hívják: fájl, metódus, sortartomány
+bash $CG --project myapp app --grep '(^|::|\.|->)cancel$'           # ki hívja: a név MINDEN hívása, a hívás sorával
+bash $CG --project myapp app --grep 'Order::cancel'                  # csak az Order-re feloldott hívások (+ interfészen / szülőn / trait-en át)
 bash $CG --project myapp app --grep 'Order::cancel' --depth 3        # hatáselemzés: a hívók hívói
 bash $CG --project myapp app --grep 'Order::cancel' --depth 3 --guess # + a csak név szerinti egyezések („?”)
 bash $CG --project myapp app --grep 'Order::cancel' --body           # a talált hívó metódusok forrása
 bash $CG --project myapp app --category model_use,orm_relation       # szűrés hívás-kategóriára
 ```
+
+**Hívók keresése:** a név szerinti mintával kezdd: `'(^|::|\.|->)név$'`. Minden hívást megtalál, akkor is, ha a fogadó
+típusa ismeretlen, örökölt vagy trait-ből jön. A `Típus::metódus` csak az erre a típusra feloldott hívásokat adja (és
+az interfészén / szülőjén / trait-jén át menőket), ezért hívók maradhatnak ki; gyakori, zajos névnél (`save`, `find`,
+`get`) szűkítésre használd.
+
+**A keresőkimenet olvasása** (`--grep`, `--depth`, `--strings`, `--const`, mappák):
+- Első sor `gyökér: /abs/út`: utána minden út ehhez a projektgyökérhez relatív; így add vissza őket (ugyanazzal a
+  `--project`-tel).
+- `L25 │ $this->repo->find($id)`: a hívás saját forrássora. Csak azért, hogy lásd, hogyan hívják, nem kell `--body`;
+  a teljes logikához igen.
+- `via Resolver`: a hívás a keresett típus interfészén, szülőosztályán vagy trait-jén át megy.
+- `?` / `?::név`: ismeretlen fogadó-típus, csak név szerinti egyezés; lehet téves, nézd meg a sort.
 
 ## Melyik `--format` mire való
 
@@ -66,6 +80,7 @@ bash $CG --project myapp resources/js --grep 'route::orders.show'     # route-ha
 bash $CG --project myapp resources/js --grep 'i18n::orders.title'     # fordítási kulcs helye
 bash $CG --project myapp resources/js --grep 'vue::emit:save'         # ki emitál 'save'-et
 bash $CG --project myapp resources/js --grep 'Atoms/AtomButton.vue'   # hol használják a komponenst
+bash $CG --project myapp resources/js --grep 'api.fetch'             # objektum-literál metódusa (const api = { fetch() {} })
 ```
 
 ## Rust
@@ -78,7 +93,12 @@ kerülnek (`implements` = a traitek). Kategóriák: `internal_helper` (saját), 
 ```bash
 bash $CG --project myapp src/api/users.rs                            # outline: struct/impl/trait, fn-ek sortartománnyal
 bash $CG --project myapp src --grep 'Repo::find'                      # ki hívja (crate-belső: Típus::fn / modul::fn)
+bash $CG --project myapp src --const MAX_ITEMS                        # const / static (Típus::CONST is): definíció + használat
+bash $CG --project myapp src/api/users.rs --format api               # pub elemek, az impl-blokkok pub fn-jei is
 ```
+
+Az értéken hívott metódus (`x.load()`) `Típus::load`, ha az `x` típusa egyértelmű (paraméter, `let x = Típus::new()`,
+`self`, saját struct mezője), különben `?::load`; a `Típus::load` keresés ezeket is listázza, bizonytalanként.
 
 ## Swift / SwiftUI
 

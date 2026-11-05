@@ -83,8 +83,9 @@ impl Command for ShowCommand {
             );
         }
         if let Some(pattern) = self.grep.as_deref() {
+            let scope = engine.depth_scope(&selectors);
             let text = match engine.grep_text(
-                &rows, pattern, self.depth, self.guess, self.full, self.limit,
+                &rows, &scope, pattern, self.depth, self.guess, self.full, self.limit,
             ) {
                 Ok(value) => value,
                 Err(error) => return Self::report(_err, error),

@@ -30,12 +30,26 @@ bash $CG --project myapp app/Http/Controllers/X.php::store --body    # the metho
 bash $CG --project myapp app/Http/Controllers/X.php --lines 30-60    # any range, line-numbered (view, procedural file)
 bash $CG --project myapp app --strings 'Order not found'             # where a string literal (error message, key) is
 bash $CG --project myapp app --const STATUS_ACTIVE                   # constant references and definition
-bash $CG --project myapp app --grep 'Order::cancel'                  # where it is called: file, method, line range
+bash $CG --project myapp app --grep '(^|::|\.|->)cancel$'           # who calls it: EVERY call of the name, with the call line
+bash $CG --project myapp app --grep 'Order::cancel'                  # only calls resolved to Order (+ via interface / parent / trait)
 bash $CG --project myapp app --grep 'Order::cancel' --depth 3        # impact analysis: the callers' callers
 bash $CG --project myapp app --grep 'Order::cancel' --depth 3 --guess # + name-only matches ("?")
 bash $CG --project myapp app --grep 'Order::cancel' --body           # source of the caller methods found
 bash $CG --project myapp app --category model_use,orm_relation       # filter by call category
 ```
+
+**Finding callers:** start with the name pattern `'(^|::|\.|->)name$'`. It catches every call, also where the receiver
+type is unknown, inherited or comes from a trait. `Type::method` finds only the calls resolved to that type (plus
+calls through its interface / parent / trait), so it can miss callers; use it to narrow a noisy common name
+(`save`, `find`, `get`).
+
+**Reading search output** (`--grep`, `--depth`, `--strings`, `--const`, directories):
+- First line `root: /abs/path`: every path after it is relative to that project root; pass them back as they are
+  (with the same `--project`).
+- `L25 │ $this->repo->find($id)`: the call's own source line. You don't need `--body` just to see how something is
+  called, only for the full logic.
+- `via Resolver`: the call goes through an interface, parent class or trait of the searched type.
+- `?` / `?::name`: the receiver type is unknown, a name-only match; it may be wrong, check the line.
 
 ## Which `--format` is for what
 
@@ -67,6 +81,7 @@ bash $CG --project myapp resources/js --grep 'route::orders.show'     # route us
 bash $CG --project myapp resources/js --grep 'i18n::orders.title'     # where a translation key is used
 bash $CG --project myapp resources/js --grep 'vue::emit:save'         # who emits 'save'
 bash $CG --project myapp resources/js --grep 'Atoms/AtomButton.vue'   # where the component is used
+bash $CG --project myapp resources/js --grep 'api.fetch'             # object-literal method (const api = { fetch() {} })
 ```
 
 ## Rust
@@ -79,7 +94,12 @@ to the type (`implements` = the traits). Categories: `internal_helper` (own), `m
 ```bash
 bash $CG --project myapp src/api/users.rs                            # outline: struct/impl/trait, fns with line ranges
 bash $CG --project myapp src --grep 'Repo::find'                      # who calls it (crate-internal: Type::fn / module::fn)
+bash $CG --project myapp src --const MAX_ITEMS                        # const / static (also Type::CONST): definition + uses
+bash $CG --project myapp src/api/users.rs --format api               # pub items, incl. the pub fn of impl blocks
 ```
+
+A method called on a value (`x.load()`) shows as `Type::load` when the type of `x` is clear (parameter, `let x =
+Type::new()`, `self`, own struct field), otherwise as `?::load`; a `Type::load` search lists those too, as uncertain.
 
 ## Swift / SwiftUI
 

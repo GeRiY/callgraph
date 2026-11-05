@@ -6,12 +6,15 @@ use crate::index::{CallerIndex, FileGraphRecord};
 use crate::query::format::{FormatterRegistry, call_lines, method_calls};
 use crate::query::snippet::{self, SourceLines};
 use crate::{t, tf};
-use std::path::Path;
+use std::path::PathBuf;
 
 impl QueryEngine {
+    // a ShowCommand kapcsolói egy az egyben (egyetlen hívóhely)
+    #[allow(clippy::too_many_arguments)]
     pub fn grep_text(
         &self,
         rows: &[QueryResult],
+        scope: &[PathBuf],
         pattern: &str,
         depth: usize,
         guess: bool,
@@ -61,11 +64,8 @@ impl QueryEngine {
             }
             return Ok(text);
         }
-        let scope = rows
-            .iter()
-            .filter_map(|row| Path::new(&row.graph.file).parent().map(Path::to_path_buf))
-            .collect::<Vec<_>>();
-        let all = self.all_graphs(&scope)?;
+        // a 2. szinttől a lekérdezés teljes hatókörében keresünk (nem csak az 1. szint fájljainak mappáiban)
+        let all = self.all_graphs(scope)?;
         let index = CallerIndex::from_graphs(all.iter().map(|(path, graph)| FileGraphRecord {
             path: path.clone(),
             graph: graph.clone(),
