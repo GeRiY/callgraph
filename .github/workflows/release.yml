@@ -36,6 +36,10 @@ jobs:
         with:
           targets: ${{ matrix.target }}
           components: clippy
+      # a függőségek fordítása (target/) cache-ben platformonként: nem fordul le minden futásnál újra a ~300 crate
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
       # musl-tools: natív musl-gcc. A C-kódos crate-ek (tree-sitter, ring) cc-je aarch64-en a nem létező
       # `aarch64-linux-musl-gcc`-t keresné (x86_64-en a musl-gcc-t magától megtalálja) — ezért explicit CC.
       - name: musl-tools
@@ -45,12 +49,13 @@ jobs:
           sudo apt-get update -qq && sudo apt-get install -y -qq musl-tools
           t="${{ matrix.target }}"
           echo "CC_${t//-/_}=musl-gcc" >> "$GITHUB_ENV"
+      # debug profillal (LTO nélkül): a tesztekhez nem kell a release-optimalizálás; a kiadott bináris lent, release+LTO
       - name: clippy + test (natív target)
         if: matrix.target != 'x86_64-apple-darwin'
         shell: bash
         run: |
-          cargo clippy --release --all-targets --target ${{ matrix.target }} -- -D warnings
-          cargo test --release --target ${{ matrix.target }}
+          cargo clippy --all-targets --target ${{ matrix.target }} -- -D warnings
+          cargo test --target ${{ matrix.target }}
       - name: build
         shell: bash
         # a binárisba ne égjen be a runner útvonala (home: cargo registry; workspace: a mi forrásunk — az utolsó egyező nyer)

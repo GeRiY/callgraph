@@ -254,14 +254,17 @@ Helyben csak Docker kell; a toolchain (Rust stable, rustfmt, clippy, musl target
 image-ben van (`docker/dev.Dockerfile`):
 
 ```bash
-bash tools/dev.sh check     # fmt --check + clippy -D warnings + tesztek — minden commit előtt
-bash tools/dev.sh build     # target/docker/release/callgraph
+bash tools/dev.sh check     # fmt --check + clippy -D warnings + tesztek (debug profil, mint a CI) — minden commit előtt
+bash tools/dev.sh build     # release bináris: ~/.cache/callgraph-dev/target/release/callgraph
 bash tools/dev.sh test      # csak a tesztek
 bash tools/dev.sh skill     # dist/callgraph-<verzió>.tar.gz (a skill-csomag, Linux)
 bash tools/dev.sh shell     # shell a konténerben
 ```
 
-Helyi toolchainnel a szokásos `cargo build --release` / `cargo test --release` is működik. A CI
+A buildkimenet minden munkapéldánynak (worktree-nek) közös (`CALLGRAPH_DEV_TARGET`, alapból
+`~/.cache/callgraph-dev/target`; `CALLGRAPH_DEV_TARGET=local`: munkapéldányonkénti `target/docker/`), így egy új ág nem
+fordít újra minden függőséget. A `check-release` ugyanezt a release-profillal futtatja (LTO, lassú).
+Helyi toolchainnel a szokásos `cargo build --release` / `cargo test` is működik. A CI
 ([`.github/workflows/release.yml`](.github/workflows/release.yml)) minden pushnál buildel és tesztel macOS-re
 (arm64, x86_64), Linuxra (arm64, x86_64, statikus musl) és Windowsra, `v*` tagnél pedig GitHub Release-t készít.
 

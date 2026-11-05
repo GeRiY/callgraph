@@ -253,14 +253,17 @@ Only Docker is needed locally; the toolchain (Rust stable, rustfmt, clippy, musl
 dev image (`docker/dev.Dockerfile`):
 
 ```bash
-bash tools/dev.sh check     # fmt --check + clippy -D warnings + tests — run before every commit
-bash tools/dev.sh build     # target/docker/release/callgraph
+bash tools/dev.sh check     # fmt --check + clippy -D warnings + tests (debug profile, like CI) — run before every commit
+bash tools/dev.sh build     # release binary: ~/.cache/callgraph-dev/target/release/callgraph
 bash tools/dev.sh test      # tests only
 bash tools/dev.sh skill     # dist/callgraph-<version>.tar.gz (skill package, Linux)
 bash tools/dev.sh shell     # shell inside the container
 ```
 
-With a local toolchain the usual `cargo build --release` / `cargo test --release` work too. CI
+The build output is shared by all checkouts / worktrees (`CALLGRAPH_DEV_TARGET`, default
+`~/.cache/callgraph-dev/target`; `CALLGRAPH_DEV_TARGET=local` keeps a per-checkout `target/docker/`), so a new branch
+doesn't rebuild every dependency. `check-release` runs the same checks with the release profile (LTO, slow).
+With a local toolchain the usual `cargo build --release` / `cargo test` work too. CI
 ([`.github/workflows/release.yml`](.github/workflows/release.yml)) builds and tests macOS (arm64, x86_64),
 Linux (arm64, x86_64, static musl) and Windows on every push, and publishes a GitHub Release on `v*` tags.
 
