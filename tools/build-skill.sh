@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # A callgraph skill-csomag előállítása: dist/callgraph/ + dist/callgraph-<verzió>.tar.gz
 # Használat: bash tools/build-skill.sh
-#   - A skill fájljai a skill/ mappából jönnek (SKILL.md, README.md, callgraph.sh, lib.sh, install.sh, projects.sh, feedback.sh, extras/).
+#   - A skill fájljai a skill/ mappából jönnek (SKILL.md, README.md, callgraph.sh, lib.sh, install.sh, projects.sh, feedback.sh, extras/, help/).
 #   - Binárisok: ha van dist/bin/<os>-<arch>/callgraph[.exe] (pl. a CI-ből), azok mennek a csomagba;
 #     különben helyben: macOS-en a két mac-target, máshol a natív build (a teljes, több platformos csomagot a GitHub Actions készíti).
 #   - Tiltólista (gép-/projektfüggő szöveg a csomagban): tools/forbidden.local (nem verziózott, egy regex), különben '/Users/|/home/'.
@@ -18,6 +18,7 @@ rm -rf "$PKG"; rm -f "$DIST/$NAME"-*.tar.gz
 mkdir -p "$PKG/bin"
 cp skill/SKILL.md skill/README.md skill/TELEPITES.md skill/callgraph.sh skill/lib.sh skill/install.sh skill/projects.sh skill/feedback.sh "$PKG/"
 cp -R skill/extras "$PKG/extras"
+cp -R skill/help "$PKG/help"   # a súgók (help/<script>.<en|hu>.txt); a felhasználó lang fájlja NEM kerül a csomagba
 cp LICENSE "$PKG/LICENSE"
 
 if [[ -d "$DIST/bin" ]]; then
