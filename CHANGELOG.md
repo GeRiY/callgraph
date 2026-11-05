@@ -6,11 +6,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 ## [Unreleased]
 
 ### Changed
-- **Faster queries on big projects:** callgraph now keeps a compact project map in `.callgraph/` — one small binary
-  file per source file, a short list of all files, and a ready-made "who calls whom" file. It is updated file by file,
-  only for files that changed since the last query (deleted or renamed files drop out). Every query reads only what
-  it needs: a search in one folder loads just that folder's files, and "callers of callers" (`--depth`, `callers`)
-  is answered from the "who calls whom" file without opening the rest. The output is exactly the same as before.
+- **Faster queries on big projects:** callgraph now keeps a compact project map in `.callgraph/` in just three
+  files, however big the project is: a short list of all files, one file with every file's full analysis, and one
+  with the summary that searches need. It is updated file by file, only for files that changed since the last query
+  (deleted or renamed files drop out). "Where is it called" (`--grep`, every `--depth` level), `callers`,
+  `--strings` and `--const` are answered from the summary file in one read; a single-file view (outline, `--body` …)
+  reads just that file's part of the full-analysis file. The output is exactly the same as before.
   An edited file shows up in the very next query; anything damaged or written by another callgraph version is
   rebuilt quietly. The map replaces the old analysis cache (`cache.jsonl`), which is removed automatically, so the
   folder takes less space than before. The MCP server (`callgraph mcp`) keeps the map in memory between requests.
