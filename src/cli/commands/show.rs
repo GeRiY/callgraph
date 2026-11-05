@@ -83,7 +83,7 @@ impl Command for ShowCommand {
             );
         }
         if let Some(pattern) = self.grep.as_deref() {
-            let scope = engine.depth_scope(&selectors);
+            let scope = engine.depth_scope();
             let text = match engine.grep_text(
                 &rows, &scope, pattern, self.depth, self.guess, self.full, self.limit,
             ) {

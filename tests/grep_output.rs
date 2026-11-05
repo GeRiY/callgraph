@@ -170,9 +170,9 @@ fn callers_jsonl_marks_interface_matches() {
 }
 
 #[test]
-fn depth_searches_the_whole_query_scope_not_only_the_first_level_folders() {
+fn depth_searches_the_whole_project_from_level_two() {
     let project = Project::new();
-    // 1. szint a src/Services/-ben, a 2. szintű hívó egy testvér-mappában (src/Http/)
+    // csak a src/Services/ a lekérdezés; a 2. szintű hívó a projekt egy másik mappájában (src/Http/) van
     let files = [
         (
             "src/Services/Lookup.php",
@@ -191,7 +191,6 @@ fn depth_searches_the_whole_query_scope_not_only_the_first_level_folders() {
     let out = project.run(&[
         "show",
         "src/Services",
-        "src/Http",
         "--grep",
         "Repo::find",
         "--depth",
