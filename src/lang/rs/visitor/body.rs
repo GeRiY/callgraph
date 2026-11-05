@@ -5,6 +5,7 @@ use std::collections::HashSet;
 
 use syn::visit::Visit;
 
+use super::receivers::TypeEnv;
 use super::scopes::{ConstNode, MacroScope, Scopes};
 
 /// A bejárt kód helye.
@@ -14,6 +15,8 @@ pub(super) struct Location {
     pub inline: Vec<String>,
     /// A függvény paraméterei és helyi kötései (`let x`, closure-paraméter).
     pub bindings: HashSet<String>,
+    /// A helyi nevek következtetett típusa (a metódushívások fogadójához).
+    pub types: TypeEnv,
 }
 
 /// Egy törzs-bejáró: bármely élettartamú szintaxisfán fut (a makró-argumentumok saját fát kapnak).
@@ -37,6 +40,7 @@ pub(super) fn walk_bodies<V: BodyVisit>(scopes: &Scopes<'_>, visitor: &mut V) {
             caller: f.name.clone(),
             inline: f.inline.clone(),
             bindings: bindings.0,
+            types: TypeEnv::of_fn(f.sig, block),
         });
         visitor.visit_block(block);
     }
@@ -73,6 +77,7 @@ fn top(container: &str, inline: &[String]) -> Location {
         caller: "__top__".to_owned(),
         inline: inline.to_vec(),
         bindings: HashSet::new(),
+        types: TypeEnv::default(),
     }
 }
 

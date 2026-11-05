@@ -26,6 +26,7 @@ Használat:
                                                 minden hívás a forrássorával: "L25 │ $this->repo->find($id)";
                                                 "via Resolver" = interfészen / trait-en / szülő-típuson át hívva
                                                 (a Típus::metódus minta ezeket a hívásokat is megtalálja)
+                                                Rust: "?::m" = ismeretlen fogadó-típus; a Típus::m minta név szerint is megtalálja
   bash ~/.claude/skills/callgraph/callgraph.sh <mappa> --grep <minta> --depth N [--guess]
                                                 hívók hívói N szintig (hatáselemzés); --guess: a feloldatlan,
                                                 csak név szerinti egyezéseket is ("?")
@@ -35,7 +36,7 @@ Használat:
   bash ~/.claude/skills/callgraph/callgraph.sh <mappa> --grep <minta> --body    a talált hívó metódusok forrása
   bash ~/.claude/skills/callgraph/callgraph.sh <fájl> --lines <n>-<m>           tetszőleges sáv sorszámozva (pl. view-fájl)
   bash ~/.claude/skills/callgraph/callgraph.sh <mappa|fájl> --strings <minta>   string-literálok (hibaüzenet, kulcs) helye
-  bash ~/.claude/skills/callgraph/callgraph.sh <mappa|fájl> --const <minta>     osztálykonstans-hivatkozások és -definíciók
+  bash ~/.claude/skills/callgraph/callgraph.sh <mappa|fájl> --const <minta>     konstans-hivatkozások és -definíciók (PHP osztálykonstans, Rust const/static)
 
 Nyelv (a terminál-kimenet és a súgó nyelve: en = angol, alapértelmezett; hu = magyar):
   bash ~/.claude/skills/callgraph/callgraph.sh set-lang                 az aktuális nyelv és a forrása

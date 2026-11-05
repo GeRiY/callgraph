@@ -7,6 +7,7 @@ use serde::Serialize;
 
 use super::hierarchy::{TypeHierarchy, ViaMatcher, normalize, same_type, split_target};
 use super::record::{FileStamp, IndexRecord};
+use super::uncertain::{bare_name, is_uncertain, uncertain_match};
 use crate::error::{CallgraphError, Result};
 
 /// A `callers` JSONL-kimenetének egy sora.
@@ -71,6 +72,7 @@ impl CallerIndex {
                     .container
                     .as_deref()
                     .map(|container| normalize(&symbol_key(namespace, None, container)));
+                let uncertain = is_uncertain(&target);
                 edges.push(Edge {
                     row: CallerRow {
                         file: record.path.clone(),
@@ -85,7 +87,8 @@ impl CallerIndex {
                     lookup,
                     caller_key,
                     caller_type,
-                    guessable: call.resolved.is_none() && call.category == "external_call",
+                    guessable: (call.resolved.is_none() && call.category == "external_call")
+                        || uncertain,
                 });
             }
         }
@@ -158,11 +161,18 @@ impl CallerIndex {
                 ))
             })?;
         let mut result = Vec::new();
+        // a `?::név` (feloldatlan fogadójú) cél a `Típus::név` mintára név szerint, bizonytalanként illeszkedik
         let mut front: Vec<Edge> = self
             .edges
             .iter()
-            .filter(|edge| matcher.is_match(&edge.row.target))
+            .filter(|edge| {
+                matcher.is_match(&edge.row.target) || uncertain_match(&matcher, &edge.row.target)
+            })
             .cloned()
+            .map(|mut edge| {
+                edge.row.guessed |= is_uncertain(&edge.row.target);
+                edge
+            })
             .collect();
         if let Some(via) = ViaMatcher::new(&self.hierarchy, pattern, &matcher) {
             front.extend(self.edges.iter().filter_map(|edge| {
@@ -271,9 +281,9 @@ impl CallerIndex {
                         .iter()
                         .filter(|parent| {
                             parent.guessable
-                                && parent.row.target == name
+                                && bare_name(&parent.row.target) == name
                                 && parent.row.target == parent.lookup
-                                && parent.row.target != parent.row.caller
+                                && bare_name(&parent.row.target) != parent.row.caller
                         })
                         .cloned(),
                 );

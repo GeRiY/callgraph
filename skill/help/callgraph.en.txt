@@ -26,6 +26,7 @@ Usage:
                                                 each call with its source line: "L25 │ $this->repo->find($id)";
                                                 "via Resolver" = called through an interface / trait / parent type
                                                 (a Type::method pattern also finds those calls)
+                                                Rust: "?::m" = receiver type unknown; a Type::m pattern still finds it (by name)
   bash ~/.claude/skills/callgraph/callgraph.sh <dir> --grep <pattern> --depth N [--guess]
                                                 callers of callers up to N levels (impact analysis); --guess: also the
                                                 unresolved, name-only matches ("?")
@@ -35,7 +36,7 @@ Usage:
   bash ~/.claude/skills/callgraph/callgraph.sh <dir> --grep <pattern> --body    source of the caller methods found
   bash ~/.claude/skills/callgraph/callgraph.sh <file> --lines <n>-<m>           any line range, line-numbered (e.g. a view file)
   bash ~/.claude/skills/callgraph/callgraph.sh <dir|file> --strings <pattern>   where string literals (error message, key) occur
-  bash ~/.claude/skills/callgraph/callgraph.sh <dir|file> --const <pattern>     class constant references and definitions
+  bash ~/.claude/skills/callgraph/callgraph.sh <dir|file> --const <pattern>     constant references and definitions (PHP class constants, Rust const/static)
 
 Language (of the terminal output and the help: en = English, default; hu = Hungarian):
   bash ~/.claude/skills/callgraph/callgraph.sh set-lang                 the current language and where it comes from

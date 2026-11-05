@@ -1,4 +1,4 @@
-//! `--const`: konstansnevek szűrt listája.
+//! `--const`: konstans-hivatkozások (`const_fetch`) és -definíciók (`const` / `static`) szűrt listája.
 
 use crate::query::QueryResult;
 use std::fmt::Write as _;
@@ -14,6 +14,8 @@ impl Formatter for Constants {
         let mut out = String::new();
         let mut found = false;
         for row in rows {
+            // (sor, hívó-oszlop, érték): a hivatkozások (`const_fetch`) és a definíciók egy listában, sorrendben
+            let mut lines: Vec<(u32, String, String)> = Vec::new();
             let mut matches: Vec<_> = row
                 .graph
                 .calls
@@ -34,11 +36,6 @@ impl Formatter for Constants {
                         .cmp(right.resolved.as_deref().unwrap_or(&right.target))
                 })
             });
-            if matches.is_empty() {
-                continue;
-            }
-            found = true;
-            writeln!(out, "FILE  {}", row.graph.file).unwrap();
             for constant in matches {
                 let caller = match (&constant.container, &constant.caller) {
                     (Some(container), Some(caller)) => format!("{container}::{caller}"),
@@ -47,7 +44,33 @@ impl Formatter for Constants {
                     _ => "<file>".to_owned(),
                 };
                 let value = constant.resolved.as_deref().unwrap_or(&constant.target);
-                writeln!(out, "  L{:<5} {:<49}{value}", constant.line, caller).unwrap();
+                lines.push((constant.line, caller, value.to_owned()));
+            }
+            for definition in row.graph.constants.iter().filter(|c| {
+                matches!(c.kind.as_str(), "const" | "static" | "static mut")
+                    && c.name.contains(&self.filter)
+            }) {
+                let name = match &definition.container {
+                    Some(container) => format!("{container}::{}", definition.name),
+                    None => definition.name.clone(),
+                };
+                let value = definition
+                    .value
+                    .as_ref()
+                    .map(|v| format!(" = {v}"))
+                    .unwrap_or_default();
+                let label = lang.pick("[definition]", "[definíció]");
+                lines.push((definition.line, name, format!("{label}{value}")));
+            }
+            if lines.is_empty() {
+                continue;
+            }
+            // stabil: azonos soron a hivatkozások (már rendezve) maradnak a definíció előtt
+            lines.sort_by_key(|(line, _, _)| *line);
+            found = true;
+            writeln!(out, "FILE  {}", row.graph.file).unwrap();
+            for (line, caller, value) in lines {
+                writeln!(out, "  L{line:<5} {caller:<49}{value}").unwrap();
             }
         }
         if !found {

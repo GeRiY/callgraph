@@ -32,6 +32,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   that don't override it). These are marked, e.g. `L14 via Resolver │ …`; `--depth` follows them to the next level, and
   `callers` adds a `"via"` field. Works where the call's receiver type is known (PHP: typed properties and other
   resolved receivers; Rust: `Type::method` calls); JS/TS interfaces and Swift protocols are not tracked yet.
+- **Rust: smarter method calls.** For `x.load()` callgraph now works out the type of `x` in the simple cases
+  (parameter type, `let x = Repo::new()`, `Repo { … }`, `self`, a field of your own struct like `self.repo`), so the
+  call shows up as `Repo::load` and "who calls `Repo::load`?" finds it. When the type can't be worked out, the call is
+  kept as `?::load` and a `Repo::load` search still lists it, marked as uncertain — instead of silently missing it.
+- **Rust constants:** `--const` now finds Rust `const` / `static` items — where they are defined and where they are
+  used (also `Type::CONST`).
+- **JS / TS object methods:** functions inside an object literal (`const api = { fetch() {}, save: () => {} }`, or a
+  plain `export default { … }`) are listed as separate methods (`api.fetch`) with their line ranges, and calls to them
+  are found.
 
 ### Changed
 - **Shorter result lists:** when the project root would repeat on many lines (`--grep`, `--depth`, `--strings`,
@@ -39,11 +48,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   it is relative to that root. Outputs with a single path, and the machine formats (`json`, `mermaid`, `dot`, `callers`),
   are unchanged.
 - The committed / packaged default `SKILL.md` is now English (generated from `skill-i18n/SKILL.en.md`).
+- `--const` also lists the matching constant definitions (marked `[definition]`), not only the references.
 - Version lookup for `update` / `update --check` uses the `releases/latest` redirect instead of the GitHub API, so the
   API rate limit (HTTP 403) no longer applies.
 - The project page moved to the `gh-pages` branch (https://geriy.github.io/callgraph/); page edits no longer touch `main`.
 
 ### Fixed
+- Rust `--format api` now lists the `pub fn` methods of `impl` blocks (and trait implementations), the `pub` constants
+  and fields — before, it showed no public methods for Rust types.
+- `--strings` now finds texts inside Vue template expressions (`{{ … }}`, `:title="…"`, `@click="…"`) and in Rust
+  `const` / `static` values, including byte strings (`b"…"`).
 - SCSS: `@mixin` / `@function` parameters (`$color: t.$brand, …`) and `@include` keyword arguments were listed as
   constants; now only `$var: value;` declarations are (the parameters stay the mixin's params).
 - `update --check` now also records its result in `update-check.json`, so the daily background check does not repeat

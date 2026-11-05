@@ -76,8 +76,12 @@ pub(super) fn token_strings(tokens: TokenStream, out: &mut Vec<(Span, String)>) 
             TokenTree::Group(group) => token_strings(group.stream(), out),
             TokenTree::Literal(literal) => {
                 let span = literal.span();
-                if let Lit::Str(s) = Lit::new(literal) {
-                    out.push((span, s.value()));
+                match Lit::new(literal) {
+                    Lit::Str(s) => out.push((span, s.value())),
+                    Lit::ByteStr(s) => {
+                        out.push((span, String::from_utf8_lossy(&s.value()).into_owned()))
+                    }
+                    _ => {}
                 }
             }
             _ => {}

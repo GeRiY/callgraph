@@ -195,6 +195,65 @@ mod tests {
     }
 
     #[test]
+    fn object_literal_methods_are_callers_and_targets() {
+        let a = run(
+            "/p/api.js",
+            "export const api = {\n  fetch() { return load() },\n  save: () => api.fetch(),\n}\nfunction load() {}\n",
+        );
+        let calls: Vec<(&str, &str, &str)> = a
+            .graph
+            .calls
+            .iter()
+            .map(|c| {
+                (
+                    c.caller.as_deref().unwrap_or(""),
+                    c.target.as_str(),
+                    c.category.as_str(),
+                )
+            })
+            .collect();
+        assert!(
+            calls.contains(&("api.fetch", "load", "internal_helper")),
+            "{calls:?}"
+        );
+        assert!(
+            calls.contains(&("api.save", "api.fetch", "internal_helper")),
+            "{calls:?}"
+        );
+        let save = a
+            .graph
+            .methods
+            .iter()
+            .find(|m| m.name == "api.save")
+            .unwrap();
+        assert_eq!((save.line, save.end_line), (3, Some(3)));
+    }
+
+    #[test]
+    fn vue_template_expressions_yield_strings() {
+        let a = run(
+            "/p/Box.vue",
+            "<template>\n  <p :title=\"ok ? 'All saved' : 'Not saved'\">{{ n > 1 ? `${n} songs left` : 'Last song' }}</p>\n  <button @click=\"notify('Undo Favorite')\">x</button>\n</template>\n<script setup>\nconst n = 1\nfunction notify(m) {}\n</script>\n",
+        );
+        let strings: Vec<(&str, u32)> = a
+            .graph
+            .strings
+            .iter()
+            .filter(|s| s.caller.as_deref() == Some("template"))
+            .map(|s| (s.value.as_str(), s.line))
+            .collect();
+        for expected in [
+            ("All saved", 2),
+            ("Not saved", 2),
+            ("${…} songs left", 2),
+            ("Last song", 2),
+            ("Undo Favorite", 3),
+        ] {
+            assert!(strings.contains(&expected), "{expected:?} in {strings:?}");
+        }
+    }
+
+    #[test]
     fn syntax_error_is_warning() {
         assert_eq!(run("/p/x.js", "const = ;").warnings.len(), 1);
     }

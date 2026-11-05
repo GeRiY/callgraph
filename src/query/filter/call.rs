@@ -12,7 +12,10 @@ struct RegexSpec(Regex, Option<ViaMatcher>);
 impl CallFilter for RegexSpec {
     fn matches(&self, call: &Call) -> bool {
         let target = call.resolved.as_deref().unwrap_or(&call.target);
-        self.0.is_match(target) || self.1.as_ref().is_some_and(|via| via.via(target).is_some())
+        // `?::név` (feloldatlan fogadó): a `Típus::név` minta név szerint illeszkedik rá
+        self.0.is_match(target)
+            || crate::index::uncertain_match(&self.0, target)
+            || self.1.as_ref().is_some_and(|via| via.via(target).is_some())
     }
 }
 

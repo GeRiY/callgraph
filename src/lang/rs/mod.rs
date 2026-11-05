@@ -20,3 +20,5 @@ pub use backend::RustBackend;
 mod tests;
 #[cfg(test)]
 mod tests_edge;
+#[cfg(test)]
+mod tests_receivers;

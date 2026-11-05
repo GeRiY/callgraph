@@ -210,7 +210,12 @@ fn calls_are_categorized() {
     assert!(has("println!", "macro_use"));
     assert!(has("helper", "internal_helper"), "{save:?}");
     assert!(has("check", "internal_helper"));
-    assert!(has("store", "external_call"));
+    // `repo: &Repo` → a fogadó típusa ismert: `Repo::store` (a `Repo` a crate `db` moduljából)
+    assert!(save.contains(&(
+        "store".into(),
+        "module_use".into(),
+        Some("Repo::store".into())
+    )));
     assert!(has("to_string", "native_rust"));
     let new = calls_of(&g, "new");
     assert!(new.contains(&(

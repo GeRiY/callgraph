@@ -1,9 +1,10 @@
-//! `strings`: string-literálok a törzsekben (a makró-argumentumokban is), az átlátszatlan makrók
-//! tokenjeiben és a függvények / típusok attribútumaiban (`#[get("/users/{id}")]`).
+//! `strings`: string- és bájtstring-literálok a törzsekben, a `const` / `static` kezdőértékekben (a makró-
+//! argumentumokban is), az átlátszatlan makrók tokenjeiben és a függvények / típusok attribútumaiban
+//! (`#[get("/users/{id}")]`).
 
 use proc_macro2::Span;
 use syn::visit::Visit;
-use syn::{LitStr, Macro};
+use syn::{LitByteStr, LitStr, Macro};
 
 use super::attrs::{attr_strings, token_strings};
 use super::body::{BodyVisit, Location, walk_bodies};
@@ -42,6 +43,7 @@ impl FileVisitor for StringsVisitor {
                 caller: f.name.clone(),
                 inline: Vec::new(),
                 bindings: Default::default(),
+                types: Default::default(),
             });
             for (span, value) in attr_strings(f.attrs) {
                 collector.push(span, value);
@@ -61,6 +63,7 @@ fn top(container: &str) -> Location {
         caller: "__top__".to_owned(),
         inline: Vec::new(),
         bindings: Default::default(),
+        types: Default::default(),
     }
 }
 
@@ -98,6 +101,14 @@ impl BodyVisit for Collector<'_, '_> {
 impl<'ast> Visit<'ast> for Collector<'_, '_> {
     fn visit_lit_str(&mut self, node: &'ast LitStr) {
         self.push(node.span(), node.value());
+    }
+
+    /// `b"…"` (pl. `const DATA: &[u8] = b"…"`): a bájtok UTF-8-ként (a hibás bájt `�`).
+    fn visit_lit_byte_str(&mut self, node: &'ast LitByteStr) {
+        self.push(
+            node.span(),
+            String::from_utf8_lossy(&node.value()).into_owned(),
+        );
     }
 
     fn visit_macro(&mut self, node: &'ast Macro) {

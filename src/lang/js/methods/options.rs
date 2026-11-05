@@ -10,6 +10,54 @@ fn prop_fn<'a, 'b>(p: &'b oxc_ast::ast::ObjectProperty<'a>) -> Option<FnRef<'a, 
     FnRef::of_expr(&p.value)
 }
 
+/// A Vue Options API kulcsai: ha egy `export default { … }` objektumban egy sincs, az sima objektum-literál.
+const OPTION_KEYS: &[&str] = &[
+    "name",
+    "components",
+    "directives",
+    "props",
+    "emits",
+    "data",
+    "setup",
+    "computed",
+    "watch",
+    "methods",
+    "mixins",
+    "extends",
+    "provide",
+    "inject",
+    "expose",
+    "template",
+    "render",
+    "model",
+    "filters",
+    "inheritAttrs",
+    "beforeCreate",
+    "created",
+    "beforeMount",
+    "mounted",
+    "beforeUpdate",
+    "updated",
+    "beforeUnmount",
+    "unmounted",
+    "beforeDestroy",
+    "destroyed",
+    "activated",
+    "deactivated",
+    "errorCaptured",
+    "serverPrefetch",
+];
+
+/// Vue Options API objektum-e (van legalább egy Vue-kulcsa).
+pub(crate) fn is_options_api(obj: &ObjectExpression<'_>) -> bool {
+    obj.properties.iter().any(|p| match p {
+        ObjectPropertyKind::ObjectProperty(p) => {
+            key_name(&p.key).is_some_and(|k| OPTION_KEYS.contains(&k.as_str()))
+        }
+        _ => false,
+    })
+}
+
 impl Collector<'_> {
     pub fn options_api(&mut self, obj: &ObjectExpression<'_>) {
         for p in &obj.properties {
