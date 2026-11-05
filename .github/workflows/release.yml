@@ -125,8 +125,16 @@ jobs:
             (cd "$d" && zip -qr "../../$n.zip" callgraph)
           done
           ls -l dist/*.zip
+      # a frissítő (self-update) ezzel ellenőrzi a letöltött zipet; `sha256sum -c SHA256SUMS` kézzel is
+      - name: SHA256SUMS
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          cd dist
+          sha256sum callgraph-*.tar.gz callgraph-*.zip > SHA256SUMS
+          cat SHA256SUMS
+          sha256sum -c SHA256SUMS
       - name: GitHub Release (csak tagnél)
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${GITHUB_REF_NAME}" dist/callgraph-*.tar.gz dist/callgraph-*.zip --title "${GITHUB_REF_NAME}" --generate-notes
+        run: gh release create "${GITHUB_REF_NAME}" dist/callgraph-*.tar.gz dist/callgraph-*.zip dist/SHA256SUMS --title "${GITHUB_REF_NAME}" --generate-notes

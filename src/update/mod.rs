@@ -4,6 +4,7 @@
 //! ellenőrzés: `check`.
 
 pub(crate) mod check;
+pub(crate) mod checksum;
 mod fetch;
 mod install;
 mod platform;

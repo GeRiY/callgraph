@@ -12,11 +12,21 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   offers the update; it never updates on its own. Opt out with `CALLGRAPH_UPDATE_CHECK=0`; off in CI.
 - **Bug reporting via GitHub:** bilingual issue forms (bug report, idea / feedback), a private security report link and
   `SECURITY.md`. Error messages now point to the bug form; `feedback.sh show <error-id>` prints the details to paste.
+- **Release checksums:** every release has a `SHA256SUMS` asset (`sha256sum` format, all assets). `update` verifies the
+  downloaded zip's SHA-256 before installing and installs nothing on a mismatch; a release without `SHA256SUMS` (v0.1.0)
+  is refused unless `--insecure-skip-checksum` is given. `update --from <zip>` checks `--sha256 <hex>` or a
+  `SHA256SUMS` next to the zip, otherwise it warns in one line and installs.
 
 ### Changed
 - Version lookup for `update` / `update --check` uses the `releases/latest` redirect instead of the GitHub API, so the
   API rate limit (HTTP 403) no longer applies.
 - The project page moved to the `gh-pages` branch (https://geriy.github.io/callgraph/); page edits no longer touch `main`.
+
+### Fixed
+- SCSS: `@mixin` / `@function` parameters (`$color: t.$brand, …`) and `@include` keyword arguments were listed as
+  constants; now only `$var: value;` declarations are (the parameters stay the mixin's params).
+- `update --check` now also records its result in `update-check.json`, so the daily background check does not repeat
+  it and a newer version found manually shows up in the notice.
 
 ## [0.1.0] — 2026-11-05
 

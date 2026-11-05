@@ -152,6 +152,9 @@ bash ~/.claude/skills/callgraph/callgraph.sh update           # letöltés és t
 A frissítés a legújabb GitHub Release-ből letölti a platformod zipjét, és felülírja a skill-fájlokat és a `bin/`-t;
 a `projects.json`, az `errors.jsonl`, a `feedback.jsonl` és a nyelvbeállítás megmarad. `--force`: a jelenlegi verzió
 újratelepítése; `callgraph --version`: a telepített verzió.
+Minden kiadásban van egy `SHA256SUMS` fájl; a frissítés ehhez veti össze a letöltött zipet, eltérésnél semmit nem
+telepít. Az ilyen fájl nélküli kiadást (v0.1.0) csak `--insecure-skip-checksum`-mal telepíti. `--from <zip>` esetén a
+`--sha256 <hex>` vagy a zip melletti `SHA256SUMS` szerint ellenőriz (ha egyik sincs: egysoros figyelmeztetés).
 A `callgraph.sh` naponta legfeljebb egyszer a háttérben (a lekérdezéseket nem lassítva) megnézi, van-e új kiadás, és ha
 igen, a kimenete egy `ℹ callgraph X elérhető` sorral végződik; kikapcsolás: `CALLGRAPH_UPDATE_CHECK=0` (a `CI`
 beállítása mellett sem fut).
