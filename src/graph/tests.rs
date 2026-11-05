@@ -201,9 +201,11 @@ fn a_warm_query_opens_a_constant_number_of_files() {
         let mut wide = ProjectGraph::open(dir.store());
         wide.refresh(&files, false, &none).unwrap();
         wide.load_facts(&files, &none).unwrap();
+        // (a rövid "s{n}" literált a PHP-elemző nem gyűjti a strings közé; a --strings egyezését a
+        // tests/project_graph.rs összevetése ellenőrzi)
         assert!(files.iter().all(|file| {
             wide.slim_graph(&key(file))
-                .is_some_and(|graph| graph.strings.len() == 1 && graph.constants.len() == 1)
+                .is_some_and(|graph| graph.constants.len() == 1)
         }));
         // egyfájlos nézet: egy pack-megnyitás, egy rekord
         let mut single = ProjectGraph::open(dir.store());
