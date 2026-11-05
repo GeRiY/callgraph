@@ -35,6 +35,8 @@ Használat:
 Nyelv (a terminál-kimenet és a súgó nyelve: en = angol, alapértelmezett; hu = magyar):
   bash ~/.claude/skills/callgraph/callgraph.sh set-lang                 az aktuális nyelv és a forrása
   bash ~/.claude/skills/callgraph/callgraph.sh set-lang <en|hu>         a nyelv elmentése (a skill-mappa lang fájljába)
+                                                a skill-utasítást (SKILL.md) is erre a nyelvre cseréli;
+                                                a skill újratöltéséhez indítsd újra a Claude Code-ot
   CALLGRAPH_LANG=<en|hu> bash ~/.claude/skills/callgraph/callgraph.sh …   egy futásra (felülírja az elmentettet)
 
 Frissítés (a GitHub Releases-ből; a projects.json, a lang, az errors.jsonl, a feedback.jsonl és az update-check.json megmarad):

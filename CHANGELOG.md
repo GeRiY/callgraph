@@ -12,8 +12,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   offers the update; it never updates on its own. Opt out with `CALLGRAPH_UPDATE_CHECK=0`; off in CI.
 - **Bug reporting via GitHub:** bilingual issue forms (bug report, idea / feedback), a private security report link and
   `SECURITY.md`. Error messages now point to the bug form; `feedback.sh show <error-id>` prints the details to paste.
+- **English skill instructions:** `SKILL.md` now exists in English and Hungarian (`skill/skill-i18n/SKILL.<en|hu>.md`).
+  The skill follows the language: `callgraph.sh set-lang <en|hu>` rewrites `SKILL.md` in that language (the other one
+  disappears); the first install (`install.sh` → new `callgraph skill-sync`) and `update` keep the user's language.
+  Restart Claude Code to reload the skill.
 
 ### Changed
+- The committed / packaged default `SKILL.md` is now English (generated from `skill-i18n/SKILL.en.md`).
 - Version lookup for `update` / `update --check` uses the `releases/latest` redirect instead of the GitHub API, so the
   API rate limit (HTTP 403) no longer applies.
 - The project page moved to the `gh-pages` branch (https://geriy.github.io/callgraph/); page edits no longer touch `main`.

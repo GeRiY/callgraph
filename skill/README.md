@@ -31,6 +31,10 @@ A terminál-kimenet és a súgó angol (alapértelmezés) vagy magyar. Váltás:
 lekérdezés: `set-lang` argumentum nélkül) — a skill-mappa `lang` fájljába menti, frissítéskor megmarad. Egy futásra: `CALLGRAPH_LANG=hu bash callgraph.sh …`
 (a környezeti változó erősebb az elmentett beállításnál).
 
+A nyelvváltás a skill-utasítást is cseréli: a `set-lang` a `skill-i18n/SKILL.<en|hu>.md`-ből újraírja a `SKILL.md`-t
+(a másik nyelvű eltűnik); az első telepítés (`install.sh` → `callgraph skill-sync`) és a frissítés is az érvényes nyelvűt
+hagyja ott. Az új utasítás betöltéséhez indítsd újra a Claude Code-ot. A `SKILL.md` generált fájl — a `skill-i18n/` forrásokat szerkeszd.
+
 ## Frissítés
 
 `bash callgraph.sh update --check` megnézi, van-e újabb kiadás a GitHub Releases-en; `bash callgraph.sh update` letölti a

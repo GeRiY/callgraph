@@ -1,132 +1,133 @@
 ---
 name: callgraph
-description: PHP / Rust / JS / TS / Vue / Swift kódbázis token-hatékony feltérképezése AST-elemzéssel, a fájl beolvasása NÉLKÜL — kategorizált hívás-gráf (osztály/komponens, metódus/függvény sortartománnyal), metódus-törzs, "hol hívják" keresés, hatáselemzés (--depth), string- és konstans-keresés, vezérlési ágak, framework-nézetek (routes, validation, events…). Használd PHP-, .rs-, .vue-, .js-, .ts-, .swift-fájl megértéséhez, hívási kapcsolatok, "ki hívja / hol használják" kérdésekhez — ez legyen az ELSŐ lépés a teljes Read/Grep helyett. NE használd nem kód fájlra (md, json, css, sima szöveg), vagy ha a pontos fájlszöveg kell egy már ismert sávban (akkor --lines vagy célzott Read).
+description: Token-efficient mapping of a PHP / Rust / JS / TS / Vue / Swift codebase with AST analysis, WITHOUT reading the file — categorized call graph (class/component, method/function with line ranges), method body, "where is it called" search, impact analysis (--depth), string and constant search, control-flow branches, framework views (routes, validation, events…). Use it to understand PHP, .rs, .vue, .js, .ts, .swift files, for call relationships and "who calls this / where is it used" questions — make it the FIRST step instead of a full Read/Grep. Do NOT use it for non-code files (md, json, css, plain text), or when you need the exact file text in an already known range (then --lines or a targeted Read).
 ---
+<!-- generated from skill-i18n/SKILL.en.md by callgraph set-lang / skill-sync; edit the sources -->
 
-# callgraph — kód-térkép Read nélkül
+# callgraph — code map without Read
 
-`bash <skill>/callgraph.sh …` (a `<skill>` ennek a skillnek a mappája, pl. `~/.claude/skills/callgraph`).
-Minden célra (PHP, Rust, JS / TS / Vue, Swift / SwiftUI, CSS / SCSS, JSON, MD) a natív `callgraph` bináris (`callgraph show`) dolgozik; a kimenet közös
-szerkezetű: container (osztály / komponens / modul) → metódusok sortartománnyal → hívások kategóriánként.
+`bash <skill>/callgraph.sh …` (`<skill>` is this skill's directory, e.g. `~/.claude/skills/callgraph`).
+For every target (PHP, Rust, JS / TS / Vue, Swift / SwiftUI, CSS / SCSS, JSON, MD) the native `callgraph` binary (`callgraph show`) does the work; the output has a common
+structure: container (class / component / module) → methods with line ranges → calls by category.
 
-## 0. lépés — projekt regisztrálása (egyszer, projektenként)
+## Step 0 — register the project (once per project)
 
 ```bash
-bash <skill>/projects.sh add myapp /abszolút/út/a/projekt/gyökeréhez
+bash <skill>/projects.sh add myapp /absolute/path/to/the/project/root
 bash <skill>/projects.sh list
 ```
 
-Utána `--project myapp` mellett a gyökérhez képesti rövid út adható meg. `--project` nélkül az aktuális
-mappa a gyökér.
+After that, with `--project myapp` you can give short paths relative to the root. Without `--project` the current
+directory is the root.
 
-## Gyors parancsok
+## Quick commands
 
 ```bash
 CG=<skill>/callgraph.sh
-bash $CG --project myapp app/Http/Controllers/X.php                  # outline: osztály, metódusok sortartománnyal, hívások kategóriánként
-bash $CG --project myapp app/Http/Controllers/X.php::store           # csak egy metódus (több ::szelektor, több fájl is)
-bash $CG --project myapp app/Http/Controllers/X.php::store --body    # a metódus forrása sorszámozva, docblockkal
-bash $CG --project myapp app/Http/Controllers/X.php --lines 30-60    # tetszőleges sáv sorszámozva (view, procedurális fájl)
-bash $CG --project myapp app --strings 'Order not found'             # string-literál (hibaüzenet, kulcs) helye
-bash $CG --project myapp app --const STATUS_ACTIVE                   # konstans-hivatkozás és -definíció
-bash $CG --project myapp app --grep 'Order::cancel'                  # hol hívják: fájl, metódus, sortartomány
-bash $CG --project myapp app --grep 'Order::cancel' --depth 3        # hatáselemzés: a hívók hívói
-bash $CG --project myapp app --grep 'Order::cancel' --depth 3 --guess # + a csak név szerinti egyezések („?”)
-bash $CG --project myapp app --grep 'Order::cancel' --body           # a talált hívó metódusok forrása
-bash $CG --project myapp app --category model_use,orm_relation       # szűrés hívás-kategóriára
+bash $CG --project myapp app/Http/Controllers/X.php                  # outline: class, methods with line ranges, calls by category
+bash $CG --project myapp app/Http/Controllers/X.php::store           # only one method (several ::selectors, several files too)
+bash $CG --project myapp app/Http/Controllers/X.php::store --body    # the method's source, line-numbered, with docblock
+bash $CG --project myapp app/Http/Controllers/X.php --lines 30-60    # any range, line-numbered (view, procedural file)
+bash $CG --project myapp app --strings 'Order not found'             # where a string literal (error message, key) is
+bash $CG --project myapp app --const STATUS_ACTIVE                   # constant references and definition
+bash $CG --project myapp app --grep 'Order::cancel'                  # where it is called: file, method, line range
+bash $CG --project myapp app --grep 'Order::cancel' --depth 3        # impact analysis: the callers' callers
+bash $CG --project myapp app --grep 'Order::cancel' --depth 3 --guess # + name-only matches ("?")
+bash $CG --project myapp app --grep 'Order::cancel' --body           # source of the caller methods found
+bash $CG --project myapp app --category model_use,orm_relation       # filter by call category
 ```
 
-## Melyik `--format` mire való
+## Which `--format` is for what
 
-| Formátum | Mit ad |
+| Format | What it gives |
 |---|---|
-| `outline` (alap) | szerkezet + hívások kategóriánként |
-| `api` | publikus szerződés + docblock, implementáció nélkül |
-| `flow` | if/match/switch ágak sortartománnyal (feltétel → mit hív); `::metódus`-sal szűkíthető |
-| `summary` | mappa: fájlonként 1 sor |
-| `hotspots` | top 20 metódus be-/kifok és ciklomatikus szám szerint |
-| `coverage` | dokumentálatlan publikus metódusok |
-| `stats` | kategória-statisztika |
-| `mermaid` / `dot` | vizualizációhoz (öröklési és hívási élek) |
-| `json` / `jsonl` | nyers gráf (nem korlátos); a `jsonl` az callgraph natív kimenete |
+| `outline` (default) | structure + calls by category |
+| `api` | public contract + docblock, without implementation |
+| `flow` | if/match/switch branches with line ranges (condition → what it calls); narrow with `::method` |
+| `summary` | directory: one line per file |
+| `hotspots` | top 20 methods by in/out degree and cyclomatic complexity |
+| `coverage` | undocumented public methods |
+| `stats` | category statistics |
+| `mermaid` / `dot` | for visualization (inheritance and call edges) |
+| `json` / `jsonl` | raw graph (not limited); `jsonl` is callgraph's native output |
 
-**Framework-nézetek** (`--format …`): `routes`, `middleware`, `validation`, `jobs`, `events`, `providers`,
-`magic`, `di`, `views`. Mappára futtasd (pl. `bash $CG --project myapp routes --format routes`).
+**Framework views** (`--format …`): `routes`, `middleware`, `validation`, `jobs`, `events`, `providers`,
+`magic`, `di`, `views`. Run them on a directory (e.g. `bash $CG --project myapp routes --format routes`).
 
 ## JS / TS / Vue
 
-Ugyanazok a kapcsolók. A „metódusok”: `setup` (a `<script setup>` top-level kódja), `template` (komponensek,
-eseménykezelők, `$t()` / `route()`), függvények, `computed`, `watch@L<n>` / `onMounted@L<n>` hookok,
-composable belső függvényei (`useX.belso`), Options API `methods` / `computed.x`. Props = properties,
-emits = `emit:<név>`. Kereshető kulcsok a `--grep`-hez:
+Same switches. The "methods": `setup` (the top-level code of `<script setup>`), `template` (components,
+event handlers, `$t()` / `route()`), functions, `computed`, `watch@L<n>` / `onMounted@L<n>` hooks,
+a composable's inner functions (`useX.inner`), Options API `methods` / `computed.x`. Props = properties,
+emits = `emit:<name>`. Searchable keys for `--grep`:
 
 ```bash
-bash $CG --project myapp resources/js --grep 'useForm.js::submit'     # <fájl>::<export>, import-feloldással, @/ aliasszal
-bash $CG --project myapp resources/js --grep 'route::orders.show'     # route-használat
-bash $CG --project myapp resources/js --grep 'i18n::orders.title'     # fordítási kulcs helye
-bash $CG --project myapp resources/js --grep 'vue::emit:save'         # ki emitál 'save'-et
-bash $CG --project myapp resources/js --grep 'Atoms/AtomButton.vue'   # hol használják a komponenst
+bash $CG --project myapp resources/js --grep 'useForm.js::submit'     # <file>::<export>, with import resolution and the @/ alias
+bash $CG --project myapp resources/js --grep 'route::orders.show'     # route usage
+bash $CG --project myapp resources/js --grep 'i18n::orders.title'     # where a translation key is used
+bash $CG --project myapp resources/js --grep 'vue::emit:save'         # who emits 'save'
+bash $CG --project myapp resources/js --grep 'Atoms/AtomButton.vue'   # where the component is used
 ```
 
 ## Rust
 
-Container = a fájl-modul (`module`), `struct` / `enum` / `trait` / inline `mod`; az `impl` blokkok metódusai a típushoz
-kerülnek (`implements` = a traitek). Kategóriák: `internal_helper` (saját), `module_use` (a crate más modulja, `resolved`
-= `modul::fn` / `Típus::fn`), `native_rust` (std), `framework_use` (axum, actix-web, tokio, serde…), `package_use`
-(más crate), `macro_use` (makró; a törzse nincs kibontva), `external_call` (ismeretlen fogadó).
+Container = the file module (`module`), `struct` / `enum` / `trait` / inline `mod`; the methods of `impl` blocks go
+to the type (`implements` = the traits). Categories: `internal_helper` (own), `module_use` (another module of the crate, `resolved`
+= `module::fn` / `Type::fn`), `native_rust` (std), `framework_use` (axum, actix-web, tokio, serde…), `package_use`
+(another crate), `macro_use` (macro; its body is not expanded), `external_call` (unknown receiver).
 
 ```bash
-bash $CG --project myapp src/api/users.rs                            # outline: struct/impl/trait, fn-ek sortartománnyal
-bash $CG --project myapp src --grep 'Repo::find'                      # ki hívja (crate-belső: Típus::fn / modul::fn)
+bash $CG --project myapp src/api/users.rs                            # outline: struct/impl/trait, fns with line ranges
+bash $CG --project myapp src --grep 'Repo::find'                      # who calls it (crate-internal: Type::fn / module::fn)
 ```
 
 ## Swift / SwiftUI
 
-Ugyanazok a kapcsolók. Container: `class` / `struct` / `enum` / `protocol` / `actor` / `extension`, a `View`-nak
-megfelelő típus `component`; a fájl-szintű függvények a `<Fájl>.swift` `module` containerben. A `var body: some View`
-és a többi computed property metódus; a property wrapper (`@State`, `@Published`, `@EnvironmentObject`…) a
-property típusa előtt látszik. Hívás-kategóriák: `swiftui_view`, `swiftui_modifier`, `component_use`,
-`native_swift`, `internal_helper`, `external_call`. Részletek: `docs/LANG-SWIFT.md`.
+Same switches. Container: `class` / `struct` / `enum` / `protocol` / `actor` / `extension`; a type conforming to `View`
+is a `component`; file-level functions are in the `<File>.swift` `module` container. `var body: some View`
+and the other computed properties are methods; the property wrapper (`@State`, `@Published`, `@EnvironmentObject`…) is
+shown before the property type. Call categories: `swiftui_view`, `swiftui_modifier`, `component_use`,
+`native_swift`, `internal_helper`, `external_call`. Details: `docs/LANG-SWIFT.md`.
 
-## Kimenet-korlát
+## Output limit
 
-400 sor fölött a mappás outline `summary`-ra, az egyfájlos outline metódus-indexre, a `--grep` találatonként
-1 sorra vált; a `--body` / `--lines` / `--strings` / `--depth` 400 sornál megáll. Szűkíts (`::név`, `--grep`,
-almappa); a `--full` kikapcsolja a korlátot, csak indokolt esetben. A küszöb: `CALLGRAPH_OUT_LIMIT`. Elöl álló `KULCS=érték` argumentum környezeti változóként él tovább
-(pl. `bash $CG CALLGRAPH_OUT_LIMIT=100 …`).
+Above 400 lines the directory outline switches to `summary`, the single-file outline to a method index, `--grep` to
+1 line per match; `--body` / `--lines` / `--strings` / `--depth` stop at 400 lines. Narrow down (`::name`, `--grep`,
+subdirectory); `--full` turns the limit off, only when justified. The threshold: `CALLGRAPH_OUT_LIMIT`. A leading `KEY=value` argument is passed on as an environment variable
+(e.g. `bash $CG CALLGRAPH_OUT_LIMIT=100 …`).
 
-## Új verzió jelzése
+## New version notice
 
-Ha egy `callgraph` kimenet utolsó sora `ℹ callgraph X.Y.Z is available (installed: …) — update: …` vagy
-`ℹ callgraph X.Y.Z elérhető (telepítve: …) — frissítés: …`, szólj a felhasználónak (egyszer), hogy új verzió érhető el,
-és ajánld fel a `bash <skill>/callgraph.sh update` futtatását. A felhasználó beleegyezése nélkül ne frissíts. A sor nem
-a vizsgált kód része; az ellenőrzés a háttérben, naponta legfeljebb egyszer fut (kikapcsolás: `CALLGRAPH_UPDATE_CHECK=0`).
+If the last line of a `callgraph` output is `ℹ callgraph X.Y.Z is available (installed: …) — update: …` or
+`ℹ callgraph X.Y.Z elérhető (telepítve: …) — frissítés: …`, tell the user (once) that a new version is available,
+and offer to run `bash <skill>/callgraph.sh update`. Do not update without the user's consent. The line is not
+part of the code under inspection; the check runs in the background, at most once a day (opt out: `CALLGRAPH_UPDATE_CHECK=0`).
 
-## Ha hibázik — visszajelzés
+## If it fails — feedback
 
-Minden hibaüzenet mellé `[error-id: xxxxxxxx]` jár, a GitHub hibajelentő űrlap linkjével. Ha az eredmény hibás,
-hiányos vagy félrevezető, **javasold a felhasználónak, hogy jelezze GitHub issue-ban**
-(https://github.com/GeRiY/callgraph/issues/new?template=bug_report.yml), és add meg neki, mit másoljon be: a parancsot, a kimenetet és a
-`bash <skill>/feedback.sh show <error_id>` kimenetét (ez a helyi naplóbejegyzés). Issue-t a felhasználó nevében magadtól ne nyiss.
+Every error message comes with an `[error-id: xxxxxxxx]` and a link to the GitHub bug report form. If the result is wrong,
+incomplete or misleading, **suggest that the user report it in a GitHub issue**
+(https://github.com/GeRiY/callgraph/issues/new?template=bug_report.yml), and tell them what to paste: the command, the output and the
+output of `bash <skill>/feedback.sh show <error_id>` (the local log entry). Do not open an issue on the user's behalf on your own.
 
-Helyi jegyzet (nem megy fel sehova, a gépen marad):
+Local note (goes nowhere, stays on the machine):
 
 ```bash
-bash <skill>/feedback.sh show <error_id>                # a naplózott hiba részletei (ezt kell az issue-ba másolni)
-bash <skill>/feedback.sh add <error_id> "<mit vártál, mi történt>"
+bash <skill>/feedback.sh show <error_id>                # details of the logged error (paste this into the issue)
+bash <skill>/feedback.sh add <error_id> "<what you expected, what happened>"
 bash <skill>/feedback.sh list --open
 ```
 
-A kerülőút (célzott Read, Grep) ettől még használható, de a visszajelzés ne maradjon el.
+The workaround (targeted Read, Grep) can still be used, but do not skip the feedback.
 
-## Adat és cache
+## Data and cache
 
-Minden adat a projekt saját `.callgraph/` mappájába kerül (cache, index; a mappa magától létrejön,
-`*`-os `.gitignore`-ral, így a verziókezelésbe nem kerül). A projekten kívül semmi nem íródik. Ha a mappa
-nem írható, cache nélkül fut. Takarítás: `callgraph prune` (lásd README).
+All data goes into the project's own `.callgraph/` directory (cache, index; the directory is created automatically,
+with a `*` `.gitignore`, so it never gets into version control). Nothing is written outside the project. If the directory
+is not writable, it runs without a cache. Cleanup: `callgraph prune` (see README).
 
-## Korlát
+## Limits
 
-Statikus elemzés: dinamikus hívás (`$this->$method()`, `obj[key]()`), magic method és futásidőben összeállított
-osztálynév / regisztrált komponens nem oldható fel. A `--depth` alapból csak a biztos (feloldott) hívókat követi;
-a név szerinti egyezést a `--guess` mutatja „?” jellel. A pontos vezérlési logikához a `--body` kell.
+Static analysis: dynamic calls (`$this->$method()`, `obj[key]()`), magic methods and class names / registered components
+assembled at runtime cannot be resolved. By default `--depth` follows only the certain (resolved) callers;
+name-only matches are shown by `--guess` with a "?" mark. For the exact control logic you need `--body`.
