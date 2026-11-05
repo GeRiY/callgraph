@@ -57,6 +57,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 - The project page moved to the `gh-pages` branch (https://geriy.github.io/callgraph/); page edits no longer touch `main`.
 
 ### Fixed
+- `--grep … --depth`: from level 2 on, callers are searched in the whole scope of the query (the folders given, or the
+  project root for a file argument), not only in the folders of the level-1 matches — callers in other folders were missed.
 - Rust `--format api` now lists the `pub fn` methods of `impl` blocks (and trait implementations), the `pub` constants
   and fields — before, it showed no public methods for Rust types.
 - `--strings` now finds texts inside Vue template expressions (`{{ … }}`, `:title="…"`, `@click="…"`) and in Rust

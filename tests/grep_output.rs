@@ -168,3 +168,41 @@ fn callers_jsonl_marks_interface_matches() {
     let direct = rows.iter().find(|row| row["caller"] == "direct").unwrap();
     assert!(direct.get("via").is_none(), "{out}");
 }
+
+#[test]
+fn depth_searches_the_whole_query_scope_not_only_the_first_level_folders() {
+    let project = Project::new();
+    // 1. szint a src/Services/-ben, a 2. szintű hívó egy testvér-mappában (src/Http/)
+    let files = [
+        (
+            "src/Services/Lookup.php",
+            "<?php\nnamespace App\\Services;\n\nclass Lookup\n{\n    private Repo $repo;\n\n    public function run(int $id): array\n    {\n        return $this->repo->find($id);\n    }\n}\n",
+        ),
+        (
+            "src/Http/Admin.php",
+            "<?php\nnamespace App\\Http;\n\nuse App\\Services\\Lookup;\n\nclass Admin\n{\n    private Lookup $lookup;\n\n    public function show(int $id): array\n    {\n        return $this->lookup->run($id);\n    }\n}\n",
+        ),
+    ];
+    for (path, text) in files {
+        let path = project.0.join(path);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, text).unwrap();
+    }
+    let out = project.run(&[
+        "show",
+        "src/Services",
+        "src/Http",
+        "--grep",
+        "Repo::find",
+        "--depth",
+        "2",
+    ]);
+    assert!(
+        out.contains("  src/Services/Lookup.php  Lookup::run()  L8-11\n"),
+        "{out}"
+    );
+    assert!(
+        out.contains("  src/Http/Admin.php  Admin::show()  L10-13  ← App\\Services\\Lookup::run\n"),
+        "{out}"
+    );
+}
