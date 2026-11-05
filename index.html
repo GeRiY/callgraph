@@ -39,12 +39,7 @@
 "offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}
 </script>
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[
-{"@type":"Question","name":"What is callgraph?","acceptedAnswer":{"@type":"Answer","text":"A command-line code map for AI coding agents. It parses a file or folder and answers what is in it, which method lives on which lines, what it calls, who calls it and what is affected by a change — in a few dozen lines instead of the whole file."}},
-{"@type":"Question","name":"Which languages are supported?","acceptedAnswer":{"@type":"Answer","text":"PHP (with Laravel and Yii awareness), JavaScript, TypeScript, Vue single-file components, Rust, Swift and SwiftUI, CSS, SCSS, JSON and Markdown."}},
-{"@type":"Question","name":"Do I need PHP, Node or Rust installed?","acceptedAnswer":{"@type":"Answer","text":"No. callgraph is a single static binary. The only runtime requirement is bash."}},
-{"@type":"Question","name":"Does it work without Claude Code?","acceptedAnswer":{"@type":"Answer","text":"Yes. It is a Claude Code skill, but the commands work from any terminal or script."}},
-{"@type":"Question","name":"How do I update it?","acceptedAnswer":{"@type":"Answer","text":"Run callgraph.sh update. It downloads the newest release from GitHub and keeps your projects and settings."}}]}
+{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "What is callgraph?", "acceptedAnswer": {"@type": "Answer", "text": "A command-line code map for AI coding agents. It parses a file or folder and answers what is in it, which method lives on which lines, what it calls, who calls it and what is affected by a change — in a few dozen lines instead of the whole file."}}, {"@type": "Question", "name": "Which languages are supported?", "acceptedAnswer": {"@type": "Answer", "text": "PHP (with Laravel and Yii awareness), JavaScript, TypeScript, Vue single-file components, Rust, Swift and SwiftUI, CSS, SCSS, JSON and Markdown."}}, {"@type": "Question", "name": "Do I need PHP, Node or Rust installed?", "acceptedAnswer": {"@type": "Answer", "text": "No. callgraph is a single static binary. The only runtime requirement is bash."}}, {"@type": "Question", "name": "Does it work without Claude Code?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. It is a Claude Code skill, but the commands work from any terminal or script."}}, {"@type": "Question", "name": "How do I update it?", "acceptedAnswer": {"@type": "Answer", "text": "Run callgraph.sh update. It downloads the newest release from GitHub and keeps your projects and settings."}}, {"@type": "Question", "name": "Where do I report a bug or suggest a feature?", "acceptedAnswer": {"@type": "Answer", "text": "Open a GitHub issue using the bug report or the idea/feedback form. Report security issues privately through a GitHub security advisory."}}]}
 </script>
 </head>
 <body>
@@ -54,7 +49,7 @@
   <a class="brand" href="./"><img src="assets/favicon.svg" alt="" width="32" height="32">callgraph</a>
   <nav class="links" aria-label="Main">
     <a href="#features">Features</a><a href="#languages">Languages</a><a href="#install">Install</a>
-    <a href="#usage">Usage</a><a href="#faq">FAQ</a>
+    <a href="#usage">Usage</a><a href="#feedback">Feedback</a><a href="#faq">FAQ</a>
     <a href="https://github.com/GeRiY/callgraph">GitHub</a><a href="hu/" hreflang="hu" lang="hu">Magyar</a>
   </nav>
 </header>
@@ -174,12 +169,30 @@ callgraph.sh update             # download and install it (settings are kept)
 callgraph.sh set-lang hu        # Hungarian output (back: set-lang en)</code></pre>
 </section>
 
+<section id="feedback" aria-labelledby="h-feedback">
+  <h2 id="h-feedback">Bugs and feedback</h2>
+  <p class="sub">Found something wrong or have an idea? We read every report. Please check <a href="https://github.com/GeRiY/callgraph/issues">existing issues</a> first.</p>
+  <div class="grid">
+    <div class="card"><h3>🐞 Report a bug</h3><p>Open a <a href="https://github.com/GeRiY/callgraph/issues/new?template=bug_report.yml">bug report</a>. The form guides you through what we need.</p></div>
+    <div class="card"><h3>💡 Ideas and feedback</h3><p>A missing language or framework, a better output, anything: <a href="https://github.com/GeRiY/callgraph/issues/new?template=feature_request.yml">share an idea</a>.</p></div>
+    <div class="card"><h3>🔒 Security issue</h3><p>Please <b>don't</b> open a public issue — <a href="https://github.com/GeRiY/callgraph/security/advisories/new">report it privately</a>. We answer within a few days.</p></div>
+  </div>
+  <h3 style="margin-top:22px">What to include in a bug report</h3>
+  <ul>
+    <li>the version: <code>callgraph --version</code></li>
+    <li>the exact command you ran and its output</li>
+    <li>the <code>[error-id: …]</code> line if the output has one</li>
+    <li>a small, non-confidential code snippet that reproduces it, and your OS</li>
+  </ul>
+</section>
+
 <section id="faq" aria-labelledby="h-faq">
   <h2 id="h-faq">FAQ</h2>
   <details><summary>What is callgraph?</summary><p>A command-line code map for AI coding agents. It parses a file or folder and answers what is in it, which method lives on which lines, what it calls, who calls it and what is affected by a change — in a few dozen lines instead of the whole file.</p></details>
   <details><summary>Do I need PHP, Node or Rust installed?</summary><p>No. callgraph is a single static binary. The only runtime requirement is bash.</p></details>
   <details><summary>Does it work without Claude Code?</summary><p>Yes. It ships as a Claude Code skill, but every command works from any terminal or script.</p></details>
   <details><summary>Is my code sent anywhere?</summary><p>No. Everything runs locally; the only network call is the optional <code>update</code> check against GitHub Releases.</p></details>
+  <details><summary>Where do I report a bug or suggest a feature?</summary><p>On GitHub: <a href="https://github.com/GeRiY/callgraph/issues/new?template=bug_report.yml">bug report</a> or <a href="https://github.com/GeRiY/callgraph/issues/new?template=feature_request.yml">idea / feedback</a>. Security issues go to a <a href="https://github.com/GeRiY/callgraph/security/advisories/new">private advisory</a>.</p></details>
   <details><summary>How much does it cost?</summary><p>Nothing. callgraph is open source under the MIT license.</p></details>
 </section>
 </main>
