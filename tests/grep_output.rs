@@ -229,3 +229,66 @@ fn depth_searches_the_whole_project_from_level_two() {
         "{out}"
     );
 }
+
+/// Egy hívó metódus: két azonos sorú hívás (összevonandó) és még négy különböző — a 3 soros korláthoz.
+fn write_many(project: &Project) {
+    fs::write(
+        project.0.join("src/Many.php"),
+        "<?php\nnamespace App\\Services;\n\nclass Many\n{\n    private Repo $repo;\n\n    public function run(int $id): array\n    {\n        $this->repo->find($id);\n        $this->repo->find(1);\n        $this->repo->find($id);\n        $this->repo->find(2);\n        $this->repo->find(3);\n        $this->repo->find(4);\n        return [];\n    }\n}\n",
+    )
+    .unwrap();
+}
+
+#[test]
+fn grep_merges_identical_call_lines_and_caps_them_per_caller() {
+    let project = Project::new();
+    write_many(&project);
+    let out = project.run(&["show", "src/Many.php", "--grep", "Repo::find"]);
+    assert!(out.contains("  run()  L8-17\n"), "{out}");
+    assert!(
+        out.contains(concat!(
+            "    L10, L12 │ $this->repo->find($id);\n",
+            "    L11 │ $this->repo->find(1);\n",
+            "    L13 │ $this->repo->find(2);\n",
+            "    … +2 more: L14, L15\n",
+        )),
+        "{out}"
+    );
+    assert!(!out.contains("L14 │"), "{out}");
+}
+
+#[test]
+fn grep_fallback_merges_and_caps_call_lines_too() {
+    let project = Project::new();
+    write_many(&project);
+    let out = project.run(&[
+        "show",
+        "src/Many.php",
+        "--grep",
+        "Repo::find",
+        "CALLGRAPH_OUT_LIMIT=6",
+    ]);
+    let file = sep("src/Many.php");
+    let expected = format!(
+        "{file}  Many::run  L10, L12  ← App\\Services\\Repo::find │ $this->repo->find($id);\n\
+         {file}  Many::run  L11  ← App\\Services\\Repo::find │ $this->repo->find(1);\n\
+         {file}  Many::run  L13  ← App\\Services\\Repo::find │ $this->repo->find(2);\n\
+         {file}  Many::run  … +2 more: L14, L15\n"
+    );
+    assert!(out.contains("1 line per call instead"), "{out}");
+    assert!(out.contains(&expected), "{out}");
+}
+
+#[test]
+fn depth_level_one_merges_identical_call_lines() {
+    let project = Project::new();
+    write_many(&project);
+    let out = project.run(&["show", "src", "--grep", "Repo::find", "--depth", "2"]);
+    assert!(
+        out.contains(&format!(
+            "  {}  Many::run()  L8-17\n    L10, L12 │ $this->repo->find($id);\n    L11 │ $this->repo->find(1);\n    L13 │ $this->repo->find(2);\n    … +2 more: L14, L15\n",
+            sep("src/Many.php")
+        )),
+        "{out}"
+    );
+}

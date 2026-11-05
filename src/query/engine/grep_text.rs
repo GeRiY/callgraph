@@ -31,36 +31,13 @@ impl QueryEngine {
             }
             let max = limit.unwrap_or_else(|| crate::query::OutputLimit::from_env(full).limit);
             if !full && text.lines().count() > max {
-                let mut lines = tf!(
-                    "⚠ --grep outline would be {} lines — showing 1 line per match instead (file  caller  L<line>  ← target │ call line). Narrow it down, or --full.\n\n",
-                    "⚠ A --grep outline {} sor lenne — helyette találatonként 1 sor (fájl  hívó  L<sor>  ← cél │ a hívás sora). Szűkíts, vagy --full.\n\n",
-                    text.lines().count()
+                let header = tf!(
+                    "⚠ --grep outline would be {} lines — showing 1 line per call instead (file  caller  L<line>  ← target │ call line; identical lines merged, at most {} per caller). Narrow it down, or --full.\n\n",
+                    "⚠ A --grep outline {} sor lenne — helyette hívásonként 1 sor (fájl  hívó  L<sor>  ← cél │ a hívás sora; az azonos sorok összevonva, hívónként legfeljebb {}). Szűkíts, vagy --full.\n\n",
+                    text.lines().count(),
+                    snippet::MAX_PER_METHOD
                 );
-                for row in rows {
-                    for call in &row.graph.calls {
-                        let code = source.get(&row.graph.file, call.line);
-                        let marks =
-                            snippet::call_line(lang, call.line, row.via_of(call), code.as_deref());
-                        // `L12 via X │ kód` → `L12  ← cél via X │ kód`
-                        let rest = marks.strip_prefix(&format!("L{}", call.line)).unwrap_or("");
-                        lines.push_str(&format!(
-                            "{}  {}::{}  L{}  ← {}{rest}\n",
-                            row.graph.file,
-                            call.container.as_deref().unwrap_or("__top__"),
-                            call.caller.as_deref().unwrap_or("__top__"),
-                            call.line,
-                            call.resolved.as_deref().unwrap_or(&call.target)
-                        ));
-                        if lines.lines().count() >= max + 2 {
-                            lines.push_str(&tf!(
-                                "⚠ … truncated at {max} lines\n",
-                                "⚠ … levágva {max} sornál\n"
-                            ));
-                            return Ok(lines);
-                        }
-                    }
-                }
-                return Ok(lines);
+                return Ok(flat_lines(header, rows, &source, lang, max));
             }
             return Ok(text);
         }
@@ -205,4 +182,81 @@ impl QueryEngine {
         ));
         Ok(output)
     }
+}
+
+/// Egy hívó metódus (konténer, név) hívásai.
+type CallerCalls<'a> = (
+    (Option<&'a str>, Option<&'a str>),
+    Vec<&'a crate::model::Call>,
+);
+
+/// A túl hosszú `--grep` outline helyett: hívó metódusonként a hívások egy-egy sorban
+/// (`fájl  Osztály::metódus  L12, L40  ← cél │ kód`), az azonos (cél, `via`, kód) hívások összevonva, legfeljebb
+/// `snippet::MAX_PER_METHOD` sor, a többi `… +N more: L55, L61`; `max` sor után levágva.
+fn flat_lines(
+    mut out: String,
+    rows: &[QueryResult],
+    source: &SourceLines,
+    lang: crate::i18n::Lang,
+    max: usize,
+) -> String {
+    for row in rows {
+        // hívó metódusonként, az első előfordulás sorrendjében
+        let mut groups: Vec<CallerCalls<'_>> = Vec::new();
+        for call in &row.graph.calls {
+            let key = (call.container.as_deref(), call.caller.as_deref());
+            match groups.iter_mut().find(|(group, _)| *group == key) {
+                Some((_, calls)) => calls.push(call),
+                None => groups.push((key, vec![call])),
+            }
+        }
+        for ((container, caller), calls) in groups {
+            let sites = snippet::merge(calls.iter().map(|call| {
+                let target = call.resolved.as_deref().unwrap_or(&call.target);
+                (
+                    call.line,
+                    (target, row.via_of(call)),
+                    source.get(&row.graph.file, call.line),
+                )
+            }));
+            let (shown, rest) = snippet::cap(sites);
+            let prefix = format!(
+                "{}  {}::{}",
+                row.graph.file,
+                container.unwrap_or("__top__"),
+                caller.unwrap_or("__top__")
+            );
+            for site in &shown {
+                let (target, via) = site.key;
+                let line = format!(
+                    "{prefix}  {}  ← {target}{}\n",
+                    snippet::line_list(&site.lines),
+                    snippet::marks(lang, via, site.code.as_deref())
+                );
+                if push_limited(&mut out, &line, max) {
+                    return out;
+                }
+            }
+            if !rest.is_empty() {
+                let line = format!("{prefix}  {}\n", snippet::more(lang, &rest));
+                if push_limited(&mut out, &line, max) {
+                    return out;
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Hozzáfűz egy sort; ha a kimenet elérte a korlátot, a levágás jelzésével `true`.
+fn push_limited(out: &mut String, line: &str, max: usize) -> bool {
+    out.push_str(line);
+    if out.lines().count() < max + 2 {
+        return false;
+    }
+    out.push_str(&tf!(
+        "⚠ … truncated at {max} lines\n",
+        "⚠ … levágva {max} sornál\n"
+    ));
+    true
 }

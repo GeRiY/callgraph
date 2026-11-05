@@ -5,6 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+### Changed
+- **Shorter call lists in "where is it called" results:** when one caller method makes the same call on several lines
+  with the very same source text, it is now shown once with all its line numbers, e.g.
+  `L12, L40 │ $this->repo->find($id)`. Each caller shows at most 3 such rows; the rest are listed by line number only:
+  `… +2 more: L55, L61`. This applies to `--grep`, the first `--depth` level and the one-line-per-call view used when
+  the result would be too long. Calls through an interface stay on their own row (`via …`).
+
 ## [0.2.0] — 2026-11-05
 
 ### Added
