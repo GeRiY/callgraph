@@ -43,6 +43,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   are found.
 
 ### Changed
+- **Faster builds:** `tools/dev.sh check` / `test` / `clippy` use the debug profile (like CI now; `check-release` keeps
+  the LTO variant), the dev container shares one build cache across all checkouts (`CALLGRAPH_DEV_TARGET`), and CI
+  caches the compiled dependencies (`Swatinem/rust-cache`) and runs clippy + tests without LTO. The released binaries
+  are built exactly as before (release profile, LTO).
 - **Shorter result lists:** when the project root would repeat on many lines (`--grep`, `--depth`, `--strings`,
   `--const`, folder outlines, framework views…), the first line is now `root: /abs/path/to/project` and every path after
   it is relative to that root. Outputs with a single path, and the machine formats (`json`, `mermaid`, `dot`, `callers`),
