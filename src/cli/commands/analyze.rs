@@ -253,7 +253,8 @@ mod tests {
 
     #[test]
     fn explicit_file_outside_language_filter_is_reported() {
-        let path = std::env::temp_dir().join(format!("callgraph-lang-filter-{}.php", std::process::id()));
+        let path =
+            std::env::temp_dir().join(format!("callgraph-lang-filter-{}.php", std::process::id()));
         fs::write(&path, "<?php echo 1;").unwrap();
         let command = AnalyzeCommand::new(
             vec![path.clone()],

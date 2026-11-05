@@ -3,7 +3,7 @@
 use std::path::Path;
 
 use crate::core::SourceFile;
-use crate::error::{Result, CallgraphError};
+use crate::error::{CallgraphError, Result};
 use crate::lang::{Analysis, LanguageRegistry};
 
 /// A nyelv-registryre épülő elemző.

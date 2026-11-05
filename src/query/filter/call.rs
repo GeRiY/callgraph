@@ -69,15 +69,18 @@ impl FilterChain {
         let mut filtered = graph.clone();
         filtered.calls = calls;
         filtered.methods.retain(|method| {
-            hits.contains(&key(method.container.as_deref(), Some(method.name.as_str())))
+            hits.contains(&key(
+                method.container.as_deref(),
+                Some(method.name.as_str()),
+            ))
         });
         // a container akkor marad, ha a neve a találatok container-részében szerepel (nem a metódusokon át)
         filtered
             .containers
             .retain(|container| hits.iter().any(|(name, _)| *name == container.name));
-        filtered.control_flow.retain(|flow| {
-            hits.contains(&key(flow.container.as_deref(), flow.caller.as_deref()))
-        });
+        filtered
+            .control_flow
+            .retain(|flow| hits.contains(&key(flow.container.as_deref(), flow.caller.as_deref())));
         filtered.properties.clear();
         filtered.constants.clear();
         filtered.comments.clear();

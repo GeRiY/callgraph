@@ -6,7 +6,7 @@ mod loader;
 use super::filter::FilterChain;
 use super::selector::SelectorSet;
 use crate::analysis::Analyzer;
-use crate::error::{Result, CallgraphError};
+use crate::error::{CallgraphError, Result};
 use crate::io::FileWalker;
 use crate::model::FileGraph;
 use std::path::{Path, PathBuf};

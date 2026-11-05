@@ -1,6 +1,6 @@
 //! A `fájl[::metódus]` lekérdezési argumentumok értelmezése.
 
-use crate::error::{Result, CallgraphError};
+use crate::error::{CallgraphError, Result};
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

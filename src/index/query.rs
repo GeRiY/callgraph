@@ -6,7 +6,7 @@ use regex::RegexBuilder;
 use serde::Serialize;
 
 use super::record::IndexRecord;
-use crate::error::{Result, CallgraphError};
+use crate::error::{CallgraphError, Result};
 
 /// A `callers` JSONL-kimenetének egy sora.
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]

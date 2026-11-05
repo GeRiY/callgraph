@@ -31,6 +31,9 @@ fn main() {
         file.strip_prefix(&src).unwrap_or(file).hash(&mut hasher);
         fs::read(file).unwrap_or_default().hash(&mut hasher);
     }
-    println!("cargo:rustc-env=CALLGRAPH_SRC_HASH={:016x}", hasher.finish());
+    println!(
+        "cargo:rustc-env=CALLGRAPH_SRC_HASH={:016x}",
+        hasher.finish()
+    );
     println!("cargo:rerun-if-changed=src");
 }

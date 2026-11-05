@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::error::{Result, CallgraphError};
+use crate::error::{CallgraphError, Result};
 
 /// Egy forrásfájl útja, nyers tartalma és módosítási ideje (másodperc).
 ///

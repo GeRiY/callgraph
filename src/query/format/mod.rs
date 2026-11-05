@@ -20,7 +20,7 @@ mod stats;
 mod strings;
 mod summary;
 
-use crate::error::{Result, CallgraphError};
+use crate::error::{CallgraphError, Result};
 use crate::query::QueryResult;
 
 pub trait Formatter: Send + Sync {
