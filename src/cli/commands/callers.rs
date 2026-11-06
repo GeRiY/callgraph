@@ -15,6 +15,17 @@ pub struct CallersCommand {
     pattern: String,
     depth: usize,
     project: Option<PathBuf>,
+    /// `--by-layer`: szintenként rétegek szerint rendezve (a hívotthoz legközelebbi réteg elöl), `layer` mezővel.
+    by_layer: bool,
+}
+
+/// Egy sor a `--by-layer` kimenetben: a szokásos mezők és a hívó fájl szerepe (ismeretlennél nincs `layer`).
+#[derive(serde::Serialize)]
+struct LayeredRow<'a> {
+    #[serde(flatten)]
+    row: &'a crate::index::CallerRow,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    layer: Option<&'static str>,
 }
 
 impl CallersCommand {
@@ -23,7 +34,14 @@ impl CallersCommand {
             pattern,
             depth,
             project,
+            by_layer: false,
         }
+    }
+
+    /// A `--by-layer` kapcsoló (alapból ki: a kimenet változatlan).
+    pub fn by_layer(mut self, on: bool) -> Self {
+        self.by_layer = on;
+        self
     }
 
     /// A projekt-gyökér ugyanúgy, mint az elemzésnél (ProjectLocator): a megadott útról vagy a munkakönyvtárról
@@ -60,8 +78,25 @@ impl CallersCommand {
 
 impl Command for CallersCommand {
     fn run(&self, out: &mut dyn Write, _err: &mut dyn Write) -> Result<i32> {
-        for row in self.callers(&self.root())? {
-            serde_json::to_writer(&mut *out, &row)?;
+        let project = self.root();
+        let mut rows = self.callers(&project)?;
+        if !self.by_layer {
+            for row in rows {
+                serde_json::to_writer(&mut *out, &row)?;
+                writeln!(out)?;
+            }
+            return Ok(0);
+        }
+        let scope = crate::profile::LayerScope::new(project.root(), None, true)
+            .map_err(crate::error::CallgraphError::Usage)?;
+        // stabil rendezés: szinten belül a réteg, azon belül az eredeti sorrend
+        rows.sort_by_key(|row| (row.level, scope.order_key(&row.file)));
+        for row in &rows {
+            let layered = LayeredRow {
+                row,
+                layer: scope.role_of_key(&row.file).map(|role| role.name()),
+            };
+            serde_json::to_writer(&mut *out, &layered)?;
             writeln!(out)?;
         }
         Ok(0)

@@ -211,6 +211,28 @@ mellett az utak a regisztrált projekt gyökeréhez képest értendők; nélkül
 A nagy eredmények korlátosak (400 sor fölött a mappás outline summary-ra, az egyfájlos metódus-indexre vált);
 a `--full` feloldja. Teljes referencia: `callgraph.sh --help` és [`skill/SKILL.md`](skill/SKILL.md).
 
+### Projekt-profil
+
+Ismeretlen projektben kezdd ezzel: `bash ~/.claude/skills/callgraph/callgraph.sh profile [--project alias]`. A mappa-
+és fájlnevekből (és a `composer.json` / `package.json` / `Cargo.toml` frameworkjéből) megmondja az architektúrát
+(Laravel / Yii rétegzett MVC, DDD / hexagonális, Vue / React frontend, SwiftUI MVVM, Rust web), a rétegeket a
+mappáikkal és a fájlszámukkal, a tervezési mintákat (Repository, Factory, Strategy, Observer…), az egyértelmű szerep
+nélküli mappákat, és hogy a rétegek hogyan hívják egymást. A kód-gráf megerősíti: `extends Controller`,
+`implements *RepositoryInterface`, `defineStore`, és a rétegek közti hívások iránya. Kb. 15 sor; a `--full` mappánként
+részletez. Minden fájl kap egy szerepet bizonyossággal (magas / közepes / alacsony), vagy „ismeretlen” marad — nem
+találgat. MCP: a `project_profile` eszköz, és kapcsolódáskor egy tömör profil is megy.
+
+A rétegek a lekérdezésekben (mind kapcsolóra, az alapkimenet nem változik):
+
+```bash
+bash ~/.claude/skills/callgraph/callgraph.sh app --layer service                     # csak a service-fájlok (név,név...)
+bash ~/.claude/skills/callgraph/callgraph.sh app --format summary --layers           # summary rétegenként
+bash ~/.claude/skills/callgraph/callgraph.sh app --grep 'Repo::find' --depth 2 --by-layer   # hívók rétegek szerint
+```
+
+Semmitmondó (vagy nem angol) mappanevek? Egy commitolható `.callgraph-layers` fájl a projekt gyökerében
+hozzárendeli őket: `service = app/Szolgaltatasok, app/Logic`, `ignore-role = app/Legacy`.
+
 ### Nyelv
 
 A terminál-kimenet és a súgó alapból angol; magyarul is kérhető:
@@ -225,7 +247,7 @@ CALLGRAPH_LANG=hu bash ~/.claude/skills/callgraph/callgraph.sh app/Models/Order.
 
 A Claude Code-skill mellett (változatlan, teljes értékűen támogatott) ugyanaz a bináris
 [MCP](https://modelcontextprotocol.io)-szerver is stdio-n, így bármely MCP-kliens használhatja: `callgraph mcp`.
-Eszközök: `outline`, `method_body`, `find_callers`, `search`, `framework_view`, `notes`, `projects`, `guide`. Ugyanazt
+Eszközök: `outline`, `method_body`, `find_callers`, `search`, `framework_view`, `notes`, `projects`, `guide`, `project_profile`. Ugyanazt
 a tömör szöveget adják, mint a CLI, ugyanazzal a kimeneti korláttal; csak olvas, az utak a projekt-gyökéren belül
 maradnak, a lekérdezések nem használnak hálózatot (csak a lenti, naponta egyszeri frissítés-ellenőrzés). Kapcsolódáskor a szerver rövid használati útmutatót küld a kliensnek a beállított
 nyelven (melyik eszköz mire, hogyan keresd a hívókat, hogyan olvasd a kimenetet); a Claude Code ezt az agent

@@ -71,6 +71,7 @@ impl QueryEngine {
                 ranges: graph,
                 source: &source,
                 lang,
+                layers: self.layers.as_ref().filter(|scope| scope.by_layer()),
             }));
         }
         // gráf nélkül: a lekérdezés teljes hatókörének minden fájlja (nem csak az 1. szint fájljainak mappái)
@@ -87,6 +88,7 @@ impl QueryEngine {
             ranges: &all,
             source: &source,
             lang,
+            layers: self.layers.as_ref().filter(|scope| scope.by_layer()),
         }))
     }
 }
@@ -127,6 +129,9 @@ struct DepthView<'a> {
     ranges: &'a dyn MethodRanges,
     source: &'a SourceLines,
     lang: Lang,
+    /// `--by-layer`: a hívók rétegek szerint (a hívotthoz legközelebbi elöl), a sor végén a szerep; `None` = a régi
+    /// sorrend és sor.
+    layers: Option<&'a crate::profile::LayerScope>,
 }
 
 /// Az 1. szint hívásai a hívó-index lekérdezéséhez (`level: 1`).
@@ -186,6 +191,7 @@ fn render_depth(view: DepthView<'_>) -> String {
         ranges,
         source,
         lang,
+        layers,
     } = view;
     let mut output = String::new();
     for level in 1..=depth {
@@ -212,16 +218,22 @@ fn render_depth(view: DepthView<'_>) -> String {
                 .cmp(&right_row.graph.file)
                 .then_with(|| left.line.cmp(&right.line))
         });
+        if let Some(scope) = layers {
+            direct.sort_by_key(|(row, _)| scope.order_key(&row.graph.file));
+        }
         if level == 1 {
             for (row, method) in &direct {
                 writeln!(
                     output,
-                    "  {}  {}::{}()  L{}-{}",
+                    "  {}  {}::{}()  L{}-{}{}",
                     row.graph.file,
                     method.container.as_deref().unwrap_or("__top__"),
                     method.name,
                     method.line,
-                    method.end_line.unwrap_or(method.line)
+                    method.end_line.unwrap_or(method.line),
+                    layers
+                        .map(|scope| scope.tag(&row.graph.file))
+                        .unwrap_or_default()
                 )
                 .unwrap();
                 let calls = method_calls(&row.graph, method);
@@ -244,13 +256,16 @@ fn render_depth(view: DepthView<'_>) -> String {
         level_callers.dedup_by(|b, a| {
             a.file == b.file && a.container == b.container && a.caller == b.caller
         });
+        if let Some(scope) = layers {
+            level_callers.sort_by_key(|row| scope.order_key(&row.file));
+        }
         for caller in level_callers {
             let range = ranges
                 .range(&caller.file, caller.container.as_deref(), &caller.caller)
                 .unwrap_or((caller.line, caller.line));
             writeln!(
                 output,
-                "  {}  {}::{}()  L{}-{}{}",
+                "  {}  {}::{}()  L{}-{}{}{}",
                 caller.file,
                 caller.container.as_deref().unwrap_or("__top__"),
                 caller.caller,
@@ -264,7 +279,8 @@ fn render_depth(view: DepthView<'_>) -> String {
                     )
                 } else {
                     String::new()
-                }
+                },
+                layers.map(|scope| scope.tag(&caller.file)).unwrap_or_default()
             )
             .unwrap();
             let code = source.get(&caller.file, caller.line);

@@ -1,6 +1,7 @@
 //! A query facade: projektútvonalakból elemzett vagy cache-elt gráfokat ad.
 
 mod grep_text;
+mod layer;
 mod loader;
 
 use super::filter::{FilterChain, pattern_regex, receiver_target};
@@ -60,6 +61,8 @@ pub struct QueryEngine {
     graph: bool,
     /// A sorok a szűkített tényekből (`facts.bin`) jönnek a teljes rekordok helyett (`use_slim_rows`).
     slim: bool,
+    /// A réteg-kapcsolók (`with_layers`: `--layer`, `--layers`, `--by-layer`); `None` = nincs (alapértelmezés).
+    layers: Option<crate::profile::LayerScope>,
 }
 
 impl QueryEngine {
@@ -84,6 +87,7 @@ impl QueryEngine {
             analyzer: Analyzer::with_defaults(),
             graph: false,
             slim: false,
+            layers: None,
         }
     }
     /// A sorok a projekt-gráf szűkített tényeiből jöjjenek (`facts.bin`: egyetlen fájl a teljes hatókörre) — a
@@ -294,7 +298,11 @@ impl QueryEngine {
                     let mut warn = |_| {};
                     let files = walker.collect(std::slice::from_ref(&abs), &mut warn);
                     for f in self.legacy_order(files) {
-                        result.push((f.strip_prefix(&self.root).unwrap_or(&f).to_path_buf(), None));
+                        let rel = f.strip_prefix(&self.root).unwrap_or(&f).to_path_buf();
+                        // `--layer`: csak a kért rétegek fájljai (szűrő nélkül mind)
+                        if self.keeps_layer(&rel) {
+                            result.push((rel, None));
+                        }
                     }
                 } else {
                     return Err(self.not_found(&abs));

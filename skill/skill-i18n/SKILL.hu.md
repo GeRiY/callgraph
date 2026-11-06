@@ -55,6 +55,24 @@ az interfészén / szülőjén / trait-jén át menőket), ezért hívók maradh
 - `?` / `?::név`: ismeretlen fogadó-típus, csak név szerinti egyezés; lehet téves, nézd meg a sort.
 <!-- /mcp -->
 
+## Projekt-profil (ismeretlen projektben ezzel kezdj)
+
+```bash
+bash $CG profile --project myapp                                     # architektúra, rétegek (mappák, fájlszám), minták, hívásirány, ismeretlen mappák
+bash $CG profile --project myapp --full                              # mappánként, bizonyosság szerint, a rétegek közti hívás-párok
+bash $CG --project myapp app --layer service                         # csak egy réteg fájljai (több: service,repository)
+bash $CG --project myapp app --format summary --layers               # summary rétegenként csoportosítva
+bash $CG --project myapp app --grep 'Repo::find' --depth 2 --by-layer # hívók rétegek szerint, a hívotthoz legközelebbi elöl
+```
+
+Ismeretlen projektben a mappák listázása helyett futtasd egyszer az elején a `profile`-t (~15 sor): megmondja, melyik
+mappában melyik réteg van, így a mappaneveket nem ismerve is szűkíthetsz a `--layer <név>`-vel. A réteg egy név a
+profilból (`controller`, `service`, `repository`, `model`, `component`, `store`…), nem út. A szerepek a mappa- és
+fájlnevekből jönnek, a gráffal megerősítve (bizonyosság magas / közepes / alacsony; „ismeretlen”, ha nem egyértelmű).
+A réteg magától soha nem rejt el találatot: csak a `--layer` szűr, a `--layers` / `--by-layer` csak csoportosít és
+sorrendez. Saját mappanevek: `.callgraph-layers` a projekt gyökerében (`service = app/Logic`,
+`ignore-role = app/Legacy`). MCP: a `project_profile` eszköz és a `layer` / `by_layer` paraméter.
+
 ## Melyik `--format` mire való
 
 | Formátum | Mit ad |

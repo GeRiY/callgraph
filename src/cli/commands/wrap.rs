@@ -62,11 +62,13 @@ fn parse(args: &[String]) -> Parsed {
                 p.forward.extend(["--depth".into(), p.depth.clone()]);
             }
             "--format" | "--grep" | "--category" | "--lines" | "--strings" | "--const"
-            | "--notes" => {
+            | "--notes" | "--layer" => {
                 let v = value();
                 p.forward.extend([a.clone(), v]);
             }
-            "--body" | "--doc" | "--raw" | "--full" | "--guess" => p.forward.push(a.clone()),
+            "--body" | "--doc" | "--raw" | "--full" | "--guess" | "--layers" | "--by-layer" => {
+                p.forward.push(a.clone())
+            }
             _ => p.targets.push(a.clone()),
         }
     }
@@ -208,6 +210,13 @@ mod tests {
             ])
         );
         assert_eq!(p.targets, s(&["a.php::m"]));
+    }
+
+    #[test]
+    fn forwards_the_layer_flags() {
+        let p = parse(&s(&["app", "--layer", "service", "--layers", "--by-layer"]));
+        assert_eq!(p.forward, s(&["--layer", "service", "--layers", "--by-layer"]));
+        assert_eq!(p.targets, s(&["app"]));
     }
 
     #[test]

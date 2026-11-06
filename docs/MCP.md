@@ -23,6 +23,11 @@ ugyanaz a tömör kimenet, amit a `callgraph show` kiír (ez a token-hatékony r
 | `notes` (pilot) | `pattern?` (regex a szövegre / horgonyra; üres = mind), `path?`, `project?` | a fájlokhoz / metódusokhoz írt jegyzetek: `út[::metódus]  idő  📝 szöveg`, `[orphaned]`, ha a metódus már nincs | `show <út> --notes <minta>` |
 | `projects` | — | a regisztrált aliasok és gyökereik | `projects.sh list` |
 | `guide` | — | a teljes skill-útmutató (`SKILL.md` törzse, frontmatter nélkül) a beállított nyelven | `skill/SKILL.md` |
+| `project_profile` | `project?`, `full?` | projekt-profil: architektúra, rétegek mappával és fájlszámmal, minták, a rétegek közti hívásirány, ismeretlen mappák (~15 sor; `full`: mappánként) | `profile [--full]` |
+
+Réteg-paraméterek (opcionálisak, alapból a kimenet változatlan): `layer` (`outline`, `search`, `find_callers`: csak az
+adott réteg — vagy vesszős lista — fájljai, pl. `"service"`; CLI: `--layer`), `by_layer` (`find_callers`: a hívók
+rétegek szerint, a hívotthoz legközelebbi elöl, `[réteg]` címkével; CLI: `--by-layer`).
 
 Az eszköz-leírások (`tools/list`) rövidek, de mindegyikben van egy példa-hívás és a fő buktató (pl. `find_callers`:
 a név szerinti mintával kezdd; `method_body`: a `method` string vagy lista, alapból tömör, a `raw` adja a pontos
@@ -52,6 +57,10 @@ kimeneti korlát és a statikus elemzés korlátai.
   nyelvben minden szakasz pontosan egyszer szerepel, a szöveg a méretkereten belül van, és nem marad benne
   CLI-kapcsoló.
 - **Nyelv:** mint a CLI-é (`CALLGRAPH_LANG` › `callgraph set-lang` › angol).
+- **Projekt-profil a végén:** ha a szerver munkakönyvtára projekt-mappa (`composer.json`, `package.json`,
+  `Cargo.toml`, `Package.swift`, `.git` vagy `.callgraph`), az útmutató végére a tömör profil kerül (csak a nevekből,
+  elemzés nélkül, egyszer számolva); különben egy mondat a `project_profile` eszközről. Az `initialize` emiatt nem
+  bukhat el.
 - **`guide` eszköz:** a teljes `SKILL.md`-törzs a beállított nyelven, a beágyazott forrásból (nem a fájlrendszerből),
   a jelölő-sorok nélkül — ha az agentnek a hosszú forma kell (nyelvenkénti részletek, formátumok, CLI-példák).
 

@@ -7,6 +7,8 @@ use crate::error::{CallgraphError, Result};
 use crate::lang::LanguageRegistry;
 use crate::query::format::BodyMode;
 
+use super::profile_args::{LayerArgs, parse_profile};
+
 fn usage() -> &'static str {
     crate::t!(
         "callgraph [--lang <id,...>] [--cache <file>] [--no-cache] <file|dir> [...] | callgraph prune [--cache <file>] [--dry-run] | callgraph set-lang [en|hu] | callgraph self-update [--check] | callgraph note add|list|rm … | callgraph refresh [--project <alias|dir>] [--background] [<path>…] | callgraph hook install|uninstall|status | callgraph mcp [--auto-update] | callgraph --version",
@@ -23,15 +25,15 @@ fn prune_usage() -> &'static str {
 
 fn callers_usage() -> &'static str {
     crate::t!(
-        "callgraph callers <pattern> [--depth N] [--project <dir>]",
-        "callgraph callers <minta> [--depth N] [--project <mappa>]"
+        "callgraph callers <pattern> [--depth N] [--project <dir>] [--by-layer]",
+        "callgraph callers <minta> [--depth N] [--project <mappa>] [--by-layer]"
     )
 }
 
 fn show_usage() -> &'static str {
     crate::t!(
-        "callgraph show [--project <root>] [--label <name>] [--format <f>] [--body [--doc|--raw]|--lines <n>-<m>|--strings <pattern>|--const <pattern>] [--grep <pattern>] [--category <cat,...>] [--depth N] [--guess] [--notes <pattern>] [--full] <path[::m]>...",
-        "callgraph show [--project <gyökér>] [--label <név>] [--format <f>] [--body [--doc|--raw]|--lines <n>-<m>|--strings <minta>|--const <minta>] [--grep <minta>] [--category <kat,...>] [--depth N] [--guess] [--notes <minta>] [--full] <út[::m]>..."
+        "callgraph show [--project <root>] [--label <name>] [--format <f>] [--body [--doc|--raw]|--lines <n>-<m>|--strings <pattern>|--const <pattern>] [--grep <pattern>] [--category <cat,...>] [--depth N] [--guess] [--notes <pattern>] [--layer <name,...>] [--layers] [--by-layer] [--full] <path[::m]>...",
+        "callgraph show [--project <gyökér>] [--label <név>] [--format <f>] [--body [--doc|--raw]|--lines <n>-<m>|--strings <minta>|--const <minta>] [--grep <minta>] [--category <kat,...>] [--depth N] [--guess] [--notes <minta>] [--layer <név,...>] [--layers] [--by-layer] [--full] <út[::m]>..."
     )
 }
 
@@ -101,6 +103,8 @@ pub enum CliArgs {
         pattern: String,
         depth: usize,
         project: Option<PathBuf>,
+        /// `--by-layer`: a hívók rétegek szerint rendezve, `layer` mezővel.
+        by_layer: bool,
     },
     /// Egy vagy több fájl gráfjának lekérdezése.
     Show {
@@ -121,7 +125,11 @@ pub enum CliArgs {
         depth: usize,
         guess: bool,
         notes: Option<String>,
+        /// A réteg-kapcsolók (`--layer`, `--layers`, `--by-layer`; `profile_args.rs`).
+        layers: LayerArgs,
     },
+    /// `profile [--project <alias|mappa>] [--full]`: a projekt-profil (architektúra, rétegek, minták).
+    Profile { project: Option<String>, full: bool },
     /// `note add|list|rm` (PILOT); `project`: alias vagy gyökér-út.
     Note {
         action: NoteAction,
@@ -188,6 +196,9 @@ impl CliArgs {
         if args.first().is_some_and(|a| a == "hook") {
             return Self::parse_hook(&args[1..]);
         }
+        if args.first().is_some_and(|a| a == "profile") {
+            return parse_profile(&args[1..]);
+        }
         // a skill-parancsok maguk értelmezik az argumentumaikat (a hibáik error-id-t kapnak)
         if let Some(command) = args.first().filter(|a| {
             matches!(
@@ -226,8 +237,13 @@ impl CliArgs {
         let mut depth = 1;
         let mut guess = false;
         let mut notes = None;
+        let mut layers = LayerArgs::default();
         let mut i = 0;
         while i < args.len() {
+            if let Some(used) = layers.take(&args[i..])? {
+                i += used;
+                continue;
+            }
             match args[i].as_str() {
                 x if x.starts_with("CALLGRAPH_OUT_LIMIT=") => {
                     limit = x.split_once('=').and_then(|(_, v)| v.parse().ok());
@@ -368,6 +384,7 @@ impl CliArgs {
             depth,
             guess,
             notes,
+            layers,
         })
     }
 
@@ -487,9 +504,14 @@ impl CliArgs {
         };
         let mut depth = 1;
         let mut project = None;
+        let mut by_layer = false;
         let mut i = 1;
         while i < args.len() {
             match args[i].as_str() {
+                "--by-layer" => {
+                    by_layer = true;
+                    i += 1;
+                }
                 "--depth" if i + 1 < args.len() => {
                     depth = args[i + 1]
                         .parse()
@@ -520,6 +542,7 @@ impl CliArgs {
             pattern: pattern.clone(),
             depth,
             project,
+            by_layer,
         })
     }
 

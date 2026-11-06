@@ -14,17 +14,45 @@ pub(crate) trait QueryRunner: Send + Sync {
     fn run(&self, query: &ShowQuery) -> Result<String, String>;
     /// A regisztrált projektek: `alias<TAB>gyökér` soronként.
     fn projects(&self) -> Result<String, String>;
+    /// A projekt-profil (`callgraph profile`) szövege; `project`: alias (`None` = a munkakönyvtár).
+    fn profile(&self, project: Option<&str>, full: bool) -> Result<String, String> {
+        let _ = (project, full);
+        Err(crate::t!("project_profile is not available", "a project_profile nem érhető el").into())
+    }
+    /// Az `initialize` útmutatójának vége: a munkakönyvtár tömör profilja, vagy tipp a `project_profile`-ra.
+    fn startup_note(&self) -> String {
+        String::new()
+    }
 }
 
 /// Az éles végrehajtó: a skill-mappa registryje és a szerver munkakönyvtára.
 pub(crate) struct ShowRunner {
     home: SkillHome,
     cwd: PathBuf,
+    /// A munkakönyvtár tömör profilja (egyszer számolva, az `initialize`-kor).
+    startup: std::sync::OnceLock<String>,
 }
 
 impl ShowRunner {
     pub(crate) fn new(home: SkillHome, cwd: PathBuf) -> Self {
-        Self { home, cwd }
+        Self {
+            home,
+            cwd,
+            startup: std::sync::OnceLock::new(),
+        }
+    }
+
+    /// Egy CLI-parancs futtatása pufferbe: siker → a kimenet, hiba → a hibaszöveg.
+    fn execute(args: Vec<String>) -> Result<String, String> {
+        let command = CliArgs::parse(args)
+            .and_then(build_command)
+            .map_err(|e| e.to_string())?;
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let code = command.run(&mut out, &mut err).map_err(|e| e.to_string())?;
+        if code != 0 {
+            return Err(String::from_utf8_lossy(&err).trim_end().to_owned());
+        }
+        Ok(String::from_utf8_lossy(&out).into_owned())
     }
 
     fn registry(&self) -> Result<ProjectRegistry, String> {
@@ -57,15 +85,26 @@ impl QueryRunner for ShowRunner {
             root.label().to_owned(),
         ];
         args.extend(query.to_args(&root)?);
-        let command = CliArgs::parse(args)
-            .and_then(build_command)
-            .map_err(|e| e.to_string())?;
-        let (mut out, mut err) = (Vec::new(), Vec::new());
-        let code = command.run(&mut out, &mut err).map_err(|e| e.to_string())?;
-        if code != 0 {
-            return Err(String::from_utf8_lossy(&err).trim_end().to_owned());
+        Self::execute(args)
+    }
+
+    fn profile(&self, project: Option<&str>, full: bool) -> Result<String, String> {
+        let root = self.root(project)?;
+        let mut args = vec![
+            "profile".to_owned(),
+            "--project".to_owned(),
+            root.root().display().to_string(),
+        ];
+        if full {
+            args.push("--full".into());
         }
-        Ok(String::from_utf8_lossy(&out).into_owned())
+        Self::execute(args)
+    }
+
+    fn startup_note(&self) -> String {
+        self.startup
+            .get_or_init(|| super::guide::startup_note(&self.cwd, crate::i18n::lang()))
+            .clone()
     }
 
     fn projects(&self) -> Result<String, String> {

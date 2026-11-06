@@ -56,6 +56,24 @@ calls through its interface / parent / trait), so it can miss callers; use it to
 - `?` / `?::name`: the receiver type is unknown, a name-only match; it may be wrong, check the line.
 <!-- /mcp -->
 
+## Project profile (start here in an unfamiliar project)
+
+```bash
+bash $CG profile --project myapp                                     # architecture, layers (folders, file counts), patterns, call direction, unknown folders
+bash $CG profile --project myapp --full                              # per folder, confidence counts, the call pairs between layers
+bash $CG --project myapp app --layer service                         # only the files of one layer (several: service,repository)
+bash $CG --project myapp app --format summary --layers               # summary grouped by layer
+bash $CG --project myapp app --grep 'Repo::find' --depth 2 --by-layer # callers ordered by layer, closest to the callee first
+```
+
+In an unfamiliar project run `profile` once at the start (~15 lines) instead of listing folders: it says which folder
+holds which layer, so you can narrow a query with `--layer <name>` without knowing the folder names. A layer is a name
+from the profile (`controller`, `service`, `repository`, `model`, `component`, `store`…), not a path. Roles come from
+folder and file names, confirmed by the graph (confidence high / medium / low; "unknown" when unclear). A layer never
+hides results by itself: only `--layer` filters, `--layers` / `--by-layer` only group and order. Own folder names:
+`.callgraph-layers` in the project root (`service = app/Logic`, `ignore-role = app/Legacy`). MCP: the
+`project_profile` tool and the `layer` / `by_layer` parameters.
+
 ## Which `--format` is for what
 
 | Format | What it gives |

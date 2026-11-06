@@ -55,6 +55,9 @@ pub(crate) struct OutlineParams {
     /// Only this method/function (file paths only).
     #[serde(default)]
     pub method: Option<String>,
+    /// Only files of this layer (see `project_profile`), e.g. `service` or `service,repository`.
+    #[serde(default)]
+    pub layer: Option<String>,
     /// Disable the 400-line output cap (use only when needed).
     #[serde(default)]
     pub full: bool,
@@ -123,6 +126,12 @@ pub(crate) struct FindCallersParams {
     /// Also follow name-only matches (marked `?`).
     #[serde(default)]
     pub guess: bool,
+    /// Search only files of this layer (level 1), e.g. `controller`.
+    #[serde(default)]
+    pub layer: Option<String>,
+    /// Order callers by layer (closest to the callee first) and tag each line with its layer.
+    #[serde(default)]
+    pub by_layer: bool,
     /// Disable the 400-line output cap.
     #[serde(default)]
     pub full: bool,
@@ -141,6 +150,9 @@ pub(crate) struct SearchParams {
     /// Registered project alias; default: the server's working directory.
     #[serde(default)]
     pub project: Option<String>,
+    /// Only files of this layer, e.g. `service`.
+    #[serde(default)]
+    pub layer: Option<String>,
     /// Disable the 400-line output cap.
     #[serde(default)]
     pub full: bool,
@@ -173,6 +185,17 @@ pub(crate) struct NotesParams {
     /// Registered project alias; default: the server's working directory.
     #[serde(default)]
     pub project: Option<String>,
+}
+
+/// `project_profile`: a projekt architektúrája, rétegei és mintái.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, JsonSchema)]
+pub(crate) struct ProfileParams {
+    /// Registered project alias; default: the server's working directory.
+    #[serde(default)]
+    pub project: Option<String>,
+    /// Per-folder details, confidence counts and the call pairs between layers.
+    #[serde(default)]
+    pub full: bool,
 }
 
 impl OutlineFormat {

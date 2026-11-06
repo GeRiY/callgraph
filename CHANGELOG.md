@@ -6,6 +6,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 ## [Unreleased]
 
 ### Added
+- **Project profile:** `callgraph.sh profile` tells you in about 15 lines how an unfamiliar project is built: the
+  architecture (Laravel / Yii layered MVC, DDD / hexagonal, Vue / React frontend, SwiftUI MVVM, Rust web), which folder
+  holds which layer (controllers, services, repositories, models, components, stores…) with file counts, the design
+  patterns it uses (Repository, Factory, Strategy, Observer…), the folders with no clear role, and whether the layers
+  call each other in the expected direction. It reads folder and file names and checks them against the code graph
+  (`extends Controller`, `implements *RepositoryInterface`, `defineStore`); what it cannot tell stays "unknown".
+  `--full` shows every folder. For AI clients: the `project_profile` MCP tool, and a short profile is sent when a
+  client connects.
+- **Layers in queries (opt-in, nothing changes by default):** `--layer service` searches only the files of that layer
+  (no need to know the folder names), `--layers` groups the summary by layer and marks each file with its role,
+  `--by-layer` orders "who calls it?" results by layer, closest to the called code first (also for `callers`, and as
+  `layer` / `by_layer` on the MCP tools). Folder names that say nothing, or are not English, can be mapped in a
+  commit-able `.callgraph-layers` file (`service = app/Logic`, `ignore-role = app/Legacy`).
 - **Exclude extensions per project:** a `.callgraphignore` file in the project root (or in any subfolder; the nearest
   one applies) lists extensions callgraph should skip there, one per line (`md`, `.json` or `*.vue`; `#` starts a
   comment). Commit it, and everyone on the team gets the same results. A file you name directly with an excluded
