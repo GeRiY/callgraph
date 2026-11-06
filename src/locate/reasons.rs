@@ -124,7 +124,11 @@ pub(crate) fn describe(reason: &Reason, terms: &[Term]) -> String {
         } => {
             let mut text = format!("{name}()  L{line}-{end}");
             if callers.count > 0 {
-                let more = if callers.count > callers.sample.len() { ", …" } else { "" };
+                let more = if callers.count > callers.sample.len() {
+                    ", …"
+                } else {
+                    ""
+                };
                 text.push_str(&crate::tf!(
                     "  callers: {} ({}{})",
                     "  hívók: {} ({}{})",
@@ -154,7 +158,11 @@ pub(crate) fn describe(reason: &Reason, terms: &[Term]) -> String {
         .filter_map(|&t| terms.get(t))
         .map(|term| format!("\"{}\"", term.raw))
         .collect();
-    let arrow = if reason.kind == Kind::NamePart { "~" } else { "←" };
+    let arrow = if reason.kind == Kind::NamePart {
+        "~"
+    } else {
+        "←"
+    };
     format!("{what}  {arrow} {} ({})", quoted.join(", "), label(reason))
 }
 

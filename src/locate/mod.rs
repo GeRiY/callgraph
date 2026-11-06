@@ -63,7 +63,10 @@ impl Locator {
                     FileMatch::new(file.path.to_string_lossy().into_owned(), hits)
                 })
                 .collect();
-            rank(matched)
+            // a teszt-felismerés a gyökérhez relatív úton (a gyökér útja maga ne számítson)
+            rank(matched, |path| {
+                rank::is_test_path(&self.relative(Path::new(path)))
+            })
         })?;
         let text = Report {
             terms: &terms,

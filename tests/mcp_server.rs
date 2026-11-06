@@ -342,7 +342,12 @@ fn locate_ranks_the_starting_files_like_the_cli() {
     // a CLI-vel azonos (egy későbbi hívás: az esetleges frissítés-értesítés csak az első eredmény végén áll)
     let again = s.call(5, "locate", args);
     let cli = Command::new(env!("CARGO_BIN_EXE_callgraph"))
-        .args(["locate", "processRefund", "payment_status", "nothingLikeThis"])
+        .args([
+            "locate",
+            "processRefund",
+            "payment_status",
+            "nothingLikeThis",
+        ])
         .arg("--project")
         .arg(&dir)
         .env("CALLGRAPH_LANG", "en")

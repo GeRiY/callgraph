@@ -20,19 +20,6 @@ pub(crate) enum Kind {
     Call,
 }
 
-impl Kind {
-    /// A fajta súlya a rangsorban: a fokozatok között nagy a különbség, hogy az ismétlés és a hívószám ne írja felül.
-    pub(crate) fn weight(self) -> u64 {
-        match self {
-            Kind::Definition => 400,
-            Kind::FileName => 300,
-            Kind::NamePart => 250,
-            Kind::StringLit => 200,
-            Kind::Call => 100,
-        }
-    }
-}
-
 /// Amire az egyezés mutat a fájlban.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Symbol {

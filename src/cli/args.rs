@@ -863,7 +863,15 @@ mod tests {
     #[test]
     fn parses_locate() {
         assert_eq!(
-            parse(&["locate", "RefundController", "--all", "--project", "sp", "refund"]).unwrap(),
+            parse(&[
+                "locate",
+                "RefundController",
+                "--all",
+                "--project",
+                "sp",
+                "refund"
+            ])
+            .unwrap(),
             CliArgs::Locate {
                 terms: vec!["RefundController".into(), "refund".into()],
                 all: true,

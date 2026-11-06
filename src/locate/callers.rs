@@ -40,7 +40,11 @@ impl CallerCounts {
                     .map(|c| short_name(&c.name.to_lowercase()).to_owned()),
             );
             for call in &graph.calls {
-                let target = call.resolved.as_deref().unwrap_or(&call.target).to_lowercase();
+                let target = call
+                    .resolved
+                    .as_deref()
+                    .unwrap_or(&call.target)
+                    .to_lowercase();
                 let (owner, name) = split_member(&target);
                 if name.is_empty() {
                     continue;
@@ -49,7 +53,12 @@ impl CallerCounts {
                     (Some(container), Some(caller)) => format!("{container}::{caller}"),
                     (None, Some(caller)) => caller.clone(),
                     (Some(container), None) => container.clone(),
-                    (None, None) => graph.file.rsplit(['/', '\\']).next().unwrap_or("").to_owned(),
+                    (None, None) => graph
+                        .file
+                        .rsplit(['/', '\\'])
+                        .next()
+                        .unwrap_or("")
+                        .to_owned(),
                 };
                 by_name.entry(name.to_owned()).or_default().push(Site {
                     owner: owner.map(|o| short_name(o).to_owned()),

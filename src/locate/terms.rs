@@ -43,7 +43,10 @@ impl Term {
     pub(crate) fn parse_all<S: AsRef<str>>(inputs: &[S]) -> Vec<Self> {
         let mut out: Vec<Self> = Vec::new();
         for input in inputs {
-            for part in input.as_ref().split(|c: char| c.is_whitespace() || c == ',') {
+            for part in input
+                .as_ref()
+                .split(|c: char| c.is_whitespace() || c == ',')
+            {
                 let Some(term) = Self::new(part) else {
                     continue;
                 };

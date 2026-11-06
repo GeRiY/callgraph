@@ -56,8 +56,14 @@ impl Project {
         );
         // kizárt / generált / bináris: a nevük illeszkedne, de nem jelenhetnek meg
         project.write(".callgraphignore", "md\n");
-        project.write("docs/refund.md", "# Refund\n\nprocessRefund RefundController\n");
-        project.write("dist/refund.min.js", "function processRefund(){return 'refund'}\n");
+        project.write(
+            "docs/refund.md",
+            "# Refund\n\nprocessRefund RefundController\n",
+        );
+        project.write(
+            "dist/refund.min.js",
+            "function processRefund(){return 'refund'}\n",
+        );
         let binary = project.0.join("assets/refund.js");
         fs::create_dir_all(binary.parent().unwrap()).unwrap();
         fs::write(binary, b"refund processRefund\0\x01\x02\xff\xfe binary").unwrap();
@@ -162,7 +168,10 @@ fn the_best_starting_file_comes_first_with_its_reasons() {
     assert!(out.contains("(exact class)"), "{out}");
     assert!(out.contains("processRefund()  L6-9  callers: "), "{out}");
     assert!(out.contains("(exact method)"), "{out}");
-    assert!(out.contains("file name  ← \"checkout.vue\" (file name)"), "{out}");
+    assert!(
+        out.contains("file name  ← \"checkout.vue\" (file name)"),
+        "{out}"
+    );
     assert!(out.contains("★★★"), "{out}");
     // a gyökér egyszer, elöl; utána minden út relatív
     let root = project.0.display().to_string();
@@ -179,9 +188,11 @@ fn all_lists_every_matching_file() {
     let out = project.run(&[&TERMS[..], &["--all"]].concat(), true);
     let files = ranked(&out);
     assert_eq!(files.len(), 6, "{out}");
+    // a csak az általános kifejezésre (név-részlettel) illő fájl a végén: a ritka kifejezés (`payment_status`)
+    // stringje többet ér
     assert_eq!(
         files.last().map(String::as_str),
-        Some("app/Models/Order.php"),
+        Some("database/migrations/2024_01_10_add_refunds_table.php"),
         "{out}"
     );
     assert!(out.contains("'payment_status'  L8"), "{out}");

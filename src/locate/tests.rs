@@ -19,7 +19,10 @@ fn splits_camel_pascal_snake_kebab_and_dots() {
     assert_eq!(w("process-refund"), ["process", "refund"]);
     assert_eq!(w("orders.show"), ["orders", "show"]);
     assert_eq!(w("HTTPServer"), ["http", "server"]);
-    assert_eq!(w("App\\Services\\RefundService"), ["app", "services", "refund", "service"]);
+    assert_eq!(
+        w("App\\Services\\RefundService"),
+        ["app", "services", "refund", "service"]
+    );
     assert_eq!(w("md5Hash"), ["md5", "hash"]);
     assert_eq!(w("PAYMENT_STATUS"), ["payment", "status"]);
     assert!(w("__").is_empty());
@@ -53,7 +56,10 @@ fn terms_are_trimmed_split_lowercased_and_deduplicated() {
     assert_eq!(dotted.member, Some(("api".into(), "refund".into())));
     assert!(Term::new("  \"\" ").is_none());
     assert_eq!(split_member("?::run"), (Some("?"), "run"));
-    assert_eq!(split_member("$this->repo->find"), (Some("$this->repo"), "find"));
+    assert_eq!(
+        split_member("$this->repo->find"),
+        (Some("$this->repo"), "find")
+    );
 }
 
 #[test]
@@ -142,12 +148,19 @@ fn graph(file: &str) -> FileGraph {
 fn matcher_finds_every_kind_of_match() {
     let mut service = graph("app/Services/RefundService.php");
     service.containers.push(container("RefundService", 5, 80));
-    service.methods.push(method(Some("RefundService"), "processRefund", 22, 71));
+    service
+        .methods
+        .push(method(Some("RefundService"), "processRefund", 22, 71));
     let mut controller = graph("app/Http/RefundController.php");
-    controller.containers.push(container("RefundController", 12, 140));
     controller
-        .calls
-        .push(call("RefundController", "store", 44, "$this->service->processRefund"));
+        .containers
+        .push(container("RefundController", 12, 140));
+    controller.calls.push(call(
+        "RefundController",
+        "store",
+        44,
+        "$this->service->processRefund",
+    ));
     let mut order = graph("app/Models/Order.php");
     order.strings.push(StringLit {
         container: Some("Order".into()),
@@ -162,7 +175,10 @@ fn matcher_finds_every_kind_of_match() {
 
     let hits = matcher.file_hits("app/Services/RefundService.php", &service, true);
     let kinds = |hits: &[Hit], term: usize| -> Vec<Kind> {
-        hits.iter().filter(|h| h.term == term).map(|h| h.kind).collect()
+        hits.iter()
+            .filter(|h| h.term == term)
+            .map(|h| h.kind)
+            .collect()
     };
     assert!(kinds(&hits, 0).contains(&Kind::Definition), "{hits:?}");
     assert!(kinds(&hits, 1).contains(&Kind::FileName), "{hits:?}");
@@ -206,9 +222,68 @@ fn hit(term: usize, kind: Kind) -> Hit {
 
 #[test]
 fn distinct_terms_beat_repeated_hits_of_one_term() {
-    let repeated: Vec<Hit> = (0..20).map(|_| hit(0, Kind::Definition)).collect();
-    let two = vec![hit(0, Kind::Call), hit(1, Kind::Call)];
+    // azonos fajtánál a két különböző kifejezés többet ér, mint egy kifejezés sok találata
+    let repeated: Vec<Hit> = (0..20).map(|_| hit(0, Kind::NamePart)).collect();
+    let two = vec![hit(0, Kind::NamePart), hit(1, Kind::NamePart)];
     assert!(score(&two) > score(&repeated));
+}
+
+#[test]
+fn an_exact_definition_beats_weak_matches_of_common_terms_in_tests() {
+    // a koel-eset: egy osztály pontos definíciója ne maradjon le a több, általános kifejezésre csak
+    // név-részlettel illő tesztfájlok mögött (ritkaság + teszt-szorzó)
+    let mut files = vec![
+        FileMatch::new(
+            "app/Http/Controllers/PlaylistController.php".into(),
+            vec![hit(0, Kind::Definition), hit(2, Kind::NamePart)],
+        )
+        .unwrap(),
+    ];
+    for n in 0..6 {
+        files.push(
+            FileMatch::new(
+                format!("tests/Feature/Playlist{n}Test.php"),
+                vec![
+                    hit(1, Kind::NamePart),
+                    hit(2, Kind::NamePart),
+                    hit(3, Kind::NamePart),
+                ],
+            )
+            .unwrap(),
+        );
+    }
+    for n in 0..20 {
+        files.push(
+            FileMatch::new(format!("app/Other{n}.php"), vec![hit(2, Kind::NamePart)]).unwrap(),
+        );
+    }
+    let ranked = rank(files, super::rank::is_test_path);
+    assert_eq!(
+        ranked[0].path,
+        "app/Http/Controllers/PlaylistController.php"
+    );
+}
+
+#[test]
+fn test_paths_are_recognised() {
+    for path in [
+        "tests/Feature/PlaylistSongTest.php",
+        "src/__tests__/store.ts",
+        "resources/js/components/Foo.spec.ts",
+        "lib/util.test.js",
+        "crates/core/src/lib_test.rs",
+        "App/AppTests.swift",
+        "packages\\a\\test\\x.php",
+    ] {
+        assert!(super::rank::is_test_path(path), "{path}");
+    }
+    for path in [
+        "app/Services/TestingService.php",
+        "src/contest.ts",
+        "app/Http/Controllers/A.php",
+    ] {
+        assert!(!super::rank::is_test_path(path), "{path}");
+    }
 }
 
 #[test]
@@ -218,7 +293,10 @@ fn a_definition_beats_a_string_and_ties_are_ordered_by_path() {
         FileMatch::new("c/def.php".into(), vec![hit(0, Kind::Definition)]).unwrap(),
         FileMatch::new("a/strings.php".into(), vec![hit(0, Kind::StringLit)]).unwrap(),
     ];
-    let order: Vec<String> = rank(files).into_iter().map(|f| f.path).collect();
+    let order: Vec<String> = rank(files, super::rank::is_test_path)
+        .into_iter()
+        .map(|f| f.path)
+        .collect();
     assert_eq!(order, ["c/def.php", "a/strings.php", "b/strings.php"]);
     // a sok string-ismétlés sem éri utol a definíciót
     let many: Vec<Hit> = (0..50).map(|_| hit(0, Kind::StringLit)).collect();
