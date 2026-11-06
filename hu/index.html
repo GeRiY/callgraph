@@ -32,7 +32,7 @@
 <meta name="twitter:image" content="https://callgraph.eu/assets/og-image.png">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"SoftwareApplication","name":"callgraph","applicationCategory":"DeveloperApplication",
-"operatingSystem":"macOS, Linux, Windows","softwareVersion":"0.4.0","license":"https://opensource.org/licenses/MIT",
+"operatingSystem":"macOS, Linux, Windows","softwareVersion":"0.5.0","license":"https://opensource.org/licenses/MIT",
 "url":"https://callgraph.eu/hu/","downloadUrl":"https://github.com/GeRiY/callgraph/releases/latest",
 "codeRepository":"https://github.com/GeRiY/callgraph","author":{"@type":"Person","name":"Makra Gergő","url":"https://www.linkedin.com/in/gergomakra/","sameAs":["https://www.linkedin.com/in/gergomakra/"]},"inLanguage":["hu","en"],
 "description":"Token-hatékony kód-térkép AI kódoló agenteknek: szerkezet, kategorizált hívás-gráf, metódus-törzs, ki hívja és hatáselemzés a teljes fájlok beolvasása nélkül. PHP, JavaScript, TypeScript, Vue, Rust, Swift/SwiftUI, CSS/SCSS, JSON és Markdown.",
@@ -92,14 +92,17 @@ class Order extends Model  <span class="d">L7-23</span>
   <h2 id="h-features">Miért szeretik az agentek (és az emberek)</h2>
   <p class="sub">Minden válasz a szintaxisfából jön, ezért pontos, tömör és olcsón olvasható.</p>
   <div class="grid">
+    <div class="card"><h3>Honnan induljon a feladat?</h3><p>A <code>locate</code> egy hívásban megkapja a feladat neveit
+      és fogalmait, és felsorolja azt a pár fájlt, amit érdemes először megnyitni, a legjobbal kezdve, indoklással.</p></div>
+    <div class="card"><h3>Projekt-profil</h3><p>A <code>profile</code> megmondja az agentnek, hogyan épül fel egy ismeretlen
+      projekt: architektúra, melyik mappában melyik réteg, tervezési minták, és a rétegek közti hívásirány.</p></div>
     <div class="card"><h3>Kevesebb token, gyorsabb válasz</h3><p>Egy outline pár tucat sor. Az agent előbb a térképet olvassa, utána csak a szükséges sorokat.</p></div>
     <div class="card"><h3>Kategorizált hívás-gráf</h3><p>Minden hívás címkét kap — ORM-reláció, modell, framework, natív, belső segéd, SwiftUI view vagy modifier —, így a szándék első ránézésre látszik.</p></div>
     <div class="card"><h3>„Ki hívja?”</h3><p>A <code>--grep</code> megtalál minden hívót a projektben; a <code>--depth N</code> a hívók hívóit is bejárja hatáselemzéshez.</p></div>
     <div class="card"><h3>Célzott olvasás</h3><p>A <code>fájl::metódus --body</code> csak azt a metódust írja ki, sorszámozva. A <code>--lines 30-60</code> bármely sávot.</p></div>
     <div class="card"><h3>Framework-nézetek</h3><p>Laravel / Yii ismeret: routes, middleware, validation, jobs, events, providers, DI, views — mind egy-egy parancs.</p></div>
-    <div class="card"><h3>Egyetlen bináris</h3><p>Nem kell PHP, Node vagy Rust. macOS, Linux és Windows. Gyors, cache-elt, inkrementális.</p></div>
+    <div class="card"><h3>Egyetlen bináris, magától frissül</h3><p>Nem kell PHP, Node vagy Rust. macOS, Linux és Windows. Gyors, cache-elt, inkrementális; a <code>callgraph.sh update</code> letölti a legújabb kiadást, a beállítások megmaradnak.</p></div>
     <div class="card"><h3>Angolul vagy magyarul</h3><p>Minden kimenet és súgó alapból angol — magyarra: <code>callgraph.sh set-lang hu</code>.</p></div>
-    <div class="card"><h3>Magától frissül</h3><p>A <code>callgraph.sh update</code> letölti a legújabb kiadást a GitHubról, a beállítások megmaradnak.</p></div>
   </div>
 </section>
 
@@ -179,9 +182,10 @@ callgraph.sh set-lang hu        # magyar kimenet (vissza: set-lang en)</code></p
       hívás a naponta egyszeri frissítés-ellenőrzés a GitHub Release-ek felé.</p></div>
     <div class="card"><h3>🔒 Csak olvas</h3><p>A forrásfájlokat soha nem írja, és csak a projekt mappáján belül olvas;
       a kifelé mutató utakat elutasítja.</p></div>
-    <div class="card"><h3>🧰 Nyolc eszköz</h3><p><code>outline</code>, <code>method_body</code>, <code>find_callers</code>,
-      <code>search</code>, <code>framework_view</code>, <code>projects</code>, <code>notes</code>, valamint <code>guide</code> —
-      ugyanazok a lekérdezések, mint a fenti parancsok, és egy rövid útmutató az agentnek.</p></div>
+    <div class="card"><h3>🧰 Tíz eszköz</h3><p><code>locate</code>, <code>project_profile</code>, <code>outline</code>,
+      <code>method_body</code>, <code>find_callers</code>, <code>search</code>, <code>framework_view</code>,
+      <code>projects</code>, <code>notes</code>, valamint <code>guide</code> — ugyanazok a lekérdezések, mint a fenti
+      parancsok, és egy rövid útmutató az agentnek.</p></div>
   </div>
   <p>Válaszd ki a rendszered — a parancsok a telepített skill-csomag binárisát használják. Az <code>--auto-update</code>-tel
     (ajánlott) a szerver induláskor naponta egyszer ellenőriz, telepíti az új kiadást (ellenőrzőösszeggel) és újraindul;

@@ -32,7 +32,7 @@
 <meta name="twitter:image" content="https://callgraph.eu/assets/og-image.png">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"SoftwareApplication","name":"callgraph","applicationCategory":"DeveloperApplication",
-"operatingSystem":"macOS, Linux, Windows","softwareVersion":"0.4.0","license":"https://opensource.org/licenses/MIT",
+"operatingSystem":"macOS, Linux, Windows","softwareVersion":"0.5.0","license":"https://opensource.org/licenses/MIT",
 "url":"https://callgraph.eu/","downloadUrl":"https://github.com/GeRiY/callgraph/releases/latest",
 "codeRepository":"https://github.com/GeRiY/callgraph","author":{"@type":"Person","name":"Gergő Makra","url":"https://www.linkedin.com/in/gergomakra/","sameAs":["https://www.linkedin.com/in/gergomakra/"]},"inLanguage":["en","hu"],
 "description":"A token-efficient code map for AI coding agents: structure, categorized call graph, method bodies, who-calls-this and impact analysis without reading whole files. Supports PHP, JavaScript, TypeScript, Vue, Rust, Swift/SwiftUI, CSS/SCSS, JSON and Markdown.",
@@ -92,14 +92,17 @@ class Order extends Model  <span class="d">L7-23</span>
   <h2 id="h-features">Why agents (and people) like it</h2>
   <p class="sub">Every answer comes from the syntax tree, so it is exact, compact and cheap to read.</p>
   <div class="grid">
+    <div class="card"><h3>Where to start with a task</h3><p><code>locate</code> takes the names and terms from a task
+      in one call and lists the few files worth opening first, best first, each with the reason.</p></div>
+    <div class="card"><h3>Project profile</h3><p><code>profile</code> tells an agent how an unfamiliar project is built:
+      architecture, which folder holds which layer, design patterns, and the call direction between layers.</p></div>
     <div class="card"><h3>Fewer tokens, faster answers</h3><p>An outline is a few dozen lines. Your agent reads the map first, then only the exact lines it needs.</p></div>
     <div class="card"><h3>Categorized call graph</h3><p>Every call is labelled — ORM relation, model use, framework, native, internal helper, SwiftUI view or modifier — so intent is visible at a glance.</p></div>
     <div class="card"><h3>“Who calls this?”</h3><p><code>--grep</code> finds every caller across the project; <code>--depth N</code> follows callers of callers for impact analysis.</p></div>
     <div class="card"><h3>Surgical reads</h3><p><code>file::method --body</code> prints just that method, line-numbered. <code>--lines 30-60</code> prints any range.</p></div>
     <div class="card"><h3>Framework views</h3><p>Laravel / Yii aware: routes, middleware, validation, jobs, events, providers, DI, views — one command each.</p></div>
-    <div class="card"><h3>One static binary</h3><p>No PHP, Node or Rust needed. macOS, Linux and Windows. Fast, cached and incremental.</p></div>
+    <div class="card"><h3>One static binary, self-updating</h3><p>No PHP, Node or Rust needed. macOS, Linux and Windows. Fast, cached and incremental; <code>callgraph.sh update</code> fetches the newest release and keeps your settings.</p></div>
     <div class="card"><h3>English or Hungarian</h3><p>All output and help in English by default — switch with <code>callgraph.sh set-lang hu</code>.</p></div>
-    <div class="card"><h3>Self-updating</h3><p><code>callgraph.sh update</code> fetches the newest release from GitHub and keeps your settings.</p></div>
   </div>
 </section>
 
@@ -179,9 +182,10 @@ callgraph.sh set-lang hu        # Hungarian output (back: set-lang en)</code></p
       is a once-a-day update check against GitHub Releases.</p></div>
     <div class="card"><h3>🔒 Read-only</h3><p>It never writes your source files, and only reads inside the project folder;
       paths that point outside are refused.</p></div>
-    <div class="card"><h3>🧰 Eight tools</h3><p><code>outline</code>, <code>method_body</code>, <code>find_callers</code>,
-      <code>search</code>, <code>framework_view</code>, <code>projects</code>, <code>notes</code>, plus <code>guide</code> —
-      the same queries as the commands above, and a short how-to for the agent.</p></div>
+    <div class="card"><h3>🧰 Ten tools</h3><p><code>locate</code>, <code>project_profile</code>, <code>outline</code>,
+      <code>method_body</code>, <code>find_callers</code>, <code>search</code>, <code>framework_view</code>,
+      <code>projects</code>, <code>notes</code>, plus <code>guide</code> — the same queries as the commands above, and a
+      short how-to for the agent.</p></div>
   </div>
   <p>Pick your system — the commands use the binary from the installed skill package. With <code>--auto-update</code>
     (recommended) the server checks once a day at start-up, installs a new release (checksum-verified) and restarts
