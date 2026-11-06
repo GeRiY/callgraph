@@ -5,6 +5,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-11-06
+
 ### Added
 - **Refresh the project map ahead of time:** `callgraph.sh refresh` brings the project map in `.callgraph/` up to
   date right away — every changed, new or deleted file, or only the files / folders you name — and prints a one-line
@@ -197,7 +199,8 @@ First release.
 - Built-in update: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Prebuilt packages for macOS (arm64, x86_64), Linux (x86_64, ARM64, static musl) and Windows.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.3.0...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.4.0...develop
+[0.4.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.4.0
 [0.3.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.3.0
 [0.2.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.2.0
 [0.1.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.1.0
