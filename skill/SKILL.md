@@ -26,7 +26,7 @@ directory is the root.
 CG=<skill>/callgraph.sh
 bash $CG --project myapp app/Http/Controllers/X.php                  # outline: class, methods with line ranges, calls by category
 bash $CG --project myapp app/Http/Controllers/X.php::store           # only one method (several ::selectors, several files too)
-bash $CG --project myapp app/Http/Controllers/X.php::store --body    # the method's source, compact (no docblock / comment lines; --doc, --raw)
+bash $CG --project myapp app/Http/Controllers/X.php::store --body    # the method's source, compact (comments kept, docblock omitted: --doc; --raw = exact)
 bash $CG --project myapp app/Http/Controllers/X.php --lines 30-60    # any range, line-numbered (view, procedural file)
 bash $CG --project myapp app --strings 'Order not found'             # where a string literal (error message, key) is
 bash $CG --project myapp app --const STATUS_ACTIVE                   # constant: definition, references, re-exports
@@ -166,4 +166,4 @@ is not writable, it runs without a cache. Cleanup: `callgraph prune` (see README
 
 Static analysis: dynamic calls (`$this->$method()`, `obj[key]()`), magic methods and class names / registered components
 assembled at runtime cannot be resolved. By default `--depth` follows only the certain (resolved) callers;
-name-only matches are shown by `--guess` with a "?" mark. For the exact control logic you need `--body` (compact; `--raw` gives the exact text with comments).
+name-only matches are shown by `--guess` with a "?" mark. For the exact control logic you need `--body` (compact, comments kept; `--raw` gives the exact text).

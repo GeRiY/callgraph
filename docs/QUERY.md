@@ -16,7 +16,7 @@ A `show` parancs a `SelectorSet` segítségével fájlokat és metódusokat vál
 |---|---|---|
 | (alap) / `--format outline` | `outline.rs` | |
 | `--format json` / `jsonl` | `json.rs` | a json a callgraph `jq -s '.'` paritása, a jsonl natív |
-| `--body` [`--doc`\|`--raw`] | `body.rs` (+`body_filter.rs`) | a kijelölt metódusok forrása sorszámozva; alapból tömör (docblock, üres és csak megjegyzés sorok nélkül, a sorszámok a forrásbeliek; a string / heredoc / template literal belseje marad), `--doc`: docblockkal, `--raw`: szűretlenül; `--grep`-pel a talált hívók forrása |
+| `--body` [`--doc`\|`--raw`] | `body.rs` (+`body_filter.rs`) | a kijelölt metódusok forrása sorszámozva; alapból tömör (a metódus fölötti docblock / doc-komment és az üres sorok nélkül, a törzsön belüli megjegyzések maradnak, a sorszámok a forrásbeliek; a string / heredoc / template literal belseje marad; a kihagyott docblockot a `==` fejléc jelzi: `(docblock L112-119 omitted: --doc)`), `--doc`: docblockkal (fejléc-megjegyzés nélkül), `--raw`: szűretlenül; `--grep`-pel a talált hívók forrása |
 | `--lines n-m` | `lines.rs` (+`source.rs`) | nyers sorok, elemzés nélkül (legacy view-n is) |
 | `--strings <minta>` / `--const <minta>` | `strings.rs` / `constants.rs` (+`reexports.rs`) | a `--const` a továbbexportálásokat is listázza (`[re-export]`: Rust `pub use`, JS/TS `export { … }`, PHP `use const`), a forrásszövegből |
 

@@ -25,7 +25,7 @@ mappa a gyökér.
 CG=<skill>/callgraph.sh
 bash $CG --project myapp app/Http/Controllers/X.php                  # outline: osztály, metódusok sortartománnyal, hívások kategóriánként
 bash $CG --project myapp app/Http/Controllers/X.php::store           # csak egy metódus (több ::szelektor, több fájl is)
-bash $CG --project myapp app/Http/Controllers/X.php::store --body    # a metódus forrása, tömören (docblock és komment-sorok nélkül; --doc, --raw)
+bash $CG --project myapp app/Http/Controllers/X.php::store --body    # a metódus forrása, tömören (kommentekkel, docblock nélkül: --doc; --raw = pontos)
 bash $CG --project myapp app/Http/Controllers/X.php --lines 30-60    # tetszőleges sáv sorszámozva (view, procedurális fájl)
 bash $CG --project myapp app --strings 'Order not found'             # string-literál (hibaüzenet, kulcs) helye
 bash $CG --project myapp app --const STATUS_ACTIVE                   # konstans: definíció, hivatkozások, továbbexportálás
@@ -166,4 +166,4 @@ nem írható, cache nélkül fut. Takarítás: `callgraph prune` (lásd README).
 
 Statikus elemzés: dinamikus hívás (`$this->$method()`, `obj[key]()`), magic method és futásidőben összeállított
 osztálynév / regisztrált komponens nem oldható fel. A `--depth` alapból csak a biztos (feloldott) hívókat követi;
-a név szerinti egyezést a `--guess` mutatja „?” jellel. A pontos vezérlési logikához a `--body` kell (tömör; a `--raw` a pontos szöveget adja kommentekkel).
+a név szerinti egyezést a `--guess` mutatja „?” jellel. A pontos vezérlési logikához a `--body` kell (tömör, kommentekkel; a `--raw` a pontos szöveget adja).

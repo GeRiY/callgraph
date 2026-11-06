@@ -6,6 +6,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 ## [Unreleased]
 
 ### Changed
+- **Comments inside a method stay in `--body`:** the short method view used to hide comment lines inside the method
+  too, so an agent could think a line was missing and read the file again. Now only the docblock above the method
+  and blank lines are left out; comments inside the method (they often explain the intent) are shown. When a
+  docblock was left out, the header line says so, e.g. `(docblock L112-119 omitted: --doc)`. `--doc` still adds the
+  docblock, `--raw` still prints the exact source. The MCP `method_body` tool works the same way.
 - The project website has its own domain: https://callgraph.eu (the old `geriy.github.io/callgraph` address redirects).
 
 ## [0.3.0] — 2026-11-06
