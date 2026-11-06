@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TypeScript, JavaScript és Vue call graph — callgraph</title>
+<meta name="description" content="JS, TS és Vue SFC outline: importok alias-feloldással, props, emits, setup, template-komponensek, típusos fogadón át hívott metódusok és hívóik.">
+<link rel="canonical" href="https://callgraph.eu/hu/typescript/">
+<link rel="alternate" hreflang="en" href="https://callgraph.eu/typescript/">
+<link rel="alternate" hreflang="hu" href="https://callgraph.eu/hu/typescript/">
+<link rel="alternate" hreflang="x-default" href="https://callgraph.eu/typescript/">
+<meta name="author" content="Makra Gergő">
+<meta name="robots" content="index,follow">
+<meta name="theme-color" content="#0c152a">
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/style.css">
+<script>document.documentElement.className += ' js';</script>
+<link rel="alternate" type="text/markdown" href="/hu/typescript/index.md" title="Az oldal Markdown-változata">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="callgraph">
+<meta property="og:title" content="TypeScript, JavaScript és Vue call graph — callgraph">
+<meta property="og:description" content="JS, TS és Vue SFC outline: importok alias-feloldással, props, emits, setup, template-komponensek, típusos fogadón át hívott metódusok és hívóik.">
+<meta property="og:url" content="https://callgraph.eu/hu/typescript/">
+<meta property="og:image" content="https://callgraph.eu/assets/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="callgraph terminál-kimenet: osztály-outline sortartománnyal és kategorizált hívásokkal">
+<meta property="og:locale" content="hu_HU">
+<meta property="og:locale:alternate" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="TypeScript, JavaScript és Vue call graph — callgraph">
+<meta name="twitter:description" content="JS, TS és Vue SFC outline: importok alias-feloldással, props, emits, setup, template-komponensek, típusos fogadón át hívott metódusok és hívóik.">
+<meta name="twitter:image" content="https://callgraph.eu/assets/og-image.png">
+<script type="application/ld+json">
+{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Kezdőlap", "item": "https://callgraph.eu/hu/"}, {"@type": "ListItem", "position": 2, "name": "TypeScript / Vue", "item": "https://callgraph.eu/hu/typescript/"}]}
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Ugrás a tartalomra</a>
+<div class="wrap">
+<header class="top">
+  <a class="brand" href="/hu/"><img src="/assets/favicon.svg" alt="" width="32" height="32">callgraph</a>
+  <nav class="links" aria-label="Fő navigáció">
+    <details class="menu"><summary>Használat</summary><div class="menu-list"><a href="/hu/#usage">Minden parancs</a><a href="/hu/locate/">locate</a><a href="/hu/profile/">Profil</a></div></details>
+    <details class="menu"><summary class="current">Nyelvek</summary><div class="menu-list"><a href="/hu/php/">PHP</a><a href="/hu/rust/">Rust</a><a href="/hu/typescript/" aria-current="page">TS / Vue</a><a href="/hu/swift/">Swift</a><a href="/hu/#languages">Minden nyelv</a></div></details>
+    <a href="/hu/mcp/">MCP</a>
+    <a href="/hu/changelog/">Változásnapló</a>
+    <a href="https://github.com/GeRiY/callgraph">GitHub</a>
+    <a class="lang" href="/typescript/" hreflang="en" lang="en">English</a>
+  </nav>
+</header>
+<main id="main">
+<nav class="crumbs" aria-label="Morzsamenü"><ol><li><a href="/hu/">Kezdőlap</a></li><li aria-current="page">TypeScript / Vue</li></ol></nav>
+<section class="hero page" aria-labelledby="title">
+  <div>
+    <h1 id="title">TypeScript, JavaScript és Vue call graph</h1>
+    <p class="lead">A callgraph az <a href="https://github.com/oxc-project/oxc">oxc</a>-vel elemzi a JavaScript-,
+      TypeScript- és Vue single-file komponenseket, és megadja az agentnek a modulokat, függvényeket, osztályokat, a
+      komponensek propsait és emitjeit, a template-használatot és minden hívást kategóriánként — és hogy ki használ egy
+      függvényt, komponenst, route-ot vagy fordítási kulcsot a projektben.</p>
+    <div class="cta">
+      <a class="btn primary" href="/hu/#install">Telepítés</a>
+      <a class="btn" href="/hu/mcp/">Használat MCP-n át</a>
+    </div>
+  </div>
+</section>
+
+<section id="extracts" aria-labelledby="h-extracts">
+  <h2 id="h-extracts">Mit nyer ki a callgraph</h2>
+  <p>Fájlok: <code>.js</code> <code>.mjs</code> <code>.cjs</code> <code>.jsx</code> <code>.ts</code> <code>.tsx</code>
+    <code>.vue</code>.</p>
+  <ul>
+    <li>Modulok, függvények és osztályok; TS <code>interface</code>-ek és az osztályok <code>implements</code>-e.</li>
+    <li>Importok alias-feloldással a <code>jsconfig.json</code> / <code>tsconfig.json</code> alapján (a <code>@/</code> alias is).</li>
+    <li>Az objektum-literálok függvényei külön metódusként: <code>const api = { fetch() {} }</code> → <code>api.fetch</code>.</li>
+    <li><code>if</code> / <code>switch</code> ágak, string- és template-literálok.</li>
+  </ul>
+</section>
+
+<section id="vue" aria-labelledby="h-vue">
+  <h2 id="h-vue">Vue single-file komponensek</h2>
+  <p>A <code>.vue</code> fájl egy <code>component</code>. A „metódusai” azok, amik alapján egy agent eligazodik benne:</p>
+  <ul>
+    <li><code>setup</code> — a <code>&lt;script setup&gt;</code> top-level kódja.</li>
+    <li><code>template</code> — a használt komponensek, eseménykezelők, <code>$t()</code>- és <code>route()</code>-hívások.</li>
+    <li>Függvények, <code>computed</code>, <code>watch@L&lt;n&gt;</code> / <code>onMounted@L&lt;n&gt;</code> hookok, egy
+      composable belső függvényei (<code>useX.belso</code>), és az Options API <code>methods</code> / <code>computed.x</code> elemei.</li>
+    <li>A props property-ként, az emitek <code>emit:&lt;név&gt;</code> alakban látszanak.</li>
+  </ul>
+  <p>A hívások kategóriái között van a <code>vue_api</code>, <code>composable_use</code>, <code>component_use</code>,
+    <code>vue_emit</code>, <code>inertia</code>, <code>i18n_helper</code>, <code>route_helper</code> (Ziggy),
+    <code>http_call</code> (axios), <code>module_use</code> és a <code>package_use</code>.</p>
+</section>
+
+<section id="callers" aria-labelledby="h-callers">
+  <h2 id="h-callers">Ki használja ezt a függvényt, komponenst vagy kulcsot?</h2>
+  <p>Ugyanaz a <code>--grep</code> kapcsoló frontend-specifikus kulcsokat is ért:</p>
+<pre class="code"><code>CG=~/.claude/skills/callgraph/callgraph.sh
+bash $CG --project myapp resources/js --grep 'useForm.js::submit'     # &lt;fájl&gt;::&lt;export&gt;, import-feloldással, @/ aliasszal
+bash $CG --project myapp resources/js --grep 'route::orders.show'     # route-használat
+bash $CG --project myapp resources/js --grep 'i18n::orders.title'     # fordítási kulcs helye
+bash $CG --project myapp resources/js --grep 'vue::emit:save'         # ki emitál 'save'-et
+bash $CG --project myapp resources/js --grep 'Atoms/AtomButton.vue'   # hol használják a komponenst
+bash $CG --project myapp resources/js --grep 'api.fetch'              # objektum-literál metódusa</code></pre>
+  <p>A <code>--strings</code> a Vue template-kifejezésekben (<code>{{ … }}</code>, <code>:title="…"</code>,
+    <code>@click="…"</code>) lévő szövegeket is megtalálja.</p>
+</section>
+
+<section id="typed" aria-labelledby="h-typed">
+  <h2 id="h-typed">TypeScript: hívások típusos objektumokon át</h2>
+  <p>Ha a típus le van írva, a callgraph kiszámolja, melyik osztályhoz megy egy metódushívás: típusos paraméter
+    (<code>repo: Repo</code>), típusos osztály-property (<code>private repo: Repo</code>, a
+    <code>constructor(private repo: Repo)</code> is), <code>this.repo = new Repo()</code> vagy
+    <code>const x = new Repo()</code>. Így a <code>this.repo.find()</code> <code>Repo::find</code> lesz, és a
+    <code>--grep 'Repo::find'</code> megtalálja. Az interfészen át tett hívások <code>via Resolver</code> jelölést kapnak.</p>
+<pre class="code"><code>bash $CG --project myapp resources/js --grep 'PlaylistResolver::getPlayables'</code></pre>
+  <p>Ha a típus nem egyértelmű — nincs típus, <code>any</code>, unió, mint a <code>Repo | null</code>, generikus
+    <code>T</code> —, a hívás feloldatlan marad; ezeket név szerint keresd: <code>--grep '(^|::|\.|->)find$'</code>.</p>
+</section>
+
+<section id="limits" aria-labelledby="h-limits">
+  <h2 id="h-limits">Korlátok</h2>
+  <ul>
+    <li>A dinamikus hívások (<code>obj[key]()</code>) és a futásidőben regisztrált komponensek statikusan nem oldhatók fel.</li>
+    <li>A hivatkozott típusnévvel megadott <code>defineProps&lt;Props&gt;()</code> nem listáz propsot (a típus nincs feloldva).</li>
+  </ul>
+</section>
+
+<section id="related" aria-labelledby="h-related">
+  <h2 id="h-related">Kapcsolódó oldalak</h2>
+  <div class="grid">
+    <a class="card" href="/hu/php/"><h3>PHP, Laravel és Yii</h3><p>Egy Laravel + Vue / Inertia alkalmazás backend-oldala.</p></a>
+    <a class="card" href="/hu/profile/"><h3>Projekt-profil</h3><p>Felismeri a Vue / React frontendet és a rétegeit.</p></a>
+    <a class="card" href="/hu/locate/"><h3>locate</h3><p>Egy fájlnév, pl. <code>checkout.vue</code> is mehet a kifejezések közé.</p></a>
+    <a class="card" href="/hu/mcp/"><h3>MCP-szerver</h3><p>Ugyanezek a kulcsok a <code>find_callers</code> eszközben is működnek.</p></a>
+  </div>
+</section>
+</main>
+
+<footer>
+  <nav class="foot" aria-label="Oldalak"><a href="/hu/">Kezdőlap</a> · <a href="/hu/mcp/">MCP</a> · <a href="/hu/php/">PHP</a> · <a href="/hu/rust/">Rust</a> · <a href="/hu/typescript/">TypeScript / Vue</a> · <a href="/hu/swift/">Swift</a> · <a href="/hu/locate/">locate</a> · <a href="/hu/profile/">Profil</a> · <a href="/hu/changelog/">Változásnapló</a></nav>
+  <div>callgraph · készítette: <a href="https://www.linkedin.com/in/gergomakra/" rel="author me">Makra Gergő</a> · MIT licenc · <a href="https://github.com/GeRiY/callgraph">GitHub</a> · <a href="https://github.com/GeRiY/callgraph/releases/latest">Kiadások</a> · <a href="/typescript/" hreflang="en" lang="en">English</a></div>
+</footer>
+</div>
+<script>
+// nyelv-menü: kívül kattintásra / Escape-re bezárul (JS nélkül is működik)
+document.addEventListener('click', function (e) {
+  document.querySelectorAll('details.menu[open]').forEach(function (d) { if (!d.contains(e.target)) d.open = false; });
+});
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape') return;
+  document.querySelectorAll('details.menu[open]').forEach(function (d) { d.open = false; d.querySelector('summary').focus(); });
+});
+</script>
+<script>
+// másoló gomb a parancs- és konfig-blokkokon (JS nélkül a blokk ugyanúgy olvasható)
+if (navigator.clipboard) document.querySelectorAll('pre.code:not(.out)').forEach(function (pre) {
+  var wrap = document.createElement('div'); wrap.className = 'copywrap';
+  pre.parentNode.insertBefore(wrap, pre); wrap.appendChild(pre);
+  var b = document.createElement('button'); b.type = 'button'; b.className = 'copy';
+  b.textContent = "M\u00e1sol\u00e1s"; b.setAttribute('aria-label', "K\u00f3d m\u00e1sol\u00e1sa a v\u00e1g\u00f3lapra"); wrap.appendChild(b);
+  b.addEventListener('click', function () {
+    navigator.clipboard.writeText(pre.innerText.replace(/\n$/, '')).then(function () {
+      b.textContent = "M\u00e1solva"; setTimeout(function () { b.textContent = "M\u00e1sol\u00e1s"; }, 1600);
+    });
+  });
+});
+</script>
+</body>
+</html>

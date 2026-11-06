@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TypeScript, JavaScript &amp; Vue call graph — callgraph</title>
+<meta name="description" content="Outline JS, TS and Vue single-file components: imports with alias resolution, props, emits, setup, template components and typed-receiver calls.">
+<link rel="canonical" href="https://callgraph.eu/typescript/">
+<link rel="alternate" hreflang="en" href="https://callgraph.eu/typescript/">
+<link rel="alternate" hreflang="hu" href="https://callgraph.eu/hu/typescript/">
+<link rel="alternate" hreflang="x-default" href="https://callgraph.eu/typescript/">
+<meta name="author" content="Gergő Makra">
+<meta name="robots" content="index,follow">
+<meta name="theme-color" content="#0c152a">
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/style.css">
+<script>document.documentElement.className += ' js';</script>
+<link rel="alternate" type="text/markdown" href="/typescript/index.md" title="Markdown version of this page">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="callgraph">
+<meta property="og:title" content="TypeScript, JavaScript &amp; Vue call graph — callgraph">
+<meta property="og:description" content="Outline JS, TS and Vue single-file components: imports with alias resolution, props, emits, setup, template components and typed-receiver calls.">
+<meta property="og:url" content="https://callgraph.eu/typescript/">
+<meta property="og:image" content="https://callgraph.eu/assets/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="callgraph terminal output: class outline with line ranges and categorized calls">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="hu_HU">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="TypeScript, JavaScript &amp; Vue call graph — callgraph">
+<meta name="twitter:description" content="Outline JS, TS and Vue single-file components: imports with alias resolution, props, emits, setup, template components and typed-receiver calls.">
+<meta name="twitter:image" content="https://callgraph.eu/assets/og-image.png">
+<script type="application/ld+json">
+{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://callgraph.eu/"}, {"@type": "ListItem", "position": 2, "name": "TypeScript / Vue", "item": "https://callgraph.eu/typescript/"}]}
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="wrap">
+<header class="top">
+  <a class="brand" href="/"><img src="/assets/favicon.svg" alt="" width="32" height="32">callgraph</a>
+  <nav class="links" aria-label="Main">
+    <details class="menu"><summary>Usage</summary><div class="menu-list"><a href="/#usage">All commands</a><a href="/locate/">locate</a><a href="/profile/">Profile</a></div></details>
+    <details class="menu"><summary class="current">Languages</summary><div class="menu-list"><a href="/php/">PHP</a><a href="/rust/">Rust</a><a href="/typescript/" aria-current="page">TS / Vue</a><a href="/swift/">Swift</a><a href="/#languages">All languages</a></div></details>
+    <a href="/mcp/">MCP</a>
+    <a href="/changelog/">Changelog</a>
+    <a href="https://github.com/GeRiY/callgraph">GitHub</a>
+    <a class="lang" href="/hu/typescript/" hreflang="hu" lang="hu">Magyar</a>
+  </nav>
+</header>
+<main id="main">
+<nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="/">Home</a></li><li aria-current="page">TypeScript / Vue</li></ol></nav>
+<section class="hero page" aria-labelledby="title">
+  <div>
+    <h1 id="title">TypeScript, JavaScript and Vue call graph</h1>
+    <p class="lead">callgraph parses JavaScript, TypeScript and Vue single-file components with
+      <a href="https://github.com/oxc-project/oxc">oxc</a> and gives your agent modules, functions, classes, component
+      props and emits, template usage and every call by category — plus who uses a function, component, route or
+      translation key across the project.</p>
+    <div class="cta">
+      <a class="btn primary" href="/#install">Install</a>
+      <a class="btn" href="/mcp/">Use it over MCP</a>
+    </div>
+  </div>
+</section>
+
+<section id="extracts" aria-labelledby="h-extracts">
+  <h2 id="h-extracts">What callgraph extracts</h2>
+  <p>Files: <code>.js</code> <code>.mjs</code> <code>.cjs</code> <code>.jsx</code> <code>.ts</code> <code>.tsx</code>
+    <code>.vue</code>.</p>
+  <ul>
+    <li>Modules, functions and classes; TS <code>interface</code>s and the <code>implements</code> of classes.</li>
+    <li>Imports with alias resolution from <code>jsconfig.json</code> / <code>tsconfig.json</code> (the <code>@/</code> alias too).</li>
+    <li>Functions inside object literals as their own methods: <code>const api = { fetch() {} }</code> → <code>api.fetch</code>.</li>
+    <li><code>if</code> / <code>switch</code> branches, string literals and template literals.</li>
+  </ul>
+</section>
+
+<section id="vue" aria-labelledby="h-vue">
+  <h2 id="h-vue">Vue single-file components</h2>
+  <p>A <code>.vue</code> file is a <code>component</code>. Its "methods" are what an agent needs to navigate it:</p>
+  <ul>
+    <li><code>setup</code> — the top-level code of <code>&lt;script setup&gt;</code>.</li>
+    <li><code>template</code> — the components used, event handlers, <code>$t()</code> and <code>route()</code> calls.</li>
+    <li>Functions, <code>computed</code>, <code>watch@L&lt;n&gt;</code> / <code>onMounted@L&lt;n&gt;</code> hooks, a
+      composable's inner functions (<code>useX.inner</code>), and the Options API <code>methods</code> / <code>computed.x</code>.</li>
+    <li>Props are listed as properties, emits as <code>emit:&lt;name&gt;</code>.</li>
+  </ul>
+  <p>Calls carry categories such as <code>vue_api</code>, <code>composable_use</code>, <code>component_use</code>,
+    <code>vue_emit</code>, <code>inertia</code>, <code>i18n_helper</code>, <code>route_helper</code> (Ziggy),
+    <code>http_call</code> (axios), <code>module_use</code> and <code>package_use</code>.</p>
+</section>
+
+<section id="callers" aria-labelledby="h-callers">
+  <h2 id="h-callers">Who uses this function, component or key?</h2>
+  <p>The same <code>--grep</code> switch understands frontend-specific keys:</p>
+<pre class="code"><code>CG=~/.claude/skills/callgraph/callgraph.sh
+bash $CG --project myapp resources/js --grep 'useForm.js::submit'     # &lt;file&gt;::&lt;export&gt;, with import resolution and the @/ alias
+bash $CG --project myapp resources/js --grep 'route::orders.show'     # route usage
+bash $CG --project myapp resources/js --grep 'i18n::orders.title'     # where a translation key is used
+bash $CG --project myapp resources/js --grep 'vue::emit:save'         # who emits 'save'
+bash $CG --project myapp resources/js --grep 'Atoms/AtomButton.vue'   # where the component is used
+bash $CG --project myapp resources/js --grep 'api.fetch'              # object-literal method</code></pre>
+  <p><code>--strings</code> also finds texts inside Vue template expressions (<code>{{ … }}</code>,
+    <code>:title="…"</code>, <code>@click="…"</code>).</p>
+</section>
+
+<section id="typed" aria-labelledby="h-typed">
+  <h2 id="h-typed">TypeScript: calls through typed objects</h2>
+  <p>When the type is written down, callgraph works out which class a method call goes to: a typed parameter
+    (<code>repo: Repo</code>), a typed class property (<code>private repo: Repo</code>, also
+    <code>constructor(private repo: Repo)</code>), <code>this.repo = new Repo()</code> or <code>const x = new Repo()</code>.
+    So <code>this.repo.find()</code> shows up as <code>Repo::find</code>, and <code>--grep 'Repo::find'</code> finds it.
+    Calls made through an interface are marked <code>via Resolver</code>.</p>
+<pre class="code"><code>bash $CG --project myapp resources/js --grep 'PlaylistResolver::getPlayables'</code></pre>
+  <p>When the type is unclear — no type, <code>any</code>, a union like <code>Repo | null</code>, a generic
+    <code>T</code> — the call stays unresolved; search those by name: <code>--grep '(^|::|\.|->)find$'</code>.</p>
+</section>
+
+<section id="limits" aria-labelledby="h-limits">
+  <h2 id="h-limits">Limits</h2>
+  <ul>
+    <li>Dynamic calls such as <code>obj[key]()</code> and components registered at runtime cannot be resolved statically.</li>
+    <li><code>defineProps&lt;Props&gt;()</code> with a referenced type name lists no props (the type is not resolved).</li>
+  </ul>
+</section>
+
+<section id="related" aria-labelledby="h-related">
+  <h2 id="h-related">Related</h2>
+  <div class="grid">
+    <a class="card" href="/php/"><h3>PHP, Laravel and Yii</h3><p>The backend side of a Laravel + Vue / Inertia app.</p></a>
+    <a class="card" href="/profile/"><h3>Project profile</h3><p>Recognises a Vue / React frontend and its layers.</p></a>
+    <a class="card" href="/locate/"><h3>locate</h3><p>Pass a file name like <code>checkout.vue</code> among the terms.</p></a>
+    <a class="card" href="/mcp/"><h3>MCP server</h3><p>The same keys work in the <code>find_callers</code> tool.</p></a>
+  </div>
+</section>
+</main>
+
+<footer>
+  <nav class="foot" aria-label="Pages"><a href="/">Home</a> · <a href="/mcp/">MCP</a> · <a href="/php/">PHP</a> · <a href="/rust/">Rust</a> · <a href="/typescript/">TypeScript / Vue</a> · <a href="/swift/">Swift</a> · <a href="/locate/">locate</a> · <a href="/profile/">Profile</a> · <a href="/changelog/">Changelog</a></nav>
+  <div>callgraph · made by <a href="https://www.linkedin.com/in/gergomakra/" rel="author me">Gergő Makra</a> · MIT license · <a href="https://github.com/GeRiY/callgraph">GitHub</a> · <a href="https://github.com/GeRiY/callgraph/releases/latest">Releases</a> · <a href="/hu/typescript/" hreflang="hu" lang="hu">Magyar</a></div>
+</footer>
+</div>
+<script>
+// nyelv-menü: kívül kattintásra / Escape-re bezárul (JS nélkül is működik)
+document.addEventListener('click', function (e) {
+  document.querySelectorAll('details.menu[open]').forEach(function (d) { if (!d.contains(e.target)) d.open = false; });
+});
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape') return;
+  document.querySelectorAll('details.menu[open]').forEach(function (d) { d.open = false; d.querySelector('summary').focus(); });
+});
+</script>
+<script>
+// másoló gomb a parancs- és konfig-blokkokon (JS nélkül a blokk ugyanúgy olvasható)
+if (navigator.clipboard) document.querySelectorAll('pre.code:not(.out)').forEach(function (pre) {
+  var wrap = document.createElement('div'); wrap.className = 'copywrap';
+  pre.parentNode.insertBefore(wrap, pre); wrap.appendChild(pre);
+  var b = document.createElement('button'); b.type = 'button'; b.className = 'copy';
+  b.textContent = "Copy"; b.setAttribute('aria-label', "Copy code to clipboard"); wrap.appendChild(b);
+  b.addEventListener('click', function () {
+    navigator.clipboard.writeText(pre.innerText.replace(/\n$/, '')).then(function () {
+      b.textContent = "Copied"; setTimeout(function () { b.textContent = "Copy"; }, 1600);
+    });
+  });
+});
+</script>
+</body>
+</html>

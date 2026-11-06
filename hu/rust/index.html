@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rust call graph és hatáselemzés AI agenteknek — callgraph</title>
+<meta name="description" content="Rust-crate-ek térképe AI agenteknek: structok, traitek, impl-blokkok, use-fák, makróhívások, framework a Cargo.toml-ból, és hogy ki mit hív.">
+<link rel="canonical" href="https://callgraph.eu/hu/rust/">
+<link rel="alternate" hreflang="en" href="https://callgraph.eu/rust/">
+<link rel="alternate" hreflang="hu" href="https://callgraph.eu/hu/rust/">
+<link rel="alternate" hreflang="x-default" href="https://callgraph.eu/rust/">
+<meta name="author" content="Makra Gergő">
+<meta name="robots" content="index,follow">
+<meta name="theme-color" content="#0c152a">
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/style.css">
+<script>document.documentElement.className += ' js';</script>
+<link rel="alternate" type="text/markdown" href="/hu/rust/index.md" title="Az oldal Markdown-változata">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="callgraph">
+<meta property="og:title" content="Rust call graph és hatáselemzés AI agenteknek — callgraph">
+<meta property="og:description" content="Rust-crate-ek térképe AI agenteknek: structok, traitek, impl-blokkok, use-fák, makróhívások, framework a Cargo.toml-ból, és hogy ki mit hív.">
+<meta property="og:url" content="https://callgraph.eu/hu/rust/">
+<meta property="og:image" content="https://callgraph.eu/assets/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="callgraph terminál-kimenet: osztály-outline sortartománnyal és kategorizált hívásokkal">
+<meta property="og:locale" content="hu_HU">
+<meta property="og:locale:alternate" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Rust call graph és hatáselemzés AI agenteknek — callgraph">
+<meta name="twitter:description" content="Rust-crate-ek térképe AI agenteknek: structok, traitek, impl-blokkok, use-fák, makróhívások, framework a Cargo.toml-ból, és hogy ki mit hív.">
+<meta name="twitter:image" content="https://callgraph.eu/assets/og-image.png">
+<script type="application/ld+json">
+{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Kezdőlap", "item": "https://callgraph.eu/hu/"}, {"@type": "ListItem", "position": 2, "name": "Rust", "item": "https://callgraph.eu/hu/rust/"}]}
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Ugrás a tartalomra</a>
+<div class="wrap">
+<header class="top">
+  <a class="brand" href="/hu/"><img src="/assets/favicon.svg" alt="" width="32" height="32">callgraph</a>
+  <nav class="links" aria-label="Fő navigáció">
+    <details class="menu"><summary>Használat</summary><div class="menu-list"><a href="/hu/#usage">Minden parancs</a><a href="/hu/locate/">locate</a><a href="/hu/profile/">Profil</a></div></details>
+    <details class="menu"><summary class="current">Nyelvek</summary><div class="menu-list"><a href="/hu/php/">PHP</a><a href="/hu/rust/" aria-current="page">Rust</a><a href="/hu/typescript/">TS / Vue</a><a href="/hu/swift/">Swift</a><a href="/hu/#languages">Minden nyelv</a></div></details>
+    <a href="/hu/mcp/">MCP</a>
+    <a href="/hu/changelog/">Változásnapló</a>
+    <a href="https://github.com/GeRiY/callgraph">GitHub</a>
+    <a class="lang" href="/rust/" hreflang="en" lang="en">English</a>
+  </nav>
+</header>
+<main id="main">
+<nav class="crumbs" aria-label="Morzsamenü"><ol><li><a href="/hu/">Kezdőlap</a></li><li aria-current="page">Rust</li></ol></nav>
+<section class="hero page" aria-labelledby="title">
+  <div>
+    <h1 id="title">Rust call graph és hatáselemzés AI agenteknek</h1>
+    <p class="lead">A callgraph a <a href="https://github.com/dtolnay/syn">syn</a>-nel elemzi a <code>.rs</code> fájlokat,
+      és megadja az agentnek a modulokat, structokat, traiteket és <code>impl</code>-blokkokat pontos sortartománnyal,
+      minden hívást kategóriánként, és hogy ki hív egy függvényt a crate-ben — a fájl beolvasása nélkül.</p>
+    <div class="cta">
+      <a class="btn primary" href="/hu/#install">Telepítés</a>
+      <a class="btn" href="/hu/mcp/">Használat MCP-n át</a>
+    </div>
+  </div>
+</section>
+
+<section id="extracts" aria-labelledby="h-extracts">
+  <h2 id="h-extracts">Mit nyer ki a callgraph a Rust-kódból</h2>
+  <ul>
+    <li>A fájl-modul, az inline <code>mod</code>-ok, a <code>struct</code>-ok, <code>enum</code>-ok, <code>union</code>-ok
+      és <code>trait</code>-ek (a supertraitekkel).</li>
+    <li>Az <code>impl</code>-blokkok metódusai a típusukhoz kerülnek; a trait-implementációk az
+      <code>implements</code> alatt látszanak.</li>
+    <li>Függvények láthatósággal (<code>pub</code>, <code>pub(crate)</code>…), <code>async</code>-kal, paraméterekkel és
+      visszatérési típussal; <code>macro_rules!</code> makrók.</li>
+    <li>Mezők, <code>const</code> / <code>static</code> elemek, típus-aliasok és enum-variánsok.</li>
+    <li>Kilapított <code>use</code>-fák, út- / metódus- / makróhívások, <code>if</code> / <code>match</code> ágak,
+      string-literálok (az attribútumokban is, pl. <code>#[get("/users/{id}")]</code>).</li>
+  </ul>
+</section>
+
+<section id="frameworks" aria-labelledby="h-frameworks">
+  <h2 id="h-frameworks">Framework-ismeret: axum, actix-web, tokio…</h2>
+  <p>A framework a fájl fölötti legközelebbi <code>Cargo.toml</code>-ból jön: az első ismert függőség, ebben a
+    sorrendben — bevy, tauri, leptos, dioxus, yew, axum, actix-web, rocket, warp, poem, diesel, sqlx, sea-orm, clap,
+    tokio, async-std, serde. Az ismert framework-crate-ek hívásai <code>framework_use</code> címkét kapnak, a
+    <a href="/hu/profile/"><code>profile</code></a> pedig felismeri a Rust webes architektúrát.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th scope="col">Kategória</th><th scope="col">Mikor</th></tr></thead>
+    <tbody>
+      <tr><td><code>internal_helper</code></td><td>a fájl saját típusai, függvényei és metódusai (<code>self.x()</code>, <code>Self::x()</code>)</td></tr>
+      <tr><td><code>module_use</code></td><td>a crate másik modulja (<code>crate::</code>, <code>super::</code>), <code>modul::fn</code> / <code>Típus::fn</code> alakban</td></tr>
+      <tr><td><code>native_rust</code></td><td>std / core / alloc, a prelude és a gyakori std-metódusok</td></tr>
+      <tr><td><code>framework_use</code></td><td>ismert framework-crate (axum, tower, hyper, actix_web, rocket, tokio, serde, clap, diesel, sqlx, bevy…)</td></tr>
+      <tr><td><code>package_use</code></td><td>más crate (külső függőség)</td></tr>
+      <tr><td><code>macro_use</code></td><td>minden makróhívás; a makró nincs kibontva</td></tr>
+      <tr><td><code>external_call</code></td><td>helyi változó vagy closure, illetve ismeretlen fogadójú metódus (<code>?::név</code>)</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="commands" aria-labelledby="h-commands">
+  <h2 id="h-commands">Parancsok</h2>
+<pre class="code"><code>CG=~/.claude/skills/callgraph/callgraph.sh
+bash $CG --project myapp src/api/users.rs              # outline: struct/impl/trait, fn-ek sortartománnyal
+bash $CG --project myapp src/api/users.rs --format api # pub elemek, az impl-blokkok pub fn-jei is
+bash $CG --project myapp src --const MAX_ITEMS         # const / static (Típus::CONST is): definíció + használat</code></pre>
+  <p>A <code>--const</code> azt is megmutatja, hol adnak tovább egy nevet: a <code>pub use state::{CheckState, STATE_FILE};</code>
+    például <code>[re-export] state::STATE_FILE</code> sorként jelenik meg.</p>
+</section>
+
+<section id="callers" aria-labelledby="h-callers">
+  <h2 id="h-callers">Ki hívja ezt a Rust-függvényt?</h2>
+<pre class="code"><code>bash $CG --project myapp src --grep 'Repo::find'                # crate-belső: Típus::fn / modul::fn
+bash $CG --project myapp src --grep '(^|::|\.|-&gt;)find$'         # a név minden hívása
+bash $CG --project myapp src --grep 'Repo::find' --depth 3      # a hívók hívói</code></pre>
+  <p>Az értéken hívott metódusnál (<code>x.load()</code>) a callgraph az egyszerű, megbízható esetekben kikövetkezteti az
+    <code>x</code> típusát: paraméter-típus (<code>x: &amp;Repo</code>, <code>Box</code> / <code>Rc</code> /
+    <code>Arc</code>, extractor, mint a <code>State(s): State&lt;App&gt;</code>), <code>let x = Repo::new()</code>,
+    struct-literál, <code>self</code>, vagy a saját struct mezője (<code>self.repo.load()</code>). Ilyenkor a hívás
+    <code>Repo::load</code> lesz. Ha a típus nem következtethető ki, <code>?::load</code> marad, és a
+    <code>Repo::load</code> keresés bizonytalanként ezt is listázza — nem esik ki csendben.</p>
+</section>
+
+<section id="limits" aria-labelledby="h-limits">
+  <h2 id="h-limits">Korlátok</h2>
+  <ul>
+    <li>A makrók nincsenek kibontva: a derive-, attribútum- és függvényszerű makrók által generált kód nem látszik.</li>
+    <li>A típus-következtetés szándékosan egyszerű: a visszatérési típusok és a láncolt hívások (<code>a.b().c()</code>) nem kapnak típust.</li>
+    <li>A <code>cfg</code>-attribútumok nem értékelődnek ki: minden ág bekerül, pl. a <code>#[cfg(test)] mod tests</code> is.</li>
+    <li>Szintaktikai hibás fájlból csak a fájl-container és egy figyelmeztetés készül.</li>
+    <li>A bejáró nem hagyja ki a <code>target/</code> mappát; a callgraph-ot a <code>src</code> mappára indítsd.</li>
+  </ul>
+</section>
+
+<section id="related" aria-labelledby="h-related">
+  <h2 id="h-related">Kapcsolódó oldalak</h2>
+  <div class="grid">
+    <a class="card" href="/hu/locate/"><h3>locate</h3><p>Rangsorolt fájlok a feladat kezdéséhez.</p></a>
+    <a class="card" href="/hu/profile/"><h3>Projekt-profil</h3><p>Egy crate architektúrája és rétegei.</p></a>
+    <a class="card" href="/hu/mcp/"><h3>MCP-szerver</h3><p>Ugyanezek a lekérdezések bármely MCP-kliensben.</p></a>
+    <a class="card" href="/hu/swift/"><h3>Swift / SwiftUI</h3><p>Egy másik natív nyelv, amit a callgraph feltérképez.</p></a>
+  </div>
+</section>
+</main>
+
+<footer>
+  <nav class="foot" aria-label="Oldalak"><a href="/hu/">Kezdőlap</a> · <a href="/hu/mcp/">MCP</a> · <a href="/hu/php/">PHP</a> · <a href="/hu/rust/">Rust</a> · <a href="/hu/typescript/">TypeScript / Vue</a> · <a href="/hu/swift/">Swift</a> · <a href="/hu/locate/">locate</a> · <a href="/hu/profile/">Profil</a> · <a href="/hu/changelog/">Változásnapló</a></nav>
+  <div>callgraph · készítette: <a href="https://www.linkedin.com/in/gergomakra/" rel="author me">Makra Gergő</a> · MIT licenc · <a href="https://github.com/GeRiY/callgraph">GitHub</a> · <a href="https://github.com/GeRiY/callgraph/releases/latest">Kiadások</a> · <a href="/rust/" hreflang="en" lang="en">English</a></div>
+</footer>
+</div>
+<script>
+// nyelv-menü: kívül kattintásra / Escape-re bezárul (JS nélkül is működik)
+document.addEventListener('click', function (e) {
+  document.querySelectorAll('details.menu[open]').forEach(function (d) { if (!d.contains(e.target)) d.open = false; });
+});
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape') return;
+  document.querySelectorAll('details.menu[open]').forEach(function (d) { d.open = false; d.querySelector('summary').focus(); });
+});
+</script>
+<script>
+// másoló gomb a parancs- és konfig-blokkokon (JS nélkül a blokk ugyanúgy olvasható)
+if (navigator.clipboard) document.querySelectorAll('pre.code:not(.out)').forEach(function (pre) {
+  var wrap = document.createElement('div'); wrap.className = 'copywrap';
+  pre.parentNode.insertBefore(wrap, pre); wrap.appendChild(pre);
+  var b = document.createElement('button'); b.type = 'button'; b.className = 'copy';
+  b.textContent = "M\u00e1sol\u00e1s"; b.setAttribute('aria-label', "K\u00f3d m\u00e1sol\u00e1sa a v\u00e1g\u00f3lapra"); wrap.appendChild(b);
+  b.addEventListener('click', function () {
+    navigator.clipboard.writeText(pre.innerText.replace(/\n$/, '')).then(function () {
+      b.textContent = "M\u00e1solva"; setTimeout(function () { b.textContent = "M\u00e1sol\u00e1s"; }, 1600);
+    });
+  });
+});
+</script>
+</body>
+</html>

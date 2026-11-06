@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PHP call graph &amp; impact analysis for AI agents — callgraph</title>
+<meta name="description" content="Outline PHP classes, methods and categorized calls, find every caller and run Laravel / Yii views (routes, validation, events) without reading files.">
+<link rel="canonical" href="https://callgraph.eu/php/">
+<link rel="alternate" hreflang="en" href="https://callgraph.eu/php/">
+<link rel="alternate" hreflang="hu" href="https://callgraph.eu/hu/php/">
+<link rel="alternate" hreflang="x-default" href="https://callgraph.eu/php/">
+<meta name="author" content="Gergő Makra">
+<meta name="robots" content="index,follow">
+<meta name="theme-color" content="#0c152a">
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/style.css">
+<script>document.documentElement.className += ' js';</script>
+<link rel="alternate" type="text/markdown" href="/php/index.md" title="Markdown version of this page">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="callgraph">
+<meta property="og:title" content="PHP call graph &amp; impact analysis for AI agents — callgraph">
+<meta property="og:description" content="Outline PHP classes, methods and categorized calls, find every caller and run Laravel / Yii views (routes, validation, events) without reading files.">
+<meta property="og:url" content="https://callgraph.eu/php/">
+<meta property="og:image" content="https://callgraph.eu/assets/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="callgraph terminal output: class outline with line ranges and categorized calls">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="hu_HU">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="PHP call graph &amp; impact analysis for AI agents — callgraph">
+<meta name="twitter:description" content="Outline PHP classes, methods and categorized calls, find every caller and run Laravel / Yii views (routes, validation, events) without reading files.">
+<meta name="twitter:image" content="https://callgraph.eu/assets/og-image.png">
+<script type="application/ld+json">
+{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://callgraph.eu/"}, {"@type": "ListItem", "position": 2, "name": "PHP", "item": "https://callgraph.eu/php/"}]}
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="wrap">
+<header class="top">
+  <a class="brand" href="/"><img src="/assets/favicon.svg" alt="" width="32" height="32">callgraph</a>
+  <nav class="links" aria-label="Main">
+    <details class="menu"><summary>Usage</summary><div class="menu-list"><a href="/#usage">All commands</a><a href="/locate/">locate</a><a href="/profile/">Profile</a></div></details>
+    <details class="menu"><summary class="current">Languages</summary><div class="menu-list"><a href="/php/" aria-current="page">PHP</a><a href="/rust/">Rust</a><a href="/typescript/">TS / Vue</a><a href="/swift/">Swift</a><a href="/#languages">All languages</a></div></details>
+    <a href="/mcp/">MCP</a>
+    <a href="/changelog/">Changelog</a>
+    <a href="https://github.com/GeRiY/callgraph">GitHub</a>
+    <a class="lang" href="/hu/php/" hreflang="hu" lang="hu">Magyar</a>
+  </nav>
+</header>
+<main id="main">
+<nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="/">Home</a></li><li aria-current="page">PHP</li></ol></nav>
+<section class="hero page" aria-labelledby="title">
+  <div>
+    <h1 id="title">PHP call graph and impact analysis for AI agents</h1>
+    <p class="lead">callgraph reads your <code>.php</code> files from the syntax tree and tells your agent what is in a
+      class, which method lives on which lines, what each method calls — sorted by category — and who calls it, across
+      the whole project. Laravel and Yii aware, without reading whole files.</p>
+    <div class="cta">
+      <a class="btn primary" href="/#install">Install</a>
+      <a class="btn" href="/mcp/">Use it over MCP</a>
+    </div>
+  </div>
+</section>
+
+<section id="extracts" aria-labelledby="h-extracts">
+  <h2 id="h-extracts">What callgraph extracts from PHP</h2>
+  <ul>
+    <li>Classes, traits and enums, with <code>extends</code> and the namespace.</li>
+    <li>Methods with exact line ranges, properties, constants and docblocks.</li>
+    <li>Calls with type tracking, each labelled with a category.</li>
+    <li>String literals and <code>if</code> / <code>match</code> / <code>switch</code> branches (<code>--format flow</code>).</li>
+    <li>Framework detection: Laravel and Yii.</li>
+  </ul>
+  <p>Call categories you will see in a PHP outline include <code>native_php</code>, <code>orm_relation</code>,
+    <code>model_use</code>, <code>global_helper</code>, <code>internal_helper</code>, <code>external_call</code> and
+    <code>framework_use</code>, so the agent sees intent, not just names. Filter by them with
+    <code>--category model_use,orm_relation</code>.</p>
+</section>
+
+<section id="example" aria-labelledby="h-example">
+  <h2 id="h-example">Outline of a model</h2>
+  <p>One command instead of reading the file:</p>
+<pre class="code"><code>bash ~/.claude/skills/callgraph/callgraph.sh --project shop app/Models/Order.php</code></pre>
+  <p class="label">Output</p>
+<pre class="code out"><code>FILE  /srv/shop/app/Models/Order.php  NS:App\Models
+
+class Order extends Illuminate\Database\Eloquent\Model  L7-23
+  constants (1):
+    STATUS_OPEN = 'open'
+  properties (1):
+    mixed $fillable
+  saveTranslations()  L13-20
+    external_call     create, info
+    global_helper     logger
+    internal_helper   translations
+  translations()  L22-22
+    orm_relation      hasMany</code></pre>
+  <p>Then read only the method you need, line-numbered (the docblock above it and blank lines are left out, comments
+    inside stay; <code>--doc</code> adds the docblock, <code>--raw</code> prints the exact source):</p>
+<pre class="code"><code>bash ~/.claude/skills/callgraph/callgraph.sh --project shop app/Models/Order.php::save --body</code></pre>
+</section>
+
+<section id="callers" aria-labelledby="h-callers">
+  <h2 id="h-callers">Who calls this PHP method?</h2>
+  <p>Start with the name pattern — it catches every call, also where the receiver type is unknown, inherited or comes
+    from a trait. <code>Type::method</code> finds only the calls resolved to that type, so use it to narrow a common
+    name like <code>save</code> or <code>find</code>:</p>
+<pre class="code"><code>bash ~/.claude/skills/callgraph/callgraph.sh --project shop app --grep '(^|::|\.|-&gt;)cancel$'
+bash ~/.claude/skills/callgraph/callgraph.sh --project shop app --grep 'Order::cancel'
+bash ~/.claude/skills/callgraph/callgraph.sh --project shop app --grep 'Order::cancel' --depth 3</code></pre>
+  <p>With <code>--depth N</code> callgraph walks callers of callers for impact analysis:</p>
+<pre class="code out"><code>$ callgraph.sh --project shop app --grep saveTranslations --depth 2
+== level 1 — directly calls: /saveTranslations/
+  /srv/shop/app/Models/Order.php  Caller::run()  L25-25
+
+== level 2 — calls the previous level
+  (no more callers)</code></pre>
+  <ul>
+    <li>Every match shows the call's own source line, e.g. <code>L25 │ $this-&gt;repo-&gt;find($id)</code>, so the
+      agent sees the arguments without another read.</li>
+    <li>Searching <code>Class::method</code> also finds calls made through its interface, abstract parent or trait,
+      marked <code>via Resolver</code>.</li>
+    <li>Calls from child classes that use the inherited method as <code>$this-&gt;method()</code> are found too, marked
+      with the child class (<code>L139 via EventeditController │ …</code>). A child class with its own version of the
+      method is not counted.</li>
+    <li><code>--guess</code> adds name-only matches, marked <code>?</code>.</li>
+  </ul>
+</section>
+
+<section id="framework" aria-labelledby="h-framework">
+  <h2 id="h-framework">Laravel and Yii views</h2>
+  <p>Framework views run on a directory and give one focused list each: <code>routes</code>, <code>middleware</code>,
+    <code>validation</code>, <code>jobs</code>, <code>events</code>, <code>providers</code>, <code>magic</code>,
+    <code>di</code> and <code>views</code>.</p>
+<pre class="code"><code>bash ~/.claude/skills/callgraph/callgraph.sh --project shop routes --format routes
+bash ~/.claude/skills/callgraph/callgraph.sh --project shop app --format validation</code></pre>
+  <p>Over MCP the same views are the <code>framework_view</code> tool. In an unfamiliar Laravel or Yii project,
+    <a href="/profile/"><code>profile</code></a> shows the layered MVC structure first: which folder holds the
+    controllers, services, repositories and models.</p>
+</section>
+
+<section id="search" aria-labelledby="h-search">
+  <h2 id="h-search">Strings and constants</h2>
+<pre class="code"><code>bash ~/.claude/skills/callgraph/callgraph.sh --project shop app --strings 'Order not found'
+bash ~/.claude/skills/callgraph/callgraph.sh --project shop app --const STATUS_ACTIVE</code></pre>
+  <p><code>--const</code> lists the definition, the references and re-exports such as <code>use const App\NAME;</code>,
+    marked <code>[re-export]</code>.</p>
+</section>
+
+<section id="limits" aria-labelledby="h-limits">
+  <h2 id="h-limits">Limits</h2>
+  <p>This is static analysis: dynamic calls (<code>$this-&gt;$method()</code>), magic methods and class names assembled at
+    runtime cannot be resolved. By default <code>--depth</code> follows only resolved callers; <code>--guess</code>
+    shows the name-only ones. For exact control logic, read the method with <code>--body</code>.</p>
+</section>
+
+<section id="related" aria-labelledby="h-related">
+  <h2 id="h-related">Related</h2>
+  <div class="grid">
+    <a class="card" href="/locate/"><h3>locate</h3><p>Ranked files to start a task with.</p></a>
+    <a class="card" href="/profile/"><h3>Project profile</h3><p>Layers and patterns of a Laravel / Yii project.</p></a>
+    <a class="card" href="/mcp/"><h3>MCP server</h3><p>The same queries in Claude Desktop, Cursor or VS Code.</p></a>
+    <a class="card" href="/typescript/"><h3>TypeScript / Vue</h3><p>The frontend side of a Laravel + Vue app.</p></a>
+  </div>
+</section>
+</main>
+
+<footer>
+  <nav class="foot" aria-label="Pages"><a href="/">Home</a> · <a href="/mcp/">MCP</a> · <a href="/php/">PHP</a> · <a href="/rust/">Rust</a> · <a href="/typescript/">TypeScript / Vue</a> · <a href="/swift/">Swift</a> · <a href="/locate/">locate</a> · <a href="/profile/">Profile</a> · <a href="/changelog/">Changelog</a></nav>
+  <div>callgraph · made by <a href="https://www.linkedin.com/in/gergomakra/" rel="author me">Gergő Makra</a> · MIT license · <a href="https://github.com/GeRiY/callgraph">GitHub</a> · <a href="https://github.com/GeRiY/callgraph/releases/latest">Releases</a> · <a href="/hu/php/" hreflang="hu" lang="hu">Magyar</a></div>
+</footer>
+</div>
+<script>
+// nyelv-menü: kívül kattintásra / Escape-re bezárul (JS nélkül is működik)
+document.addEventListener('click', function (e) {
+  document.querySelectorAll('details.menu[open]').forEach(function (d) { if (!d.contains(e.target)) d.open = false; });
+});
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape') return;
+  document.querySelectorAll('details.menu[open]').forEach(function (d) { d.open = false; d.querySelector('summary').focus(); });
+});
+</script>
+<script>
+// másoló gomb a parancs- és konfig-blokkokon (JS nélkül a blokk ugyanúgy olvasható)
+if (navigator.clipboard) document.querySelectorAll('pre.code:not(.out)').forEach(function (pre) {
+  var wrap = document.createElement('div'); wrap.className = 'copywrap';
+  pre.parentNode.insertBefore(wrap, pre); wrap.appendChild(pre);
+  var b = document.createElement('button'); b.type = 'button'; b.className = 'copy';
+  b.textContent = "Copy"; b.setAttribute('aria-label', "Copy code to clipboard"); wrap.appendChild(b);
+  b.addEventListener('click', function () {
+    navigator.clipboard.writeText(pre.innerText.replace(/\n$/, '')).then(function () {
+      b.textContent = "Copied"; setTimeout(function () { b.textContent = "Copy"; }, 1600);
+    });
+  });
+});
+</script>
+</body>
+</html>

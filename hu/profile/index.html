@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Projekt-profil: architektúra és rétegek — callgraph</title>
+<meta name="description" content="A callgraph profile kb. 15 sorban leírja az ismeretlen projektet: architektúra, rétegek és mappák, minták, hívásirány. Hozzá a --layer szűrők.">
+<link rel="canonical" href="https://callgraph.eu/hu/profile/">
+<link rel="alternate" hreflang="en" href="https://callgraph.eu/profile/">
+<link rel="alternate" hreflang="hu" href="https://callgraph.eu/hu/profile/">
+<link rel="alternate" hreflang="x-default" href="https://callgraph.eu/profile/">
+<meta name="author" content="Makra Gergő">
+<meta name="robots" content="index,follow">
+<meta name="theme-color" content="#0c152a">
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/style.css">
+<script>document.documentElement.className += ' js';</script>
+<link rel="alternate" type="text/markdown" href="/hu/profile/index.md" title="Az oldal Markdown-változata">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="callgraph">
+<meta property="og:title" content="Projekt-profil: architektúra és rétegek — callgraph">
+<meta property="og:description" content="A callgraph profile kb. 15 sorban leírja az ismeretlen projektet: architektúra, rétegek és mappák, minták, hívásirány. Hozzá a --layer szűrők.">
+<meta property="og:url" content="https://callgraph.eu/hu/profile/">
+<meta property="og:image" content="https://callgraph.eu/assets/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="callgraph terminál-kimenet: osztály-outline sortartománnyal és kategorizált hívásokkal">
+<meta property="og:locale" content="hu_HU">
+<meta property="og:locale:alternate" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Projekt-profil: architektúra és rétegek — callgraph">
+<meta name="twitter:description" content="A callgraph profile kb. 15 sorban leírja az ismeretlen projektet: architektúra, rétegek és mappák, minták, hívásirány. Hozzá a --layer szűrők.">
+<meta name="twitter:image" content="https://callgraph.eu/assets/og-image.png">
+<script type="application/ld+json">
+{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Kezdőlap", "item": "https://callgraph.eu/hu/"}, {"@type": "ListItem", "position": 2, "name": "Projekt-profil", "item": "https://callgraph.eu/hu/profile/"}]}
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Ugrás a tartalomra</a>
+<div class="wrap">
+<header class="top">
+  <a class="brand" href="/hu/"><img src="/assets/favicon.svg" alt="" width="32" height="32">callgraph</a>
+  <nav class="links" aria-label="Fő navigáció">
+    <details class="menu"><summary class="current">Használat</summary><div class="menu-list"><a href="/hu/#usage">Minden parancs</a><a href="/hu/locate/">locate</a><a href="/hu/profile/" aria-current="page">Profil</a></div></details>
+    <details class="menu"><summary>Nyelvek</summary><div class="menu-list"><a href="/hu/php/">PHP</a><a href="/hu/rust/">Rust</a><a href="/hu/typescript/">TS / Vue</a><a href="/hu/swift/">Swift</a><a href="/hu/#languages">Minden nyelv</a></div></details>
+    <a href="/hu/mcp/">MCP</a>
+    <a href="/hu/changelog/">Változásnapló</a>
+    <a href="https://github.com/GeRiY/callgraph">GitHub</a>
+    <a class="lang" href="/profile/" hreflang="en" lang="en">English</a>
+  </nav>
+</header>
+<main id="main">
+<nav class="crumbs" aria-label="Morzsamenü"><ol><li><a href="/hu/">Kezdőlap</a></li><li aria-current="page">Projekt-profil</li></ol></nav>
+<section class="hero page" aria-labelledby="title">
+  <div>
+    <h1 id="title">Projekt-profil: architektúra és rétegek kb. 15 sorban</h1>
+    <p class="lead">Ismeretlen projektben a mappák listázása helyett futtasd egyszer a <code>profile</code>-t. Megmondja,
+      hogyan épül fel a projekt — architektúra, melyik mappában melyik réteg, tervezési minták és a rétegek közti
+      hívásirány — a mappa- és fájlnevekből, a kód-gráffal megerősítve. Nem találgat.</p>
+    <div class="cta">
+      <a class="btn primary" href="/hu/#install">Telepítés</a>
+      <a class="btn" href="/hu/mcp/">A <code>project_profile</code> MCP-eszköz</a>
+    </div>
+  </div>
+</section>
+
+<section id="run" aria-labelledby="h-run">
+  <h2 id="h-run">Futtatás</h2>
+<pre class="code"><code>bash ~/.claude/skills/callgraph/callgraph.sh profile --project myapp          # kb. 15 sor
+bash ~/.claude/skills/callgraph/callgraph.sh profile --project myapp --full   # mappánként, bizonyosság szerint, a rétegek közti hívás-párok</code></pre>
+</section>
+
+<section id="shape" aria-labelledby="h-shape">
+  <h2 id="h-shape">Mi van a profilban</h2>
+  <ul>
+    <li><b>Architektúra</b> — Laravel / Yii rétegzett MVC, DDD / hexagonális, Vue / React frontend, SwiftUI MVVM vagy
+      Rust web, a <code>composer.json</code>, <code>package.json</code> vagy <code>Cargo.toml</code> frameworkjével.</li>
+    <li><b>Rétegek</b> — melyik mappában vannak a controllerek, service-ek, repository-k, modellek, komponensek,
+      store-ok…, a fájlszámmal.</li>
+    <li><b>Tervezési minták</b> — Repository, Factory, Strategy, Observer…</li>
+    <li><b>Hívásirány</b> — a rétegek a várt irányban hívják-e egymást.</li>
+    <li><b>Ismeretlen mappák</b> — az egyértelmű szerep nélküli mappák.</li>
+  </ul>
+  <p>A kód-gráf megerősíti, amit a nevek sugallnak: <code>extends Controller</code>,
+    <code>implements *RepositoryInterface</code>, <code>defineStore</code>, és a rétegek közti hívások iránya. Minden fájl
+    kap egy szerepet bizonyossággal (magas / közepes / alacsony), vagy „ismeretlen” marad.</p>
+</section>
+
+<section id="layers" aria-labelledby="h-layers">
+  <h2 id="h-layers">A rétegek a lekérdezésekben</h2>
+  <p>A réteg egy név a profilból (<code>controller</code>, <code>service</code>, <code>repository</code>,
+    <code>model</code>, <code>component</code>, <code>store</code>…), nem út — így a mappaneveket nem ismerve is
+    szűkíthetsz. Mind kapcsolóra megy; az alapkimenet nem változik.</p>
+<pre class="code"><code>bash ~/.claude/skills/callgraph/callgraph.sh --project myapp app --layer service                       # csak a service-fájlok (több: service,repository)
+bash ~/.claude/skills/callgraph/callgraph.sh --project myapp app --format summary --layers             # summary rétegenként
+bash ~/.claude/skills/callgraph/callgraph.sh --project myapp app --grep 'Repo::find' --depth 2 --by-layer # hívók rétegek szerint, a legközelebbi elöl</code></pre>
+  <ul>
+    <li>Csak a <code>--layer</code> szűr; a <code>--layers</code> és a <code>--by-layer</code> csak csoportosít és rendez.</li>
+    <li>A <code>--by-layer</code> a „ki hívja?” találatait rétegek szerint rendezi, a hívott kódhoz legközelebbivel kezdve.</li>
+    <li>MCP-n: a <code>layer</code> paraméter az <code>outline</code>, a <code>search</code> és a <code>find_callers</code>
+      eszközön, a <code>by_layer</code> a <code>find_callers</code>-en.</li>
+  </ul>
+</section>
+
+<section id="custom" aria-labelledby="h-custom">
+  <h2 id="h-custom">Saját mappanevek: <code>.callgraph-layers</code></h2>
+  <p>Semmitmondó vagy nem angol mappanevek? Egy commitolható <code>.callgraph-layers</code> fájl a projekt gyökerében
+    hozzárendeli őket, például:</p>
+<pre class="code"><code>service = app/Szolgaltatasok, app/Logic
+ignore-role = app/Legacy</code></pre>
+</section>
+
+<section id="mcp" aria-labelledby="h-mcp">
+  <h2 id="h-mcp">AI-klienseknek</h2>
+  <p>A <code>project_profile</code> MCP-eszköz ugyanezt a profilt adja (<code>full: true</code>: részletesen). Ha az
+    MCP-szerver projektmappában indul (ahol van <code>composer.json</code>, <code>package.json</code>,
+    <code>Cargo.toml</code>, <code>Package.swift</code>, <code>.git</code> vagy <code>.callgraph</code>), kapcsolódáskor
+    egy tömör profil is megy a kliensnek. <a href="/hu/mcp/">Az MCP-szerver beállítása</a>.</p>
+</section>
+
+<section id="related" aria-labelledby="h-related">
+  <h2 id="h-related">Kapcsolódó oldalak</h2>
+  <div class="grid">
+    <a class="card" href="/hu/locate/"><h3>locate</h3><p>Utána keresd meg a feladat fájljait.</p></a>
+    <a class="card" href="/hu/php/"><h3>PHP, Laravel és Yii</h3><p>Rétegzett MVC projektek.</p></a>
+    <a class="card" href="/hu/swift/"><h3>Swift / SwiftUI</h3><p>SwiftUI MVVM projektek.</p></a>
+    <a class="card" href="/hu/changelog/#v0.5.0"><h3>Újdonság a v0.5.0-ban</h3><p>A projekt-profil a 0.5.0-val érkezett.</p></a>
+  </div>
+</section>
+</main>
+
+<footer>
+  <nav class="foot" aria-label="Oldalak"><a href="/hu/">Kezdőlap</a> · <a href="/hu/mcp/">MCP</a> · <a href="/hu/php/">PHP</a> · <a href="/hu/rust/">Rust</a> · <a href="/hu/typescript/">TypeScript / Vue</a> · <a href="/hu/swift/">Swift</a> · <a href="/hu/locate/">locate</a> · <a href="/hu/profile/">Profil</a> · <a href="/hu/changelog/">Változásnapló</a></nav>
+  <div>callgraph · készítette: <a href="https://www.linkedin.com/in/gergomakra/" rel="author me">Makra Gergő</a> · MIT licenc · <a href="https://github.com/GeRiY/callgraph">GitHub</a> · <a href="https://github.com/GeRiY/callgraph/releases/latest">Kiadások</a> · <a href="/profile/" hreflang="en" lang="en">English</a></div>
+</footer>
+</div>
+<script>
+// nyelv-menü: kívül kattintásra / Escape-re bezárul (JS nélkül is működik)
+document.addEventListener('click', function (e) {
+  document.querySelectorAll('details.menu[open]').forEach(function (d) { if (!d.contains(e.target)) d.open = false; });
+});
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape') return;
+  document.querySelectorAll('details.menu[open]').forEach(function (d) { d.open = false; d.querySelector('summary').focus(); });
+});
+</script>
+<script>
+// másoló gomb a parancs- és konfig-blokkokon (JS nélkül a blokk ugyanúgy olvasható)
+if (navigator.clipboard) document.querySelectorAll('pre.code:not(.out)').forEach(function (pre) {
+  var wrap = document.createElement('div'); wrap.className = 'copywrap';
+  pre.parentNode.insertBefore(wrap, pre); wrap.appendChild(pre);
+  var b = document.createElement('button'); b.type = 'button'; b.className = 'copy';
+  b.textContent = "M\u00e1sol\u00e1s"; b.setAttribute('aria-label', "K\u00f3d m\u00e1sol\u00e1sa a v\u00e1g\u00f3lapra"); wrap.appendChild(b);
+  b.addEventListener('click', function () {
+    navigator.clipboard.writeText(pre.innerText.replace(/\n$/, '')).then(function () {
+      b.textContent = "M\u00e1solva"; setTimeout(function () { b.textContent = "M\u00e1sol\u00e1s"; }, 1600);
+    });
+  });
+});
+</script>
+</body>
+</html>

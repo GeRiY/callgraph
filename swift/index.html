@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Swift &amp; SwiftUI call graph for AI agents — callgraph</title>
+<meta name="description" content="Map Swift and SwiftUI code: View types as components, body and computed properties, property wrappers, SwiftUI views and modifiers as call categories.">
+<link rel="canonical" href="https://callgraph.eu/swift/">
+<link rel="alternate" hreflang="en" href="https://callgraph.eu/swift/">
+<link rel="alternate" hreflang="hu" href="https://callgraph.eu/hu/swift/">
+<link rel="alternate" hreflang="x-default" href="https://callgraph.eu/swift/">
+<meta name="author" content="Gergő Makra">
+<meta name="robots" content="index,follow">
+<meta name="theme-color" content="#0c152a">
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/style.css">
+<script>document.documentElement.className += ' js';</script>
+<link rel="alternate" type="text/markdown" href="/swift/index.md" title="Markdown version of this page">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="callgraph">
+<meta property="og:title" content="Swift &amp; SwiftUI call graph for AI agents — callgraph">
+<meta property="og:description" content="Map Swift and SwiftUI code: View types as components, body and computed properties, property wrappers, SwiftUI views and modifiers as call categories.">
+<meta property="og:url" content="https://callgraph.eu/swift/">
+<meta property="og:image" content="https://callgraph.eu/assets/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="callgraph terminal output: class outline with line ranges and categorized calls">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="hu_HU">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Swift &amp; SwiftUI call graph for AI agents — callgraph">
+<meta name="twitter:description" content="Map Swift and SwiftUI code: View types as components, body and computed properties, property wrappers, SwiftUI views and modifiers as call categories.">
+<meta name="twitter:image" content="https://callgraph.eu/assets/og-image.png">
+<script type="application/ld+json">
+{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://callgraph.eu/"}, {"@type": "ListItem", "position": 2, "name": "Swift / SwiftUI", "item": "https://callgraph.eu/swift/"}]}
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="wrap">
+<header class="top">
+  <a class="brand" href="/"><img src="/assets/favicon.svg" alt="" width="32" height="32">callgraph</a>
+  <nav class="links" aria-label="Main">
+    <details class="menu"><summary>Usage</summary><div class="menu-list"><a href="/#usage">All commands</a><a href="/locate/">locate</a><a href="/profile/">Profile</a></div></details>
+    <details class="menu"><summary class="current">Languages</summary><div class="menu-list"><a href="/php/">PHP</a><a href="/rust/">Rust</a><a href="/typescript/">TS / Vue</a><a href="/swift/" aria-current="page">Swift</a><a href="/#languages">All languages</a></div></details>
+    <a href="/mcp/">MCP</a>
+    <a href="/changelog/">Changelog</a>
+    <a href="https://github.com/GeRiY/callgraph">GitHub</a>
+    <a class="lang" href="/hu/swift/" hreflang="hu" lang="hu">Magyar</a>
+  </nav>
+</header>
+<main id="main">
+<nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="/">Home</a></li><li aria-current="page">Swift / SwiftUI</li></ol></nav>
+<section class="hero page" aria-labelledby="title">
+  <div>
+    <h1 id="title">Swift and SwiftUI call graph for AI agents</h1>
+    <p class="lead">callgraph parses <code>.swift</code> files with
+      <a href="https://github.com/alex-pinkus/tree-sitter-swift">tree-sitter-swift</a> and shows your agent types,
+      methods and computed properties with line ranges, property wrappers, and every call by category — with SwiftUI
+      views and modifiers as their own categories.</p>
+    <div class="cta">
+      <a class="btn primary" href="/#install">Install</a>
+      <a class="btn" href="/mcp/">Use it over MCP</a>
+    </div>
+  </div>
+</section>
+
+<section id="extracts" aria-labelledby="h-extracts">
+  <h2 id="h-extracts">What callgraph extracts from Swift</h2>
+  <ul>
+    <li>Containers: <code>class</code>, <code>struct</code>, <code>enum</code>, <code>protocol</code>, <code>actor</code>
+      and <code>extension</code>; nested types as <code>Outer.Inner</code>.</li>
+    <li>A type conforming to <code>View</code> is a <code>component</code> — a SwiftUI view, like a Vue component.</li>
+    <li>File-level functions and statements go into a <code>&lt;File&gt;.swift</code> <code>module</code> container.</li>
+    <li>Methods: <code>func</code>, <code>init</code>, <code>deinit</code>, <code>subscript</code> and computed properties,
+      so <code>var body: some View { … }</code> is the method <code>body</code> with return type <code>some View</code>.</li>
+    <li>Properties with their property wrapper before the type: <code>@State String</code>,
+      <code>@StateObject TodoViewModel</code>, <code>@Published [Todo]</code>.</li>
+    <li>Constants (<code>static let</code>, file-level <code>let</code>) and enum cases.</li>
+    <li>Branches of <code>if</code>, <code>switch</code> and <code>guard</code> (<code>--format flow</code>), string literals
+      with interpolations, doc comments.</li>
+  </ul>
+  <p>A file that contains <code>import SwiftUI</code> is marked as SwiftUI.</p>
+</section>
+
+<section id="swiftui" aria-labelledby="h-swiftui">
+  <h2 id="h-swiftui">SwiftUI-aware call categories</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th scope="col">Category</th><th scope="col">When</th></tr></thead>
+    <tbody>
+      <tr><td><code>swiftui_view</code></td><td>a built-in SwiftUI view: <code>Text</code>, <code>VStack</code>, <code>HStack</code>, <code>List</code>, <code>NavigationStack</code>, <code>Button</code>…</td></tr>
+      <tr><td><code>swiftui_modifier</code></td><td>a known modifier: <code>padding</code>, <code>font</code>, <code>onAppear</code>, <code>navigationTitle</code>, <code>sheet</code>, <code>toolbar</code>…</td></tr>
+      <tr><td><code>component_use</code></td><td>your own <code>View</code> type used in a view body, e.g. <code>TodoRow(...)</code></td></tr>
+      <tr><td><code>swiftui_api</code></td><td><code>withAnimation</code>, <code>withTransaction</code></td></tr>
+      <tr><td><code>native_swift</code></td><td>stdlib, Foundation, Dispatch, Combine: <code>UUID()</code>, <code>JSONDecoder().decode</code>, <code>DispatchQueue.main.async</code>, <code>append</code>, <code>map</code>…</td></tr>
+      <tr><td><code>internal_helper</code></td><td>a function defined in the same file, or <code>self.f()</code></td></tr>
+      <tr><td><code>instantiation</code></td><td>other type constructors</td></tr>
+      <tr><td><code>external_call</code></td><td>other member calls, e.g. <code>viewModel.load()</code></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="commands" aria-labelledby="h-commands">
+  <h2 id="h-commands">Commands</h2>
+<pre class="code"><code>CG=~/.claude/skills/callgraph/callgraph.sh
+bash $CG --project myapp &lt;path/to/View&gt;.swift                   # outline: types, body, properties with wrappers, calls
+bash $CG --project myapp &lt;path/to/View&gt;.swift::body --body      # just the view body, line-numbered
+bash $CG --project myapp &lt;path/to/View&gt;.swift --format flow     # if / switch / guard branches with line ranges</code></pre>
+</section>
+
+<section id="callers" aria-labelledby="h-callers">
+  <h2 id="h-callers">Who calls this Swift method?</h2>
+<pre class="code"><code>bash $CG --project myapp &lt;folder&gt; --grep '(^|::|\.|-&gt;)load$'      # every call of the name
+bash $CG --project myapp &lt;folder&gt; --grep '(^|::|\.|-&gt;)load$' --depth 2</code></pre>
+  <p>Swift has no cross-file type resolution in callgraph, so search by name: the name pattern finds every call of
+    <code>load</code>, whatever the receiver.</p>
+</section>
+
+<section id="limits" aria-labelledby="h-limits">
+  <h2 id="h-limits">Limits</h2>
+  <ul>
+    <li>No type resolution and no cross-file symbol table: categories come from the names in the file and known lists.
+      A view declared in another file counts as <code>instantiation</code> outside a view body.</li>
+    <li>The stdlib method list is by name: your own <code>filter</code> or <code>append</code> is also <code>native_swift</code>.</li>
+    <li><code>#if</code> branches are all walked; macros such as <code>#Preview</code> and <code>@Observable</code> are not expanded.</li>
+  </ul>
+</section>
+
+<section id="related" aria-labelledby="h-related">
+  <h2 id="h-related">Related</h2>
+  <div class="grid">
+    <a class="card" href="/profile/"><h3>Project profile</h3><p>Recognises a SwiftUI MVVM project and its layers.</p></a>
+    <a class="card" href="/locate/"><h3>locate</h3><p>Ranked files to start a task with.</p></a>
+    <a class="card" href="/mcp/"><h3>MCP server</h3><p>The same queries in any MCP client.</p></a>
+    <a class="card" href="/rust/"><h3>Rust</h3><p>Structs, traits and <code>impl</code> blocks.</p></a>
+  </div>
+</section>
+</main>
+
+<footer>
+  <nav class="foot" aria-label="Pages"><a href="/">Home</a> · <a href="/mcp/">MCP</a> · <a href="/php/">PHP</a> · <a href="/rust/">Rust</a> · <a href="/typescript/">TypeScript / Vue</a> · <a href="/swift/">Swift</a> · <a href="/locate/">locate</a> · <a href="/profile/">Profile</a> · <a href="/changelog/">Changelog</a></nav>
+  <div>callgraph · made by <a href="https://www.linkedin.com/in/gergomakra/" rel="author me">Gergő Makra</a> · MIT license · <a href="https://github.com/GeRiY/callgraph">GitHub</a> · <a href="https://github.com/GeRiY/callgraph/releases/latest">Releases</a> · <a href="/hu/swift/" hreflang="hu" lang="hu">Magyar</a></div>
+</footer>
+</div>
+<script>
+// nyelv-menü: kívül kattintásra / Escape-re bezárul (JS nélkül is működik)
+document.addEventListener('click', function (e) {
+  document.querySelectorAll('details.menu[open]').forEach(function (d) { if (!d.contains(e.target)) d.open = false; });
+});
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape') return;
+  document.querySelectorAll('details.menu[open]').forEach(function (d) { d.open = false; d.querySelector('summary').focus(); });
+});
+</script>
+<script>
+// másoló gomb a parancs- és konfig-blokkokon (JS nélkül a blokk ugyanúgy olvasható)
+if (navigator.clipboard) document.querySelectorAll('pre.code:not(.out)').forEach(function (pre) {
+  var wrap = document.createElement('div'); wrap.className = 'copywrap';
+  pre.parentNode.insertBefore(wrap, pre); wrap.appendChild(pre);
+  var b = document.createElement('button'); b.type = 'button'; b.className = 'copy';
+  b.textContent = "Copy"; b.setAttribute('aria-label', "Copy code to clipboard"); wrap.appendChild(b);
+  b.addEventListener('click', function () {
+    navigator.clipboard.writeText(pre.innerText.replace(/\n$/, '')).then(function () {
+      b.textContent = "Copied"; setTimeout(function () { b.textContent = "Copy"; }, 1600);
+    });
+  });
+});
+</script>
+</body>
+</html>

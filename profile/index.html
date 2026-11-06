@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Project profile: architecture &amp; layers — callgraph</title>
+<meta name="description" content="callgraph profile describes an unfamiliar project in about 15 lines: architecture, layers and folders, patterns, call direction. Plus --layer filters.">
+<link rel="canonical" href="https://callgraph.eu/profile/">
+<link rel="alternate" hreflang="en" href="https://callgraph.eu/profile/">
+<link rel="alternate" hreflang="hu" href="https://callgraph.eu/hu/profile/">
+<link rel="alternate" hreflang="x-default" href="https://callgraph.eu/profile/">
+<meta name="author" content="Gergő Makra">
+<meta name="robots" content="index,follow">
+<meta name="theme-color" content="#0c152a">
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/style.css">
+<script>document.documentElement.className += ' js';</script>
+<link rel="alternate" type="text/markdown" href="/profile/index.md" title="Markdown version of this page">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="callgraph">
+<meta property="og:title" content="Project profile: architecture &amp; layers — callgraph">
+<meta property="og:description" content="callgraph profile describes an unfamiliar project in about 15 lines: architecture, layers and folders, patterns, call direction. Plus --layer filters.">
+<meta property="og:url" content="https://callgraph.eu/profile/">
+<meta property="og:image" content="https://callgraph.eu/assets/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="callgraph terminal output: class outline with line ranges and categorized calls">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="hu_HU">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Project profile: architecture &amp; layers — callgraph">
+<meta name="twitter:description" content="callgraph profile describes an unfamiliar project in about 15 lines: architecture, layers and folders, patterns, call direction. Plus --layer filters.">
+<meta name="twitter:image" content="https://callgraph.eu/assets/og-image.png">
+<script type="application/ld+json">
+{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://callgraph.eu/"}, {"@type": "ListItem", "position": 2, "name": "Project profile", "item": "https://callgraph.eu/profile/"}]}
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="wrap">
+<header class="top">
+  <a class="brand" href="/"><img src="/assets/favicon.svg" alt="" width="32" height="32">callgraph</a>
+  <nav class="links" aria-label="Main">
+    <details class="menu"><summary class="current">Usage</summary><div class="menu-list"><a href="/#usage">All commands</a><a href="/locate/">locate</a><a href="/profile/" aria-current="page">Profile</a></div></details>
+    <details class="menu"><summary>Languages</summary><div class="menu-list"><a href="/php/">PHP</a><a href="/rust/">Rust</a><a href="/typescript/">TS / Vue</a><a href="/swift/">Swift</a><a href="/#languages">All languages</a></div></details>
+    <a href="/mcp/">MCP</a>
+    <a href="/changelog/">Changelog</a>
+    <a href="https://github.com/GeRiY/callgraph">GitHub</a>
+    <a class="lang" href="/hu/profile/" hreflang="hu" lang="hu">Magyar</a>
+  </nav>
+</header>
+<main id="main">
+<nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="/">Home</a></li><li aria-current="page">Project profile</li></ol></nav>
+<section class="hero page" aria-labelledby="title">
+  <div>
+    <h1 id="title">Project profile: architecture and layers in about 15 lines</h1>
+    <p class="lead">In an unfamiliar project, run <code>profile</code> once instead of listing folders. It tells you how
+      the project is built — architecture, which folder holds which layer, design patterns and the call direction between
+      layers — from folder and file names, confirmed by the code graph. It never guesses.</p>
+    <div class="cta">
+      <a class="btn primary" href="/#install">Install</a>
+      <a class="btn" href="/mcp/">The <code>project_profile</code> MCP tool</a>
+    </div>
+  </div>
+</section>
+
+<section id="run" aria-labelledby="h-run">
+  <h2 id="h-run">Run it</h2>
+<pre class="code"><code>bash ~/.claude/skills/callgraph/callgraph.sh profile --project myapp          # about 15 lines
+bash ~/.claude/skills/callgraph/callgraph.sh profile --project myapp --full   # per folder, confidence counts, call pairs between layers</code></pre>
+</section>
+
+<section id="shape" aria-labelledby="h-shape">
+  <h2 id="h-shape">What the profile contains</h2>
+  <ul>
+    <li><b>Architecture</b> — Laravel / Yii layered MVC, DDD / hexagonal, Vue / React frontend, SwiftUI MVVM or Rust web,
+      using the framework found in <code>composer.json</code>, <code>package.json</code> or <code>Cargo.toml</code>.</li>
+    <li><b>Layers</b> — which folder holds the controllers, services, repositories, models, components, stores…, with
+      file counts.</li>
+    <li><b>Design patterns</b> — Repository, Factory, Strategy, Observer…</li>
+    <li><b>Call direction</b> — whether the layers call each other in the expected direction.</li>
+    <li><b>Unknown folders</b> — folders without a clear role.</li>
+  </ul>
+  <p>The code graph confirms what the names suggest: <code>extends Controller</code>,
+    <code>implements *RepositoryInterface</code>, <code>defineStore</code>, and the direction of the calls between
+    layers. Every file gets a role with a confidence (high / medium / low), or stays "unknown".</p>
+</section>
+
+<section id="layers" aria-labelledby="h-layers">
+  <h2 id="h-layers">Use the layers in queries</h2>
+  <p>A layer is a name from the profile (<code>controller</code>, <code>service</code>, <code>repository</code>,
+    <code>model</code>, <code>component</code>, <code>store</code>…), not a path — so you can narrow a query without
+    knowing the folder names. All of this is opt-in; the default output does not change.</p>
+<pre class="code"><code>bash ~/.claude/skills/callgraph/callgraph.sh --project myapp app --layer service                       # only the service files (several: service,repository)
+bash ~/.claude/skills/callgraph/callgraph.sh --project myapp app --format summary --layers             # summary grouped by layer
+bash ~/.claude/skills/callgraph/callgraph.sh --project myapp app --grep 'Repo::find' --depth 2 --by-layer # callers by layer, closest first</code></pre>
+  <ul>
+    <li><code>--layer</code> is the only one that filters; <code>--layers</code> and <code>--by-layer</code> only group
+      and order.</li>
+    <li><code>--by-layer</code> orders "who calls it?" results by layer, closest to the called code first.</li>
+    <li>Over MCP: the <code>layer</code> parameter on <code>outline</code>, <code>search</code> and
+      <code>find_callers</code>, and <code>by_layer</code> on <code>find_callers</code>.</li>
+  </ul>
+</section>
+
+<section id="custom" aria-labelledby="h-custom">
+  <h2 id="h-custom">Your own folder names: <code>.callgraph-layers</code></h2>
+  <p>Folder names that say nothing, or are not English? A commit-able <code>.callgraph-layers</code> file in the project
+    root maps them, for example:</p>
+<pre class="code"><code>service = app/Szolgaltatasok, app/Logic
+ignore-role = app/Legacy</code></pre>
+</section>
+
+<section id="mcp" aria-labelledby="h-mcp">
+  <h2 id="h-mcp">For AI clients</h2>
+  <p>The <code>project_profile</code> MCP tool returns the same profile (<code>full: true</code> for the details). When
+    the MCP server starts in a project folder (one with <code>composer.json</code>, <code>package.json</code>,
+    <code>Cargo.toml</code>, <code>Package.swift</code>, <code>.git</code> or <code>.callgraph</code>), a compact profile
+    is sent to the client on connect. <a href="/mcp/">Set up the MCP server</a>.</p>
+</section>
+
+<section id="related" aria-labelledby="h-related">
+  <h2 id="h-related">Related</h2>
+  <div class="grid">
+    <a class="card" href="/locate/"><h3>locate</h3><p>Then find the files for the task itself.</p></a>
+    <a class="card" href="/php/"><h3>PHP, Laravel and Yii</h3><p>Layered MVC projects.</p></a>
+    <a class="card" href="/swift/"><h3>Swift / SwiftUI</h3><p>SwiftUI MVVM projects.</p></a>
+    <a class="card" href="/changelog/#v0.5.0"><h3>New in v0.5.0</h3><p>The project profile arrived in 0.5.0.</p></a>
+  </div>
+</section>
+</main>
+
+<footer>
+  <nav class="foot" aria-label="Pages"><a href="/">Home</a> · <a href="/mcp/">MCP</a> · <a href="/php/">PHP</a> · <a href="/rust/">Rust</a> · <a href="/typescript/">TypeScript / Vue</a> · <a href="/swift/">Swift</a> · <a href="/locate/">locate</a> · <a href="/profile/">Profile</a> · <a href="/changelog/">Changelog</a></nav>
+  <div>callgraph · made by <a href="https://www.linkedin.com/in/gergomakra/" rel="author me">Gergő Makra</a> · MIT license · <a href="https://github.com/GeRiY/callgraph">GitHub</a> · <a href="https://github.com/GeRiY/callgraph/releases/latest">Releases</a> · <a href="/hu/profile/" hreflang="hu" lang="hu">Magyar</a></div>
+</footer>
+</div>
+<script>
+// nyelv-menü: kívül kattintásra / Escape-re bezárul (JS nélkül is működik)
+document.addEventListener('click', function (e) {
+  document.querySelectorAll('details.menu[open]').forEach(function (d) { if (!d.contains(e.target)) d.open = false; });
+});
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape') return;
+  document.querySelectorAll('details.menu[open]').forEach(function (d) { d.open = false; d.querySelector('summary').focus(); });
+});
+</script>
+<script>
+// másoló gomb a parancs- és konfig-blokkokon (JS nélkül a blokk ugyanúgy olvasható)
+if (navigator.clipboard) document.querySelectorAll('pre.code:not(.out)').forEach(function (pre) {
+  var wrap = document.createElement('div'); wrap.className = 'copywrap';
+  pre.parentNode.insertBefore(wrap, pre); wrap.appendChild(pre);
+  var b = document.createElement('button'); b.type = 'button'; b.className = 'copy';
+  b.textContent = "Copy"; b.setAttribute('aria-label', "Copy code to clipboard"); wrap.appendChild(b);
+  b.addEventListener('click', function () {
+    navigator.clipboard.writeText(pre.innerText.replace(/\n$/, '')).then(function () {
+      b.textContent = "Copied"; setTimeout(function () { b.textContent = "Copy"; }, 1600);
+    });
+  });
+});
+</script>
+</body>
+</html>

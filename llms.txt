@@ -1,0 +1,34 @@
+# callgraph
+
+> A token-efficient code map for AI coding agents: structure, categorized call graph, method bodies, "who calls this?" and impact analysis from the AST, without reading whole files. PHP, JavaScript / TypeScript, Vue, Rust, Swift / SwiftUI, CSS / SCSS, JSON, Markdown. One static binary (MIT), used as a CLI, a Claude Code skill or a local MCP server (`callgraph mcp`). Latest release: v0.5.0.
+
+Install (macOS / Linux):
+
+```bash
+p="$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)" && t="$(mktemp -d)" && curl -fsSL -o "$t/cg.zip" "https://github.com/GeRiY/callgraph/releases/latest/download/callgraph-$p.zip" && mkdir -p ~/.claude/skills && unzip -qo "$t/cg.zip" -d ~/.claude/skills && bash ~/.claude/skills/callgraph/install.sh && rm -rf "$t"
+```
+
+MCP server in Claude Code (macOS / Linux):
+
+```bash
+claude mcp add -s user callgraph -- ~/.claude/skills/callgraph/bin/$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)/callgraph mcp --auto-update
+```
+
+## Pages
+
+- [Home](https://callgraph.eu/index.md): Show AI agents a file's structure, call graph and callers without reading it. PHP, JS/TS, Vue, Rust, Swift. Free, MIT, one binary: CLI or MCP server.
+- [MCP server](https://callgraph.eu/mcp/index.md): Run callgraph as a local MCP server: setup for Claude Code, Claude Desktop, Cursor and VS Code, --auto-update, the ten tools and troubleshooting.
+- [PHP](https://callgraph.eu/php/index.md): Outline PHP classes, methods and categorized calls, find every caller and run Laravel / Yii views (routes, validation, events) without reading files.
+- [Rust](https://callgraph.eu/rust/index.md): Map Rust crates for AI agents: structs, traits, impl blocks, use trees and macro calls, framework detection from Cargo.toml and who calls what.
+- [TypeScript / Vue](https://callgraph.eu/typescript/index.md): Outline JS, TS and Vue single-file components: imports with alias resolution, props, emits, setup, template components and typed-receiver calls.
+- [Swift / SwiftUI](https://callgraph.eu/swift/index.md): Map Swift and SwiftUI code: View types as components, body and computed properties, property wrappers, SwiftUI views and modifiers as call categories.
+- [locate](https://callgraph.eu/locate/index.md): callgraph locate takes the names and terms of a task in one call and ranks the few files worth opening first, each with the reason. When to use grep.
+- [Project profile](https://callgraph.eu/profile/index.md): callgraph profile describes an unfamiliar project in about 15 lines: architecture, layers and folders, patterns, call direction. Plus --layer filters.
+- [Changelog](https://callgraph.eu/changelog/index.md): Every callgraph release with its date: what was added, changed and fixed, in plain language. Also as an Atom feed; downloads on GitHub releases.
+
+## Optional
+
+- [GitHub repository](https://github.com/GeRiY/callgraph)
+- [Releases](https://github.com/GeRiY/callgraph/releases)
+- [Atom feed](https://callgraph.eu/changelog/feed.xml)
+- [Hungarian version](https://callgraph.eu/hu/llms.txt)

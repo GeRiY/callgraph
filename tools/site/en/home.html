@@ -1,0 +1,263 @@
+<section class="hero" aria-labelledby="title">
+  <div>
+    <a class="badge" href="/changelog/">v{{version}} — what's new →</a>
+    <h1 id="title">Understand code without reading it.</h1>
+    <p class="lead"><b>callgraph</b> is a token-efficient code map for AI coding agents. It shows the structure,
+      a categorized call graph, single method bodies, <i>“who calls this?”</i> and impact analysis —
+      in a few dozen lines instead of whole files.</p>
+    <div class="cta">
+      <a class="btn primary" href="#install">Install in one line</a>
+      <a class="btn" href="https://github.com/GeRiY/callgraph/releases/latest">Download v{{version}}</a>
+      <a class="btn" href="https://github.com/GeRiY/callgraph">View on GitHub</a>
+    </div>
+  </div>
+  <div class="term" role="img" aria-label="Example: outline of a PHP model and its callers">
+    <div class="dots" aria-hidden="true"><i style="background:#ff6467"></i><i style="background:#ffb900"></i><i style="background:#00c950"></i></div>
+<pre><span class="c">$ callgraph.sh --project shop app/Models/Order.php</span>
+class Order extends Model  <span class="d">L7-23</span>
+  constants (1):
+    STATUS_OPEN = 'open'
+  saveTranslations()  <span class="d">L13-20</span>
+    <span class="k">external_call  </span>   create, info
+    <span class="k">global_helper  </span>   logger
+    <span class="k">internal_helper</span>   translations
+  translations()  <span class="d">L22-22</span>
+    <span class="k">orm_relation   </span>   hasMany
+
+<span class="c">$ callgraph.sh app --grep saveTranslations --depth 2</span>
+== level 1 — directly calls: /saveTranslations/
+  app/Models/Order.php  Caller::run()  <span class="d">L25-25</span>
+== level 2 — calls the previous level
+  (no more callers)</pre>
+  </div>
+</section>
+
+<nav class="toc" aria-label="On this page"><ul><li><a href="#features">Features</a></li><li><a href="#why">When to use it</a></li><li><a href="#languages">Languages</a></li><li><a href="#install">Install</a></li><li><a href="#usage">Usage</a></li><li><a href="#mcp">MCP</a></li><li><a href="#next">Guides</a></li><li><a href="#feedback">Feedback</a></li><li><a href="#faq">FAQ</a></li></ul></nav>
+
+<section id="features" aria-labelledby="h-features">
+  <h2 id="h-features">Why agents (and people) like it</h2>
+  <p class="sub">Every answer comes from the syntax tree, so it is exact, compact and cheap to read.</p>
+  <div class="grid">
+    <div class="card"><h3><a href="/locate/">Where to start with a task</a></h3><p><code>locate</code> takes the names and terms from a task
+      in one call and lists the few files worth opening first, best first, each with the reason.</p></div>
+    <div class="card"><h3><a href="/profile/">Project profile</a></h3><p><code>profile</code> tells an agent how an unfamiliar project is built:
+      architecture, which folder holds which layer, design patterns, and the call direction between layers.</p></div>
+    <div class="card"><h3>Fewer tokens, faster answers</h3><p>An outline is a few dozen lines. Your agent reads the map first, then only the exact lines it needs.</p></div>
+    <div class="card"><h3>Categorized call graph</h3><p>Every call is labelled — ORM relation, model use, framework, native, internal helper, SwiftUI view or modifier — so intent is visible at a glance.</p></div>
+    <div class="card"><h3>“Who calls this?”</h3><p><code>--grep</code> finds every caller across the project; <code>--depth N</code> follows callers of callers for impact analysis.</p></div>
+    <div class="card"><h3>Surgical reads</h3><p><code>file::method --body</code> prints just that method, line-numbered. <code>--lines 30-60</code> prints any range.</p></div>
+    <div class="card"><h3>Framework views</h3><p>Laravel / Yii aware: routes, middleware, validation, jobs, events, providers, DI, views — one command each.</p></div>
+    <div class="card"><h3>One static binary, self-updating</h3><p>No PHP, Node or Rust needed. macOS, Linux and Windows. Fast, cached and incremental; <code>callgraph.sh update</code> fetches the newest release and keeps your settings.</p></div>
+    <div class="card"><h3>English or Hungarian</h3><p>All output and help in English by default — switch with <code>callgraph.sh set-lang hu</code>.</p></div>
+  </div>
+</section>
+
+<section id="why" aria-labelledby="h-why">
+  <h2 id="h-why">When to use it — and when not</h2>
+  <p class="sub">callgraph and plain text search do different jobs. Use each for what it is best at.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th scope="col">The question</th><th scope="col">Best tool</th></tr></thead>
+    <tbody>
+      <tr><td>An exact string, log message or config value</td><td>grep — plain text search is the best at that</td></tr>
+      <tr><td>Where do I start with this task?</td><td><a href="/locate/"><code>locate</code></a> — ranked files from the names and terms of the task</td></tr>
+      <tr><td>How is this unfamiliar project built?</td><td><a href="/profile/"><code>profile</code></a> — architecture, layers, patterns</td></tr>
+      <tr><td>Definitions, structure, callers, impact of a change</td><td>callgraph — outline, <code>--body</code>, <code>--grep</code>, <code>--depth</code></td></tr>
+    </tbody>
+  </table></div>
+  <h3 style="margin-top:22px">When <em>not</em> to use it</h3>
+  <ul>
+    <li>You need the exact text of a known line range: use <code>--lines</code> or a targeted read.</li>
+    <li>Non-code files (plain text, data dumps): the outline adds little.</li>
+    <li>Macro- or reflection-heavy code: dynamic calls that can't be resolved statically are shown as name-only matches (<code>?</code>) with <code>--guess</code>, or not at all.</li>
+  </ul>
+</section>
+
+<section id="languages" aria-labelledby="h-lang">
+  <h2 id="h-lang">Supported languages</h2>
+  <p class="sub">One shared output format for every language.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th scope="col">Language</th><th scope="col">Files</th><th scope="col">What you get</th></tr></thead>
+    <tbody>
+      <tr><td><a href="/php/">PHP</a></td><td><code>.php</code></td><td>classes, traits, enums, methods, properties, constants, calls with type tracking, Laravel / Yii detection</td></tr>
+      <tr><td><a href="/typescript/">JavaScript / TypeScript</a></td><td><code>.js .mjs .cjs .jsx .ts .tsx</code></td><td>modules, functions, classes, imports with alias resolution</td></tr>
+      <tr><td><a href="/typescript/">Vue</a></td><td><code>.vue</code></td><td>props, emits, setup, template components and handlers, computed, watch, hooks</td></tr>
+      <tr><td><a href="/rust/">Rust</a></td><td><code>.rs</code></td><td>modules, structs, enums, traits, impl blocks, functions, use trees, macro calls, framework detection (axum, actix-web, tokio…)</td></tr>
+      <tr><td><a href="/swift/">Swift / SwiftUI</a></td><td><code>.swift</code></td><td>classes, structs, protocols, actors, extensions, View components, property wrappers, SwiftUI views and modifiers</td></tr>
+      <tr><td>CSS / SCSS</td><td><code>.css .scss</code></td><td>rule blocks, mixins, functions, variables, imports</td></tr>
+      <tr><td>JSON / Markdown</td><td><code>.json .md</code></td><td>key paths; heading sections and links</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="install" aria-labelledby="h-install">
+  <h2 id="h-install">Install</h2>
+  <p class="sub">The package contains the Claude Code skill and the binary for your platform. Only <code>bash</code> is required.</p>
+  <div class="tabs" role="tablist" data-os aria-label="Platform">
+    <button role="tab" id="t-unix" aria-controls="p-unix" aria-selected="true">macOS / Linux</button>
+    <button role="tab" id="t-win" aria-controls="p-win" aria-selected="false" tabindex="-1">Windows</button>
+  </div>
+  <div class="panel" id="p-unix" role="tabpanel" aria-labelledby="t-unix">
+    <h3 class="tab-title">macOS / Linux</h3>
+<pre class="code"><code>p="$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)" && t="$(mktemp -d)" \
+  && curl -fsSL -o "$t/cg.zip" "https://github.com/GeRiY/callgraph/releases/latest/download/callgraph-$p.zip" \
+  && mkdir -p ~/.claude/skills && unzip -qo "$t/cg.zip" -d ~/.claude/skills \
+  && bash ~/.claude/skills/callgraph/install.sh && rm -rf "$t"</code></pre>
+  </div>
+  <div class="panel" id="p-win" role="tabpanel" aria-labelledby="t-win">
+    <h3 class="tab-title">Windows</h3>
+    <p>Download <a href="https://github.com/GeRiY/callgraph/releases/latest/download/callgraph-windows-x86_64.zip">callgraph-windows-x86_64.zip</a>,
+      unzip it, copy the <code>callgraph</code> folder to <code>%USERPROFILE%\.claude\skills\</code>, then run in Git Bash:</p>
+<pre class="code"><code>bash ~/.claude/skills/callgraph/install.sh</code></pre>
+  </div>
+  <p>Then register your project once and restart Claude Code:</p>
+<pre class="code"><code>bash ~/.claude/skills/callgraph/projects.sh add shop /absolute/path/to/shop</code></pre>
+  <p class="sub" style="margin-top:14px">All downloads (macOS Apple Silicon &amp; Intel, Linux x86_64 &amp; ARM64, Windows):
+    <a href="https://github.com/GeRiY/callgraph/releases/latest">latest release</a>.</p>
+</section>
+
+<section id="usage" aria-labelledby="h-usage">
+  <h2 id="h-usage">Usage</h2>
+  <p class="sub">Your agent uses the skill automatically. The same commands work from any terminal.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th scope="col">Task</th><th scope="col">Command</th></tr></thead>
+    <tbody>
+      <tr><td>Where do I start with this task? (<a href="/locate/">locate</a>)</td><td><code>callgraph.sh locate &lt;term&gt;... [--all]</code></td></tr>
+      <tr><td>How is this project built? (<a href="/profile/">profile</a>)</td><td><code>callgraph.sh profile [--full]</code></td></tr>
+      <tr><td>Outline of a file or folder</td><td><code>callgraph.sh &lt;file|dir&gt;</code></td></tr>
+      <tr><td>One method only</td><td><code>callgraph.sh &lt;file&gt;::&lt;method&gt;</code></td></tr>
+      <tr><td>Method source, line-numbered</td><td><code>callgraph.sh &lt;file&gt;::&lt;method&gt; --body</code></td></tr>
+      <tr><td>Where is it called?</td><td><code>callgraph.sh &lt;dir&gt; --grep &lt;pattern&gt;</code></td></tr>
+      <tr><td>Impact analysis</td><td><code>callgraph.sh &lt;dir&gt; --grep &lt;pattern&gt; --depth 3</code></td></tr>
+      <tr><td>String / constant usages</td><td><code>--strings &lt;pattern&gt;</code> · <code>--const &lt;pattern&gt;</code></td></tr>
+      <tr><td>Branches with line ranges</td><td><code>--format flow</code></td></tr>
+      <tr><td>Public API only</td><td><code>--format api</code></td></tr>
+      <tr><td>Where to look first</td><td><code>--format hotspots</code></td></tr>
+      <tr><td>Diagrams</td><td><code>--format mermaid</code> · <code>--format dot</code></td></tr>
+      <tr><td>Laravel views</td><td><code>--format routes</code> · <code>validation</code> · <code>events</code> · <code>jobs</code></td></tr>
+    </tbody>
+  </table></div>
+  <h3 style="margin-top:22px">Update and language</h3>
+<pre class="code"><code>callgraph.sh update --check     # is there a newer release?
+callgraph.sh update             # download and install it (settings are kept)
+callgraph.sh set-lang hu        # Hungarian output (back: set-lang en)</code></pre>
+</section>
+
+<section id="mcp" aria-labelledby="h-mcp">
+  <h2 id="h-mcp">Use it from any MCP client</h2>
+  <p class="sub">callgraph is also an MCP server: <code>callgraph mcp</code>. Claude Desktop, Cursor, VS Code, Claude Code
+    or any other MCP client calls the same queries as typed tools, with the same compact output.</p>
+  <div class="grid">
+    <div class="card"><h3>🔌 Runs locally</h3><p>Your client starts it on your machine and talks to it over stdin/stdout.
+      No server, and queries never touch the network: your code never leaves the computer. The only network call
+      is a once-a-day update check against GitHub Releases.</p></div>
+    <div class="card"><h3>🔒 Read-only</h3><p>It never writes your source files, and only reads inside the project folder;
+      paths that point outside are refused.</p></div>
+    <div class="card"><h3>🧰 Ten tools</h3><p><code>locate</code>, <code>project_profile</code>, <code>outline</code>,
+      <code>method_body</code>, <code>find_callers</code>, <code>search</code>, <code>framework_view</code>,
+      <code>projects</code>, <code>notes</code>, plus <code>guide</code> — the same queries as the commands above, and a
+      short how-to for the agent.</p></div>
+  </div>
+  <p>Pick your system — the commands use the binary from the installed skill package. With <code>--auto-update</code>
+    (recommended) the server checks once a day at start-up, installs a new release (checksum-verified) and restarts
+    itself; without it, it only tells the agent that an update is available. Turn the check off with
+    <code>CALLGRAPH_UPDATE_CHECK=0</code>.</p>
+  <div class="tabs" role="tablist" data-os aria-label="Platform for MCP setup">
+    <button role="tab" id="t-mcp-unix" aria-controls="p-mcp-unix" aria-selected="true">macOS / Linux</button>
+    <button role="tab" id="t-mcp-win" aria-controls="p-mcp-win" aria-selected="false" tabindex="-1">Windows</button>
+  </div>
+  <div class="panel" id="p-mcp-unix" role="tabpanel" aria-labelledby="t-mcp-unix">
+    <h3 class="tab-title">macOS / Linux</h3>
+    <p>Claude Code (all projects):</p>
+<pre class="code"><code>claude mcp add -s user callgraph -- \
+  ~/.claude/skills/callgraph/bin/$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)/callgraph mcp --auto-update</code></pre>
+    <p>For the JSON configs below you need the binary's absolute path — this prints it:</p>
+<pre class="code"><code>echo ~/.claude/skills/callgraph/bin/$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)/callgraph</code></pre>
+    <p>Claude Desktop (<code>claude_desktop_config.json</code>) · Cursor (<code>.cursor/mcp.json</code>):</p>
+<pre class="code"><code>{
+  "mcpServers": {
+    "callgraph": {
+      "command": "/Users/you/.claude/skills/callgraph/bin/darwin-arm64/callgraph",
+      "args": ["mcp", "--auto-update"]
+    }
+  }
+}</code></pre>
+    <p>VS Code (<code>.vscode/mcp.json</code>):</p>
+<pre class="code"><code>{
+  "servers": {
+    "callgraph": {
+      "type": "stdio",
+      "command": "/Users/you/.claude/skills/callgraph/bin/darwin-arm64/callgraph",
+      "args": ["mcp", "--auto-update"],
+      "cwd": "${workspaceFolder}"
+    }
+  }
+}</code></pre>
+    <p class="sub">Replace the example path with the one printed above (folders: <code>darwin-arm64</code>, <code>darwin-x86_64</code>, <code>linux-x86_64</code>, <code>linux-aarch64</code>).</p>
+  </div>
+  <div class="panel" id="p-mcp-win" role="tabpanel" aria-labelledby="t-mcp-win">
+    <h3 class="tab-title">Windows</h3>
+    <p>Claude Code (PowerShell, all projects):</p>
+<pre class="code"><code>claude mcp add -s user callgraph -- "$env:USERPROFILE\.claude\skills\callgraph\bin\windows-x86_64\callgraph.exe" mcp --auto-update</code></pre>
+    <p>Claude Desktop (<code>claude_desktop_config.json</code>) · Cursor (<code>.cursor/mcp.json</code>):</p>
+<pre class="code"><code>{
+  "mcpServers": {
+    "callgraph": {
+      "command": "C:\\Users\\you\\.claude\\skills\\callgraph\\bin\\windows-x86_64\\callgraph.exe",
+      "args": ["mcp", "--auto-update"]
+    }
+  }
+}</code></pre>
+    <p>VS Code (<code>.vscode/mcp.json</code>):</p>
+<pre class="code"><code>{
+  "servers": {
+    "callgraph": {
+      "type": "stdio",
+      "command": "C:\\Users\\you\\.claude\\skills\\callgraph\\bin\\windows-x86_64\\callgraph.exe",
+      "args": ["mcp", "--auto-update"],
+      "cwd": "${workspaceFolder}"
+    }
+  }
+}</code></pre>
+    <p class="sub">Replace <code>you</code> with your Windows user name (in JSON every <code>\</code> is doubled).</p>
+  </div>
+  <p>Step-by-step setup per client, the ten tools and troubleshooting: <a href="/mcp/">MCP server setup</a>.</p>
+  <p class="sub" style="margin-top:14px">The skill and the MCP server work side by side. Clients that don't start in the project folder (e.g. Claude
+    Desktop) use a registered project alias: <code>projects.sh add shop /path/to/shop</code>.</p>
+</section>
+
+<section id="next" aria-labelledby="h-next">
+  <h2 id="h-next">Where to next</h2>
+  <p class="sub">Guides for each language and feature.</p>
+  <div class="grid">
+    <a class="card" href="/mcp/"><h3>MCP server setup</h3><p>Claude Code, Claude Desktop, Cursor and VS Code configs, <code>--auto-update</code>, the ten tools.</p></a>
+    <a class="card" href="/php/"><h3>PHP, Laravel and Yii</h3><p>Classes, categorized calls, callers through interfaces and traits, framework views.</p></a>
+    <a class="card" href="/rust/"><h3>Rust</h3><p>Structs, traits, <code>impl</code> blocks, macro calls, frameworks from <code>Cargo.toml</code>.</p></a>
+    <a class="card" href="/typescript/"><h3>JavaScript, TypeScript and Vue</h3><p>Imports with alias resolution, Vue SFCs, typed receivers, route and i18n keys.</p></a>
+    <a class="card" href="/swift/"><h3>Swift and SwiftUI</h3><p>View types as components, property wrappers, SwiftUI views and modifiers.</p></a>
+    <a class="card" href="/locate/"><h3>locate</h3><p>The few files worth opening first for a task, each with the reason.</p></a>
+    <a class="card" href="/profile/"><h3>Project profile</h3><p>Architecture, layers and the call direction between them, in about 15 lines.</p></a>
+    <a class="card" href="/changelog/"><h3>Changelog</h3><p>What every release added, changed and fixed.</p></a>
+  </div>
+</section>
+
+<section id="feedback" aria-labelledby="h-feedback">
+  <h2 id="h-feedback">Bugs and feedback</h2>
+  <p class="sub">Found something wrong or have an idea? We read every report. Please check <a href="https://github.com/GeRiY/callgraph/issues">existing issues</a> first.</p>
+  <div class="grid">
+    <div class="card"><h3>🐞 Report a bug</h3><p>Open a <a href="https://github.com/GeRiY/callgraph/issues/new?template=bug_report.yml">bug report</a>. The form guides you through what we need.</p></div>
+    <div class="card"><h3>💡 Ideas and feedback</h3><p>A missing language or framework, a better output, anything: <a href="https://github.com/GeRiY/callgraph/issues/new?template=feature_request.yml">share an idea</a>.</p></div>
+    <div class="card"><h3>🔒 Security issue</h3><p>Please <b>don't</b> open a public issue — <a href="https://github.com/GeRiY/callgraph/security/advisories/new">report it privately</a>. We answer within a few days.</p></div>
+  </div>
+  <h3 style="margin-top:22px">What to include in a bug report</h3>
+  <ul>
+    <li>the version: <code>callgraph --version</code></li>
+    <li>the exact command you ran and its output</li>
+    <li>if the output has an <code>[error-id: …]</code> line: the output of <code>bash ~/.claude/skills/callgraph/feedback.sh show &lt;error-id&gt;</code> — the error message itself links to the bug form</li>
+    <li>a small, non-confidential code snippet that reproduces it, and your OS</li>
+  </ul>
+</section>
+
+<section id="faq" aria-labelledby="h-faq">
+  <h2 id="h-faq">FAQ</h2>
+{{faq}}
+</section>

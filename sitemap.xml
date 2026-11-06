@@ -4,16 +4,144 @@
     <loc>https://callgraph.eu/</loc>
     <xhtml:link rel="alternate" hreflang="en" href="https://callgraph.eu/"/>
     <xhtml:link rel="alternate" hreflang="hu" href="https://callgraph.eu/hu/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://callgraph.eu/"/>
     <lastmod>2026-11-06</lastmod>
-    <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
     <loc>https://callgraph.eu/hu/</loc>
     <xhtml:link rel="alternate" hreflang="en" href="https://callgraph.eu/"/>
     <xhtml:link rel="alternate" hreflang="hu" href="https://callgraph.eu/hu/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://callgraph.eu/"/>
     <lastmod>2026-11-06</lastmod>
-    <changefreq>weekly</changefreq>
     <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://callgraph.eu/mcp/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://callgraph.eu/mcp/"/>
+    <xhtml:link rel="alternate" hreflang="hu" href="https://callgraph.eu/hu/mcp/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://callgraph.eu/mcp/"/>
+    <lastmod>2026-11-06</lastmod>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://callgraph.eu/hu/mcp/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://callgraph.eu/mcp/"/>
+    <xhtml:link rel="alternate" hreflang="hu" href="https://callgraph.eu/hu/mcp/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://callgraph.eu/mcp/"/>
+    <lastmod>2026-11-06</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://callgraph.eu/php/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://callgraph.eu/php/"/>
+    <xhtml:link rel="alternate" hreflang="hu" href="https://callgraph.eu/hu/php/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://callgraph.eu/php/"/>
+    <lastmod>2026-11-06</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://callgraph.eu/hu/php/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://callgraph.eu/php/"/>
+    <xhtml:link rel="alternate" hreflang="hu" href="https://callgraph.eu/hu/php/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://callgraph.eu/php/"/>
+    <lastmod>2026-11-06</lastmod>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://callgraph.eu/rust/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://callgraph.eu/rust/"/>
+    <xhtml:link rel="alternate" hreflang="hu" href="https://callgraph.eu/hu/rust/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://callgraph.eu/rust/"/>
+    <lastmod>2026-11-06</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://callgraph.eu/hu/rust/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://callgraph.eu/rust/"/>
+    <xhtml:link rel="alternate" hreflang="hu" href="https://callgraph.eu/hu/rust/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://callgraph.eu/rust/"/>
+    <lastmod>2026-11-06</lastmod>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://callgraph.eu/typescript/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://callgraph.eu/typescript/"/>
+    <xhtml:link rel="alternate" hreflang="hu" href="https://callgraph.eu/hu/typescript/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://callgraph.eu/typescript/"/>
+    <lastmod>2026-11-06</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://callgraph.eu/hu/typescript/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://callgraph.eu/typescript/"/>
+    <xhtml:link rel="alternate" hreflang="hu" href="https://callgraph.eu/hu/typescript/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://callgraph.eu/typescript/"/>
+    <lastmod>2026-11-06</lastmod>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://callgraph.eu/swift/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://callgraph.eu/swift/"/>
+    <xhtml:link rel="alternate" hreflang="hu" href="https://callgraph.eu/hu/swift/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://callgraph.eu/swift/"/>
+    <lastmod>2026-11-06</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://callgraph.eu/hu/swift/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://callgraph.eu/swift/"/>
+    <xhtml:link rel="alternate" hreflang="hu" href="https://callgraph.eu/hu/swift/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://callgraph.eu/swift/"/>
+    <lastmod>2026-11-06</lastmod>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://callgraph.eu/locate/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://callgraph.eu/locate/"/>
+    <xhtml:link rel="alternate" hreflang="hu" href="https://callgraph.eu/hu/locate/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://callgraph.eu/locate/"/>
+    <lastmod>2026-11-06</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://callgraph.eu/hu/locate/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://callgraph.eu/locate/"/>
+    <xhtml:link rel="alternate" hreflang="hu" href="https://callgraph.eu/hu/locate/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://callgraph.eu/locate/"/>
+    <lastmod>2026-11-06</lastmod>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://callgraph.eu/profile/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://callgraph.eu/profile/"/>
+    <xhtml:link rel="alternate" hreflang="hu" href="https://callgraph.eu/hu/profile/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://callgraph.eu/profile/"/>
+    <lastmod>2026-11-06</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://callgraph.eu/hu/profile/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://callgraph.eu/profile/"/>
+    <xhtml:link rel="alternate" hreflang="hu" href="https://callgraph.eu/hu/profile/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://callgraph.eu/profile/"/>
+    <lastmod>2026-11-06</lastmod>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://callgraph.eu/changelog/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://callgraph.eu/changelog/"/>
+    <xhtml:link rel="alternate" hreflang="hu" href="https://callgraph.eu/hu/changelog/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://callgraph.eu/changelog/"/>
+    <lastmod>2026-11-06</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://callgraph.eu/hu/changelog/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://callgraph.eu/changelog/"/>
+    <xhtml:link rel="alternate" hreflang="hu" href="https://callgraph.eu/hu/changelog/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://callgraph.eu/changelog/"/>
+    <lastmod>2026-11-06</lastmod>
+    <priority>0.5</priority>
   </url>
 </urlset>

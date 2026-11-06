@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Swift és SwiftUI call graph AI agenteknek — callgraph</title>
+<meta name="description" content="Swift és SwiftUI térkép: View-típusok komponensként, body és computed property-k, property wrapperek, SwiftUI view-k és modifierek kategóriaként.">
+<link rel="canonical" href="https://callgraph.eu/hu/swift/">
+<link rel="alternate" hreflang="en" href="https://callgraph.eu/swift/">
+<link rel="alternate" hreflang="hu" href="https://callgraph.eu/hu/swift/">
+<link rel="alternate" hreflang="x-default" href="https://callgraph.eu/swift/">
+<meta name="author" content="Makra Gergő">
+<meta name="robots" content="index,follow">
+<meta name="theme-color" content="#0c152a">
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/style.css">
+<script>document.documentElement.className += ' js';</script>
+<link rel="alternate" type="text/markdown" href="/hu/swift/index.md" title="Az oldal Markdown-változata">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="callgraph">
+<meta property="og:title" content="Swift és SwiftUI call graph AI agenteknek — callgraph">
+<meta property="og:description" content="Swift és SwiftUI térkép: View-típusok komponensként, body és computed property-k, property wrapperek, SwiftUI view-k és modifierek kategóriaként.">
+<meta property="og:url" content="https://callgraph.eu/hu/swift/">
+<meta property="og:image" content="https://callgraph.eu/assets/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="callgraph terminál-kimenet: osztály-outline sortartománnyal és kategorizált hívásokkal">
+<meta property="og:locale" content="hu_HU">
+<meta property="og:locale:alternate" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Swift és SwiftUI call graph AI agenteknek — callgraph">
+<meta name="twitter:description" content="Swift és SwiftUI térkép: View-típusok komponensként, body és computed property-k, property wrapperek, SwiftUI view-k és modifierek kategóriaként.">
+<meta name="twitter:image" content="https://callgraph.eu/assets/og-image.png">
+<script type="application/ld+json">
+{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Kezdőlap", "item": "https://callgraph.eu/hu/"}, {"@type": "ListItem", "position": 2, "name": "Swift / SwiftUI", "item": "https://callgraph.eu/hu/swift/"}]}
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Ugrás a tartalomra</a>
+<div class="wrap">
+<header class="top">
+  <a class="brand" href="/hu/"><img src="/assets/favicon.svg" alt="" width="32" height="32">callgraph</a>
+  <nav class="links" aria-label="Fő navigáció">
+    <details class="menu"><summary>Használat</summary><div class="menu-list"><a href="/hu/#usage">Minden parancs</a><a href="/hu/locate/">locate</a><a href="/hu/profile/">Profil</a></div></details>
+    <details class="menu"><summary class="current">Nyelvek</summary><div class="menu-list"><a href="/hu/php/">PHP</a><a href="/hu/rust/">Rust</a><a href="/hu/typescript/">TS / Vue</a><a href="/hu/swift/" aria-current="page">Swift</a><a href="/hu/#languages">Minden nyelv</a></div></details>
+    <a href="/hu/mcp/">MCP</a>
+    <a href="/hu/changelog/">Változásnapló</a>
+    <a href="https://github.com/GeRiY/callgraph">GitHub</a>
+    <a class="lang" href="/swift/" hreflang="en" lang="en">English</a>
+  </nav>
+</header>
+<main id="main">
+<nav class="crumbs" aria-label="Morzsamenü"><ol><li><a href="/hu/">Kezdőlap</a></li><li aria-current="page">Swift / SwiftUI</li></ol></nav>
+<section class="hero page" aria-labelledby="title">
+  <div>
+    <h1 id="title">Swift és SwiftUI call graph AI agenteknek</h1>
+    <p class="lead">A callgraph a <a href="https://github.com/alex-pinkus/tree-sitter-swift">tree-sitter-swift</a>-tel
+      elemzi a <code>.swift</code> fájlokat, és megmutatja az agentnek a típusokat, metódusokat és computed
+      property-ket sortartománnyal, a property wrappereket és minden hívást kategóriánként — a SwiftUI view-k és
+      modifierek saját kategóriát kapnak.</p>
+    <div class="cta">
+      <a class="btn primary" href="/hu/#install">Telepítés</a>
+      <a class="btn" href="/hu/mcp/">Használat MCP-n át</a>
+    </div>
+  </div>
+</section>
+
+<section id="extracts" aria-labelledby="h-extracts">
+  <h2 id="h-extracts">Mit nyer ki a callgraph a Swift-kódból</h2>
+  <ul>
+    <li>Containerek: <code>class</code>, <code>struct</code>, <code>enum</code>, <code>protocol</code>, <code>actor</code>
+      és <code>extension</code>; a beágyazott típusok <code>Külső.Belső</code> néven.</li>
+    <li>A <code>View</code>-nak megfelelő típus <code>component</code> — SwiftUI-nézet, mint egy Vue-komponens.</li>
+    <li>A fájl-szintű függvények és utasítások a <code>&lt;Fájl&gt;.swift</code> <code>module</code> containerbe kerülnek.</li>
+    <li>Metódusok: <code>func</code>, <code>init</code>, <code>deinit</code>, <code>subscript</code> és a computed
+      property-k, így a <code>var body: some View { … }</code> a <code>body</code> metódus, <code>some View</code> visszatérési típussal.</li>
+    <li>Property-k a property wrapperrel a típus előtt: <code>@State String</code>,
+      <code>@StateObject TodoViewModel</code>, <code>@Published [Todo]</code>.</li>
+    <li>Konstansok (<code>static let</code>, fájl-szintű <code>let</code>) és enum case-ek.</li>
+    <li>Az <code>if</code>, <code>switch</code> és <code>guard</code> ágai (<code>--format flow</code>), string-literálok
+      interpolációval, doc-kommentek.</li>
+  </ul>
+  <p>Az <code>import SwiftUI</code>-t tartalmazó fájl SwiftUI-fájlként van jelölve.</p>
+</section>
+
+<section id="swiftui" aria-labelledby="h-swiftui">
+  <h2 id="h-swiftui">SwiftUI-t ismerő hívás-kategóriák</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th scope="col">Kategória</th><th scope="col">Mikor</th></tr></thead>
+    <tbody>
+      <tr><td><code>swiftui_view</code></td><td>beépített SwiftUI-nézet: <code>Text</code>, <code>VStack</code>, <code>HStack</code>, <code>List</code>, <code>NavigationStack</code>, <code>Button</code>…</td></tr>
+      <tr><td><code>swiftui_modifier</code></td><td>ismert modifier: <code>padding</code>, <code>font</code>, <code>onAppear</code>, <code>navigationTitle</code>, <code>sheet</code>, <code>toolbar</code>…</td></tr>
+      <tr><td><code>component_use</code></td><td>saját <code>View</code>-típus egy nézet-törzsben, pl. <code>TodoRow(...)</code></td></tr>
+      <tr><td><code>swiftui_api</code></td><td><code>withAnimation</code>, <code>withTransaction</code></td></tr>
+      <tr><td><code>native_swift</code></td><td>stdlib, Foundation, Dispatch, Combine: <code>UUID()</code>, <code>JSONDecoder().decode</code>, <code>DispatchQueue.main.async</code>, <code>append</code>, <code>map</code>…</td></tr>
+      <tr><td><code>internal_helper</code></td><td>ugyanabban a fájlban definiált függvény, vagy <code>self.f()</code></td></tr>
+      <tr><td><code>instantiation</code></td><td>egyéb típus-konstruktor</td></tr>
+      <tr><td><code>external_call</code></td><td>minden más tag-hívás, pl. <code>viewModel.load()</code></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="commands" aria-labelledby="h-commands">
+  <h2 id="h-commands">Parancsok</h2>
+<pre class="code"><code>CG=~/.claude/skills/callgraph/callgraph.sh
+bash $CG --project myapp &lt;út/a/View&gt;.swift                   # outline: típusok, body, property-k wrapperrel, hívások
+bash $CG --project myapp &lt;út/a/View&gt;.swift::body --body      # csak a nézet törzse, sorszámozva
+bash $CG --project myapp &lt;út/a/View&gt;.swift --format flow     # if / switch / guard ágak sortartománnyal</code></pre>
+</section>
+
+<section id="callers" aria-labelledby="h-callers">
+  <h2 id="h-callers">Ki hívja ezt a Swift-metódust?</h2>
+<pre class="code"><code>bash $CG --project myapp &lt;mappa&gt; --grep '(^|::|\.|-&gt;)load$'      # a név minden hívása
+bash $CG --project myapp &lt;mappa&gt; --grep '(^|::|\.|-&gt;)load$' --depth 2</code></pre>
+  <p>Swiftben a callgraph nem old fel típusokat fájlok között, ezért név szerint keress: a név szerinti minta a
+    <code>load</code> minden hívását megtalálja, bármi a fogadó.</p>
+</section>
+
+<section id="limits" aria-labelledby="h-limits">
+  <h2 id="h-limits">Korlátok</h2>
+  <ul>
+    <li>Nincs típus-feloldás és fájlok közötti szimbólum-tábla: a kategória a fájlbeli nevekből és ismert listákból
+      dől el. Egy másik fájlban deklarált nézet nézet-törzsön kívül <code>instantiation</code>.</li>
+    <li>A stdlib-metódusok listája név szerinti: egy saját <code>filter</code> vagy <code>append</code> is <code>native_swift</code>.</li>
+    <li>Az <code>#if</code> minden ága bejárásra kerül; a makrók (<code>#Preview</code>, <code>@Observable</code>) nincsenek kibontva.</li>
+  </ul>
+</section>
+
+<section id="related" aria-labelledby="h-related">
+  <h2 id="h-related">Kapcsolódó oldalak</h2>
+  <div class="grid">
+    <a class="card" href="/hu/profile/"><h3>Projekt-profil</h3><p>Felismeri a SwiftUI MVVM projektet és a rétegeit.</p></a>
+    <a class="card" href="/hu/locate/"><h3>locate</h3><p>Rangsorolt fájlok a feladat kezdéséhez.</p></a>
+    <a class="card" href="/hu/mcp/"><h3>MCP-szerver</h3><p>Ugyanezek a lekérdezések bármely MCP-kliensben.</p></a>
+    <a class="card" href="/hu/rust/"><h3>Rust</h3><p>Structok, traitek és <code>impl</code>-blokkok.</p></a>
+  </div>
+</section>
+</main>
+
+<footer>
+  <nav class="foot" aria-label="Oldalak"><a href="/hu/">Kezdőlap</a> · <a href="/hu/mcp/">MCP</a> · <a href="/hu/php/">PHP</a> · <a href="/hu/rust/">Rust</a> · <a href="/hu/typescript/">TypeScript / Vue</a> · <a href="/hu/swift/">Swift</a> · <a href="/hu/locate/">locate</a> · <a href="/hu/profile/">Profil</a> · <a href="/hu/changelog/">Változásnapló</a></nav>
+  <div>callgraph · készítette: <a href="https://www.linkedin.com/in/gergomakra/" rel="author me">Makra Gergő</a> · MIT licenc · <a href="https://github.com/GeRiY/callgraph">GitHub</a> · <a href="https://github.com/GeRiY/callgraph/releases/latest">Kiadások</a> · <a href="/swift/" hreflang="en" lang="en">English</a></div>
+</footer>
+</div>
+<script>
+// nyelv-menü: kívül kattintásra / Escape-re bezárul (JS nélkül is működik)
+document.addEventListener('click', function (e) {
+  document.querySelectorAll('details.menu[open]').forEach(function (d) { if (!d.contains(e.target)) d.open = false; });
+});
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape') return;
+  document.querySelectorAll('details.menu[open]').forEach(function (d) { d.open = false; d.querySelector('summary').focus(); });
+});
+</script>
+<script>
+// másoló gomb a parancs- és konfig-blokkokon (JS nélkül a blokk ugyanúgy olvasható)
+if (navigator.clipboard) document.querySelectorAll('pre.code:not(.out)').forEach(function (pre) {
+  var wrap = document.createElement('div'); wrap.className = 'copywrap';
+  pre.parentNode.insertBefore(wrap, pre); wrap.appendChild(pre);
+  var b = document.createElement('button'); b.type = 'button'; b.className = 'copy';
+  b.textContent = "M\u00e1sol\u00e1s"; b.setAttribute('aria-label', "K\u00f3d m\u00e1sol\u00e1sa a v\u00e1g\u00f3lapra"); wrap.appendChild(b);
+  b.addEventListener('click', function () {
+    navigator.clipboard.writeText(pre.innerText.replace(/\n$/, '')).then(function () {
+      b.textContent = "M\u00e1solva"; setTimeout(function () { b.textContent = "M\u00e1sol\u00e1s"; }, 1600);
+    });
+  });
+});
+</script>
+</body>
+</html>
