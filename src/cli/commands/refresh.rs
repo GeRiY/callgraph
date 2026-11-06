@@ -78,20 +78,18 @@ impl Command for RefreshCommand {
         let root = super::project_root(&self.home, self.project.as_deref())?;
         let shown = root.to_string_lossy();
         let shown = crate::query::strip_verbatim(&shown);
-        if self.background {
-            if crate::update::check::spawn_detached(self.background_args(&root)) {
-                writeln!(
-                    out,
-                    "{}",
-                    crate::tf!(
-                        "refresh: started in the background ({})",
-                        "frissítés: elindult a háttérben ({})",
-                        shown
-                    )
-                )?;
-                return Ok(0);
-            }
-            // ha nem indult el a háttér-folyamat, helyben fut
+        // ha a háttér-folyamat nem indult el, helyben fut tovább
+        if self.background && crate::update::check::spawn_detached(self.background_args(&root)) {
+            writeln!(
+                out,
+                "{}",
+                crate::tf!(
+                    "refresh: started in the background ({})",
+                    "frissítés: elindult a háttérben ({})",
+                    shown
+                )
+            )?;
+            return Ok(0);
         }
         let store = ProjectStore::at_root(&root);
         store.ensure()?;
