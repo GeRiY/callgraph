@@ -15,14 +15,17 @@ pub struct ParsedProgram<'a> {
 
 /// A `SourceType` a fájlkiterjesztésből; `.vue`-nál a script blokk `lang` attribútuma dönt.
 pub fn source_type_for(path: &Path, vue_lang: Option<&str>) -> SourceType {
-    if path.extension().and_then(|e| e.to_str()) == Some("vue") {
+    let ext = crate::lang::filetype::extension_lower(path);
+    if ext.as_deref() == Some("vue") {
         return match vue_lang {
             Some("ts") => SourceType::ts(),
             Some("tsx") => SourceType::tsx(),
             _ => SourceType::jsx(),
         };
     }
-    SourceType::from_path(path).unwrap_or_else(|_| SourceType::jsx())
+    // nagybetűs kiterjesztésnél (`App.TS`) a kisbetűs alak dönt
+    let path = ext.map_or_else(|| path.to_path_buf(), |ext| path.with_extension(ext));
+    SourceType::from_path(&path).unwrap_or_else(|_| SourceType::jsx())
 }
 
 /// Parsolja a forrást; a program az `allocator`-ban él.

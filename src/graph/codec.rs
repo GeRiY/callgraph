@@ -288,6 +288,9 @@ struct StoredGraph {
     writes: Vec<Write>,
     /// A `.vue` SFC-leírás JSON-szövegként (a `serde_json::Value` így pontosan visszaáll).
     sfc: Option<String>,
+    /// Bináris tartalmú fájl (a régi rekordokban nincs: hamis).
+    #[serde(default)]
+    binary: bool,
 }
 
 impl From<&FileGraph> for StoredGraph {
@@ -309,6 +312,7 @@ impl From<&FileGraph> for StoredGraph {
             strings,
             writes,
             sfc,
+            binary,
         } = graph;
         let (entries, object) = imports.parts();
         Self {
@@ -328,6 +332,7 @@ impl From<&FileGraph> for StoredGraph {
             strings: strings.clone(),
             writes: writes.clone(),
             sfc: sfc.as_ref().map(serde_json::Value::to_string),
+            binary: *binary,
         }
     }
 }
@@ -350,6 +355,7 @@ impl From<StoredGraph> for FileGraph {
             strings: stored.strings,
             writes: stored.writes,
             sfc: stored.sfc.and_then(|text| serde_json::from_str(&text).ok()),
+            binary: stored.binary,
         }
     }
 }

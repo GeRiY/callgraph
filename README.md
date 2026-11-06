@@ -87,6 +87,23 @@ $ callgraph.sh --project shop app --grep saveTranslations --depth 2
 | CSS / SCSS | `.css` `.scss` | rule blocks, mixins, functions, variables, `@use` / `@import` |
 | JSON / Markdown | `.json` `.md` | key paths; heading sections and links |
 
+### Which files are processed
+
+Only files with the extensions above, in upper or lower case (`B.PHP` counts as PHP); everything else is ignored.
+Also skipped, even with a supported extension: generated files (`package-lock.json`, `*.min.js`, `*.min.css`) and
+files with binary content. Each file is read once, even if a symlink points to it. Folders like `vendor/`,
+`node_modules/` and those listed in `.gitignore` are skipped too.
+
+To exclude more extensions in a project, put a `.callgraphignore` file in its root (or in any subfolder; the nearest
+one applies). Commit it, and the whole team gets the same results:
+
+```
+# callgraph: skip these extensions in this project
+md
+json
+*.vue
+```
+
 ### When *not* to use it
 
 - You need the exact text of a known line range: use `--lines` or a targeted read.

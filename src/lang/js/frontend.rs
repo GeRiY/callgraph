@@ -98,7 +98,7 @@ impl Language for JsFrontend {
 
     fn analyze(&self, file: &SourceFile) -> Result<Analysis> {
         let text = String::from_utf8_lossy(&file.text);
-        let is_vue = file.path.extension().and_then(|e| e.to_str()) == Some("vue");
+        let is_vue = crate::lang::filetype::extension_lower(&file.path).as_deref() == Some("vue");
         let mut out = JsAnalysis::new(file.path_string());
         apply_file_meta(&mut out.builder, &self.resolver, &file.path, &text, is_vue);
         out.builder.container(Container {

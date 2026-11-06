@@ -87,6 +87,23 @@ $ callgraph.sh --project shop app --grep saveTranslations --depth 2
 | CSS / SCSS | `.css` `.scss` | szabály-blokkok, mixinek, függvények, változók, `@use` / `@import` |
 | JSON / Markdown | `.json` `.md` | kulcs-útvonalak; címsor-szakaszok és linkek |
 
+### Mely fájlokat dolgozza fel
+
+Csak a fenti kiterjesztésű fájlokat, kis- és nagybetűvel is (a `B.PHP` is PHP); minden mást figyelmen kívül hagy.
+Támogatott kiterjesztéssel is kimarad: a generált fájl (`package-lock.json`, `*.min.js`, `*.min.css`) és a bináris
+tartalmú fájl. Minden fájlt egyszer olvas, akkor is, ha egy symlink is mutat rá. A `vendor/`, a `node_modules/` és a
+`.gitignore`-ban felsorolt mappák is kimaradnak.
+
+Ha egy projektben további kiterjesztéseket zárnál ki, tegyél egy `.callgraphignore` fájlt a gyökerébe (vagy
+bármelyik almappába; a legközelebbi érvényes). Commitold, és az egész csapatnál ugyanaz lesz az eredmény:
+
+```
+# callgraph: ezeket a kiterjesztéseket hagyja ki ebben a projektben
+md
+json
+*.vue
+```
+
 ### Mikor *ne* használd
 
 - Egy ismert sorsáv pontos szövege kell: `--lines` vagy célzott olvasás.
