@@ -3,7 +3,8 @@
 <p align="center">
   <b>Token-hatékony kód-térkép AI kódoló agenteknek.</b><br>
   Szerkezet, kategorizált hívás-gráf, metódus-törzs, „ki hívja?” és hatáselemzés —
-  a teljes fájlok beolvasása nélkül.
+  a teljes fájlok beolvasása nélkül.<br>
+  🌐 <a href="https://callgraph.eu/hu/">callgraph.eu</a>
 </p>
 
 <p align="center">

@@ -5,6 +5,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+### Changed
+- The project website has its own domain: https://callgraph.eu (the old `geriy.github.io/callgraph` address redirects).
+
 ## [0.3.0] — 2026-11-06
 
 ### Changed

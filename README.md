@@ -3,7 +3,8 @@
 <p align="center">
   <b>A token-efficient code map for AI coding agents.</b><br>
   Structure, categorized call graph, method bodies, "who calls this?" and impact analysis —
-  without reading whole files.
+  without reading whole files.<br>
+  🌐 <a href="https://callgraph.eu/">callgraph.eu</a>
 </p>
 
 <p align="center">
