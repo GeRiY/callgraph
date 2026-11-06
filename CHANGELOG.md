@@ -5,6 +5,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-11-06
+
 ### Added
 - **Where to start with a task — `locate`:** give it the names and terms from a task in one go (`callgraph.sh locate
   RefundController processRefund refund payment_status checkout.vue`, or the new `locate` tool over MCP) and it lists
@@ -239,7 +241,8 @@ First release.
 - Built-in update: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Prebuilt packages for macOS (arm64, x86_64), Linux (x86_64, ARM64, static musl) and Windows.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.4.0...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.5.0...develop
+[0.5.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.5.0
 [0.4.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.4.0
 [0.3.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.3.0
 [0.2.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.2.0
