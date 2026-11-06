@@ -183,6 +183,7 @@ relative to a registered project root; without it, the current directory is the 
 
 | Task | Command |
 |---|---|
+| Where do I start with this task? | `callgraph.sh locate <term>... [--all]` |
 | Outline of a file / directory | `callgraph.sh <file\|dir>` |
 | One method only | `callgraph.sh <file>::<method>` (several selectors allowed) |
 | Method source, line-numbered | `callgraph.sh <file>::<method> --body` |
@@ -191,6 +192,32 @@ relative to a registered project root; without it, the current directory is the 
 | Impact analysis | `callgraph.sh <dir> --grep <pattern> --depth N [--guess]` |
 | String literal / constant usages | `callgraph.sh <dir> --strings <pattern>` · `--const <pattern>` |
 | Filter by call category | `callgraph.sh <dir> --category model_use,orm_relation` |
+
+### Where to start: `locate`
+
+Give `locate` the names and domain terms from the task in one call (function, class and file names, column names,
+routes); it answers from the project map, without reading the source, with a short ranked list of files to start
+from, each with the reason:
+
+```bash
+bash ~/.claude/skills/callgraph/callgraph.sh locate RefundController processRefund refund payment_status checkout.vue --project myapp
+```
+
+```
+locate: 5 terms · 14 matches in 6 files · start here ↓
+1. app/Http/Controllers/RefundController.php  ★★★
+   class RefundController  L6-16  ← "RefundController", "refund" (exact class)
+   store()  L14  calls RefundService::processRefund  ← "processRefund" (call)
+2. app/Services/RefundService.php  ★★
+   processRefund()  L6-9  callers: 2 (RefundController::store, RefundJob::handle)  ← "processRefund", "refund" (exact method)
+…
+```
+
+A match counts more the stronger it is: exact definition, then file name, then a part of a name (`refund` ~
+`RefundJob`, `refunds_table`, singular / plural), then a string literal, then a call. A file that matches several
+different terms ranks above one that matches a single term many times. By default 5 files are shown (`--all`: every
+match); terms without a match and terms that are too general are listed at the end. Plain text search (an exact
+message or config value) is still a job for grep; `locate` answers "where do I start?".
 
 ### Output formats (`--format`)
 
@@ -224,7 +251,7 @@ CALLGRAPH_LANG=hu bash ~/.claude/skills/callgraph/callgraph.sh app/Models/Order.
 
 Besides the Claude Code skill (unchanged, fully supported), the same binary is also an
 [MCP](https://modelcontextprotocol.io) server on stdio, so any MCP client can use it: `callgraph mcp`.
-Tools: `outline`, `method_body`, `find_callers`, `search`, `framework_view`, `notes`, `projects`, `guide`. They return
+Tools: `locate`, `outline`, `method_body`, `find_callers`, `search`, `framework_view`, `notes`, `projects`, `guide`. They return
 the same compact text as the CLI, with the same output cap; read-only, paths are confined to the project root, and
 queries never use the network (only the once-a-day update check below does).
 On connect the server sends the client a short usage guide in your language (which tool to use when, how to find

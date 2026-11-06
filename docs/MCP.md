@@ -15,6 +15,7 @@ ugyanaz a tömör kimenet, amit a `callgraph show` kiír (ez a token-hatékony r
 
 | Eszköz | Paraméterek | Mit ad | CLI-megfelelő |
 |---|---|---|---|
+| `locate` | `terms` (egy string vagy lista), `project?`, `all?` | honnan induljak: a feladat neveiből / fogalmaiból rangsorolt fájlok (alapból 5, `all: true`: mind), fájlonként az indoklással | `locate <kifejezés>… [--all]` |
 | `outline` | `path`, `project?`, `format?` (`outline`\|`api`\|`flow`\|`summary`\|`hotspots`\|`stats`), `method?`, `full?` | fájl / mappa szerkezete; `method`-dal egy metódus hívás-gráfja | `show <út>[::m] --format <f>` |
 | `method_body` | `path`, `method` (egy név stringként vagy névtömb), `project?`, `doc?`, `raw?`, `full?` | a metódus(ok) forrása sorszámozva, tömören (docblock és üres sorok nélkül, a törzsbeli megjegyzések maradnak; a kihagyott docblockot a fejléc jelzi); `doc: true`: docblockkal, `raw: true`: szűretlenül | `show <út>::m --body [--doc\|--raw]` |
 | `find_callers` | `pattern`, `path?`, `project?`, `depth?` (1–5), `guess?`, `full?` | ki hívja; `depth` > 1: hatáselemzés | `show <út> --grep <minta> --depth N [--guess]` |
@@ -38,8 +39,9 @@ szöveget; `outline`: a metódus a `method` paraméterbe megy, nem `path::method
 ## Használati útmutató a kliensnek (`instructions`, `guide`)
 
 A CLI-s agent a `SKILL.md`-ből tanulja meg a használatot; MCP-n ez nincs meg, ezért a szerver az `initialize`
-válaszának `instructions` mezőjében tömör útmutatót küld (kb. 35 sor, ~3,5 KB; a Claude Code ezt az agent
-rendszer-promptjába teszi): melyik eszköz mire, szokásos menet (`outline` → `method_body` → `find_callers`), a
+válaszának `instructions` mezőjében tömör útmutatót küld (kb. 50 sor, ~4,5 KB; a Claude Code ezt az agent
+rendszer-promptjába teszi): a munkamegosztás (sima szöveg → Grep, „honnan induljak?” → `locate`, szerkezet / hívók /
+hatás → callgraph), melyik eszköz mire, szokásos menet (`locate` → `outline` → `method_body` → `find_callers`), a
 hívók keresése a név szerinti mintával (`(^|::|\.|->)név$`) és a `Típus::metódus` korlátja, a keresőkimenet olvasása
 (`root:` / `gyökér:` sor, `L12 │ kód`, `via <Típus>`, `?::név`, `… +N more`), a tömör törzs vs. `doc` / `raw`, a
 kimeneti korlát és a statikus elemzés korlátai.

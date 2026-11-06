@@ -1,20 +1,31 @@
 //! Eszköz-paraméter → `show`-lekérdezés leképezés. A lekérdezést a meglévő `show` parancs futtatja (ugyanaz a
-//! motor, ugyanaz a tömör kimenet és kimeneti korlát, mint a CLI-ben) — itt csak az argumentumlista készül.
+//! motor, ugyanaz a tömör kimenet és kimeneti korlát, mint a CLI-ben) — itt csak az argumentumlista készül. A
+//! `locate` eszköz ugyanígy a `locate` parancsot futtatja.
 
 use super::guard::ProjectRoot;
 use super::params::{
-    FindCallersParams, FrameworkViewParams, MethodBodyParams, NotesParams, OutlineParams,
-    SearchKind, SearchParams,
+    FindCallersParams, FrameworkViewParams, LocateParams, MethodBodyParams, NotesParams,
+    OutlineParams, SearchKind, SearchParams,
 };
 
 /// A `find_callers` megengedett mélysége.
 const MAX_DEPTH: u8 = 5;
 
-/// Egy `show`-hívás leírása, a gyökér feloldása előtt.
+/// A futtatott CLI-parancs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Subcommand {
+    /// `show` (minden eszköz, a `locate` kivételével).
+    Show,
+    /// `locate`: a kifejezések a cél helyett.
+    Locate,
+}
+
+/// Egy `show`- (vagy `locate`-) hívás leírása, a gyökér feloldása előtt.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ShowQuery {
     /// Projekt-alias (`None` = a szerver munkakönyvtára).
     pub project: Option<String>,
+    command: Subcommand,
     /// A cél (fájl vagy mappa), a gyökérhez képest.
     path: String,
     /// `::metódus` szelektorok a célhoz (üres = az egész cél).
@@ -32,6 +43,7 @@ impl ShowQuery {
         };
         Self {
             project,
+            command: Subcommand::Show,
             path,
             methods: Vec::new(),
             flags,
@@ -120,9 +132,55 @@ impl ShowQuery {
         Ok(Self::new(p.project, path, false).flag("--notes", p.pattern.unwrap_or_default()))
     }
 
+    /// `locate`: `--all` és a kifejezések (`--` után, hogy a `-`-sel kezdődő se legyen kapcsoló). A kifejezések
+    /// nem utak, nem kell őket a gyökérre ellenőrizni.
+    pub(crate) fn locate(p: LocateParams) -> Result<Self, String> {
+        let terms: Vec<String> = p
+            .terms
+            .into_vec()
+            .into_iter()
+            .filter(|t| !t.trim().is_empty())
+            .collect();
+        if terms.is_empty() {
+            return Err(crate::t!(
+                "'terms' needs at least one name or term from the task.",
+                "A 'terms' legalább egy nevet vagy fogalmat vár a feladatból."
+            )
+            .into());
+        }
+        let mut query = Self::new(p.project, String::new(), false);
+        query.command = Subcommand::Locate;
+        if p.all {
+            query.flags.push("--all".into());
+        }
+        query.flags.push("--".into());
+        query.flags.extend(terms);
+        Ok(query)
+    }
+
+    /// A parancs eleje: a parancs neve és a feloldott gyökér (a `show`-nál a kimenet címkéje is).
+    pub(crate) fn head(&self, root: &ProjectRoot) -> Vec<String> {
+        let mut args = vec![
+            match self.command {
+                Subcommand::Show => "show",
+                Subcommand::Locate => "locate",
+            }
+            .to_owned(),
+            "--project".to_owned(),
+            root.root().display().to_string(),
+        ];
+        if self.command == Subcommand::Show {
+            args.extend(["--label".to_owned(), root.label().to_owned()]);
+        }
+        args
+    }
+
     /// A `show` argumentumai (`show` és `--project`/`--label` nélkül): kapcsolók, majd a gyökéren belülre
-    /// ellenőrzött cél(ok).
+    /// ellenőrzött cél(ok). A `locate`-nél csak a kapcsolók és a kifejezések.
     pub(crate) fn to_args(&self, root: &ProjectRoot) -> Result<Vec<String>, String> {
+        if self.command == Subcommand::Locate {
+            return Ok(self.flags.clone());
+        }
         let target = root.resolve(&self.path)?;
         let mut args = self.flags.clone();
         if self.methods.is_empty() {
@@ -291,6 +349,28 @@ mod tests {
         assert_eq!(q.to_args(&root()).unwrap(), s(&["--notes", "cache", "src"]));
         let q = ShowQuery::notes(NotesParams::default()).unwrap();
         assert_eq!(q.to_args(&root()).unwrap(), s(&["--notes", "", "."]));
+    }
+
+    #[test]
+    fn locate_maps_terms_after_a_separator() {
+        let q = ShowQuery::locate(LocateParams {
+            terms: OneOrMany::Many(s(&["RefundController", " ", "-odd"])),
+            project: Some("alias".into()),
+            all: true,
+        })
+        .unwrap();
+        assert_eq!(q.project.as_deref(), Some("alias"));
+        assert_eq!(
+            q.to_args(&root()).unwrap(),
+            s(&["--all", "--", "RefundController", "-odd"])
+        );
+        let head = q.head(&root());
+        assert_eq!(head[0], "locate");
+        assert!(!head.contains(&"--label".to_owned()), "{head:?}");
+        let show = ShowQuery::notes(NotesParams::default()).unwrap();
+        assert_eq!(show.head(&root())[0], "show");
+        assert!(show.head(&root()).contains(&"--label".to_owned()));
+        assert!(ShowQuery::locate(LocateParams::default()).is_err());
     }
 
     #[test]

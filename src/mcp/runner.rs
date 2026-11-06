@@ -1,5 +1,5 @@
 //! A lekérdezés futtatása: a projekt-gyökér feloldása (alias a `projects.json`-ból, vagy a munkakönyvtár), majd a
-//! meglévő `show` parancs, a kimenete és a hibaszövege pufferbe gyűjtve.
+//! meglévő `show` (a `locate` eszköznél a `locate`) parancs, a kimenete és a hibaszövege pufferbe gyűjtve.
 
 use std::path::PathBuf;
 
@@ -49,13 +49,7 @@ impl ShowRunner {
 impl QueryRunner for ShowRunner {
     fn run(&self, query: &ShowQuery) -> Result<String, String> {
         let root = self.root(query.project.as_deref())?;
-        let mut args = vec![
-            "show".to_owned(),
-            "--project".to_owned(),
-            root.root().display().to_string(),
-            "--label".to_owned(),
-            root.label().to_owned(),
-        ];
+        let mut args = query.head(&root);
         args.extend(query.to_args(&root)?);
         let command = CliArgs::parse(args)
             .and_then(build_command)

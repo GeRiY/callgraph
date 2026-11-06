@@ -42,6 +42,8 @@ src/
                                 előre-frissítés (refresh.rs: `callgraph refresh`, refresh.lock) és MCP-fájlfigyelő (watch.rs)
   hook/                         Claude Code PostToolUse hook: a hook JSON-ja → háttér-`refresh`; settings.json szerkesztése
   query/                        QueryEngine (Facade), formázók (Strategy + FormatterRegistry), kimeneti korlát
+  locate/                       kiindulópont-kereső (Facade: Locator): kifejezések bontása (terms), egyezés a szűkített
+                                tényeken (matcher), név szerinti hívószám (callers), rangsor (rank), indoklás + kimenet
   cli/                          Command minta; args, parancsok (analyze, prune)
   mcp/                          MCP-szerver (`callgraph mcp`, rmcp, stdio): eszköz-paraméter → `show`-lekérdezés, útvonal-őr, frissítés (`--auto-update`, napi értesítés)
 tests/                          integrációs tesztek (pl. languages.rs: teszt-nyelvek a registryn)

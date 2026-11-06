@@ -10,15 +10,15 @@ use crate::i18n::Lang;
 const SKILL_EN: &str = include_str!("../../skill/skill-i18n/SKILL.en.md");
 const SKILL_HU: &str = include_str!("../../skill/skill-i18n/SKILL.hu.md");
 
-/// A kivágott szakaszok, az útmutatóbeli sorrendjükben (eszközök elöl).
-const SECTIONS: [&str; 4] = ["tools", "callers", "output", "limits"];
+/// A kivágott szakaszok, az útmutatóbeli sorrendjükben (a munkamegosztás és a `locate` elöl, utána az eszközök).
+const SECTIONS: [&str; 5] = ["start", "tools", "callers", "output", "limits"];
 
 /// Egy jelölt szakasz vége.
 const END: &str = "<!-- /mcp -->";
 
 /// CLI-kapcsoló → MCP-eszköz / -paraméter (a jelölt szakaszokban, backtickkel együtt). A név szerinti hívó-minta
 /// idézőjelei is lekerülnek: MCP-n a `pattern` sima JSON-string.
-const CLI_TO_MCP: [(&str, &str); 13] = [
+const CLI_TO_MCP: [(&str, &str); 14] = [
     ("`--grep`", "`find_callers`"),
     ("`--depth`", "`depth`"),
     ("`--strings`", "`search` (strings)"),
@@ -30,6 +30,7 @@ const CLI_TO_MCP: [(&str, &str); 13] = [
     ("`--full`", "`full: true`"),
     ("`--project`", "`project`"),
     ("`--format`", "`format`"),
+    ("`--all`", "`all: true`"),
     ("`'(^|::|\\.|->)", "`(^|::|\\.|->)"),
     ("$'`", "$`"),
 ];
@@ -103,7 +104,8 @@ fn is_marker(line: &str) -> bool {
 mod tests {
     use super::*;
 
-    const TOOLS: [&str; 8] = [
+    const TOOLS: [&str; 9] = [
+        "locate",
         "outline",
         "method_body",
         "find_callers",
