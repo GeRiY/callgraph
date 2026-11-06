@@ -1,7 +1,9 @@
 //! MCP-szerver mód (`callgraph mcp`): Model Context Protocol stdio-n, a hivatalos Rust SDK-val (`rmcp`).
-//! Csak olvas, hálózatot nem használ; a lekérdezéseket a meglévő `show` parancs futtatja, így a kimenet és a
+//! Csak olvas; hálózatot csak a frissítés használ (`autoupdate`: napi háttér-ellenőrzés, opt-in `--auto-update`),
+//! a skill-mappán belül. A lekérdezéseket a meglévő `show` parancs futtatja, így a kimenet és a
 //! kimeneti korlát azonos a CLI-ével. Részletek: `docs/MCP.md`.
 
+mod autoupdate;
 mod guard;
 mod guide;
 mod params;
@@ -16,8 +18,11 @@ use rmcp::ServiceExt;
 use crate::error::{CallgraphError, Result};
 use crate::skill::SkillHome;
 
-/// Elindítja a szervert a folyamat stdin/stdout-ján, és a kliens bontásáig fut.
-pub(crate) fn serve_stdio(home: SkillHome) -> Result<()> {
+pub(crate) use autoupdate::{AUTO_UPDATE_FLAG, auto_update};
+
+/// Elindítja a szervert a folyamat stdin/stdout-ján, és a kliens bontásáig fut. `auto_update` nélkül a napi
+/// háttér-ellenőrzés az első eszköz-eredmény végén szól, ha újabb verzió van (`autoupdate`).
+pub(crate) fn serve_stdio(home: SkillHome, auto_update: bool) -> Result<()> {
     let cwd = std::env::current_dir()?;
     // a betöltött projekt-gyökerek figyelése: a változott fájlok a háttérben frissülnek (`graph::watch`)
     crate::graph::watch::enable();
@@ -25,7 +30,12 @@ pub(crate) fn serve_stdio(home: SkillHome) -> Result<()> {
         .enable_all()
         .build()?;
     runtime.block_on(async move {
-        let server = server::CallgraphServer::new(Arc::new(runner::ShowRunner::new(home, cwd)));
+        let mut runner: Arc<dyn runner::QueryRunner> =
+            Arc::new(runner::ShowRunner::new(home.clone(), cwd));
+        if !auto_update {
+            runner = autoupdate::with_notice(runner, &home);
+        }
+        let server = server::CallgraphServer::new(runner);
         let service = server
             .serve(rmcp::transport::stdio())
             .await

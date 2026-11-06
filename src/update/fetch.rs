@@ -36,6 +36,11 @@ pub(crate) trait Fetcher {
 pub(crate) const FOREGROUND_TIMEOUT: Duration = Duration::from_secs(300);
 /// A háttér-ellenőrzés időkorlátja: rövid, hogy a gyerekfolyamat hamar kilépjen.
 pub(crate) const BACKGROUND_TIMEOUT: Duration = Duration::from_secs(5);
+/// Az MCP-szerver `--auto-update` lépésének kérésenkénti időkorlátja (a zip letöltése is): az indítást legfeljebb
+/// ennyivel késlelteti kérésenként.
+pub(crate) const AUTO_UPDATE_TIMEOUT: Duration = Duration::from_secs(30);
+/// Az `--auto-update` kapcsolódási időkorlátja: hálózat nélkül gyorsan feladja.
+pub(crate) const AUTO_UPDATE_CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
 
 /// A valódi fetcher: `http(s)://` → ureq, `file://<út>` vagy sima út → a fájl tartalma.
 pub(crate) struct HttpFetcher {
@@ -47,10 +52,15 @@ pub(crate) struct HttpFetcher {
 impl HttpFetcher {
     /// Fetcher a megadott teljes időkorláttal (a kapcsolódásé legfeljebb 20 s).
     pub(crate) fn new(timeout: Duration) -> Self {
+        Self::with_connect(timeout, timeout.min(Duration::from_secs(20)))
+    }
+
+    /// Fetcher külön teljes (kérésenkénti) és kapcsolódási időkorláttal.
+    pub(crate) fn with_connect(timeout: Duration, connect: Duration) -> Self {
         let agent = |redirects: u32| -> ureq::Agent {
             ureq::Agent::config_builder()
                 .timeout_global(Some(timeout))
-                .timeout_connect(Some(timeout.min(Duration::from_secs(20))))
+                .timeout_connect(Some(connect))
                 .max_redirects(redirects)
                 .user_agent(USER_AGENT)
                 .build()

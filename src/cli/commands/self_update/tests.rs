@@ -410,6 +410,7 @@ fn manual_check_refreshes_the_background_state() {
         latest: Some("0.1.0".into()),
         notified_at: Some(7),
         notified_version: Some("0.1.0".into()),
+        auto_update_at: None,
     };
     old.save(&file).unwrap();
     let (code, _, _) = run(
@@ -451,5 +452,88 @@ fn manual_check_refreshes_the_background_state() {
     );
     assert_eq!(code, 0);
     assert!(!file.exists());
+    let _ = std::fs::remove_dir_all(skill);
+}
+
+/// Az MCP `--auto-update` lépéséhez: a parancs az API-forrással és a hamis letöltővel, argumentumok nélkül.
+fn auto_command(skill: &Path, responses: Responses) -> SelfUpdateCommand {
+    let env = UpdateEnv {
+        fetcher: Box::new(FakeFetcher(
+            responses
+                .into_iter()
+                .map(|(u, r)| (u.to_owned(), r))
+                .collect(),
+        )),
+        source: Box::new(ApiSource::new(API)),
+        target: Some(target_of(skill)),
+        platform: test_platform(),
+        current: Version::parse("0.1.0").unwrap(),
+    };
+    SelfUpdateCommand::with_env(Vec::new(), home(skill), env)
+}
+
+#[test]
+fn update_if_newer_installs_only_a_verified_newer_release() {
+    let skill = fake_skill("cmd-auto");
+    let binary = skill.join("bin/linux-x86_64/callgraph");
+
+    // nincs újabb / nincs kiadás: semmi nem települ, a latest az állapotba kerül
+    let same = vec![
+        (API, Ok(release_json("v0.1.0"))),
+        (ASSET, Ok(release_zip(b"SAME"))),
+        (SUMS, Ok(sums(&release_zip(b"SAME"), NAME))),
+    ];
+    assert!(
+        auto_command(&skill, same)
+            .update_if_newer()
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(read(binary.clone()), "OLD");
+    let state = CheckState::load(&skill.join("update-check.json"));
+    assert_eq!(state.latest.as_deref(), Some("0.1.0"));
+    assert!(
+        auto_command(&skill, vec![])
+            .update_if_newer()
+            .unwrap()
+            .is_none()
+    );
+
+    // eltérő ellenőrzőösszeg vagy hiányzó SHA256SUMS: hiba, semmi nem települ (kihagyási lehetőség nincs)
+    for sums_response in [
+        Ok(sums(&release_zip(b"TAMPERED"), NAME)),
+        Err(FetchError::NotFound),
+    ] {
+        let responses = vec![
+            (API, Ok(release_json("v0.2.0"))),
+            (ASSET, Ok(release_zip(b"NEW"))),
+            (SUMS, sums_response),
+        ];
+        let e = auto_command(&skill, responses)
+            .update_if_newer()
+            .unwrap_err();
+        assert_eq!(e.context, "checksum", "{}", e.message);
+        assert_eq!(read(binary.clone()), "OLD");
+    }
+
+    // hálózati hiba: hiba (a hívó a régi verzióval folytatja)
+    let offline = vec![(API, Err(FetchError::Other("offline".into())))];
+    assert!(auto_command(&skill, offline).update_if_newer().is_err());
+    assert_eq!(read(binary.clone()), "OLD");
+
+    // újabb, egyező összeggel: telepít, a felhasználói adat marad
+    let newer = vec![
+        (API, Ok(release_json("v0.2.0"))),
+        (ASSET, Ok(release_zip(b"NEW"))),
+        (SUMS, Ok(sums(&release_zip(b"NEW"), NAME))),
+    ];
+    let (version, path) = auto_command(&skill, newer)
+        .update_if_newer()
+        .unwrap()
+        .unwrap();
+    assert_eq!(version, Version::parse("0.2.0").unwrap());
+    assert_eq!(path, binary.canonicalize().unwrap());
+    assert_eq!(read(binary), "NEW");
+    assert_eq!(read(skill.join("lang")), "hu\n");
     let _ = std::fs::remove_dir_all(skill);
 }

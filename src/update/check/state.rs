@@ -20,6 +20,8 @@ pub(crate) struct CheckState {
     pub(crate) notified_at: Option<u64>,
     /// Melyik verzióról szólt az utolsó értesítés.
     pub(crate) notified_version: Option<String>,
+    /// Az MCP-szerver utolsó automatikus frissítési kísérlete (`callgraph mcp --auto-update`), unix-másodperc.
+    pub(crate) auto_update_at: Option<u64>,
 }
 
 impl CheckState {
@@ -60,6 +62,7 @@ mod tests {
             latest: Some("0.2.0".into()),
             notified_at: None,
             notified_version: None,
+            auto_update_at: None,
         };
         state.save(&file).unwrap();
         assert_eq!(CheckState::load(&file), state);

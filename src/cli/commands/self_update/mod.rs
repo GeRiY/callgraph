@@ -21,8 +21,9 @@ use crate::tf;
 use crate::update::check::{BACKGROUND_ARGS, now_secs, record_latest};
 use crate::update::checksum::normalize_hex;
 use crate::update::{
-    ASSET_LIMIT, BACKGROUND_TIMEOUT, FOREGROUND_TIMEOUT, Fetcher, HttpFetcher, InstallTarget,
-    Installer, Platform, Release, ReleaseSource, Version, default_source,
+    ASSET_LIMIT, AUTO_UPDATE_CONNECT_TIMEOUT, AUTO_UPDATE_TIMEOUT, BACKGROUND_TIMEOUT,
+    FOREGROUND_TIMEOUT, Fetcher, HttpFetcher, InstallTarget, Installer, Platform, Release,
+    ReleaseSource, Version, default_source,
 };
 use messages::{failure, fetch_failure, install_failure, source_failure, usage};
 
@@ -41,9 +42,14 @@ impl UpdateEnv {
     /// A valódi környezet: HTTPS-letöltő a megadott időkorláttal, `CALLGRAPH_UPDATE_API` › GitHub,
     /// a futó bináris skill-mappája.
     pub(crate) fn from_env(timeout: Duration) -> Self {
+        Self::with_fetcher(Box::new(HttpFetcher::new(timeout)))
+    }
+
+    /// A valódi környezet a megadott letöltővel.
+    pub(crate) fn with_fetcher(fetcher: Box<dyn Fetcher>) -> Self {
         let platform = Platform::current();
         Self {
-            fetcher: Box::new(HttpFetcher::new(timeout)),
+            fetcher,
             source: default_source(&platform),
             target: InstallTarget::current(),
             platform,
@@ -86,6 +92,12 @@ impl SelfUpdateCommand {
             FOREGROUND_TIMEOUT
         };
         Self::with_env(args, home, UpdateEnv::from_env(timeout))
+    }
+
+    /// Az MCP `--auto-update` lépéséhez: rövid időkorlátok (3 s kapcsolódás, 30 s kérésenként).
+    pub(crate) fn for_auto_update(home: SkillHome) -> Self {
+        let fetcher = HttpFetcher::with_connect(AUTO_UPDATE_TIMEOUT, AUTO_UPDATE_CONNECT_TIMEOUT);
+        Self::with_env(Vec::new(), home, UpdateEnv::with_fetcher(Box::new(fetcher)))
     }
 
     pub(crate) fn with_env(args: Vec<String>, home: SkillHome, env: UpdateEnv) -> Self {
@@ -185,6 +197,27 @@ impl SelfUpdateCommand {
             writeln!(out, "{}", tf!("Run: {cmd} update", "Futtasd: {cmd} update"))?;
             return Ok(());
         }
+        let summary = self.install_release(&o, &release, err)?;
+        let line = if latest == current {
+            tf!("Reinstalled: {latest}", "Újratelepítve: {latest}")
+        } else {
+            tf!(
+                "Updated: {current} → {latest}",
+                "Frissítve: {current} → {latest}"
+            )
+        };
+        writeln!(out, "{line} ({summary})")?;
+        Ok(())
+    }
+
+    /// Egy kiadás platform-zipjének letöltése, ellenőrzése (`SHA256SUMS`, lásd `verify`) és telepítése; az
+    /// eredmény rövid összefoglalója.
+    fn install_release(
+        &self,
+        o: &Options,
+        release: &Release,
+        err: &mut dyn Write,
+    ) -> std::result::Result<String, SkillFailure> {
         let target = self.target()?;
         let asset_name = self.env.platform.asset_name();
         let Some(asset) = release.asset(&asset_name) else {
@@ -199,24 +232,32 @@ impl SelfUpdateCommand {
         };
         let zip = self.download(&asset.browser_download_url)?;
         self.verify_release_asset(
-            &o,
-            &release,
+            o,
+            release,
             &asset.browser_download_url,
             &asset_name,
             &zip,
             err,
         )?;
-        let summary = self.install(&zip, target)?;
-        let line = if latest == current {
-            tf!("Reinstalled: {latest}", "Újratelepítve: {latest}")
-        } else {
-            tf!(
-                "Updated: {current} → {latest}",
-                "Frissítve: {current} → {latest}"
-            )
+        self.install(&zip, target)
+    }
+
+    /// Az MCP-szerver `--auto-update` lépése: ha a legutóbbi stabil kiadás újabb a sajátnál, letölti, a
+    /// `SHA256SUMS` szerint ellenőrzi (kötelező — kihagyási lehetőség nincs) és telepíti, kimenet nélkül.
+    /// `Ok(Some(..))`: a telepített verzió és az új bináris útja; `Ok(None)`: nincs újabb (vagy nincs kiadás).
+    /// Az eredményt (a `latest`-et) az állapotfájlba is írja, mint a `--check`.
+    pub(crate) fn update_if_newer(
+        &self,
+    ) -> std::result::Result<Option<(Version, std::path::PathBuf)>, SkillFailure> {
+        let binary = self.target()?.exe().to_path_buf();
+        let release = self.latest()?;
+        let latest = release.as_ref().map(|r| r.version.clone());
+        record_latest(&self.home, now_secs(), Ok(latest));
+        let Some(release) = release.filter(|r| r.version > self.env.current) else {
+            return Ok(None);
         };
-        writeln!(out, "{line} ({summary})")?;
-        Ok(())
+        self.install_release(&Options::default(), &release, &mut std::io::sink())?;
+        Ok(Some((release.version, binary)))
     }
 
     /// A legutóbbi stabil kiadás; `None`, ha még nincs (404).

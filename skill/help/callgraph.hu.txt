@@ -89,6 +89,10 @@ Frissítés (a GitHub Releases-ből; a projects.json, a lang, az errors.jsonl, a
   --insecure-skip-checksum kihagyja. --from: a --sha256 <hex> vagy a zip melletti SHA256SUMS szerint, különben figyelmeztet.
   Automatikus ellenőrzés: naponta legfeljebb egyszer, a háttérben; újabb kiadásnál egy „ℹ callgraph X elérhető” sor
   kerül a kimenet végére. Kikapcsolás: CALLGRAPH_UPDATE_CHECK=0 (CI mellett és skill-telepítésen kívül magától ki van kapcsolva).
+  MCP-szerver: a "args": ["mcp", "--auto-update"] (ajánlott) a szerver indításakor telepíti az újabb kiadást (naponta
+  legfeljebb egyszer, kötelező SHA256SUMS-szal, ugyanazokat a fájlokat, mint az update), és újraindul; bármilyen hibánál
+  a jelenlegi verzió fut, és egy sor megy a stderr-re. Kapcsoló nélkül a munkamenet első eszköz-eredménye kapja meg a
+  „ℹ callgraph X elérhető” sort. Mindkettő csak a skill-mappába ír; CALLGRAPH_UPDATE_CHECK=0: semmi hálózat.
 
 Kimenet-korlát: 400 sor fölött a mappás outline summary-ra, az egyfájlos metódus-indexre vált;
 

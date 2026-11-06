@@ -89,6 +89,10 @@ Update (from GitHub Releases; projects.json, lang, errors.jsonl, feedback.jsonl,
   --insecure-skip-checksum skips this. --from: verified by --sha256 <hex> or a SHA256SUMS next to the zip, else a warning.
   Automatic check: at most once a day, in the background; a newer release adds one "ℹ callgraph X is available" line
   to the end of the output. Off: CALLGRAPH_UPDATE_CHECK=0 (also off when CI is set or outside a skill installation).
+  MCP server: "args": ["mcp", "--auto-update"] (recommended) installs a newer release at server start (at most once a
+  day, SHA256SUMS required, same files as update) and restarts itself; on any failure it runs the current version and
+  writes one line to stderr. Without the flag the first tool result of a session gets the "ℹ callgraph X is available"
+  line. Both only write into the skill dir; CALLGRAPH_UPDATE_CHECK=0 turns off all network access.
 
 Output limit: above 400 lines the directory outline switches to summary, the single-file one to a method index;
 

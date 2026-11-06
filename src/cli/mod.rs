@@ -93,8 +93,9 @@ pub fn build_command(args: CliArgs) -> Result<Box<dyn Command>> {
             crate::skill::SkillHome::from_env(),
         ))),
         CliArgs::Version => Ok(Box::new(commands::VersionCommand)),
-        CliArgs::Mcp => Ok(Box::new(commands::McpCommand::new(
+        CliArgs::Mcp { auto_update } => Ok(Box::new(commands::McpCommand::new(
             crate::skill::SkillHome::from_env(),
+            auto_update,
         ))),
         CliArgs::Skill { command, args } => {
             let home = crate::skill::SkillHome::from_env();
