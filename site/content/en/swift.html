@@ -1,0 +1,88 @@
+<section class="hero page" aria-labelledby="title">
+  <div>
+    <h1 id="title">Swift and SwiftUI call graph for AI agents</h1>
+    <p class="lead">callgraph parses <code>.swift</code> files with
+      <a href="https://github.com/alex-pinkus/tree-sitter-swift">tree-sitter-swift</a> and shows your agent types,
+      methods and computed properties with line ranges, property wrappers, and every call by category — with SwiftUI
+      views and modifiers as their own categories.</p>
+    <div class="cta">
+      <a class="btn primary" href="/#install">Install</a>
+      <a class="btn" href="/mcp/">Use it over MCP</a>
+    </div>
+  </div>
+</section>
+
+<section id="extracts" aria-labelledby="h-extracts">
+  <h2 id="h-extracts">What callgraph extracts from Swift</h2>
+  <ul>
+    <li>Containers: <code>class</code>, <code>struct</code>, <code>enum</code>, <code>protocol</code>, <code>actor</code>
+      and <code>extension</code>; nested types as <code>Outer.Inner</code>.</li>
+    <li>A type conforming to <code>View</code> is a <code>component</code> — a SwiftUI view, like a Vue component.</li>
+    <li>File-level functions and statements go into a <code>&lt;File&gt;.swift</code> <code>module</code> container.</li>
+    <li>Methods: <code>func</code>, <code>init</code>, <code>deinit</code>, <code>subscript</code> and computed properties,
+      so <code>var body: some View { … }</code> is the method <code>body</code> with return type <code>some View</code>.</li>
+    <li>Properties with their property wrapper before the type: <code>@State String</code>,
+      <code>@StateObject TodoViewModel</code>, <code>@Published [Todo]</code>.</li>
+    <li>Constants (<code>static let</code>, file-level <code>let</code>) and enum cases.</li>
+    <li>Branches of <code>if</code>, <code>switch</code> and <code>guard</code> (<code>--format flow</code>), string literals
+      with interpolations, doc comments.</li>
+  </ul>
+  <p>A file that contains <code>import SwiftUI</code> is marked as SwiftUI.</p>
+</section>
+
+<section id="swiftui" aria-labelledby="h-swiftui">
+  <h2 id="h-swiftui">SwiftUI-aware call categories</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th scope="col">Category</th><th scope="col">When</th></tr></thead>
+    <tbody>
+      <tr><td><code>swiftui_view</code></td><td>a built-in SwiftUI view: <code>Text</code>, <code>VStack</code>, <code>HStack</code>, <code>List</code>, <code>NavigationStack</code>, <code>Button</code>…</td></tr>
+      <tr><td><code>swiftui_modifier</code></td><td>a known modifier: <code>padding</code>, <code>font</code>, <code>onAppear</code>, <code>navigationTitle</code>, <code>sheet</code>, <code>toolbar</code>…</td></tr>
+      <tr><td><code>component_use</code></td><td>your own <code>View</code> type used in a view body, e.g. <code>TodoRow(...)</code></td></tr>
+      <tr><td><code>swiftui_api</code></td><td><code>withAnimation</code>, <code>withTransaction</code></td></tr>
+      <tr><td><code>native_swift</code></td><td>stdlib, Foundation, Dispatch, Combine: <code>UUID()</code>, <code>JSONDecoder().decode</code>, <code>DispatchQueue.main.async</code>, <code>append</code>, <code>map</code>…</td></tr>
+      <tr><td><code>internal_helper</code></td><td>a function defined in the same file, or <code>self.f()</code></td></tr>
+      <tr><td><code>instantiation</code></td><td>other type constructors</td></tr>
+      <tr><td><code>external_call</code></td><td>other member calls, e.g. <code>viewModel.load()</code></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="commands" aria-labelledby="h-commands">
+  <h2 id="h-commands">Commands</h2>
+```
+CG=~/.claude/skills/callgraph/callgraph.sh
+bash $CG --project myapp <path/to/View>.swift                   # outline: types, body, properties with wrappers, calls
+bash $CG --project myapp <path/to/View>.swift::body --body      # just the view body, line-numbered
+bash $CG --project myapp <path/to/View>.swift --format flow     # if / switch / guard branches with line ranges
+```
+</section>
+
+<section id="callers" aria-labelledby="h-callers">
+  <h2 id="h-callers">Who calls this Swift method?</h2>
+```
+bash $CG --project myapp <folder> --grep '(^|::|\.|->)load$'      # every call of the name
+bash $CG --project myapp <folder> --grep '(^|::|\.|->)load$' --depth 2
+```
+  <p>Swift has no cross-file type resolution in callgraph, so search by name: the name pattern finds every call of
+    <code>load</code>, whatever the receiver.</p>
+</section>
+
+<section id="limits" aria-labelledby="h-limits">
+  <h2 id="h-limits">Limits</h2>
+  <ul>
+    <li>No type resolution and no cross-file symbol table: categories come from the names in the file and known lists.
+      A view declared in another file counts as <code>instantiation</code> outside a view body.</li>
+    <li>The stdlib method list is by name: your own <code>filter</code> or <code>append</code> is also <code>native_swift</code>.</li>
+    <li><code>#if</code> branches are all walked; macros such as <code>#Preview</code> and <code>@Observable</code> are not expanded.</li>
+  </ul>
+</section>
+
+<section id="related" aria-labelledby="h-related">
+  <h2 id="h-related">Related</h2>
+  <div class="grid">
+    <a class="card" href="/profile/"><h3>Project profile</h3><p>Recognises a SwiftUI MVVM project and its layers.</p></a>
+    <a class="card" href="/locate/"><h3>locate</h3><p>Ranked files to start a task with.</p></a>
+    <a class="card" href="/mcp/"><h3>MCP server</h3><p>The same queries in any MCP client.</p></a>
+    <a class="card" href="/rust/"><h3>Rust</h3><p>Structs, traits and <code>impl</code> blocks.</p></a>
+  </div>
+</section>

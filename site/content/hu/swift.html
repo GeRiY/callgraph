@@ -1,0 +1,88 @@
+<section class="hero page" aria-labelledby="title">
+  <div>
+    <h1 id="title">Swift és SwiftUI call graph AI agenteknek</h1>
+    <p class="lead">A callgraph a <a href="https://github.com/alex-pinkus/tree-sitter-swift">tree-sitter-swift</a>-tel
+      elemzi a <code>.swift</code> fájlokat, és megmutatja az agentnek a típusokat, metódusokat és computed
+      property-ket sortartománnyal, a property wrappereket és minden hívást kategóriánként — a SwiftUI view-k és
+      modifierek saját kategóriát kapnak.</p>
+    <div class="cta">
+      <a class="btn primary" href="/hu/#install">Telepítés</a>
+      <a class="btn" href="/hu/mcp/">Használat MCP-n át</a>
+    </div>
+  </div>
+</section>
+
+<section id="extracts" aria-labelledby="h-extracts">
+  <h2 id="h-extracts">Mit nyer ki a callgraph a Swift-kódból</h2>
+  <ul>
+    <li>Containerek: <code>class</code>, <code>struct</code>, <code>enum</code>, <code>protocol</code>, <code>actor</code>
+      és <code>extension</code>; a beágyazott típusok <code>Külső.Belső</code> néven.</li>
+    <li>A <code>View</code>-nak megfelelő típus <code>component</code> — SwiftUI-nézet, mint egy Vue-komponens.</li>
+    <li>A fájl-szintű függvények és utasítások a <code>&lt;Fájl&gt;.swift</code> <code>module</code> containerbe kerülnek.</li>
+    <li>Metódusok: <code>func</code>, <code>init</code>, <code>deinit</code>, <code>subscript</code> és a computed
+      property-k, így a <code>var body: some View { … }</code> a <code>body</code> metódus, <code>some View</code> visszatérési típussal.</li>
+    <li>Property-k a property wrapperrel a típus előtt: <code>@State String</code>,
+      <code>@StateObject TodoViewModel</code>, <code>@Published [Todo]</code>.</li>
+    <li>Konstansok (<code>static let</code>, fájl-szintű <code>let</code>) és enum case-ek.</li>
+    <li>Az <code>if</code>, <code>switch</code> és <code>guard</code> ágai (<code>--format flow</code>), string-literálok
+      interpolációval, doc-kommentek.</li>
+  </ul>
+  <p>Az <code>import SwiftUI</code>-t tartalmazó fájl SwiftUI-fájlként van jelölve.</p>
+</section>
+
+<section id="swiftui" aria-labelledby="h-swiftui">
+  <h2 id="h-swiftui">SwiftUI-t ismerő hívás-kategóriák</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th scope="col">Kategória</th><th scope="col">Mikor</th></tr></thead>
+    <tbody>
+      <tr><td><code>swiftui_view</code></td><td>beépített SwiftUI-nézet: <code>Text</code>, <code>VStack</code>, <code>HStack</code>, <code>List</code>, <code>NavigationStack</code>, <code>Button</code>…</td></tr>
+      <tr><td><code>swiftui_modifier</code></td><td>ismert modifier: <code>padding</code>, <code>font</code>, <code>onAppear</code>, <code>navigationTitle</code>, <code>sheet</code>, <code>toolbar</code>…</td></tr>
+      <tr><td><code>component_use</code></td><td>saját <code>View</code>-típus egy nézet-törzsben, pl. <code>TodoRow(...)</code></td></tr>
+      <tr><td><code>swiftui_api</code></td><td><code>withAnimation</code>, <code>withTransaction</code></td></tr>
+      <tr><td><code>native_swift</code></td><td>stdlib, Foundation, Dispatch, Combine: <code>UUID()</code>, <code>JSONDecoder().decode</code>, <code>DispatchQueue.main.async</code>, <code>append</code>, <code>map</code>…</td></tr>
+      <tr><td><code>internal_helper</code></td><td>ugyanabban a fájlban definiált függvény, vagy <code>self.f()</code></td></tr>
+      <tr><td><code>instantiation</code></td><td>egyéb típus-konstruktor</td></tr>
+      <tr><td><code>external_call</code></td><td>minden más tag-hívás, pl. <code>viewModel.load()</code></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="commands" aria-labelledby="h-commands">
+  <h2 id="h-commands">Parancsok</h2>
+```
+CG=~/.claude/skills/callgraph/callgraph.sh
+bash $CG --project myapp <út/a/View>.swift                   # outline: típusok, body, property-k wrapperrel, hívások
+bash $CG --project myapp <út/a/View>.swift::body --body      # csak a nézet törzse, sorszámozva
+bash $CG --project myapp <út/a/View>.swift --format flow     # if / switch / guard ágak sortartománnyal
+```
+</section>
+
+<section id="callers" aria-labelledby="h-callers">
+  <h2 id="h-callers">Ki hívja ezt a Swift-metódust?</h2>
+```
+bash $CG --project myapp <mappa> --grep '(^|::|\.|->)load$'      # a név minden hívása
+bash $CG --project myapp <mappa> --grep '(^|::|\.|->)load$' --depth 2
+```
+  <p>Swiftben a callgraph nem old fel típusokat fájlok között, ezért név szerint keress: a név szerinti minta a
+    <code>load</code> minden hívását megtalálja, bármi a fogadó.</p>
+</section>
+
+<section id="limits" aria-labelledby="h-limits">
+  <h2 id="h-limits">Korlátok</h2>
+  <ul>
+    <li>Nincs típus-feloldás és fájlok közötti szimbólum-tábla: a kategória a fájlbeli nevekből és ismert listákból
+      dől el. Egy másik fájlban deklarált nézet nézet-törzsön kívül <code>instantiation</code>.</li>
+    <li>A stdlib-metódusok listája név szerinti: egy saját <code>filter</code> vagy <code>append</code> is <code>native_swift</code>.</li>
+    <li>Az <code>#if</code> minden ága bejárásra kerül; a makrók (<code>#Preview</code>, <code>@Observable</code>) nincsenek kibontva.</li>
+  </ul>
+</section>
+
+<section id="related" aria-labelledby="h-related">
+  <h2 id="h-related">Kapcsolódó oldalak</h2>
+  <div class="grid">
+    <a class="card" href="/hu/profile/"><h3>Projekt-profil</h3><p>Felismeri a SwiftUI MVVM projektet és a rétegeit.</p></a>
+    <a class="card" href="/hu/locate/"><h3>locate</h3><p>Rangsorolt fájlok a feladat kezdéséhez.</p></a>
+    <a class="card" href="/hu/mcp/"><h3>MCP-szerver</h3><p>Ugyanezek a lekérdezések bármely MCP-kliensben.</p></a>
+    <a class="card" href="/hu/rust/"><h3>Rust</h3><p>Structok, traitek és <code>impl</code>-blokkok.</p></a>
+  </div>
+</section>

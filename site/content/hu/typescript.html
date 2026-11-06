@@ -1,0 +1,88 @@
+<section class="hero page" aria-labelledby="title">
+  <div>
+    <h1 id="title">TypeScript, JavaScript és Vue call graph</h1>
+    <p class="lead">A callgraph az <a href="https://github.com/oxc-project/oxc">oxc</a>-vel elemzi a JavaScript-,
+      TypeScript- és Vue single-file komponenseket, és megadja az agentnek a modulokat, függvényeket, osztályokat, a
+      komponensek propsait és emitjeit, a template-használatot és minden hívást kategóriánként — és hogy ki használ egy
+      függvényt, komponenst, route-ot vagy fordítási kulcsot a projektben.</p>
+    <div class="cta">
+      <a class="btn primary" href="/hu/#install">Telepítés</a>
+      <a class="btn" href="/hu/mcp/">Használat MCP-n át</a>
+    </div>
+  </div>
+</section>
+
+<section id="extracts" aria-labelledby="h-extracts">
+  <h2 id="h-extracts">Mit nyer ki a callgraph</h2>
+  <p>Fájlok: <code>.js</code> <code>.mjs</code> <code>.cjs</code> <code>.jsx</code> <code>.ts</code> <code>.tsx</code>
+    <code>.vue</code>.</p>
+  <ul>
+    <li>Modulok, függvények és osztályok; TS <code>interface</code>-ek és az osztályok <code>implements</code>-e.</li>
+    <li>Importok alias-feloldással a <code>jsconfig.json</code> / <code>tsconfig.json</code> alapján (a <code>@/</code> alias is).</li>
+    <li>Az objektum-literálok függvényei külön metódusként: <code>const api = { fetch() {} }</code> → <code>api.fetch</code>.</li>
+    <li><code>if</code> / <code>switch</code> ágak, string- és template-literálok.</li>
+  </ul>
+</section>
+
+<section id="vue" aria-labelledby="h-vue">
+  <h2 id="h-vue">Vue single-file komponensek</h2>
+  <p>A <code>.vue</code> fájl egy <code>component</code>. A „metódusai” azok, amik alapján egy agent eligazodik benne:</p>
+  <ul>
+    <li><code>setup</code> — a <code>&lt;script setup&gt;</code> top-level kódja.</li>
+    <li><code>template</code> — a használt komponensek, eseménykezelők, <code>$t()</code>- és <code>route()</code>-hívások.</li>
+    <li>Függvények, <code>computed</code>, <code>watch@L&lt;n&gt;</code> / <code>onMounted@L&lt;n&gt;</code> hookok, egy
+      composable belső függvényei (<code>useX.belso</code>), és az Options API <code>methods</code> / <code>computed.x</code> elemei.</li>
+    <li>A props property-ként, az emitek <code>emit:&lt;név&gt;</code> alakban látszanak.</li>
+  </ul>
+  <p>A hívások kategóriái között van a <code>vue_api</code>, <code>composable_use</code>, <code>component_use</code>,
+    <code>vue_emit</code>, <code>inertia</code>, <code>i18n_helper</code>, <code>route_helper</code> (Ziggy),
+    <code>http_call</code> (axios), <code>module_use</code> és a <code>package_use</code>.</p>
+</section>
+
+<section id="callers" aria-labelledby="h-callers">
+  <h2 id="h-callers">Ki használja ezt a függvényt, komponenst vagy kulcsot?</h2>
+  <p>Ugyanaz a <code>--grep</code> kapcsoló frontend-specifikus kulcsokat is ért:</p>
+```
+CG=~/.claude/skills/callgraph/callgraph.sh
+bash $CG --project myapp resources/js --grep 'useForm.js::submit'     # <fájl>::<export>, import-feloldással, @/ aliasszal
+bash $CG --project myapp resources/js --grep 'route::orders.show'     # route-használat
+bash $CG --project myapp resources/js --grep 'i18n::orders.title'     # fordítási kulcs helye
+bash $CG --project myapp resources/js --grep 'vue::emit:save'         # ki emitál 'save'-et
+bash $CG --project myapp resources/js --grep 'Atoms/AtomButton.vue'   # hol használják a komponenst
+bash $CG --project myapp resources/js --grep 'api.fetch'              # objektum-literál metódusa
+```
+  <p>A <code>--strings</code> a Vue template-kifejezésekben (<code>{{ … }}</code>, <code>:title="…"</code>,
+    <code>@click="…"</code>) lévő szövegeket is megtalálja.</p>
+</section>
+
+<section id="typed" aria-labelledby="h-typed">
+  <h2 id="h-typed">TypeScript: hívások típusos objektumokon át</h2>
+  <p>Ha a típus le van írva, a callgraph kiszámolja, melyik osztályhoz megy egy metódushívás: típusos paraméter
+    (<code>repo: Repo</code>), típusos osztály-property (<code>private repo: Repo</code>, a
+    <code>constructor(private repo: Repo)</code> is), <code>this.repo = new Repo()</code> vagy
+    <code>const x = new Repo()</code>. Így a <code>this.repo.find()</code> <code>Repo::find</code> lesz, és a
+    <code>--grep 'Repo::find'</code> megtalálja. Az interfészen át tett hívások <code>via Resolver</code> jelölést kapnak.</p>
+```
+bash $CG --project myapp resources/js --grep 'PlaylistResolver::getPlayables'
+```
+  <p>Ha a típus nem egyértelmű — nincs típus, <code>any</code>, unió, mint a <code>Repo | null</code>, generikus
+    <code>T</code> —, a hívás feloldatlan marad; ezeket név szerint keresd: <code>--grep '(^|::|\.|->)find$'</code>.</p>
+</section>
+
+<section id="limits" aria-labelledby="h-limits">
+  <h2 id="h-limits">Korlátok</h2>
+  <ul>
+    <li>A dinamikus hívások (<code>obj[key]()</code>) és a futásidőben regisztrált komponensek statikusan nem oldhatók fel.</li>
+    <li>A hivatkozott típusnévvel megadott <code>defineProps&lt;Props&gt;()</code> nem listáz propsot (a típus nincs feloldva).</li>
+  </ul>
+</section>
+
+<section id="related" aria-labelledby="h-related">
+  <h2 id="h-related">Kapcsolódó oldalak</h2>
+  <div class="grid">
+    <a class="card" href="/hu/php/"><h3>PHP, Laravel és Yii</h3><p>Egy Laravel + Vue / Inertia alkalmazás backend-oldala.</p></a>
+    <a class="card" href="/hu/profile/"><h3>Projekt-profil</h3><p>Felismeri a Vue / React frontendet és a rétegeit.</p></a>
+    <a class="card" href="/hu/locate/"><h3>locate</h3><p>Egy fájlnév, pl. <code>checkout.vue</code> is mehet a kifejezések közé.</p></a>
+    <a class="card" href="/hu/mcp/"><h3>MCP-szerver</h3><p>Ugyanezek a kulcsok a <code>find_callers</code> eszközben is működnek.</p></a>
+  </div>
+</section>

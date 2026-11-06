@@ -1,0 +1,95 @@
+<section class="hero page" aria-labelledby="title">
+  <div>
+    <h1 id="title">Rust call graph és hatáselemzés AI agenteknek</h1>
+    <p class="lead">A callgraph a <a href="https://github.com/dtolnay/syn">syn</a>-nel elemzi a <code>.rs</code> fájlokat,
+      és megadja az agentnek a modulokat, structokat, traiteket és <code>impl</code>-blokkokat pontos sortartománnyal,
+      minden hívást kategóriánként, és hogy ki hív egy függvényt a crate-ben — a fájl beolvasása nélkül.</p>
+    <div class="cta">
+      <a class="btn primary" href="/hu/#install">Telepítés</a>
+      <a class="btn" href="/hu/mcp/">Használat MCP-n át</a>
+    </div>
+  </div>
+</section>
+
+<section id="extracts" aria-labelledby="h-extracts">
+  <h2 id="h-extracts">Mit nyer ki a callgraph a Rust-kódból</h2>
+  <ul>
+    <li>A fájl-modul, az inline <code>mod</code>-ok, a <code>struct</code>-ok, <code>enum</code>-ok, <code>union</code>-ok
+      és <code>trait</code>-ek (a supertraitekkel).</li>
+    <li>Az <code>impl</code>-blokkok metódusai a típusukhoz kerülnek; a trait-implementációk az
+      <code>implements</code> alatt látszanak.</li>
+    <li>Függvények láthatósággal (<code>pub</code>, <code>pub(crate)</code>…), <code>async</code>-kal, paraméterekkel és
+      visszatérési típussal; <code>macro_rules!</code> makrók.</li>
+    <li>Mezők, <code>const</code> / <code>static</code> elemek, típus-aliasok és enum-variánsok.</li>
+    <li>Kilapított <code>use</code>-fák, út- / metódus- / makróhívások, <code>if</code> / <code>match</code> ágak,
+      string-literálok (az attribútumokban is, pl. <code>#[get("/users/{id}")]</code>).</li>
+  </ul>
+</section>
+
+<section id="frameworks" aria-labelledby="h-frameworks">
+  <h2 id="h-frameworks">Framework-ismeret: axum, actix-web, tokio…</h2>
+  <p>A framework a fájl fölötti legközelebbi <code>Cargo.toml</code>-ból jön: az első ismert függőség, ebben a
+    sorrendben — bevy, tauri, leptos, dioxus, yew, axum, actix-web, rocket, warp, poem, diesel, sqlx, sea-orm, clap,
+    tokio, async-std, serde. Az ismert framework-crate-ek hívásai <code>framework_use</code> címkét kapnak, a
+    <a href="/hu/profile/"><code>profile</code></a> pedig felismeri a Rust webes architektúrát.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th scope="col">Kategória</th><th scope="col">Mikor</th></tr></thead>
+    <tbody>
+      <tr><td><code>internal_helper</code></td><td>a fájl saját típusai, függvényei és metódusai (<code>self.x()</code>, <code>Self::x()</code>)</td></tr>
+      <tr><td><code>module_use</code></td><td>a crate másik modulja (<code>crate::</code>, <code>super::</code>), <code>modul::fn</code> / <code>Típus::fn</code> alakban</td></tr>
+      <tr><td><code>native_rust</code></td><td>std / core / alloc, a prelude és a gyakori std-metódusok</td></tr>
+      <tr><td><code>framework_use</code></td><td>ismert framework-crate (axum, tower, hyper, actix_web, rocket, tokio, serde, clap, diesel, sqlx, bevy…)</td></tr>
+      <tr><td><code>package_use</code></td><td>más crate (külső függőség)</td></tr>
+      <tr><td><code>macro_use</code></td><td>minden makróhívás; a makró nincs kibontva</td></tr>
+      <tr><td><code>external_call</code></td><td>helyi változó vagy closure, illetve ismeretlen fogadójú metódus (<code>?::név</code>)</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="commands" aria-labelledby="h-commands">
+  <h2 id="h-commands">Parancsok</h2>
+```
+CG=~/.claude/skills/callgraph/callgraph.sh
+bash $CG --project myapp src/api/users.rs              # outline: struct/impl/trait, fn-ek sortartománnyal
+bash $CG --project myapp src/api/users.rs --format api # pub elemek, az impl-blokkok pub fn-jei is
+bash $CG --project myapp src --const MAX_ITEMS         # const / static (Típus::CONST is): definíció + használat
+```
+  <p>A <code>--const</code> azt is megmutatja, hol adnak tovább egy nevet: a <code>pub use state::{CheckState, STATE_FILE};</code>
+    például <code>[re-export] state::STATE_FILE</code> sorként jelenik meg.</p>
+</section>
+
+<section id="callers" aria-labelledby="h-callers">
+  <h2 id="h-callers">Ki hívja ezt a Rust-függvényt?</h2>
+```
+bash $CG --project myapp src --grep 'Repo::find'                # crate-belső: Típus::fn / modul::fn
+bash $CG --project myapp src --grep '(^|::|\.|->)find$'         # a név minden hívása
+bash $CG --project myapp src --grep 'Repo::find' --depth 3      # a hívók hívói
+```
+  <p>Az értéken hívott metódusnál (<code>x.load()</code>) a callgraph az egyszerű, megbízható esetekben kikövetkezteti az
+    <code>x</code> típusát: paraméter-típus (<code>x: &amp;Repo</code>, <code>Box</code> / <code>Rc</code> /
+    <code>Arc</code>, extractor, mint a <code>State(s): State&lt;App&gt;</code>), <code>let x = Repo::new()</code>,
+    struct-literál, <code>self</code>, vagy a saját struct mezője (<code>self.repo.load()</code>). Ilyenkor a hívás
+    <code>Repo::load</code> lesz. Ha a típus nem következtethető ki, <code>?::load</code> marad, és a
+    <code>Repo::load</code> keresés bizonytalanként ezt is listázza — nem esik ki csendben.</p>
+</section>
+
+<section id="limits" aria-labelledby="h-limits">
+  <h2 id="h-limits">Korlátok</h2>
+  <ul>
+    <li>A makrók nincsenek kibontva: a derive-, attribútum- és függvényszerű makrók által generált kód nem látszik.</li>
+    <li>A típus-következtetés szándékosan egyszerű: a visszatérési típusok és a láncolt hívások (<code>a.b().c()</code>) nem kapnak típust.</li>
+    <li>A <code>cfg</code>-attribútumok nem értékelődnek ki: minden ág bekerül, pl. a <code>#[cfg(test)] mod tests</code> is.</li>
+    <li>Szintaktikai hibás fájlból csak a fájl-container és egy figyelmeztetés készül.</li>
+    <li>A bejáró nem hagyja ki a <code>target/</code> mappát; a callgraph-ot a <code>src</code> mappára indítsd.</li>
+  </ul>
+</section>
+
+<section id="related" aria-labelledby="h-related">
+  <h2 id="h-related">Kapcsolódó oldalak</h2>
+  <div class="grid">
+    <a class="card" href="/hu/locate/"><h3>locate</h3><p>Rangsorolt fájlok a feladat kezdéséhez.</p></a>
+    <a class="card" href="/hu/profile/"><h3>Projekt-profil</h3><p>Egy crate architektúrája és rétegei.</p></a>
+    <a class="card" href="/hu/mcp/"><h3>MCP-szerver</h3><p>Ugyanezek a lekérdezések bármely MCP-kliensben.</p></a>
+    <a class="card" href="/hu/swift/"><h3>Swift / SwiftUI</h3><p>Egy másik natív nyelv, amit a callgraph feltérképez.</p></a>
+  </div>
+</section>
