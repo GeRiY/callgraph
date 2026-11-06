@@ -11,7 +11,7 @@ use crate::cli::{Command, NoteAction};
 use crate::error::{CallgraphError, Result};
 use crate::notes::{NoteFilter, NoteStore, list_line, orphaned, relative_path};
 use crate::query::{QueryEngine, Selector, SelectorSet};
-use crate::skill::{ProjectRegistry, SkillHome};
+use crate::skill::SkillHome;
 
 /// A jegyzet-parancs; a registry (alias-feloldás) a `SkillHome`-ból jön.
 pub struct NoteCommand {
@@ -31,28 +31,7 @@ impl NoteCommand {
 
     /// A projekt-gyökér (kanonikus): alias › mappa-út › munkakönyvtár.
     fn root(&self) -> Result<PathBuf> {
-        let root = match self.project.as_deref() {
-            None => std::env::current_dir()?,
-            Some(value) => {
-                let file = self.home.registry_file();
-                let alias = if file.is_file() {
-                    ProjectRegistry::load(file)?.root(value)
-                } else {
-                    None
-                };
-                match alias {
-                    Some(path) => PathBuf::from(path),
-                    None if Path::new(value).is_dir() => PathBuf::from(value),
-                    None => {
-                        return Err(CallgraphError::Usage(crate::tf!(
-                            "Unknown project: {value} (neither a registered alias nor a directory)",
-                            "Ismeretlen projekt: {value} (se nem regisztrált alias, se nem mappa)"
-                        )));
-                    }
-                }
-            }
-        };
-        Ok(root.canonicalize().unwrap_or(root))
+        super::project_root(&self.home, self.project.as_deref())
     }
 
     fn execute(&self, out: &mut dyn Write) -> Result<()> {

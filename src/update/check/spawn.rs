@@ -1,5 +1,5 @@
 //! A háttér-ellenőrzés indítása: leválasztott gyerekfolyamat (`callgraph self-update --check --background`),
-//! null stdin/stdout/stderr-rel; nem várunk rá. A `Spawner` trait mögött, hogy a tesztek ne indítsanak folyamatot.
+//! null stdin/stdout/stderr-rel; nem várunk rá (`spawn_detached`: a háttér-`refresh` is ezt használja). A `Spawner` trait mögött, hogy a tesztek ne indítsanak folyamatot.
 
 use std::process::{Command, Stdio};
 
@@ -16,19 +16,30 @@ pub(crate) struct DetachedProcess;
 
 impl Spawner for DetachedProcess {
     fn spawn(&self) {
-        let Ok(exe) = std::env::current_exe() else {
-            return;
-        };
-        let mut command = Command::new(exe);
-        command
-            .args(BACKGROUND_ARGS)
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null());
-        detach(&mut command);
-        // a Child eldobása nem öli meg és nem várja meg a folyamatot
-        let _ = command.spawn();
+        spawn_detached(BACKGROUND_ARGS);
     }
+}
+
+/// A futó bináris indítása a megadott argumentumokkal, leválasztva, null stdin/stdout/stderr-rel, várakozás nélkül
+/// (a hibát elnyelve; `false`, ha nem indult el). A háttér-ellenőrzés és a `callgraph refresh --background` /
+/// `callgraph hook post-edit` közös indítója.
+pub(crate) fn spawn_detached<I, S>(args: I) -> bool
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<std::ffi::OsStr>,
+{
+    let Ok(exe) = std::env::current_exe() else {
+        return false;
+    };
+    let mut command = Command::new(exe);
+    command
+        .args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    detach(&mut command);
+    // a Child eldobása nem öli meg és nem várja meg a folyamatot
+    command.spawn().is_ok()
 }
 
 /// Unix: saját folyamatcsoport — a hívó terminál / burok jelzései (Ctrl-C, csoport-kilövés) nem érik el.

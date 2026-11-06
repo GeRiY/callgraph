@@ -18,6 +18,8 @@ use crate::skill::SkillHome;
 /// Elindítja a szervert a folyamat stdin/stdout-ján, és a kliens bontásáig fut.
 pub(crate) fn serve_stdio(home: SkillHome) -> Result<()> {
     let cwd = std::env::current_dir()?;
+    // a betöltött projekt-gyökerek figyelése: a változott fájlok a háttérben frissülnek (`graph::watch`)
+    crate::graph::watch::enable();
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()?;

@@ -56,6 +56,19 @@ Jegyzetek (pilot — rövid jegyzet egy fájlhoz vagy metódushoz, a forráson k
   Az outline a fájl-fejléc / a metódus alatt mutatja: "📝 2026-11-05 20:27 · <szöveg>" (legújabb elöl, legfeljebb 3),
   a --body a metódus forrása fölött. Az idő UTC.
 
+Előre-frissítés (git pull vagy sok szerkesztés után, hogy a következő lekérdezésnek ne kelljen újraelemeznie):
+  bash ~/.claude/skills/callgraph/callgraph.sh refresh [--project alias]     a projekt minden változott / új / törölt fájlja
+  bash ~/.claude/skills/callgraph/callgraph.sh refresh <fájl|mappa> ... [--project alias]   csak ezek (a gyökérhez képest)
+                                                kiírja: "frissítés: N frissítve, N eltávolítva, N változatlan"; --background:
+                                                azonnal visszatér, a frissítés leválasztott folyamatban fut; ha egy másik
+                                                frissítés fut, kihagyja ("frissítés: kihagyva")
+  bash ~/.claude/skills/callgraph/callgraph.sh hook install|uninstall|status   Claude Code-hook (~/.claude/settings.json):
+                                                Edit / Write / MultiEdit után a szerkesztett fájl a háttérben frissül
+                                                (csak regisztrált, vagy már .callgraph/ mappával rendelkező projektben);
+                                                a többi beállítás marad, előtte settings.json.bak mentés készül
+  Az MCP-szerver (callgraph mcp) a betöltött projekteket figyeli, és a változott fájlokat magától frissíti
+  (kikapcsolás: CALLGRAPH_WATCH=0).
+
 Nyelv (a terminál-kimenet és a súgó nyelve: en = angol, alapértelmezett; hu = magyar):
   bash ~/.claude/skills/callgraph/callgraph.sh set-lang                 az aktuális nyelv és a forrása
   bash ~/.claude/skills/callgraph/callgraph.sh set-lang <en|hu>         a nyelv elmentése (a skill-mappa lang fájljába)

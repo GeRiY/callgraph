@@ -33,11 +33,17 @@ ugyanaz a tömör kimenet, amit a `callgraph show` kiír (ez a token-hatékony r
 ## Biztonság
 
 - **Csak olvas.** Forrásfájlt nem ír; egyetlen mellékhatás a CLI-vel közös projekt-gráf a projekt
-  `.callgraph/` mappájában (ha írható). A jegyzeteket (pilot, `docs/NOTES.md`) is csak olvassa: írni (`note add` / `rm`)
+  `.callgraph/` mappájában (ha írható; a fájlfigyelő is csak ezt frissíti). A jegyzeteket (pilot, `docs/NOTES.md`) is csak olvassa: írni (`note add` / `rm`)
   csak a CLI-vel lehet, MCP-n nincs író eszköz.
 - **Projekt-gráf a memóriában:** a szerver a betöltött projekt-gráfot (`docs/PROJECT-GRAPH.md`: manifest, szűkített tények, a már betöltött teljes rekordok) és a hívó-indexet
   kérésről kérésre megtartja; kérésenként csak a változott fájlok frissülnek, egy közben szerkesztett fájl a következő
   kérésben már látszik.
+- **Fájlfigyelő:** a szerver a már betöltött projekt-gyökereket figyeli (`notify`: macOS FSEvents, Linux inotify,
+  Windows), és a változott fájlokat röviddel (300 ms csend) a változás után a háttérben frissíti a memóriában és a
+  `.callgraph/` tárolóban — így a következő kérés nem elemez. A `.callgraph/`, `.git/`, `target/`, `node_modules/`,
+  `vendor/` és a bejárás által kihagyott fájlok kimaradnak. A válaszok szövege ettől nem változik. Ha a figyelés nem
+  indul (pl. elfogyott az inotify-keret), egyszer szól a stderr-en, és marad a kérésenkénti ellenőrzés. Kikapcsolás:
+  `CALLGRAPH_WATCH=0` a szerver környezetében. Részletek: `docs/PROJECT-GRAPH.md`.
 - **Útvonal-őr:** minden út a projekt-gyökérhez (alias vagy munkakönyvtár) képest oldódik fel; a gyökérből kilépő út
   (`..`, gyökéren kívüli abszolút út, kifelé mutató symlink) hibát ad. A `::` az útban nem megengedett (a metódus
   külön paraméter).

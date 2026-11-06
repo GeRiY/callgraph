@@ -5,6 +5,23 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+### Added
+- **Refresh the project map ahead of time:** `callgraph.sh refresh` brings the project map in `.callgraph/` up to
+  date right away — every changed, new or deleted file, or only the files / folders you name — and prints a one-line
+  summary. Handy after a `git pull` or after an agent wrote many files: the next query no longer has to re-analyse
+  them. `--background` returns at once and does the work in a separate process. Two refreshes never work on the same
+  project at the same time; if one is already running, the other simply skips.
+- **Optional Claude Code hook:** after Claude edits or writes a file, callgraph refreshes that file in the background,
+  so the next question about it is answered instantly. The installer asks whether to add it (`install.sh --hooks`
+  adds it without asking); it only adds one entry to `~/.claude/settings.json`, keeps all other settings and hooks,
+  and saves a `settings.json.bak` backup first. Check or remove it any time: `callgraph.sh hook status` /
+  `callgraph.sh hook uninstall`. It does nothing outside registered projects (or ones that already have a
+  `.callgraph/` folder).
+- **The MCP server keeps itself up to date:** while `callgraph mcp` runs, it watches the projects it has opened and
+  refreshes changed files a moment after they are saved, so queries stay fast. The answers are exactly the same as
+  before. If watching is not possible on a system, it says so once and works as before. To switch it off, set
+  `CALLGRAPH_WATCH=0`.
+
 ### Changed
 - The project website has its own domain: https://callgraph.eu (the old `geriy.github.io/callgraph` address redirects).
 

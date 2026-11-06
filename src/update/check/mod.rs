@@ -17,7 +17,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 #[cfg(test)]
 pub(crate) use policy::INTERVAL_SECS;
 pub(crate) use policy::{CheckEnv, Decision, decide};
-pub(crate) use spawn::{BACKGROUND_ARGS, DetachedProcess, Spawner};
+pub(crate) use spawn::{BACKGROUND_ARGS, DetachedProcess, Spawner, spawn_detached};
 pub(crate) use state::{CheckState, STATE_FILE};
 
 use super::{InstallTarget, Version};

@@ -56,6 +56,19 @@ Notes (pilot — a short note on a file or method, stored outside the source in 
   The outline shows "📝 2026-11-05 20:27 · <text>" under the file header / the method (newest first, max 3),
   --body above the method source. Times are UTC.
 
+Refresh ahead of time (after a git pull or many edits, so the next query does not have to re-analyse):
+  bash ~/.claude/skills/callgraph/callgraph.sh refresh [--project alias]     every changed / new / deleted file of the project
+  bash ~/.claude/skills/callgraph/callgraph.sh refresh <file|dir> ... [--project alias]   only these (paths relative to the root)
+                                                prints "refresh: N updated, N removed, N unchanged"; --background: returns
+                                                at once and refreshes in a detached process; if another refresh is running
+                                                it is skipped ("refresh: skipped")
+  bash ~/.claude/skills/callgraph/callgraph.sh hook install|uninstall|status   Claude Code hook (~/.claude/settings.json):
+                                                after Edit / Write / MultiEdit the edited file is refreshed in the background
+                                                (only in registered projects or ones that already have .callgraph/);
+                                                other settings are kept, a settings.json.bak backup is written first
+  The MCP server (callgraph mcp) watches the projects it has loaded and refreshes changed files by itself
+  (off: CALLGRAPH_WATCH=0).
+
 Language (of the terminal output and the help: en = English, default; hu = Hungarian):
   bash ~/.claude/skills/callgraph/callgraph.sh set-lang                 the current language and where it comes from
   bash ~/.claude/skills/callgraph/callgraph.sh set-lang <en|hu>         save the language (to the skill dir's lang file)

@@ -3,8 +3,16 @@
 # (skill-i18n/SKILL.<en|hu>.md), létrehozza az üres projects.json-t.
 # Az elemzést és a projekt- / feedback-kezelést a natív callgraph bináris végzi (bin/<os>-<arch>/callgraph) — PHP, Node és jq nem kell.
 # Az üzenetek nyelve: CALLGRAPH_LANG › a skill-mappa lang fájlja (friss telepítésnél még nincs) › angol.
-# Használat:  bash install.sh
+# Használat:  bash install.sh [--hooks|--no-hooks]
+#   --hooks: a Claude Code-hook (háttér-frissítés fájl-írás után) kérdés nélkül; --no-hooks: kérdés nélkül kihagyja.
 set -euo pipefail
+HOOKS=""
+for arg in "$@"; do
+    case "$arg" in
+        --hooks) HOOKS=yes ;;
+        --no-hooks) HOOKS=no ;;
+    esac
+done
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$DIR"
 source "$DIR/lib.sh"
@@ -34,6 +42,27 @@ if [[ -n "$RPG" ]]; then
     CALLGRAPH_SKILL_DIR="$DIR" PHP_AST_HOME="${PHP_AST_HOME:-$DIR}" "./$RPG" skill-sync || true
 fi
 [[ -f projects.json ]] || { echo '{}' > projects.json; msg "✓ empty projects.json" "✓ üres projects.json"; }
+# Claude Code-hook (PostToolUse: Edit / Write / MultiEdit → `callgraph refresh` a háttérben): interaktívan rákérdez
+# (alapból nem), nem interaktívan csak a --hooks kapcsolóval; a ~/.claude/settings.json szerkesztését a bináris végzi
+# (a többi beállítás marad, előtte settings.json.bak). Eltávolítás: callgraph.sh hook uninstall
+if [[ -n "$RPG" ]]; then
+    want_hooks="$HOOKS"
+    if [[ -z "$want_hooks" && -t 0 && -t 1 ]]; then
+        if [[ "$(ui_lang)" == hu ]]; then
+            printf 'Claude Code-hook: a szerkesztett fájlok a háttérben frissüljenek a callgraph-ban (~/.claude/settings.json)? [i/N] '
+        else
+            printf 'Claude Code hook: refresh edited files in the callgraph in the background (~/.claude/settings.json)? [y/N] '
+        fi
+        read -r answer || answer=""
+        case "$answer" in [yYiI]*) want_hooks=yes ;; *) want_hooks=no ;; esac
+    fi
+    if [[ "$want_hooks" == yes ]]; then
+        "./$RPG" hook install || msg "⚠ The hook was not installed (see above)." "⚠ A hook nem települt (lásd fent)."
+    else
+        msg "Hook skipped — add later: bash callgraph.sh hook install (remove: bash callgraph.sh hook uninstall)" \
+            "Hook kihagyva — később: bash callgraph.sh hook install (eltávolítás: bash callgraph.sh hook uninstall)"
+    fi
+fi
 msg "Done. Register a project: bash projects.sh add <alias> <absolute_path>" \
     "Kész. Projekt regisztrálása: bash projects.sh add <alias> <abszolút_út>"
 msg "Language: $(ui_lang) — switch: bash callgraph.sh set-lang <en|hu>" \

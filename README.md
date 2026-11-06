@@ -223,6 +223,16 @@ claude mcp add -s user callgraph -- "$env:USERPROFILE\.claude\skills\callgraph\b
 
 Claude Desktop, Cursor and VS Code use a JSON entry with `"command": "<absolute path to the binary>", "args": ["mcp"]`.
 Recipes, tool parameters and safety notes (Hungarian): [`docs/MCP.md`](docs/MCP.md).
+While it runs, the MCP server watches the projects it has loaded and refreshes changed files by itself.
+
+### Keeping the project map fresh
+
+After a `git pull` or many edits, `bash ~/.claude/skills/callgraph/callgraph.sh refresh [--project alias]` (add
+`--background` to return at once) updates the project map in advance, so the next query does not have to re-analyse.
+Optional Claude Code hook: `bash install.sh --hooks` (or `callgraph.sh hook install`) refreshes every file Claude
+edits in the background; it adds one entry to `~/.claude/settings.json`, keeps everything else and writes a
+`settings.json.bak` backup first. Remove it with `bash ~/.claude/skills/callgraph/callgraph.sh hook uninstall`.
+Details (Hungarian): [`docs/PROJECT-GRAPH.md`](docs/PROJECT-GRAPH.md).
 
 ### Feedback from agents
 

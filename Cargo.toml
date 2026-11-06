@@ -44,6 +44,9 @@ tree-sitter-swift = "=0.7.4"
 # MCP-szerver (`callgraph mcp`): a hivatalos Rust SDK, csak szerver + stdio + makrók; tokio minimális funkciókkal
 rmcp = { version = "=3.8.0", default-features = false, features = ["server", "macros", "transport-io"] }
 tokio = { version = "1", default-features = false, features = ["rt"] }
+# MCP-fájlfigyelő (`graph::watch`): macOS FSEvents, Linux inotify, Windows ReadDirectoryChangesW; a mago-database
+# is ezt a verziót használja, így nem kerül be új crate
+notify = "=8.2.1"
 # self-update: pure-Rust HTTPS (rustls, no OpenSSL) and zip (deflate only)
 ureq = { version = "=3.5.1", default-features = false, features = ["rustls"] }
 # self-update: SHA-256 of the downloaded package (SHA256SUMS), pure Rust

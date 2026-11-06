@@ -15,6 +15,7 @@ Kód: `src/graph/` — `ProjectGraph` (`store.rs`), a bináris formátum (`codec
   graph.pack         a teljes rekordok, csak hozzáfűzve: FileGraph (veszteségmentesen) + hívás-sorok
   facts.bin          a szűkített rekordok fájlonként: a teljes hatókörű lekérdezések mezői + hívás-sorok
   notes.jsonl        a jegyzetek (külön funkció, a gráf nem nyúl hozzá)
+  refresh.lock       a frissítők zárfájlja (`callgraph refresh`, MCP-figyelő; üres, a tároló törlése nem érinti)
   .gitignore         `*`
 ```
 
@@ -82,6 +83,42 @@ adatvesztést. Teszt: `graph::tests::stored_graphs_round_trip_exactly` (minden g
 `graph::shared(gyökér)` gyökerenként egy példányt ad a folyamatban (`Arc<Mutex<ProjectGraph>>`). A CLI-ben ez egy
 hívás; az **MCP-szerver** (`callgraph mcp`) hosszan fut, ott a manifest, a szűkített tények, a hívó-index és a már
 betöltött teljes rekordok kérésről kérésre megmaradnak, és kérésenként csak a változott fájlok frissülnek.
+
+## Előre-frissítés: `callgraph refresh`, hook, MCP-fájlfigyelő
+
+Sok változás után (git pull, egy sok fájlt író agent) az első lekérdezésnek kellene újraelemeznie. Ezt a munkát
+előre is el lehet végezni; a lekérdezések kimenete ettől nem változik (a bélyeg-ellenőrzés továbbra is fut).
+
+- **`callgraph refresh [--project <alias|gyökér>] [--background] [<fájl|mappa>…]`** (`callgraph.sh refresh …`) — a
+  megadott fájlok / mappák (relatív út a gyökérhez képest), út nélkül a projekt minden változott, új és törölt
+  fájlja naprakészre kerül a gráfban (a szűkített tények is), majd mentés és egysoros összegzés:
+  `refresh: 3 updated, 1 removed, 120 unchanged (<gyökér>)`. Csak a bejárás által is felvett kódfájlok számítanak
+  (`FileWalker::includes`); egy nem létező út (törölt fájl, törölt mappa) ismert fájljai kikerülnek. A gyökér, mint a
+  `note`-nál: alias › mappa-út › munkakönyvtár. Kód: `src/graph/refresh.rs`, `src/cli/commands/refresh.rs`.
+- **`--background`:** a bináris önmagát indítja leválasztva (`--background` nélkül, ugyanazzal az indítóval, mint a
+  háttér-frissítés-ellenőrzés: `update::check::spawn_detached`), és azonnal visszatér.
+- **Zár:** egyszerre egy frissítő dolgozik egy tárolón: `.callgraph/refresh.lock` az operációs rendszer fájlzárával
+  (`File::try_lock`; egy összeomlott folyamat után magától feloldódik). Ha egy másik frissítő 2 másodperc után is
+  tartja, a `refresh` kihagyja (`refresh: skipped …`, kilépési kód 0). Ha a fájlrendszer nem támogat zárat, zár
+  nélkül fut. A lekérdezések nem várnak a zárra: egy velük párhuzamos írás legfeljebb újraelemzést okoz (a manifest,
+  a `facts.bin` és az új pack írása atomikus, a pack-rekordok a saját útjukat és bélyegüket hordozzák).
+- **Claude Code-hook:** `callgraph hook install` (vagy `bash install.sh --hooks`) egy `PostToolUse` hookot vesz fel
+  a `~/.claude/settings.json`-ba (`$CLAUDE_CONFIG_DIR`, ill. `--settings <fájl>` felülírja) az `Edit|Write|MultiEdit`
+  eszközökre: `"<bináris>" hook post-edit`. A hook a stdin-en kapott JSON-ból (`tool_input.file_path`) kiveszi a
+  fájlt, megkeresi a projektjét (felfelé az első regisztrált alias-gyökér, vagy egy mappa, amelyben már van
+  `.callgraph/`; ha nincs ilyen, semmit sem tesz), és ha kódfájl, leválasztva elindítja rá a `callgraph refresh`-t.
+  Mindig azonnal, 0-val lép ki, és nem ír ki semmit. A szerkesztés megtartja a többi beállítást és hookot
+  (idempotens; egy régebbi bináris-út helyére kerül), írás előtt `settings.json.bak` mentés készül.
+  `callgraph hook status` megmutatja, `callgraph hook uninstall` eltávolítja (a kiürült `PostToolUse` / `hooks`
+  kulcsokkal együtt). Kód: `src/hook/`, `src/cli/commands/hook.rs`.
+- **MCP-fájlfigyelő:** a `callgraph mcp` futása alatt a betöltött projekt-gyökereket a `notify` crate figyeli (macOS
+  FSEvents, Linux inotify, Windows ReadDirectoryChangesW), és a változott fájlokat 300 ms csend után (folyamatos
+  írásnál legfeljebb 2 s késéssel) frissíti a memóriában lévő gráfban, majd ment (ha a `refresh.lock` szabad;
+  különben a következő lekérdezés ment). Kimarad: `.callgraph/`, `.git/`, `target/`, `node_modules/`, `vendor/` és
+  minden, amit a bejárás kihagyna; mappa csak létrehozáskor / törléskor / átnevezéskor számít. Ha a figyelés nem
+  indul (pl. az inotify-korlát), egyszer szól a stderr-en, és minden marad a lekérdezésenkénti bélyeg-ellenőrzésen.
+  Kikapcsolás: `CALLGRAPH_WATCH=0`. Kód: `src/graph/watch.rs` (az időzítés: `Debouncer`, determinisztikusan
+  tesztelve).
 
 ## Kimenet és összevetés
 
