@@ -53,8 +53,23 @@ projektmappában indítja a szervert.
 
 ### Claude Code
 
+macOS / Linux (az `uname` alapján a géphez illő binárist választja; `-s user`: minden projektben elérhető):
+
 ```bash
-claude mcp add callgraph -- ~/.claude/skills/callgraph/bin/linux-x86_64/callgraph mcp
+claude mcp add -s user callgraph -- \
+  ~/.claude/skills/callgraph/bin/$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)/callgraph mcp
+```
+
+Windows (PowerShell):
+
+```powershell
+claude mcp add -s user callgraph -- "$env:USERPROFILE\.claude\skills\callgraph\bin\windows-x86_64\callgraph.exe" mcp
+```
+
+A JSON-beállításokhoz kellő abszolút utat ez írja ki (macOS / Linux):
+
+```bash
+echo ~/.claude/skills/callgraph/bin/$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)/callgraph
 ```
 
 (Claude Code-ban a skill is elérhető; a kettő megfér egymás mellett.)

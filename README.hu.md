@@ -212,7 +212,14 @@ Eszközök: `outline`, `method_body`, `find_callers`, `search`, `framework_view`
 adják, mint a CLI, ugyanazzal a kimeneti korláttal; csak olvas, hálózat nincs, az utak a projekt-gyökéren belül maradnak.
 
 ```bash
-claude mcp add callgraph -- ~/.claude/skills/callgraph/bin/linux-x86_64/callgraph mcp   # Claude Code
+# Claude Code, macOS / Linux (a géphez illő binárist választja):
+claude mcp add -s user callgraph -- \
+  ~/.claude/skills/callgraph/bin/$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)/callgraph mcp
+```
+
+```powershell
+# Claude Code, Windows (PowerShell):
+claude mcp add -s user callgraph -- "$env:USERPROFILE\.claude\skills\callgraph\bin\windows-x86_64\callgraph.exe" mcp
 ```
 
 Claude Desktop, Cursor és VS Code: JSON-bejegyzés `"command": "<a bináris abszolút útja>", "args": ["mcp"]` alakban.

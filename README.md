@@ -211,7 +211,14 @@ Tools: `outline`, `method_body`, `find_callers`, `search`, `framework_view`, `pr
 text as the CLI, with the same output cap; read-only, no network, paths are confined to the project root.
 
 ```bash
-claude mcp add callgraph -- ~/.claude/skills/callgraph/bin/linux-x86_64/callgraph mcp   # Claude Code
+# Claude Code, macOS / Linux (picks the binary for your platform):
+claude mcp add -s user callgraph -- \
+  ~/.claude/skills/callgraph/bin/$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)/callgraph mcp
+```
+
+```powershell
+# Claude Code, Windows (PowerShell):
+claude mcp add -s user callgraph -- "$env:USERPROFILE\.claude\skills\callgraph\bin\windows-x86_64\callgraph.exe" mcp
 ```
 
 Claude Desktop, Cursor and VS Code use a JSON entry with `"command": "<absolute path to the binary>", "args": ["mcp"]`.
