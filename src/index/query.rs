@@ -156,13 +156,17 @@ impl CallerIndex {
                 ))
             })?;
         let mut result = Vec::new();
+        // a saját példányon át hívott (`$this->m()`) él célja a hívó típusán is: `Ns\Osztály::m` (a `lookup`),
+        // így a `Típus::metódus` minta — és a leszármazottakon át a `via` — az örökölt hívást is megtalálja
+        let direct = |edge: &Edge| {
+            matcher.is_match(&edge.row.target)
+                || own_target(edge).is_some_and(|o| matcher.is_match(o))
+        };
         // a `?::név` (feloldatlan fogadójú) cél a `Típus::név` mintára név szerint, bizonytalanként illeszkedik
         let mut front: Vec<Edge> = self
             .edges
             .iter()
-            .filter(|edge| {
-                matcher.is_match(&edge.row.target) || uncertain_match(&matcher, &edge.row.target)
-            })
+            .filter(|edge| direct(edge) || uncertain_match(&matcher, &edge.row.target))
             .cloned()
             .map(|mut edge| {
                 edge.row.guessed |= is_uncertain(&edge.row.target);
@@ -171,10 +175,12 @@ impl CallerIndex {
             .collect();
         if let Some(via) = ViaMatcher::new(&self.hierarchy, pattern, &matcher) {
             front.extend(self.edges.iter().filter_map(|edge| {
-                if matcher.is_match(&edge.row.target) {
+                if direct(edge) {
                     return None;
                 }
-                let label = via.via(&edge.row.target)?;
+                let label = via
+                    .via(&edge.row.target)
+                    .or_else(|| own_target(edge).and_then(|o| via.via(o)))?;
                 let mut edge = edge.clone();
                 edge.row.via = Some(label.to_owned());
                 Some(edge)
@@ -345,6 +351,12 @@ impl CallerIndex {
         }
         (result, skipped)
     }
+}
+
+/// A saját példányon át hívott (`$this->m()`, feloldatlan belső) él célja a hívó típusán: a `lookup`
+/// (`Ns\\Osztály::m`), ha eltér a nyers céltól.
+fn own_target(edge: &Edge) -> Option<&str> {
+    (edge.lookup != edge.row.target).then_some(edge.lookup.as_str())
 }
 
 fn symbol_key(namespace: &str, container: Option<&str>, caller: &str) -> String {

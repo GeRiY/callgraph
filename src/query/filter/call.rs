@@ -4,24 +4,50 @@ use crate::index::ViaMatcher;
 use crate::model::{Call, FileGraph};
 
 pub(crate) trait CallFilter {
-    fn matches(&self, call: &Call) -> bool;
+    fn matches(&self, graph: &FileGraph, call: &Call) -> bool;
+}
+
+/// A saját példányon át hívott metódus (`$this->m()`, `this.m()`, `self.m()`) célja a hívó típusán:
+/// `Ns\Osztály::m`. Így a `Típus::metódus` minta (és rajta át a leszármazottak „via” illesztése) az örökölt
+/// `$this->` hívást is megtalálja. `None`, ha a hívás már fel van oldva, vagy nem a saját példányon megy.
+pub(crate) fn receiver_target(graph: &FileGraph, call: &Call) -> Option<String> {
+    if call.resolved.is_some() || !matches!(call.on.as_deref(), Some("this" | "self")) {
+        return None;
+    }
+    let container = call.container.as_deref().filter(|c| !c.is_empty())?;
+    let method = call.target.as_str();
+    if method.is_empty() || method.contains(['.', ':', '>', '(', ' ']) {
+        return None;
+    }
+    Some(
+        match graph.namespace.as_deref().filter(|ns| !ns.is_empty()) {
+            Some(ns) => format!("{ns}\\{container}::{method}"),
+            None => format!("{container}::{method}"),
+        },
+    )
 }
 
 /// A minta: a hívás-célra illeszkedő regex, vagy (ha van) a rokon típuson át hívott keresett metódus.
 struct RegexSpec(Regex, Option<ViaMatcher>);
 impl CallFilter for RegexSpec {
-    fn matches(&self, call: &Call) -> bool {
+    fn matches(&self, graph: &FileGraph, call: &Call) -> bool {
         let target = call.resolved.as_deref().unwrap_or(&call.target);
         // `?::név` (feloldatlan fogadó): a `Típus::név` minta név szerint illeszkedik rá
-        self.0.is_match(target)
+        if self.0.is_match(target)
             || crate::index::uncertain_match(&self.0, target)
             || self.1.as_ref().is_some_and(|via| via.via(target).is_some())
+        {
+            return true;
+        }
+        receiver_target(graph, call).is_some_and(|own| {
+            self.0.is_match(&own) || self.1.as_ref().is_some_and(|via| via.via(&own).is_some())
+        })
     }
 }
 
 struct CategorySpec(Vec<String>);
 impl CallFilter for CategorySpec {
-    fn matches(&self, call: &Call) -> bool {
+    fn matches(&self, _graph: &FileGraph, call: &Call) -> bool {
         self.0.iter().any(|category| category == &call.category)
     }
 }
@@ -59,7 +85,7 @@ impl FilterChain {
         let calls: Vec<_> = graph
             .calls
             .iter()
-            .filter(|call| self.specs.iter().all(|spec| spec.matches(call)))
+            .filter(|call| self.specs.iter().all(|spec| spec.matches(graph, call)))
             .cloned()
             .collect();
         if calls.is_empty() {

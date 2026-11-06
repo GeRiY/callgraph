@@ -51,6 +51,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   docblock, `--raw` still prints the exact source. The MCP `method_body` tool works the same way.
 - The project website has its own domain: https://callgraph.eu (the old `geriy.github.io/callgraph` address redirects).
 
+### Fixed
+- **"Who calls it" now finds calls from child classes:** searching for a method with its class name
+  (`--grep FrontendController::redirectToNewDashboard`, or the MCP `find_callers` tool) missed the places where a
+  child class calls the inherited method as `$this->redirectToNewDashboard()` — only the bare method name found them.
+  Now these calls are found too, marked with the child class (`L139 via EventeditController │ …`). A child class that
+  has its own version of the method is not counted, because its call runs its own version.
+
 ## [0.3.0] — 2026-11-06
 
 ### Changed
