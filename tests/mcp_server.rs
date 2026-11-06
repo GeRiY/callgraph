@@ -117,6 +117,7 @@ fn initialize_list_and_call_outline() {
             "find_callers",
             "framework_view",
             "guide",
+            "locate",
             "method_body",
             "notes",
             "outline",
@@ -286,6 +287,74 @@ fn the_server_keeps_the_project_graph_and_sees_edits() {
         .output()
         .unwrap();
     assert_eq!(body, String::from_utf8_lossy(&cli.stdout));
+    drop(s);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// `locate`: a feladat nevei egy hívásban → rangsorolt fájlok indoklással, a CLI-vel azonos szöveggel; üres
+/// kifejezés-lista eszköz-hiba.
+#[test]
+fn locate_ranks_the_starting_files_like_the_cli() {
+    let id = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let dir =
+        std::env::temp_dir().join(format!("callgraph-mcp-locate-{}-{id}", std::process::id()));
+    let files = [
+        (
+            "src/RefundService.php",
+            "<?php\nnamespace App;\n\nclass RefundService\n{\n    public function processRefund(int $id): void\n    {\n    }\n}\n",
+        ),
+        (
+            "src/Order.php",
+            "<?php\nnamespace App;\n\nclass Order\n{\n    public function paid(): string\n    {\n        return 'payment_status';\n    }\n}\n",
+        ),
+    ];
+    for (path, body) in files {
+        let path = dir.join(path);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, body).unwrap();
+    }
+    let dir = dir.canonicalize().unwrap();
+    let mut s = Session::start_in(&dir);
+    s.send(
+        json!({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
+        "protocolVersion": "2025-06-18", "capabilities": {},
+        "clientInfo": {"name": "test", "version": "0"}}}),
+    );
+    s.response(1);
+    s.send(json!({"jsonrpc": "2.0", "method": "notifications/initialized"}));
+    let args = json!({"terms": ["processRefund", "payment_status", "nothingLikeThis"]});
+    let found = s.call(2, "locate", args.clone());
+    assert_ne!(found["isError"], json!(true), "{found}");
+    let body = text(&found).to_owned();
+    assert!(body.contains("locate: 3 terms · "), "{body}");
+    assert!(body.contains("1. src/RefundService.php"), "{body}");
+    assert!(body.contains("(exact method)"), "{body}");
+    assert!(body.contains("'payment_status'"), "{body}");
+    assert!(body.contains("no match: nothingLikeThis"), "{body}");
+    // egyetlen string is elég
+    let single = s.call(3, "locate", json!({"terms": "Order"}));
+    assert!(text(&single).contains("Order.php"), "{single}");
+    let empty = s.call(4, "locate", json!({"terms": []}));
+    assert_eq!(empty["isError"], json!(true), "{empty}");
+    // a CLI-vel azonos (egy későbbi hívás: az esetleges frissítés-értesítés csak az első eredmény végén áll)
+    let again = s.call(5, "locate", args);
+    let cli = Command::new(env!("CARGO_BIN_EXE_callgraph"))
+        .args([
+            "locate",
+            "processRefund",
+            "payment_status",
+            "nothingLikeThis",
+        ])
+        .arg("--project")
+        .arg(&dir)
+        .env("CALLGRAPH_LANG", "en")
+        .env("CALLGRAPH_REGISTRY", "/nonexistent/projects.json")
+        .output()
+        .unwrap();
+    assert_eq!(text(&again), String::from_utf8_lossy(&cli.stdout));
     drop(s);
     let _ = std::fs::remove_dir_all(&dir);
 }

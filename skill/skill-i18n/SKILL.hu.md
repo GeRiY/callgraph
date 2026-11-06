@@ -1,6 +1,6 @@
 ---
 name: callgraph
-description: PHP / Rust / JS / TS / Vue / Swift kódbázis token-hatékony feltérképezése AST-elemzéssel, a fájl beolvasása NÉLKÜL — kategorizált hívás-gráf (osztály/komponens, metódus/függvény sortartománnyal), metódus-törzs, "hol hívják" keresés, hatáselemzés (--depth), string- és konstans-keresés, vezérlési ágak, framework-nézetek (routes, validation, events…). Használd PHP-, .rs-, .vue-, .js-, .ts-, .swift-fájl megértéséhez, hívási kapcsolatok, "ki hívja / hol használják" kérdésekhez — ez legyen az ELSŐ lépés a teljes Read/Grep helyett. NE használd nem kód fájlra (md, json, css, sima szöveg), vagy ha a pontos fájlszöveg kell egy már ismert sávban (akkor --lines vagy célzott Read).
+description: PHP / Rust / JS / TS / Vue / Swift kódbázis token-hatékony feltérképezése AST-elemzéssel, a fájl beolvasása NÉLKÜL — honnan induljak egy feladattal (locate: rangsorolt fájlok a feladat neveiből), kategorizált hívás-gráf (osztály/komponens, metódus/függvény sortartománnyal), metódus-törzs, "hol hívják" keresés, hatáselemzés (--depth), string- és konstans-keresés, vezérlési ágak, framework-nézetek (routes, validation, events…). Használd PHP-, .rs-, .vue-, .js-, .ts-, .swift-fájl megértéséhez, hívási kapcsolatok, "ki hívja / hol használják" kérdésekhez — ez legyen az ELSŐ lépés a teljes Read/Grep helyett. NE használd nem kód fájlra (md, json, css, sima szöveg), vagy ha a pontos fájlszöveg kell egy már ismert sávban (akkor --lines vagy célzott Read).
 ---
 
 # callgraph — kód-térkép Read nélkül
@@ -18,6 +18,24 @@ bash <skill>/projects.sh list
 
 Utána `--project myapp` mellett a gyökérhez képesti rövid út adható meg. `--project` nélkül az aktuális
 mappa a gyökér.
+
+## 1. lépés — honnan induljak: `locate` (a feladat első hívása)
+
+<!-- mcp:start -->
+**Melyik eszköz mire:** sima szövegkeresés (pontos szöveg, log-üzenet, konfig-érték) → Grep, arra az a legjobb;
+„honnan induljak ezzel a feladattal?” → `locate`; definíciók, szerkezet, hívók, hatás → callgraph (outline,
+`--body`, `--grep`, `--depth`).
+**A feladat első hívása:** add át a `locate`-nek a feladat neveit és fogalmait EGY hívásban: függvény-, osztály- és
+fájlneveket, oszlopokat, útvonalakat, fordítási kulcsokat, a nem angol domain-szavaknak pedig az angol
+kódnév-megfelelőjét is (pl. visszatérítés → `refund`). A projekt-térképből válaszol, fájl-olvasás nélkül: az első 5
+fájl (`--all`: minden találat), mindegyik az indoklásával (pontos definíció, fájlnév, név-részlet, string, hívás,
+`hívók: N`). Ezekkel a fájlokkal folytasd: outline / `--body` / `--grep`.
+<!-- /mcp -->
+
+```bash
+bash <skill>/callgraph.sh locate RefundController processRefund refund payment_status checkout.vue --project myapp   # honnan induljak: rangsorolt fájlok + indoklás
+bash <skill>/callgraph.sh locate refund --all --project myapp                                                       # minden egyező fájl, nem csak az első 5
+```
 
 ## Gyors parancsok
 
@@ -121,8 +139,10 @@ property típusa előtt látszik. Hívás-kategóriák: `swiftui_view`, `swiftui
 <!-- mcp:tools -->
 callgraph (`callgraph mcp`): AST-alapú, token-hatékony kód-térkép (PHP, Rust, JS / TS / Vue, Swift, SCSS); a CLI
 lekérdezései csak olvasó eszközként, azonos kimenettel. Kódfájl beolvasása előtt használd. Az utak a projektgyökérhez
-relatívak: regisztrált alias (`project`, lista: `projects`) vagy a szerver munkakönyvtára. Szokásos menet: `outline`
-→ `method_body` csak a szükséges metódusra → `find_callers` a név szerinti mintával (lásd lent).
+relatívak: regisztrált alias (`project`, lista: `projects`) vagy a szerver munkakönyvtára. Szokásos menet: `locate`
+(honnan induljak) → `outline` → `method_body` csak a szükséges metódusra → `find_callers` a név szerinti mintával.
+- `locate` `{terms}`: honnan induljak egy feladattal (lásd fent): rangsorolt fájlok indoklással, a feladat neveiből
+  és fogalmaiból egy hívásban; `all: true` = minden találat, nem csak az első 5.
 - `outline` `{path}`: fájl vagy mappa szerkezete: osztályok / komponensek, metódusok sortartománnyal, hívások
   kategóriánként. Ezzel kezdd. `method`: egy metódus hívás-gráfja; `format`: `api`, `flow` (ágak), `summary`, `hotspots`.
 - `method_body` `{path, method}`: sorszámozott forrás; a `method` egy név vagy lista (`["store", "update"]`). Alapból
@@ -139,7 +159,7 @@ relatívak: regisztrált alias (`project`, lista: `projects`) vagy a szerver mun
 A kimenet 400 sornál korlátos (mappa → summary, fájl → metódus-index, keresés → találatonként 1 sor): előbb a `path`,
 a `method` vagy a `pattern` szűkítése; `full: true` csak indokolt esetben.
 <!-- /mcp -->
-CLI-megfelelők: `outline` = `bash $CG <út>` (`method` = `<út>::név`), `method_body` = `::név --body`,
+CLI-megfelelők: `locate` = `bash $CG locate <kifejezés>…`, `outline` = `bash $CG <út>` (`method` = `<út>::név`), `method_body` = `::név --body`,
 `find_callers` = `--grep`, `search` = `--strings` / `--const`, `framework_view` = `--format <nézet>`, `notes` = `--notes`.
 
 ## Kimenet-korlát

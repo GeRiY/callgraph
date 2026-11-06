@@ -6,6 +6,8 @@
 # `callgraph.sh note add|list|rm …` (pilot) manages notes on files / methods (forwarded to `callgraph note`).
 # `callgraph.sh refresh [--project alias] [--background] [<path>…]` brings the project graph up to date
 # (forwarded to `callgraph refresh`); `callgraph.sh hook install|uninstall|status` manages the Claude Code hook.
+# `callgraph.sh locate <term>… [--all] [--project alias]` lists where to start with a task (ranked files + reasons;
+# forwarded to `callgraph locate`).
 # Help: skill/help/callgraph.en.txt and skill/help/callgraph.hu.txt (`callgraph.sh --help`).
 
 set -uo pipefail
@@ -28,6 +30,13 @@ fi
 # előre-frissítés: `callgraph.sh refresh [--project alias] [--background] [<út>…]` → `callgraph refresh …`;
 # a Claude Code-hook kezelése: `callgraph.sh hook install|uninstall|status` → `callgraph hook …`
 if [[ "${1:-}" == refresh || "${1:-}" == hook ]]; then
+    run_callgraph "$@"
+fi
+# kiindulópont-kereső: `callgraph.sh [--project alias] locate <kifejezés>… [--all]` → `callgraph locate …`
+if [[ "${1:-}" == --project && "${3:-}" == locate ]]; then
+    run_callgraph locate --project "$2" "${@:4}"
+fi
+if [[ "${1:-}" == locate ]]; then
     run_callgraph "$@"
 fi
 for a in "$@"; do

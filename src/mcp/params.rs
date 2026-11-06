@@ -175,6 +175,21 @@ pub(crate) struct NotesParams {
     pub project: Option<String>,
 }
 
+/// `locate`: kiindulópont-kereső — a feladat nevei és fogalmai egy hívásban.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, JsonSchema)]
+pub(crate) struct LocateParams {
+    /// Names and domain terms from the task, in code form: function / class / file names, columns, routes, and the
+    /// English code name of a non-English domain word (`["RefundController", "processRefund", "refund",
+    /// "payment_status", "checkout.vue"]`); a single string works too.
+    pub terms: OneOrMany,
+    /// Registered project alias; default: the server's working directory.
+    #[serde(default)]
+    pub project: Option<String>,
+    /// Every matching file instead of the top 5.
+    #[serde(default)]
+    pub all: bool,
+}
+
 impl OutlineFormat {
     pub(crate) fn as_str(self) -> &'static str {
         match self {
@@ -221,6 +236,20 @@ mod tests {
         assert_eq!(many.method.into_vec(), vec!["a".to_owned(), "b".to_owned()]);
         let wrong = serde_json::json!({"path": "a.rs", "method": 3});
         assert!(serde_json::from_value::<MethodBodyParams>(wrong).is_err());
+    }
+
+    #[test]
+    fn locate_terms_accept_a_string_or_an_array() {
+        let one: LocateParams =
+            serde_json::from_value(serde_json::json!({"terms": "refund"})).unwrap();
+        assert_eq!(one.terms.into_vec(), vec!["refund".to_owned()]);
+        let many: LocateParams = serde_json::from_value(
+            serde_json::json!({"terms": ["refund", "checkout.vue"], "all": true}),
+        )
+        .unwrap();
+        assert!(many.all && many.project.is_none());
+        assert_eq!(many.terms.into_vec().len(), 2);
+        assert!(serde_json::from_value::<LocateParams>(serde_json::json!({})).is_err());
     }
 
     #[test]

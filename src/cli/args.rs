@@ -9,8 +9,8 @@ use crate::query::format::BodyMode;
 
 fn usage() -> &'static str {
     crate::t!(
-        "callgraph [--lang <id,...>] [--cache <file>] [--no-cache] <file|dir> [...] | callgraph prune [--cache <file>] [--dry-run] | callgraph set-lang [en|hu] | callgraph self-update [--check] | callgraph note add|list|rm … | callgraph refresh [--project <alias|dir>] [--background] [<path>…] | callgraph hook install|uninstall|status | callgraph mcp [--auto-update] | callgraph --version",
-        "callgraph [--lang <id,...>] [--cache <fájl>] [--no-cache] <fájl|mappa> [...] | callgraph prune [--cache <fájl>] [--dry-run] | callgraph set-lang [en|hu] | callgraph self-update [--check] | callgraph note add|list|rm … | callgraph refresh [--project <alias|mappa>] [--background] [<út>…] | callgraph hook install|uninstall|status | callgraph mcp [--auto-update] | callgraph --version"
+        "callgraph [--lang <id,...>] [--cache <file>] [--no-cache] <file|dir> [...] | callgraph prune [--cache <file>] [--dry-run] | callgraph set-lang [en|hu] | callgraph self-update [--check] | callgraph note add|list|rm … | callgraph refresh [--project <alias|dir>] [--background] [<path>…] | callgraph locate <term>... [--all] [--project <alias|dir>] | callgraph hook install|uninstall|status | callgraph mcp [--auto-update] | callgraph --version",
+        "callgraph [--lang <id,...>] [--cache <fájl>] [--no-cache] <fájl|mappa> [...] | callgraph prune [--cache <fájl>] [--dry-run] | callgraph set-lang [en|hu] | callgraph self-update [--check] | callgraph note add|list|rm … | callgraph refresh [--project <alias|mappa>] [--background] [<út>…] | callgraph locate <kifejezés>... [--all] [--project <alias|mappa>] | callgraph hook install|uninstall|status | callgraph mcp [--auto-update] | callgraph --version"
     )
 }
 
@@ -134,6 +134,13 @@ pub enum CliArgs {
         project: Option<String>,
         background: bool,
     },
+    /// `locate`: kiindulópont-kereső a feladat neveire / fogalmaira; `all`: minden egyező fájl (alapból 5);
+    /// `project`: alias vagy gyökér-út.
+    Locate {
+        terms: Vec<String>,
+        all: bool,
+        project: Option<String>,
+    },
     /// `hook post-edit|install|uninstall|status`; `settings`: a Claude Code `settings.json` helye (alapból
     /// `~/.claude/settings.json`).
     Hook {
@@ -184,6 +191,9 @@ impl CliArgs {
         }
         if args.first().is_some_and(|a| a == "refresh") {
             return Self::parse_refresh(&args[1..]);
+        }
+        if args.first().is_some_and(|a| a == "locate") {
+            return Self::parse_locate(&args[1..]);
         }
         if args.first().is_some_and(|a| a == "hook") {
             return Self::parse_hook(&args[1..]);
@@ -448,6 +458,42 @@ impl CliArgs {
             paths,
             project,
             background,
+        })
+    }
+
+    /// `locate <kifejezés>… [--all] [--project <alias|út>]`; `--` után minden kifejezés (a `-`-sel kezdődők is).
+    fn parse_locate(args: &[String]) -> Result<Self> {
+        let usage = || CallgraphError::Usage(crate::locate::usage().into());
+        let mut terms = Vec::new();
+        let mut project = None;
+        let mut all = false;
+        let mut i = 0;
+        while i < args.len() {
+            match args[i].as_str() {
+                "--" => {
+                    terms.extend(args[i + 1..].iter().cloned());
+                    break;
+                }
+                "--all" => all = true,
+                "--project" if i + 1 < args.len() => {
+                    project = Some(args[i + 1].clone());
+                    i += 1;
+                }
+                x if x.starts_with("--project=") => project = Some(x[10..].to_owned()),
+                x if x.starts_with('-') && x.len() > 1 => return Err(usage()),
+                x => terms.push(x.to_owned()),
+            }
+            i += 1;
+        }
+        if terms.iter().all(|t| t.trim().is_empty())
+            || project.as_deref().is_some_and(str::is_empty)
+        {
+            return Err(usage());
+        }
+        Ok(Self::Locate {
+            terms,
+            all,
+            project,
         })
     }
 
@@ -812,6 +858,38 @@ mod tests {
         );
         assert!(parse(&["refresh", "--bogus"]).is_err());
         assert!(parse(&["refresh", "--project="]).is_err());
+    }
+
+    #[test]
+    fn parses_locate() {
+        assert_eq!(
+            parse(&[
+                "locate",
+                "RefundController",
+                "--all",
+                "--project",
+                "sp",
+                "refund"
+            ])
+            .unwrap(),
+            CliArgs::Locate {
+                terms: vec!["RefundController".into(), "refund".into()],
+                all: true,
+                project: Some("sp".into()),
+            }
+        );
+        assert_eq!(
+            parse(&["locate", "--project=/x", "--", "-odd"]).unwrap(),
+            CliArgs::Locate {
+                terms: vec!["-odd".into()],
+                all: false,
+                project: Some("/x".into()),
+            }
+        );
+        assert!(parse(&["locate"]).is_err());
+        assert!(parse(&["locate", "--all"]).is_err());
+        assert!(parse(&["locate", "x", "--bogus"]).is_err());
+        assert!(parse(&["locate", "x", "--project="]).is_err());
     }
 
     #[test]

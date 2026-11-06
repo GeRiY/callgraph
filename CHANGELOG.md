@@ -6,6 +6,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 ## [Unreleased]
 
 ### Added
+- **Where to start with a task — `locate`:** give it the names and terms from a task in one go (`callgraph.sh locate
+  RefundController processRefund refund payment_status checkout.vue`, or the new `locate` tool over MCP) and it lists
+  the few files worth opening first, best first, each with the reason: the class or method of that name, the file of
+  that name, a name that contains the word (`refund` → `RefundJob`, `refunds_table`), a text such as a column name or
+  route, or a call to it. It answers from the project map without reading the code again, so it is quick. A file that
+  matches several of your terms comes before one that matches a single term many times. It shows 5 files (`--all`
+  for every match) and says which terms found nothing and which are too general. The skill and MCP instructions now
+  also tell agents when to use it, and when plain text search (grep) is the better tool.
 - **Exclude extensions per project:** a `.callgraphignore` file in the project root (or in any subfolder; the nearest
   one applies) lists extensions callgraph should skip there, one per line (`md`, `.json` or `*.vue`; `#` starts a
   comment). Commit it, and everyone on the team gets the same results. A file you name directly with an excluded

@@ -57,6 +57,14 @@ Jegyzetek (pilot — rövid jegyzet egy fájlhoz vagy metódushoz, a forráson k
   Az outline a fájl-fejléc / a metódus alatt mutatja: "📝 2026-11-05 20:27 · <szöveg>" (legújabb elöl, legfeljebb 3),
   a --body a metódus forrása fölött. Az idő UTC.
 
+Honnan induljak a feladattal (egy hívás a feladat neveivel és fogalmaival):
+  bash ~/.claude/skills/callgraph/callgraph.sh locate <kifejezés>... [--all] [--project alias]
+                                                rangsorolt fájlok a projekt-térképből (forrás olvasása nélkül), fájlonként
+                                                legfeljebb 3 indoklással: pontos definíció, fájlnév, név-részlet (camelCase /
+                                                snake_case / kebab-case, egyes / többes szám), string-literál, hívás; "hívók: N";
+                                                az első 5 fájl, --all: minden egyező fájl; a "nincs találat: …" a meg nem
+                                                talált, a "túl általános" a 30-nál több fájlban egyező kifejezéseket sorolja
+
 Előre-frissítés (git pull vagy sok szerkesztés után, hogy a következő lekérdezésnek ne kelljen újraelemeznie):
   bash ~/.claude/skills/callgraph/callgraph.sh refresh [--project alias]     a projekt minden változott / új / törölt fájlja
   bash ~/.claude/skills/callgraph/callgraph.sh refresh <fájl|mappa> ... [--project alias]   csak ezek (a gyökérhez képest)

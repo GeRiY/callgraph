@@ -11,6 +11,7 @@ pub mod i18n;
 pub mod index;
 pub mod io;
 pub mod lang;
+pub mod locate;
 pub mod mcp;
 pub mod model;
 pub mod notes;

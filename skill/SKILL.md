@@ -1,6 +1,6 @@
 ---
 name: callgraph
-description: Token-efficient mapping of a PHP / Rust / JS / TS / Vue / Swift codebase with AST analysis, WITHOUT reading the file — categorized call graph (class/component, method/function with line ranges), method body, "where is it called" search, impact analysis (--depth), string and constant search, control-flow branches, framework views (routes, validation, events…). Use it to understand PHP, .rs, .vue, .js, .ts, .swift files, for call relationships and "who calls this / where is it used" questions — make it the FIRST step instead of a full Read/Grep. Do NOT use it for non-code files (md, json, css, plain text), or when you need the exact file text in an already known range (then --lines or a targeted Read).
+description: Token-efficient mapping of a PHP / Rust / JS / TS / Vue / Swift codebase with AST analysis, WITHOUT reading the file — where to start with a task (locate: ranked files from the names in the task), categorized call graph (class/component, method/function with line ranges), method body, "where is it called" search, impact analysis (--depth), string and constant search, control-flow branches, framework views (routes, validation, events…). Use it to understand PHP, .rs, .vue, .js, .ts, .swift files, for call relationships and "who calls this / where is it used" questions — make it the FIRST step instead of a full Read/Grep. Do NOT use it for non-code files (md, json, css, plain text), or when you need the exact file text in an already known range (then --lines or a targeted Read).
 ---
 <!-- generated from skill-i18n/SKILL.en.md by callgraph set-lang / skill-sync; edit the sources -->
 
@@ -19,6 +19,24 @@ bash <skill>/projects.sh list
 
 After that, with `--project myapp` you can give short paths relative to the root. Without `--project` the current
 directory is the root.
+
+## Step 1 — where to start: `locate` (the first call of a task)
+
+<!-- mcp:start -->
+**Which tool for what:** plain text search (an exact string, log message, config value) → Grep, it is the best at
+that; "where do I start with this task?" → `locate`; definitions, structure, callers, impact → callgraph (outline,
+`--body`, `--grep`, `--depth`).
+**The first call of a task:** give `locate` the names and domain terms of the task in ONE call: function, class and
+file names, columns, routes, translation keys, and for a non-English domain word its English code name too (e.g.
+visszatérítés → `refund`). It answers from the project map without reading files: the top 5 files (`--all`: every
+match), each with its reasons (exact definition, file name, name part, string, call, `callers: N`). Continue on
+those files with the outline / `--body` / `--grep`.
+<!-- /mcp -->
+
+```bash
+bash <skill>/callgraph.sh locate RefundController processRefund refund payment_status checkout.vue --project myapp   # where to start: ranked files + reasons
+bash <skill>/callgraph.sh locate refund --all --project myapp                                                       # every matching file, not just the top 5
+```
 
 ## Quick commands
 
@@ -121,8 +139,10 @@ shown before the property type. Call categories: `swiftui_view`, `swiftui_modifi
 <!-- mcp:tools -->
 callgraph (`callgraph mcp`): AST-based, token-efficient code map (PHP, Rust, JS / TS / Vue, Swift, SCSS); the CLI's
 queries as read-only tools, with the same output. Use it before reading a code file. Paths are relative to the project
-root: a registered alias (`project`, list: `projects`) or the server's working directory. Typical flow: `outline`
-→ `method_body` for just the method you need → `find_callers` with the name pattern (see below).
+root: a registered alias (`project`, list: `projects`) or the server's working directory. Typical flow: `locate`
+(where to start) → `outline` → `method_body` for just the method you need → `find_callers` with the name pattern.
+- `locate` `{terms}`: where to start with a task (see above): ranked files with reasons, from the names and terms
+  of the task in one call; `all: true` = every match, not just the top 5.
 - `outline` `{path}`: structure of a file or directory: classes / components, methods with line ranges, calls by
   category. Start here. `method`: one method's call graph; `format`: `api`, `flow` (branches), `summary`, `hotspots`.
 - `method_body` `{path, method}`: line-numbered source; `method` is a name or a list (`["store", "update"]`). Compact
@@ -138,7 +158,7 @@ root: a registered alias (`project`, list: `projects`) or the server's working d
 Output is capped at 400 lines (directory → summary, file → method index, search → 1 line per match): narrow `path`,
 `method` or `pattern` first; `full: true` only when justified.
 <!-- /mcp -->
-CLI equivalents: `outline` = `bash $CG <path>` (`method` = `<path>::name`), `method_body` = `::name --body`,
+CLI equivalents: `locate` = `bash $CG locate <term>…`, `outline` = `bash $CG <path>` (`method` = `<path>::name`), `method_body` = `::name --body`,
 `find_callers` = `--grep`, `search` = `--strings` / `--const`, `framework_view` = `--format <view>`, `notes` = `--notes`.
 
 ## Output limit
