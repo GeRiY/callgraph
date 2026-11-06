@@ -4,6 +4,7 @@
     <loc>https://callgraph.eu/</loc>
     <xhtml:link rel="alternate" hreflang="en" href="https://callgraph.eu/"/>
     <xhtml:link rel="alternate" hreflang="hu" href="https://callgraph.eu/hu/"/>
+    <lastmod>2026-11-06</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
@@ -11,6 +12,7 @@
     <loc>https://callgraph.eu/hu/</loc>
     <xhtml:link rel="alternate" hreflang="en" href="https://callgraph.eu/"/>
     <xhtml:link rel="alternate" hreflang="hu" href="https://callgraph.eu/hu/"/>
+    <lastmod>2026-11-06</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
