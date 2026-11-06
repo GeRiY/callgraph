@@ -3,7 +3,7 @@
 mod grep_text;
 mod loader;
 
-use super::filter::{FilterChain, pattern_regex};
+use super::filter::{FilterChain, pattern_regex, receiver_target};
 use super::selector::SelectorSet;
 use crate::analysis::Analyzer;
 use crate::error::{CallgraphError, Result};
@@ -43,7 +43,9 @@ impl QueryResult {
 
     /// Ha a hívás rokon típuson át illeszkedett a mintára: a típus rövid neve (`via Resolver`).
     pub fn via_of(&self, call: &Call) -> Option<&str> {
-        let target = call.resolved.as_deref().unwrap_or(&call.target);
+        // ugyanaz a cél, mint a `via` gyűjtésénél (a `$this->m()` a hívó típusán)
+        let target = receiver_target(&self.graph, call)
+            .unwrap_or_else(|| call.resolved.as_deref().unwrap_or(&call.target).to_owned());
         self.via
             .iter()
             .find(|v| v.line == call.line && v.target == target)
@@ -210,14 +212,18 @@ impl QueryEngine {
                         .calls
                         .iter()
                         .filter_map(|call| {
-                            let target = call.resolved.as_deref().unwrap_or(&call.target);
-                            if regex.is_match(target) {
+                            // a saját példányon át hívott (`$this->m()`) a hívó típusán: `Ns\Osztály::m`
+                            let target = receiver_target(&row.graph, call).unwrap_or_else(|| {
+                                call.resolved.as_deref().unwrap_or(&call.target).to_owned()
+                            });
+                            if regex.is_match(&target) {
                                 return None;
                             }
+                            let via = matcher.via(&target)?.to_owned();
                             Some(ViaCall {
                                 line: call.line,
-                                target: target.to_owned(),
-                                via: matcher.via(target)?.to_owned(),
+                                target,
+                                via,
                             })
                         })
                         .collect();
