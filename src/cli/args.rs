@@ -9,8 +9,8 @@ use crate::query::format::BodyMode;
 
 fn usage() -> &'static str {
     crate::t!(
-        "callgraph [--lang <id,...>] [--cache <file>] [--no-cache] <file|dir> [...] | callgraph prune [--cache <file>] [--dry-run] | callgraph set-lang [en|hu] | callgraph self-update [--check] | callgraph note add|list|rm … | callgraph mcp | callgraph --version",
-        "callgraph [--lang <id,...>] [--cache <fájl>] [--no-cache] <fájl|mappa> [...] | callgraph prune [--cache <fájl>] [--dry-run] | callgraph set-lang [en|hu] | callgraph self-update [--check] | callgraph note add|list|rm … | callgraph mcp | callgraph --version"
+        "callgraph [--lang <id,...>] [--cache <file>] [--no-cache] <file|dir> [...] | callgraph prune [--cache <file>] [--dry-run] | callgraph set-lang [en|hu] | callgraph self-update [--check] | callgraph note add|list|rm … | callgraph refresh [--project <alias|dir>] [--background] [<path>…] | callgraph hook install|uninstall|status | callgraph mcp | callgraph --version",
+        "callgraph [--lang <id,...>] [--cache <fájl>] [--no-cache] <fájl|mappa> [...] | callgraph prune [--cache <fájl>] [--dry-run] | callgraph set-lang [en|hu] | callgraph self-update [--check] | callgraph note add|list|rm … | callgraph refresh [--project <alias|mappa>] [--background] [<út>…] | callgraph hook install|uninstall|status | callgraph mcp | callgraph --version"
     )
 }
 
@@ -40,6 +40,33 @@ fn note_usage() -> &'static str {
         "callgraph note add <file>[::<method>] \"<text>\" | note list [<path>] | note rm <id>  [--project <alias|root>]",
         "callgraph note add <fájl>[::<metódus>] \"<szöveg>\" | note list [<út>] | note rm <id>  [--project <alias|gyökér>]"
     )
+}
+
+fn refresh_usage() -> &'static str {
+    crate::t!(
+        "callgraph refresh [--project <alias|root>] [--background] [<file|dir> ...]  (no path: every changed / new / deleted file of the project)",
+        "callgraph refresh [--project <alias|gyökér>] [--background] [<fájl|mappa> ...]  (út nélkül: a projekt minden változott / új / törölt fájlja)"
+    )
+}
+
+fn hook_usage() -> &'static str {
+    crate::t!(
+        "callgraph hook install|uninstall|status [--settings <file>]  (Claude Code PostToolUse hook: background refresh after Edit / Write / MultiEdit; default settings: ~/.claude/settings.json) | callgraph hook post-edit  (run by the hook: reads the hook JSON from stdin)",
+        "callgraph hook install|uninstall|status [--settings <fájl>]  (Claude Code PostToolUse hook: háttér-frissítés Edit / Write / MultiEdit után; alapértelmezett beállítások: ~/.claude/settings.json) | callgraph hook post-edit  (a hook futtatja: a hook JSON-ját a stdin-ről olvassa)"
+    )
+}
+
+/// A `hook` alparancs művelete (Claude Code-hook a fájl-írásokra, `crate::hook`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HookAction {
+    /// A hook maga: a stdin JSON-jából a szerkesztett fájl háttér-frissítése.
+    PostEdit,
+    /// A hook felvétele a `settings.json`-ba (idempotens, `.bak` mentéssel).
+    Install,
+    /// A hook eltávolítása a `settings.json`-ból.
+    Uninstall,
+    /// Telepítve van-e.
+    Status,
 }
 
 /// A `note` alparancs művelete (PILOT: jegyzetek fájlhoz / metódushoz).
@@ -100,6 +127,19 @@ pub enum CliArgs {
         action: NoteAction,
         project: Option<String>,
     },
+    /// `refresh`: a megadott fájlok / mappák (út nélkül a teljes projekt) naprakészre hozása a projekt-gráfban;
+    /// `project`: alias vagy gyökér-út; `background`: leválasztott folyamatban, azonnal visszatér.
+    Refresh {
+        paths: Vec<PathBuf>,
+        project: Option<String>,
+        background: bool,
+    },
+    /// `hook post-edit|install|uninstall|status`; `settings`: a Claude Code `settings.json` helye (alapból
+    /// `~/.claude/settings.json`).
+    Hook {
+        action: HookAction,
+        settings: Option<PathBuf>,
+    },
     /// `--version` / `-V`: a verzió és a platform.
     Version,
     /// `mcp`: MCP-szerver stdio-n (argumentum nélkül).
@@ -138,6 +178,12 @@ impl CliArgs {
         }
         if args.first().is_some_and(|a| a == "show") {
             return Self::parse_show(&args[1..]);
+        }
+        if args.first().is_some_and(|a| a == "refresh") {
+            return Self::parse_refresh(&args[1..]);
+        }
+        if args.first().is_some_and(|a| a == "hook") {
+            return Self::parse_hook(&args[1..]);
         }
         // a skill-parancsok maguk értelmezik az argumentumaikat (a hibáik error-id-t kapnak)
         if let Some(command) = args.first().filter(|a| {
@@ -366,6 +412,70 @@ impl CliArgs {
             _ => return Err(usage()),
         };
         Ok(Self::Note { action, project })
+    }
+
+    /// `refresh [--project <alias|út>] [--background] [<út>…]`; `--` után minden út.
+    fn parse_refresh(args: &[String]) -> Result<Self> {
+        let usage = || CallgraphError::Usage(refresh_usage().into());
+        let mut paths = Vec::new();
+        let mut project = None;
+        let mut background = false;
+        let mut i = 0;
+        while i < args.len() {
+            match args[i].as_str() {
+                "--" => {
+                    paths.extend(args[i + 1..].iter().map(PathBuf::from));
+                    break;
+                }
+                "--background" => background = true,
+                "--project" if i + 1 < args.len() => {
+                    project = Some(args[i + 1].clone());
+                    i += 1;
+                }
+                x if x.starts_with("--project=") => project = Some(x[10..].to_owned()),
+                x if x.starts_with('-') && x.len() > 1 => return Err(usage()),
+                x => paths.push(PathBuf::from(x)),
+            }
+            i += 1;
+        }
+        if project.as_deref().is_some_and(str::is_empty) {
+            return Err(usage());
+        }
+        Ok(Self::Refresh {
+            paths,
+            project,
+            background,
+        })
+    }
+
+    /// `hook post-edit|install|uninstall|status [--settings <fájl>]`.
+    fn parse_hook(args: &[String]) -> Result<Self> {
+        let usage = || CallgraphError::Usage(hook_usage().into());
+        let mut action = None;
+        let mut settings = None;
+        let mut i = 0;
+        while i < args.len() {
+            match args[i].as_str() {
+                "--settings" if i + 1 < args.len() => {
+                    settings = Some(PathBuf::from(&args[i + 1]));
+                    i += 1;
+                }
+                x if x.starts_with("--settings=") => settings = Some(PathBuf::from(&x[11..])),
+                x if action.is_none() => {
+                    action = Some(match x {
+                        "post-edit" => HookAction::PostEdit,
+                        "install" => HookAction::Install,
+                        "uninstall" | "remove" => HookAction::Uninstall,
+                        "status" => HookAction::Status,
+                        _ => return Err(usage()),
+                    });
+                }
+                _ => return Err(usage()),
+            }
+            i += 1;
+        }
+        let action = action.ok_or_else(usage)?;
+        Ok(Self::Hook { action, settings })
     }
 
     fn parse_callers(args: &[String]) -> Result<Self> {
@@ -669,6 +779,64 @@ mod tests {
             parse(&["show", "src", "--notes", "cache"]).unwrap(),
             CliArgs::Show { notes: Some(n), .. } if n == "cache"
         ));
+    }
+
+    #[test]
+    fn parses_refresh() {
+        assert_eq!(
+            parse(&["refresh"]).unwrap(),
+            CliArgs::Refresh {
+                paths: vec![],
+                project: None,
+                background: false
+            }
+        );
+        assert_eq!(
+            parse(&["refresh", "--background", "--project", "sp", "a.php", "src"]).unwrap(),
+            CliArgs::Refresh {
+                paths: vec![PathBuf::from("a.php"), PathBuf::from("src")],
+                project: Some("sp".into()),
+                background: true
+            }
+        );
+        assert_eq!(
+            parse(&["refresh", "--project=/x", "--", "-odd.php"]).unwrap(),
+            CliArgs::Refresh {
+                paths: vec![PathBuf::from("-odd.php")],
+                project: Some("/x".into()),
+                background: false
+            }
+        );
+        assert!(parse(&["refresh", "--bogus"]).is_err());
+        assert!(parse(&["refresh", "--project="]).is_err());
+    }
+
+    #[test]
+    fn parses_hook() {
+        assert_eq!(
+            parse(&["hook", "post-edit"]).unwrap(),
+            CliArgs::Hook {
+                action: HookAction::PostEdit,
+                settings: None
+            }
+        );
+        assert_eq!(
+            parse(&["hook", "install", "--settings", "/s.json"]).unwrap(),
+            CliArgs::Hook {
+                action: HookAction::Install,
+                settings: Some(PathBuf::from("/s.json"))
+            }
+        );
+        assert_eq!(
+            parse(&["hook", "--settings=/s.json", "uninstall"]).unwrap(),
+            CliArgs::Hook {
+                action: HookAction::Uninstall,
+                settings: Some(PathBuf::from("/s.json"))
+            }
+        );
+        assert!(parse(&["hook"]).is_err());
+        assert!(parse(&["hook", "bogus"]).is_err());
+        assert!(parse(&["hook", "status", "install"]).is_err());
     }
 
     #[test]

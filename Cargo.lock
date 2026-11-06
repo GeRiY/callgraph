@@ -131,6 +131,7 @@ dependencies = [
  "mago-span",
  "mago-syntax",
  "mimalloc",
+ "notify",
  "oxc_allocator",
  "oxc_ast",
  "oxc_ast_visit",

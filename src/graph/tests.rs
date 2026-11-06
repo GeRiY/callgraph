@@ -5,8 +5,12 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use std::time::{Duration, Instant};
+
 use super::record::{FileFacts, FileStamp};
-use super::{ProjectGraph, codec, lock, shared};
+use super::{
+    ProjectGraph, RefreshLock, Refreshed, codec, lock, refresh_all, refresh_paths, shared, watch,
+};
 use crate::analysis::Analyzer;
 use crate::io::FileWalker;
 use crate::lang::LanguageRegistry;
@@ -345,4 +349,259 @@ fn the_process_keeps_one_graph_per_project() {
     let again = shared(&dir.0.join(".")).unwrap();
     assert!(std::sync::Arc::ptr_eq(&first, &again));
     assert_eq!(callers_of(&lock(&again), "Order::save"), vec!["first"]);
+}
+
+// --- előre-frissítés (`callgraph refresh`), zár, MCP-figyelő ---
+
+fn analyzed(graph: &ProjectGraph) -> usize {
+    graph.stats().analyzed
+}
+
+/// A megadott utak frissítése: a változott és az új fájl elemződik, a törölt kikerül, a nem kód / nem létező /
+/// gyökéren kívüli út kimarad; utána egy új megnyitás semmit sem elemez, és a tények is naprakészek.
+#[test]
+fn refresh_paths_reflects_changed_new_and_deleted_files() {
+    let dir = TempDir::new();
+    let analyzer = Analyzer::with_defaults();
+    let a = dir.write("a.php", ORDER);
+    let b = dir.write("src/b.php", "<?php\nfunction helper() {}\n");
+    let mut graph = ProjectGraph::open(dir.store());
+    let first = refresh_all(&mut graph, &dir.0, &analyzer).unwrap();
+    assert_eq!((first.updated, first.removed, first.unchanged), (2, 0, 0));
+    graph.save().unwrap();
+
+    fs::write(&a, ORDER.replace("first", "secondName")).unwrap();
+    let c = dir.write("src/c.php", "<?php\nclass Fresh { function fresh() {} }\n");
+    fs::remove_file(&b).unwrap();
+    dir.write("notes.txt", "not code");
+    let mut graph = ProjectGraph::open(dir.store());
+    let paths = [
+        PathBuf::from("a.php"),
+        c.clone(),
+        b.clone(),
+        PathBuf::from("notes.txt"),
+        PathBuf::from("missing.php"),
+        std::env::temp_dir().join("callgraph-elsewhere/x.php"),
+    ];
+    let done = refresh_paths(&mut graph, &dir.0, &paths, &analyzer).unwrap();
+    assert_eq!(
+        done,
+        Refreshed {
+            updated: 2,
+            removed: 1,
+            unchanged: 0
+        }
+    );
+    graph.save().unwrap();
+
+    let mut warm = ProjectGraph::open(dir.store());
+    assert!(warm.tracked_under(&b).is_empty());
+    let again = refresh_paths(&mut warm, &dir.0, &paths, &analyzer).unwrap();
+    assert_eq!((again.updated, again.removed, again.unchanged), (0, 0, 2));
+    assert_eq!(analyzed(&warm), 0);
+    assert!(
+        warm.method_range(&key(&c), Some("Fresh"), "fresh")
+            .is_some()
+    );
+    assert!(
+        warm.method_range(&key(&a), Some("Caller"), "secondName")
+            .is_some()
+    );
+}
+
+/// Egy törölt mappa minden ismert fájlja kikerül; a teljes frissítés a törölt fájlt is észreveszi.
+#[test]
+fn refresh_handles_deleted_directories_and_full_refresh() {
+    let dir = TempDir::new();
+    let analyzer = Analyzer::with_defaults();
+    let a = dir.write("a.php", ORDER);
+    let nested = dir.write("lib/deep/n.php", "<?php\nfunction n() {}\n");
+    dir.write("lib/m.php", "<?php\nfunction m() {}\n");
+    let mut graph = ProjectGraph::open(dir.store());
+    refresh_all(&mut graph, &dir.0, &analyzer).unwrap();
+    graph.save().unwrap();
+
+    fs::remove_dir_all(dir.0.join("lib")).unwrap();
+    let done = refresh_paths(&mut graph, &dir.0, &[PathBuf::from("lib")], &analyzer).unwrap();
+    assert_eq!((done.updated, done.removed), (0, 2));
+    assert!(graph.tracked_under(&nested).is_empty());
+
+    dir.write("d.php", "<?php\nfunction d() {}\n");
+    fs::remove_file(&a).unwrap();
+    let full = refresh_all(&mut graph, &dir.0, &analyzer).unwrap();
+    assert_eq!((full.updated, full.removed, full.unchanged), (1, 1, 0));
+    graph.save().unwrap();
+    let warm = ProjectGraph::open(dir.store());
+    assert!(warm.tracked_under(&a).is_empty());
+    assert_eq!(warm.tracked_under(&dir.0).len(), 1);
+}
+
+/// A második frissítő a zárra vár, majd feladja; a zár eldobása után megszerezhető.
+#[test]
+fn a_second_refresh_lock_waits_then_gives_up() {
+    let dir = TempDir::new();
+    let held = RefreshLock::acquire(&dir.store(), Duration::ZERO).expect("first lock");
+    let start = Instant::now();
+    assert!(RefreshLock::acquire(&dir.store(), Duration::from_millis(100)).is_none());
+    assert!(start.elapsed() >= Duration::from_millis(100));
+    drop(held);
+    assert!(RefreshLock::acquire(&dir.store(), Duration::ZERO).is_some());
+}
+
+/// Két egyszerre induló frissítő (szálanként saját példány, mint két folyamat) a zár mögött egymás után fut: a
+/// tároló ép, és utána semmit sem kell újraelemezni.
+#[test]
+fn concurrent_refreshes_leave_a_consistent_store() {
+    let dir = TempDir::new();
+    for n in 0..8 {
+        dir.write(
+            &format!("f{n}.php"),
+            &format!("<?php\nfunction f{n}() {{ g{n}(); }}\n"),
+        );
+    }
+    let workers: Vec<_> = (0..2)
+        .map(|_| {
+            let root = dir.0.clone();
+            std::thread::spawn(move || {
+                let store = root.join(".callgraph");
+                let _lock = RefreshLock::acquire(&store, Duration::from_secs(30)).expect("lock");
+                let mut graph = ProjectGraph::open(store);
+                refresh_all(&mut graph, &root, &Analyzer::with_defaults()).unwrap();
+                graph.save().unwrap();
+            })
+        })
+        .collect();
+    for worker in workers {
+        worker.join().unwrap();
+    }
+    let mut warm = ProjectGraph::open(dir.store());
+    let done = refresh_all(&mut warm, &dir.0, &Analyzer::with_defaults()).unwrap();
+    assert_eq!((done.updated, done.removed, done.unchanged), (0, 0, 8));
+    assert_eq!(analyzed(&warm), 0);
+}
+
+#[test]
+fn debouncer_waits_for_quiet_but_not_forever() {
+    let quiet = Duration::from_millis(300);
+    let mut pending = watch::Debouncer::new(quiet, Duration::from_secs(2));
+    let t0 = Instant::now();
+    assert_eq!(pending.wait(t0), None);
+    pending.push(Vec::new(), t0);
+    assert_eq!(pending.wait(t0), None);
+    pending.push(vec![PathBuf::from("/p/b.php")], t0);
+    assert_eq!(pending.wait(t0), Some(quiet));
+    assert!(pending.take(t0 + Duration::from_millis(299)).is_none());
+    // egy újabb esemény kitolja
+    pending.push(
+        vec![PathBuf::from("/p/a.php"), PathBuf::from("/p/b.php")],
+        t0 + Duration::from_millis(200),
+    );
+    assert!(pending.take(t0 + Duration::from_millis(450)).is_none());
+    assert_eq!(
+        pending.take(t0 + Duration::from_millis(500)),
+        Some(vec![PathBuf::from("/p/a.php"), PathBuf::from("/p/b.php")])
+    );
+    assert!(pending.take(t0 + Duration::from_secs(10)).is_none());
+    // folyamatos írás mellett is legfeljebb 2 s késés
+    let mut at = t0;
+    let mut flushed = None;
+    for step in 0..20 {
+        pending.push(vec![PathBuf::from(format!("/p/{step}.php"))], at);
+        at += Duration::from_millis(200);
+        if let Some(batch) = pending.take(at) {
+            flushed = Some((at - t0, batch.len()));
+            break;
+        }
+    }
+    assert_eq!(flushed, Some((Duration::from_secs(2), 10)));
+}
+
+#[test]
+fn watcher_events_are_filtered_like_the_walker() {
+    use notify::event::{AccessKind, AccessMode, CreateKind, DataChange, MetadataKind, ModifyKind};
+    use notify::{Event, EventKind};
+    let dir = TempDir::new();
+    let root = &dir.0;
+    let code = dir.write("a.php", ORDER);
+    let text = dir.write("notes.txt", "x");
+    let dep = dir.write("node_modules/x/i.js", "export const a = 1;\n");
+    let stored = dir.write(".callgraph/x.php", "<?php\n");
+    let src = root.join("src");
+    fs::create_dir_all(&src).unwrap();
+    let walker = FileWalker::for_registry(Analyzer::with_defaults().registry());
+    let modify = EventKind::Modify(ModifyKind::Data(DataChange::Content));
+    let paths = |kind: EventKind, path: &PathBuf| {
+        watch::changed_paths(root, &Event::new(kind).add_path(path.clone()), &walker)
+    };
+    assert_eq!(paths(modify, &code), vec![code.clone()]);
+    assert!(paths(modify, &text).is_empty());
+    assert!(paths(modify, &dep).is_empty());
+    assert!(paths(modify, &stored).is_empty());
+    assert!(paths(modify, &std::env::temp_dir().join("elsewhere.php")).is_empty());
+    assert!(paths(EventKind::Access(AccessKind::Read), &code).is_empty());
+    assert_eq!(
+        paths(
+            EventKind::Access(AccessKind::Close(AccessMode::Write)),
+            &code
+        ),
+        vec![code.clone()]
+    );
+    // mappa: csak létrehozás / törlés / átnevezés számít
+    assert!(
+        paths(
+            EventKind::Modify(ModifyKind::Metadata(MetadataKind::Any)),
+            &src
+        )
+        .is_empty()
+    );
+    assert_eq!(
+        paths(EventKind::Create(CreateKind::Folder), &src),
+        vec![src.clone()]
+    );
+    // út nélküli esemény (túlcsordulás): a teljes gyökér
+    assert_eq!(
+        watch::changed_paths(root, &Event::new(EventKind::Other), &walker),
+        vec![root.clone()]
+    );
+}
+
+/// A figyelő egy adagja frissíti a memóriában lévő gráfot és menti a tárolót (determinisztikus, szál nélkül).
+#[test]
+fn watcher_batch_updates_the_shared_graph_and_saves() {
+    let dir = TempDir::new();
+    let analyzer = Analyzer::with_defaults();
+    let a = dir.write("a.php", ORDER);
+    let graph = shared(&dir.0).unwrap();
+    refresh_full(&mut lock(&graph), std::slice::from_ref(&a));
+    let b = dir.write("b.php", "<?php\nclass Watched { function watched() {} }\n");
+    watch::apply(&dir.0, &graph, std::slice::from_ref(&b), &analyzer);
+    assert!(
+        lock(&graph)
+            .method_range(&key(&b), Some("Watched"), "watched")
+            .is_some()
+    );
+    let mut warm = ProjectGraph::open(dir.store());
+    refresh_paths(&mut warm, &dir.0, std::slice::from_ref(&b), &analyzer).unwrap();
+    assert_eq!(analyzed(&warm), 0);
+}
+
+/// Valódi figyelő: egy fájl írása után a gráf egy időkorláton belül frissül. A fájlrendszer-események időzítése
+/// CI-n bizonytalan, ezért alapból nem fut (`cargo test -- --ignored`).
+#[test]
+#[ignore = "real file-system events; timing is not reliable on CI"]
+fn real_watcher_refreshes_a_written_file() {
+    let dir = TempDir::new();
+    dir.write("a.php", ORDER);
+    let graph = shared(&dir.0).unwrap();
+    assert!(watch::start(dir.0.clone(), std::sync::Arc::clone(&graph)));
+    std::thread::sleep(Duration::from_millis(500));
+    let b = dir.write("b.php", "<?php\nfunction watched() {}\n");
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while lock(&graph).tracked_under(&b).is_empty() {
+        assert!(
+            Instant::now() < deadline,
+            "the watcher did not refresh b.php"
+        );
+        std::thread::sleep(Duration::from_millis(50));
+    }
 }

@@ -4,6 +4,8 @@
 # `callgraph.sh set-lang [en|hu]` shows / sets the output language (forwarded to `callgraph set-lang`).
 # `callgraph.sh update [--check|--force]` updates the skill from GitHub Releases (forwarded to `callgraph self-update`).
 # `callgraph.sh note add|list|rm …` (pilot) manages notes on files / methods (forwarded to `callgraph note`).
+# `callgraph.sh refresh [--project alias] [--background] [<path>…]` brings the project graph up to date
+# (forwarded to `callgraph refresh`); `callgraph.sh hook install|uninstall|status` manages the Claude Code hook.
 # Help: skill/help/callgraph.en.txt and skill/help/callgraph.hu.txt (`callgraph.sh --help`).
 
 set -uo pipefail
@@ -21,6 +23,11 @@ if [[ "${1:-}" == update ]]; then
 fi
 # jegyzetek (pilot): `callgraph.sh note add|list|rm …` → `callgraph note …` (a --project aliast a bináris oldja fel)
 if [[ "${1:-}" == note ]]; then
+    run_callgraph "$@"
+fi
+# előre-frissítés: `callgraph.sh refresh [--project alias] [--background] [<út>…]` → `callgraph refresh …`;
+# a Claude Code-hook kezelése: `callgraph.sh hook install|uninstall|status` → `callgraph hook …`
+if [[ "${1:-}" == refresh || "${1:-}" == hook ]]; then
     run_callgraph "$@"
 fi
 for a in "$@"; do

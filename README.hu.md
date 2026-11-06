@@ -224,6 +224,16 @@ claude mcp add -s user callgraph -- "$env:USERPROFILE\.claude\skills\callgraph\b
 
 Claude Desktop, Cursor és VS Code: JSON-bejegyzés `"command": "<a bináris abszolút útja>", "args": ["mcp"]` alakban.
 Receptek, paraméterek, biztonság: [`docs/MCP.md`](docs/MCP.md).
+Futás közben az MCP-szerver figyeli a betöltött projekteket, és a változott fájlokat magától frissíti.
+
+### A projekt-térkép frissen tartása
+
+Egy `git pull` vagy sok szerkesztés után a `bash ~/.claude/skills/callgraph/callgraph.sh refresh [--project alias]`
+(`--background`-dal azonnal visszatér) előre frissíti a projekt-térképet, így a következő lekérdezésnek nem kell
+újraelemeznie. Opcionális Claude Code-hook: a `bash install.sh --hooks` (vagy `callgraph.sh hook install`) minden
+Claude által szerkesztett fájlt a háttérben frissít; egyetlen bejegyzést vesz fel a `~/.claude/settings.json`-ba, a
+többit megtartja, és előtte `settings.json.bak` mentést ír. Eltávolítás:
+`bash ~/.claude/skills/callgraph/callgraph.sh hook uninstall`. Részletek: [`docs/PROJECT-GRAPH.md`](docs/PROJECT-GRAPH.md).
 
 ### Visszajelzés az agentektől
 

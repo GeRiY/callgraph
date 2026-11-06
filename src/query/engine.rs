@@ -292,7 +292,7 @@ impl QueryEngine {
 }
 
 /// `\\?\C:\x` → `C:\x` (a Windows-féle „verbatim” előtag a meghajtós utaknál; UNC- és más utak változatlanok).
-fn strip_verbatim(path: &str) -> &str {
+pub(crate) fn strip_verbatim(path: &str) -> &str {
     match path.strip_prefix(r"\\?\") {
         Some(rest) if rest.as_bytes().get(1) == Some(&b':') => rest,
         _ => path,

@@ -6,6 +6,7 @@ pub mod cli;
 pub mod core;
 pub mod error;
 pub mod graph;
+pub mod hook;
 pub mod i18n;
 pub mod index;
 pub mod io;
