@@ -99,7 +99,7 @@ pre.code.out{background:var(--card);color:var(--fg);border:1px solid var(--borde
 border:1px solid #a6c0e555;background:#ffffff14;color:var(--term-fg)}
 .copy:hover{background:#ffffff2a}
 .copywrap pre.code{padding-top:38px}
-.copywrap pre.code+.copy{top:18px}
+.copywrap pre.code+.copy{top:8px}
 .tabs{display:none}
 .js .tabs{display:flex}
 .js .panel>.tab-title{display:none}
