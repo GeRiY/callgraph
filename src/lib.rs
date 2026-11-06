@@ -19,4 +19,5 @@ pub mod profile;
 pub mod project;
 pub mod query;
 pub mod skill;
+pub mod stats;
 pub mod update;

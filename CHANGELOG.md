@@ -5,6 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+### Added
+- **Local usage stats:** `callgraph.sh stats` shows how you (and your agents) used callgraph in the last 7 days
+  (`--days N` for up to 90): how many calls per command and MCP tool, how many failed, how long they took and how big
+  the output was, and for `locate` how often the first result was the file the agent opened next. Everything stays on
+  your computer: nothing is sent anywhere, and no paths, names or search terms are recorded — only counts in ranges.
+  The data is in the skill folder (`stats/`, about 90 days); turn it off with `CALLGRAPH_STATS=0`.
+
 ## [0.5.0] — 2026-11-06
 
 ### Added

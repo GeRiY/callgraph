@@ -74,6 +74,11 @@ Projekt-profil (architektúra, rétegek és minták a mappa- / fájlnevekből, a
   bash ~/.claude/skills/callgraph/callgraph.sh <mappa> --grep <minta> --depth 2 --by-layer   hívók rétegek szerint
   Saját mappanevek: .callgraph-layers fájl a projekt gyökerében ("service = app/Logic", "ignore-role = app/Legacy").
 
+Helyi használati statisztika (a gépen marad, semmi nem megy el; út, név és keresési kifejezés nélkül):
+  bash ~/.claude/skills/callgraph/callgraph.sh stats [--days N]
+                                                hívások parancsonként / MCP-eszközönként, hibák, idő és kimenet-méret
+                                                sávokban, locate-találati arány; az elmúlt 7 nap (max. 90); kikapcsolás: CALLGRAPH_STATS=0
+
 Előre-frissítés (git pull vagy sok szerkesztés után, hogy a következő lekérdezésnek ne kelljen újraelemeznie):
   bash ~/.claude/skills/callgraph/callgraph.sh refresh [--project alias]     a projekt minden változott / új / törölt fájlja
   bash ~/.claude/skills/callgraph/callgraph.sh refresh <fájl|mappa> ... [--project alias]   csak ezek (a gyökérhez képest)

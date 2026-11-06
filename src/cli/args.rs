@@ -8,11 +8,12 @@ use crate::lang::LanguageRegistry;
 use crate::query::format::BodyMode;
 
 use super::profile_args::{LayerArgs, parse_profile};
+use super::stats_args::parse_stats;
 
 fn usage() -> &'static str {
     crate::t!(
-        "callgraph [--lang <id,...>] [--cache <file>] [--no-cache] <file|dir> [...] | callgraph prune [--cache <file>] [--dry-run] | callgraph set-lang [en|hu] | callgraph self-update [--check] | callgraph note add|list|rm … | callgraph refresh [--project <alias|dir>] [--background] [<path>…] | callgraph locate <term>... [--all] [--project <alias|dir>] | callgraph hook install|uninstall|status | callgraph mcp [--auto-update] | callgraph --version",
-        "callgraph [--lang <id,...>] [--cache <fájl>] [--no-cache] <fájl|mappa> [...] | callgraph prune [--cache <fájl>] [--dry-run] | callgraph set-lang [en|hu] | callgraph self-update [--check] | callgraph note add|list|rm … | callgraph refresh [--project <alias|mappa>] [--background] [<út>…] | callgraph locate <kifejezés>... [--all] [--project <alias|mappa>] | callgraph hook install|uninstall|status | callgraph mcp [--auto-update] | callgraph --version"
+        "callgraph [--lang <id,...>] [--cache <file>] [--no-cache] <file|dir> [...] | callgraph prune [--cache <file>] [--dry-run] | callgraph set-lang [en|hu] | callgraph self-update [--check] | callgraph note add|list|rm … | callgraph refresh [--project <alias|dir>] [--background] [<path>…] | callgraph locate <term>... [--all] [--project <alias|dir>] | callgraph hook install|uninstall|status | callgraph stats [--days N] | callgraph mcp [--auto-update] | callgraph --version",
+        "callgraph [--lang <id,...>] [--cache <fájl>] [--no-cache] <fájl|mappa> [...] | callgraph prune [--cache <fájl>] [--dry-run] | callgraph set-lang [en|hu] | callgraph self-update [--check] | callgraph note add|list|rm … | callgraph refresh [--project <alias|mappa>] [--background] [<út>…] | callgraph locate <kifejezés>... [--all] [--project <alias|mappa>] | callgraph hook install|uninstall|status | callgraph stats [--days N] | callgraph mcp [--auto-update] | callgraph --version"
     )
 }
 
@@ -157,6 +158,8 @@ pub enum CliArgs {
         action: HookAction,
         settings: Option<PathBuf>,
     },
+    /// `stats [--days N]`: a helyi használati statisztika az elmúlt N napról (`crate::stats`).
+    Stats { days: u32 },
     /// `--version` / `-V`: a verzió és a platform.
     Version,
     /// `mcp [--auto-update]`: MCP-szerver stdio-n; `--auto-update`: indításkor naponta egyszer frissít.
@@ -210,6 +213,9 @@ impl CliArgs {
         }
         if args.first().is_some_and(|a| a == "profile") {
             return parse_profile(&args[1..]);
+        }
+        if args.first().is_some_and(|a| a == "stats") {
+            return parse_stats(&args[1..]);
         }
         // a skill-parancsok maguk értelmezik az argumentumaikat (a hibáik error-id-t kapnak)
         if let Some(command) = args.first().filter(|a| {

@@ -16,6 +16,7 @@ mod refresh;
 mod self_update;
 mod show;
 mod skill_sync;
+mod stats;
 mod version;
 mod wrap;
 
@@ -40,6 +41,7 @@ pub use refresh::RefreshCommand;
 pub use self_update::SelfUpdateCommand;
 pub use show::ShowCommand;
 pub use skill_sync::SkillSyncCommand;
+pub use stats::StatsCommand;
 pub use version::VersionCommand;
 pub use wrap::WrapCommand;
 
