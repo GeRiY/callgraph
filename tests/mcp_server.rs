@@ -100,6 +100,9 @@ fn initialize_list_and_call_outline() {
         assert!(instructions.contains(item), "{item}: {instructions}");
     }
     assert!(!instructions.contains("`--"), "{instructions}");
+    // a munkakönyvtár (a repó) tömör projekt-profilja az útmutató végén
+    assert!(instructions.contains("`project_profile`"), "{instructions}");
+    assert!(instructions.contains("\nprofile: "), "{instructions}");
     s.send(json!({"jsonrpc": "2.0", "method": "notifications/initialized"}));
 
     s.send(json!({"jsonrpc": "2.0", "id": 2, "method": "tools/list"}));
@@ -117,9 +120,11 @@ fn initialize_list_and_call_outline() {
             "find_callers",
             "framework_view",
             "guide",
+            "locate",
             "method_body",
             "notes",
             "outline",
+            "project_profile",
             "projects",
             "search"
         ]
@@ -286,6 +291,159 @@ fn the_server_keeps_the_project_graph_and_sees_edits() {
         .output()
         .unwrap();
     assert_eq!(body, String::from_utf8_lossy(&cli.stdout));
+    drop(s);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// `locate`: a feladat nevei egy hívásban → rangsorolt fájlok indoklással, a CLI-vel azonos szöveggel; üres
+/// kifejezés-lista eszköz-hiba.
+#[test]
+fn locate_ranks_the_starting_files_like_the_cli() {
+    let id = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let dir =
+        std::env::temp_dir().join(format!("callgraph-mcp-locate-{}-{id}", std::process::id()));
+    let files = [
+        (
+            "src/RefundService.php",
+            "<?php\nnamespace App;\n\nclass RefundService\n{\n    public function processRefund(int $id): void\n    {\n    }\n}\n",
+        ),
+        (
+            "src/Order.php",
+            "<?php\nnamespace App;\n\nclass Order\n{\n    public function paid(): string\n    {\n        return 'payment_status';\n    }\n}\n",
+        ),
+    ];
+    for (path, body) in files {
+        let path = dir.join(path);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, body).unwrap();
+    }
+    let dir = dir.canonicalize().unwrap();
+    let mut s = Session::start_in(&dir);
+    s.send(
+        json!({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
+        "protocolVersion": "2025-06-18", "capabilities": {},
+        "clientInfo": {"name": "test", "version": "0"}}}),
+    );
+    s.response(1);
+    s.send(json!({"jsonrpc": "2.0", "method": "notifications/initialized"}));
+    let args = json!({"terms": ["processRefund", "payment_status", "nothingLikeThis"]});
+    let found = s.call(2, "locate", args.clone());
+    assert_ne!(found["isError"], json!(true), "{found}");
+    // Windowson az út-elválasztó `\`
+    let body = text(&found).replace('\\', "/");
+    assert!(body.contains("locate: 3 terms · "), "{body}");
+    assert!(body.contains("1. src/RefundService.php"), "{body}");
+    assert!(body.contains("(exact method)"), "{body}");
+    assert!(body.contains("'payment_status'"), "{body}");
+    assert!(body.contains("no match: nothingLikeThis"), "{body}");
+    // egyetlen string is elég
+    let single = s.call(3, "locate", json!({"terms": "Order"}));
+    assert!(text(&single).contains("Order.php"), "{single}");
+    let empty = s.call(4, "locate", json!({"terms": []}));
+    assert_eq!(empty["isError"], json!(true), "{empty}");
+    // a CLI-vel azonos (egy későbbi hívás: az esetleges frissítés-értesítés csak az első eredmény végén áll)
+    let again = s.call(5, "locate", args);
+    let cli = Command::new(env!("CARGO_BIN_EXE_callgraph"))
+        .args([
+            "locate",
+            "processRefund",
+            "payment_status",
+            "nothingLikeThis",
+        ])
+        .arg("--project")
+        .arg(&dir)
+        .env("CALLGRAPH_LANG", "en")
+        .env("CALLGRAPH_REGISTRY", "/nonexistent/projects.json")
+        .output()
+        .unwrap();
+    assert_eq!(text(&again), String::from_utf8_lossy(&cli.stdout));
+    drop(s);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A `project_profile` eszköz: a CLI `profile` kimenete; a `layer` paraméter a `find_callers`-ben szűr.
+#[test]
+fn project_profile_and_the_layer_parameter() {
+    let id = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let dir =
+        std::env::temp_dir().join(format!("callgraph-mcp-profile-{}-{id}", std::process::id()));
+    let files = [
+        (
+            "composer.json",
+            "{\"require\": {\"laravel/framework\": \"^11\"}}\n",
+        ),
+        (
+            "app/Repositories/UserRepository.php",
+            "<?php\nnamespace App\\Repositories;\n\nclass UserRepository\n{\n    public function find(int $id): array\n    {\n        return [];\n    }\n}\n",
+        ),
+        (
+            "app/Services/UserService.php",
+            "<?php\nnamespace App\\Services;\n\nuse App\\Repositories\\UserRepository;\n\nclass UserService\n{\n    private UserRepository $repo;\n\n    public function show(int $id): array\n    {\n        return $this->repo->find($id);\n    }\n}\n",
+        ),
+        (
+            "app/Http/Controllers/UserController.php",
+            "<?php\nnamespace App\\Http\\Controllers;\n\nuse App\\Repositories\\UserRepository;\n\nclass UserController\n{\n    private UserRepository $repo;\n\n    public function show(int $id): array\n    {\n        return $this->repo->find($id);\n    }\n}\n",
+        ),
+    ];
+    for (path, body) in files {
+        let path = dir.join(path);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, body).unwrap();
+    }
+    let dir = dir.canonicalize().unwrap();
+    let mut s = Session::start_in(&dir);
+    s.send(
+        json!({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
+        "protocolVersion": "2025-06-18", "capabilities": {},
+        "clientInfo": {"name": "test", "version": "0"}}}),
+    );
+    let init = s.response(1);
+    let instructions = init["result"]["instructions"].as_str().unwrap_or_default();
+    assert!(
+        instructions.contains("profile: laravel (layered MVC)"),
+        "{instructions}"
+    );
+    s.send(json!({"jsonrpc": "2.0", "method": "notifications/initialized"}));
+
+    let profile = s.call(2, "project_profile", json!({}));
+    assert_ne!(profile["isError"], json!(true), "{profile}");
+    let body = text(&profile).to_owned();
+    assert!(body.starts_with("profile: laravel (layered MVC)"), "{body}");
+    assert!(body.contains("repository"), "{body}");
+    let cli = Command::new(env!("CARGO_BIN_EXE_callgraph"))
+        .args(["profile", "--project"])
+        .arg(&dir)
+        .env("CALLGRAPH_LANG", "en")
+        .env("CALLGRAPH_REGISTRY", "/nonexistent/projects.json")
+        .output()
+        .unwrap();
+    assert_eq!(body, String::from_utf8_lossy(&cli.stdout));
+    let full = s.call(3, "project_profile", json!({"full": true}));
+    assert!(text(&full).contains("    app/Services  1"), "{full}");
+
+    let all = s.call(
+        4,
+        "find_callers",
+        json!({"pattern": "UserRepository::find"}),
+    );
+    assert!(text(&all).contains("UserController"), "{all}");
+    assert!(text(&all).contains("UserService"), "{all}");
+    let services = s.call(
+        5,
+        "find_callers",
+        json!({"pattern": "UserRepository::find", "layer": "service"}),
+    );
+    assert!(text(&services).contains("UserService"), "{services}");
+    assert!(!text(&services).contains("UserController"), "{services}");
+    let wrong = s.call(6, "outline", json!({"path": "app", "layer": "nope"}));
+    assert_eq!(wrong["isError"], json!(true));
+    assert!(text(&wrong).contains("Unknown layer: nope"), "{wrong}");
     drop(s);
     let _ = std::fs::remove_dir_all(&dir);
 }

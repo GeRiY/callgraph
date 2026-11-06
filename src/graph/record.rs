@@ -77,6 +77,7 @@ impl FileFacts {
             strings: source.strings.clone(),
             writes: Vec::new(),
             sfc: None,
+            binary: source.binary,
         };
         Self {
             graph,

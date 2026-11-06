@@ -57,6 +57,23 @@ Notes (pilot — a short note on a file or method, stored outside the source in 
   The outline shows "📝 2026-11-05 20:27 · <text>" under the file header / the method (newest first, max 3),
   --body above the method source. Times are UTC.
 
+Where to start with a task (one call with the names and domain terms of the task):
+  bash ~/.claude/skills/callgraph/callgraph.sh locate <term>... [--all] [--project alias]
+                                                ranked files from the project map (no source reading), each with up to
+                                                3 reasons: exact definition, file name, name part (camelCase / snake_case /
+                                                kebab-case, singular / plural), string literal, call; "callers: N";
+                                                top 5 files, --all: every matching file; "no match: …" lists the terms
+                                                not found, "too general" the ones matching more than 30 files
+
+Project profile (architecture, layers and patterns from folder / file names, checked against the graph):
+  bash ~/.claude/skills/callgraph/callgraph.sh profile [--project alias] [--full]
+                                                ~15 lines: architecture, layers with folders and file counts, patterns,
+                                                call direction between layers, unknown folders; --full: per folder
+  bash ~/.claude/skills/callgraph/callgraph.sh <dir> --layer service           only the files of that layer (name,name...)
+  bash ~/.claude/skills/callgraph/callgraph.sh <dir> --layers                  summary grouped by layer, [role] on FILE lines
+  bash ~/.claude/skills/callgraph/callgraph.sh <dir> --grep <pattern> --depth 2 --by-layer   callers ordered by layer
+  Own folder names: a .callgraph-layers file in the project root ("service = app/Logic", "ignore-role = app/Legacy").
+
 Refresh ahead of time (after a git pull or many edits, so the next query does not have to re-analyse):
   bash ~/.claude/skills/callgraph/callgraph.sh refresh [--project alias]     every changed / new / deleted file of the project
   bash ~/.claude/skills/callgraph/callgraph.sh refresh <file|dir> ... [--project alias]   only these (paths relative to the root)

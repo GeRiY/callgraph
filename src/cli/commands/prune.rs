@@ -170,6 +170,7 @@ mod tests {
             writes: vec![],
             module: None,
             sfc: None,
+            binary: false,
         }
     }
 

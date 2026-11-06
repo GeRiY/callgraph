@@ -1,6 +1,7 @@
 //! A query facade: projektútvonalakból elemzett vagy cache-elt gráfokat ad.
 
 mod grep_text;
+mod layer;
 mod loader;
 
 use super::filter::{FilterChain, pattern_regex, receiver_target};
@@ -60,6 +61,8 @@ pub struct QueryEngine {
     graph: bool,
     /// A sorok a szűkített tényekből (`facts.bin`) jönnek a teljes rekordok helyett (`use_slim_rows`).
     slim: bool,
+    /// A réteg-kapcsolók (`with_layers`: `--layer`, `--layers`, `--by-layer`); `None` = nincs (alapértelmezés).
+    layers: Option<crate::profile::LayerScope>,
 }
 
 impl QueryEngine {
@@ -84,6 +87,7 @@ impl QueryEngine {
             analyzer: Analyzer::with_defaults(),
             graph: false,
             slim: false,
+            layers: None,
         }
     }
     /// A sorok a projekt-gráf szűkített tényeiből jöjjenek (`facts.bin`: egyetlen fájl a teljes hatókörre) — a
@@ -152,6 +156,16 @@ impl QueryEngine {
                 Some(graph) => graph,
                 None => self.analyze(&abs)?,
             };
+            if graph.binary {
+                if selectors
+                    .items
+                    .iter()
+                    .any(|input| self.root.join(&input.file) == abs)
+                {
+                    return Err(CallgraphError::Binary(abs));
+                }
+                continue;
+            }
             let methods = methods.map(|names| {
                 // névegyezés: egy név több metódusra is illeszkedhet (Rust: több impl, PHP/Swift: túlterhelés),
                 // ezért a hiányt név szerint nézzük, nem darabszámra
@@ -258,6 +272,13 @@ impl QueryEngine {
     }
     fn files(&self, selectors: &SelectorSet) -> Result<Vec<(PathBuf, Option<Vec<String>>)>> {
         let mut result: Vec<(PathBuf, Option<Vec<String>>)> = Vec::new();
+        let walker = FileWalker::for_registry(self.analyzer.registry());
+        for input in &selectors.items {
+            let abs = self.root.join(&input.file);
+            if abs.is_file() && walker.excluded_by_ignore_file(&abs) {
+                return Err(CallgraphError::Excluded(abs));
+            }
+        }
         if selectors.selected {
             for s in &selectors.items {
                 let rel = s.file.clone();
@@ -275,10 +296,13 @@ impl QueryEngine {
                     result.push((input.file.clone(), None));
                 } else if abs.is_dir() {
                     let mut warn = |_| {};
-                    let files = FileWalker::for_registry(self.analyzer.registry())
-                        .collect(std::slice::from_ref(&abs), &mut warn);
+                    let files = walker.collect(std::slice::from_ref(&abs), &mut warn);
                     for f in self.legacy_order(files) {
-                        result.push((f.strip_prefix(&self.root).unwrap_or(&f).to_path_buf(), None));
+                        let rel = f.strip_prefix(&self.root).unwrap_or(&f).to_path_buf();
+                        // `--layer`: csak a kért rétegek fájljai (szűrő nélkül mind)
+                        if self.keeps_layer(&rel) {
+                            result.push((rel, None));
+                        }
                     }
                 } else {
                     return Err(self.not_found(&abs));

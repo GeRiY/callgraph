@@ -10,15 +10,15 @@ use crate::i18n::Lang;
 const SKILL_EN: &str = include_str!("../../skill/skill-i18n/SKILL.en.md");
 const SKILL_HU: &str = include_str!("../../skill/skill-i18n/SKILL.hu.md");
 
-/// A kivágott szakaszok, az útmutatóbeli sorrendjükben (eszközök elöl).
-const SECTIONS: [&str; 4] = ["tools", "callers", "output", "limits"];
+/// A kivágott szakaszok, az útmutatóbeli sorrendjükben (a munkamegosztás és a `locate` elöl, utána az eszközök).
+const SECTIONS: [&str; 5] = ["start", "tools", "callers", "output", "limits"];
 
 /// Egy jelölt szakasz vége.
 const END: &str = "<!-- /mcp -->";
 
 /// CLI-kapcsoló → MCP-eszköz / -paraméter (a jelölt szakaszokban, backtickkel együtt). A név szerinti hívó-minta
 /// idézőjelei is lekerülnek: MCP-n a `pattern` sima JSON-string.
-const CLI_TO_MCP: [(&str, &str); 13] = [
+const CLI_TO_MCP: [(&str, &str); 14] = [
     ("`--grep`", "`find_callers`"),
     ("`--depth`", "`depth`"),
     ("`--strings`", "`search` (strings)"),
@@ -30,6 +30,7 @@ const CLI_TO_MCP: [(&str, &str); 13] = [
     ("`--full`", "`full: true`"),
     ("`--project`", "`project`"),
     ("`--format`", "`format`"),
+    ("`--all`", "`all: true`"),
     ("`'(^|::|\\.|->)", "`(^|::|\\.|->)"),
     ("$'`", "$`"),
 ];
@@ -41,6 +42,29 @@ fn source(lang: Lang) -> &'static str {
 /// Az `initialize` válaszának `instructions` mezője az adott nyelven.
 pub(crate) fn instructions(lang: Lang) -> String {
     instructions_from(source(lang))
+}
+
+/// Az útmutató vége (`initialize`): a munkakönyvtár tömör projekt-profilja a nevekből (gyors, elemzés nélkül), vagy
+/// ha a munkakönyvtár nem projekt (pl. Claude Desktop), egy tipp a `project_profile` eszközre. Soha nem bukik el.
+pub(crate) fn startup_note(root: &std::path::Path, lang: Lang) -> String {
+    match crate::profile::startup_summary(root, lang) {
+        Some(profile) => {
+            let mut text = lang
+                .pick(
+                    "\nProject profile of the working directory (from folder and file names; details: `project_profile`; narrow a query to one layer with `layer`):\n",
+                    "\nA munkakönyvtár projekt-profilja (a mappa- és fájlnevekből; részletek: `project_profile`; egy rétegre szűkítés: `layer`):\n",
+                )
+                .to_owned();
+            text.push_str(&profile);
+            text
+        }
+        None => lang
+            .pick(
+                "\nIn an unfamiliar project call `project_profile` first (architecture, layers, patterns from folder and file names), then narrow queries with `layer`.\n",
+                "\nIsmeretlen projektben előbb a `project_profile` (architektúra, rétegek, minták a mappa- és fájlnevekből), utána a lekérdezések szűkíthetők a `layer` paraméterrel.\n",
+            )
+            .to_owned(),
+    }
 }
 
 /// A `guide` eszköz válasza: a teljes skill-útmutató az adott nyelven.
@@ -103,7 +127,8 @@ fn is_marker(line: &str) -> bool {
 mod tests {
     use super::*;
 
-    const TOOLS: [&str; 8] = [
+    const TOOLS: [&str; 9] = [
+        "locate",
         "outline",
         "method_body",
         "find_callers",
@@ -180,6 +205,31 @@ mod tests {
             .map(|t| s.matches(t).count())
         };
         assert_eq!(tokens(&en), tokens(&hu));
+    }
+
+    #[test]
+    fn startup_note_names_the_profile_tool_without_cli_flags() {
+        let dir = std::env::temp_dir().join(format!("callgraph-guide-note-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("app/Http/Controllers")).unwrap();
+        // projekt-jel nélkül: csak a tipp
+        for lang in Lang::ALL {
+            let text = startup_note(&dir, lang);
+            assert!(text.contains("`project_profile`"), "{lang:?}: {text}");
+            assert!(!text.contains("`--"), "{lang:?}: {text}");
+        }
+        std::fs::write(dir.join("composer.json"), "{}").unwrap();
+        std::fs::write(
+            dir.join("app/Http/Controllers/UserController.php"),
+            "<?php\nclass UserController {}\n",
+        )
+        .unwrap();
+        let text = startup_note(&dir, Lang::En);
+        assert!(text.contains("profile: "), "{text}");
+        assert!(text.contains("controller"), "{text}");
+        assert!(!text.contains("💡"), "{text}");
+        assert!(text.lines().count() <= 18, "{text}");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

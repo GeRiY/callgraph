@@ -1,4 +1,4 @@
-//! Az MCP-szerver (rmcp): nyolc, csak olvasó eszköz a meglévő lekérdező-motor fölött. A leírások rövidek (minden
+//! Az MCP-szerver (rmcp): kilenc, csak olvasó eszköz a meglévő lekérdező-motor fölött. A leírások rövidek (minden
 //! kliensben kontextus-tokenbe kerülnek): mit ad, egy példa, a fő buktató. Az `initialize` útmutatója és a `guide`
 //! eszköz szövege a skill-utasítás forrásából készül (`guide.rs`), így nem csúszik szét a SKILL.md-vel.
 
@@ -9,8 +9,8 @@ use rmcp::model::{CallToolResult, ContentBlock, Implementation, ServerCapabiliti
 use rmcp::{ServerHandler, tool, tool_handler, tool_router};
 
 use super::params::{
-    FindCallersParams, FrameworkViewParams, MethodBodyParams, NotesParams, OutlineParams,
-    SearchParams,
+    FindCallersParams, FrameworkViewParams, LocateParams, MethodBodyParams, NotesParams,
+    OutlineParams, ProfileParams, SearchParams,
 };
 use super::request::ShowQuery;
 use super::runner::QueryRunner;
@@ -44,7 +44,14 @@ impl CallgraphServer {
     }
 
     #[tool(
-        description = "Structure of a code file or directory without reading it: classes/components, methods with line ranges, calls by category. With `method`: that one method's call graph. Start here. Example: {\"path\": \"app/Order.php\", \"method\": \"cancel\"}. Pitfall: give the method in `method`, not as `path::method`; on a large directory use `format: summary` or a subdirectory."
+        description = "Where to start with a task: give the names and domain terms from the task in ONE call; answers from the project map (no file reading) with a short ranked list of files (top 5; `all: true` = every match), each with its reasons: exact definition, file name, name part, string literal, call, `callers: N`. Example: {\"terms\": [\"RefundController\", \"processRefund\", \"refund\", \"payment_status\", \"checkout.vue\"]}. Pitfall: pass code names, not a sentence; translate non-English domain words to their English code names (visszatérítés → refund); one call with all terms, not one call per term. For exact text (log message, config value) use Grep."
+    )]
+    async fn locate(&self, Parameters(p): Parameters<LocateParams>) -> CallToolResult {
+        self.execute(ShowQuery::locate(p)).await
+    }
+
+    #[tool(
+        description = "Structure of a code file or directory without reading it: classes/components, methods with line ranges, calls by category. With `method`: that one method's call graph. Start here once you know the file (else `locate`). Example: {\"path\": \"app/Order.php\", \"method\": \"cancel\"}. Pitfall: give the method in `method`, not as `path::method`; on a large directory use `format: summary` or a subdirectory."
     )]
     async fn outline(&self, Parameters(p): Parameters<OutlineParams>) -> CallToolResult {
         self.execute(ShowQuery::outline(p)).await
@@ -100,6 +107,18 @@ impl CallgraphServer {
     }
 
     #[tool(
+        description = "Project profile from folder and file names, checked against the code graph: architecture (Laravel/Yii layered MVC, DDD/hexagonal, Vue/React frontend, SwiftUI MVVM, Rust web), layers with their folders and file counts, design patterns, the call direction between layers, unknown folders (~15 lines). Call it first in an unfamiliar project, then pass `layer` (e.g. \"service\") to `outline` / `search` / `find_callers`. Example: {} or {\"project\": \"shop\", \"full\": true}. Pitfall: a layer name comes from this list (controller, service, repository, model, component, store…), not a folder path."
+    )]
+    async fn project_profile(&self, Parameters(p): Parameters<ProfileParams>) -> CallToolResult {
+        let runner = Arc::clone(&self.runner);
+        let result =
+            tokio::task::spawn_blocking(move || runner.profile(p.project.as_deref(), p.full))
+                .await
+                .unwrap_or_else(|e| Err(e.to_string()));
+        to_result(result)
+    }
+
+    #[tool(
         description = "The full callgraph manual (the skill's SKILL.md in the configured language): every query with CLI examples, JS/TS/Vue, Rust and Swift specifics, formats, limits. Call it once when the server instructions are not enough; the CLI flags map to these tools (see its MCP section)."
     )]
     async fn guide(&self) -> CallToolResult {
@@ -112,7 +131,9 @@ impl ServerHandler for CallgraphServer {
     fn get_info(&self) -> ServerConfig {
         ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
             .with_server_info(Implementation::new("callgraph", env!("CARGO_PKG_VERSION")))
-            .with_instructions(super::guide::instructions(crate::i18n::lang()))
+            .with_instructions(
+                super::guide::instructions(crate::i18n::lang()) + &self.runner.startup_note(),
+            )
     }
 }
 

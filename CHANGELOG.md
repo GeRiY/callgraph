@@ -5,6 +5,48 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-11-06
+
+### Added
+- **Where to start with a task — `locate`:** give it the names and terms from a task in one go (`callgraph.sh locate
+  RefundController processRefund refund payment_status checkout.vue`, or the new `locate` tool over MCP) and it lists
+  the few files worth opening first, best first, each with the reason: the class or method of that name, the file of
+  that name, a name that contains the word (`refund` → `RefundJob`, `refunds_table`), a text such as a column name or
+  route, or a call to it. It answers from the project map without reading the code again, so it is quick. A file that
+  matches several of your terms comes before one that matches a single term many times. It shows 5 files (`--all`
+  for every match) and says which terms found nothing and which are too general. The skill and MCP instructions now
+  also tell agents when to use it, and when plain text search (grep) is the better tool.
+- **Project profile:** `callgraph.sh profile` tells you in about 15 lines how an unfamiliar project is built: the
+  architecture (Laravel / Yii layered MVC, DDD / hexagonal, Vue / React frontend, SwiftUI MVVM, Rust web), which folder
+  holds which layer (controllers, services, repositories, models, components, stores…) with file counts, the design
+  patterns it uses (Repository, Factory, Strategy, Observer…), the folders with no clear role, and whether the layers
+  call each other in the expected direction. It reads folder and file names and checks them against the code graph
+  (`extends Controller`, `implements *RepositoryInterface`, `defineStore`); what it cannot tell stays "unknown".
+  `--full` shows every folder. For AI clients: the `project_profile` MCP tool, and a short profile is sent when a
+  client connects.
+- **Layers in queries (opt-in, nothing changes by default):** `--layer service` searches only the files of that layer
+  (no need to know the folder names), `--layers` groups the summary by layer and marks each file with its role,
+  `--by-layer` orders "who calls it?" results by layer, closest to the called code first (also for `callers`, and as
+  `layer` / `by_layer` on the MCP tools). Folder names that say nothing, or are not English, can be mapped in a
+  commit-able `.callgraph-layers` file (`service = app/Logic`, `ignore-role = app/Legacy`).
+- **Exclude extensions per project:** a `.callgraphignore` file in the project root (or in any subfolder; the nearest
+  one applies) lists extensions callgraph should skip there, one per line (`md`, `.json` or `*.vue`; `#` starts a
+  comment). Commit it, and everyone on the team gets the same results. A file you name directly with an excluded
+  extension is refused with a clear message.
+
+### Changed
+- **Only supported files are processed, more strictly:** callgraph already ignored files with other extensions; now
+  it also skips generated files (`package-lock.json`, `*.min.js`, `*.min.css`) and files with binary content, even
+  when their extension is supported. Naming one of them directly gives a clear reason instead of a result.
+- **Upper-case extensions count:** `B.PHP`, `App.TS` or `Main.Vue` are now processed like their lower-case versions
+  (before, they were silently skipped).
+
+### Fixed
+- **A file reached through a symlink is no longer listed twice:** if a symlink pointed to a file inside the project,
+  that file appeared (and was analysed) twice in folder results.
+- **Windows: the short summary shows file names again:** when a folder's output was too long and callgraph showed the
+  one-line-per-file summary instead, Windows listed each file with its full path instead of just its name.
+
 ## [0.4.0] — 2026-11-06
 
 ### Added
@@ -199,7 +241,8 @@ First release.
 - Built-in update: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Prebuilt packages for macOS (arm64, x86_64), Linux (x86_64, ARM64, static musl) and Windows.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.4.0...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.5.0...develop
+[0.5.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.5.0
 [0.4.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.4.0
 [0.3.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.3.0
 [0.2.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.2.0

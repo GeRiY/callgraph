@@ -87,6 +87,23 @@ $ callgraph.sh --project shop app --grep saveTranslations --depth 2
 | CSS / SCSS | `.css` `.scss` | szabály-blokkok, mixinek, függvények, változók, `@use` / `@import` |
 | JSON / Markdown | `.json` `.md` | kulcs-útvonalak; címsor-szakaszok és linkek |
 
+### Mely fájlokat dolgozza fel
+
+Csak a fenti kiterjesztésű fájlokat, kis- és nagybetűvel is (a `B.PHP` is PHP); minden mást figyelmen kívül hagy.
+Támogatott kiterjesztéssel is kimarad: a generált fájl (`package-lock.json`, `*.min.js`, `*.min.css`) és a bináris
+tartalmú fájl. Minden fájlt egyszer olvas, akkor is, ha egy symlink is mutat rá. A `vendor/`, a `node_modules/` és a
+`.gitignore`-ban felsorolt mappák is kimaradnak.
+
+Ha egy projektben további kiterjesztéseket zárnál ki, tegyél egy `.callgraphignore` fájlt a gyökerébe (vagy
+bármelyik almappába; a legközelebbi érvényes). Commitold, és az egész csapatnál ugyanaz lesz az eredmény:
+
+```
+# callgraph: ezeket a kiterjesztéseket hagyja ki ebben a projektben
+md
+json
+*.vue
+```
+
 ### Mikor *ne* használd
 
 - Egy ismert sorsáv pontos szövege kell: `--lines` vagy célzott olvasás.
@@ -167,6 +184,7 @@ mellett az utak a regisztrált projekt gyökeréhez képest értendők; nélkül
 
 | Feladat | Parancs |
 |---|---|
+| Honnan induljak ezzel a feladattal? | `callgraph.sh locate <kifejezés>... [--all]` |
 | Fájl / mappa outline-ja | `callgraph.sh <fájl\|mappa>` |
 | Csak egy metódus | `callgraph.sh <fájl>::<metódus>` (több szelektor is mehet) |
 | Metódus forrása sorszámozva | `callgraph.sh <fájl>::<metódus> --body` |
@@ -175,6 +193,32 @@ mellett az utak a regisztrált projekt gyökeréhez képest értendők; nélkül
 | Hatáselemzés | `callgraph.sh <mappa> --grep <minta> --depth N [--guess]` |
 | String-literál / konstans helye | `callgraph.sh <mappa> --strings <minta>` · `--const <minta>` |
 | Szűrés hívás-kategóriára | `callgraph.sh <mappa> --category model_use,orm_relation` |
+
+### Honnan induljak: `locate`
+
+Add át a `locate`-nek a feladat neveit és fogalmait egy hívásban (függvény-, osztály- és fájlnevek, oszlopnevek,
+útvonalak); a projekt-térképből válaszol, a forrás beolvasása nélkül: rövid, rangsorolt lista arról, melyik fájllal
+kezdj, mindegyik az indoklásával:
+
+```bash
+bash ~/.claude/skills/callgraph/callgraph.sh locate RefundController processRefund refund payment_status checkout.vue --project myapp
+```
+
+```
+locate: 5 kifejezés · 14 találat 6 fájlban · innen indulj ↓
+1. app/Http/Controllers/RefundController.php  ★★★
+   class RefundController  L6-16  ← "RefundController", "refund" (pontos class)
+   store()  L14  hívja: RefundService::processRefund  ← "processRefund" (hívás)
+2. app/Services/RefundService.php  ★★
+   processRefund()  L6-9  hívók: 2 (RefundController::store, RefundJob::handle)  ← "processRefund", "refund" (pontos metódus)
+…
+```
+
+Az egyezés annál többet ér, minél erősebb: pontos definíció, aztán fájlnév, aztán egy név része (`refund` ~
+`RefundJob`, `refunds_table`, egyes / többes szám), aztán string-literál, végül hívás. Az a fájl, amelyik több
+különböző kifejezésre illik, előrébb kerül, mint amelyik egyre sokszor. Alapból 5 fájl látszik (`--all`: minden
+találat); a végén a találat nélküli és a túl általános kifejezések. A sima szövegkeresés (pontos üzenet,
+konfig-érték) továbbra is a grep dolga; a `locate` arra felel: honnan induljak?
 
 ### Kimeneti formátumok (`--format`)
 
@@ -194,6 +238,28 @@ mellett az utak a regisztrált projekt gyökeréhez képest értendők; nélkül
 A nagy eredmények korlátosak (400 sor fölött a mappás outline summary-ra, az egyfájlos metódus-indexre vált);
 a `--full` feloldja. Teljes referencia: `callgraph.sh --help` és [`skill/SKILL.md`](skill/SKILL.md).
 
+### Projekt-profil
+
+Ismeretlen projektben kezdd ezzel: `bash ~/.claude/skills/callgraph/callgraph.sh profile [--project alias]`. A mappa-
+és fájlnevekből (és a `composer.json` / `package.json` / `Cargo.toml` frameworkjéből) megmondja az architektúrát
+(Laravel / Yii rétegzett MVC, DDD / hexagonális, Vue / React frontend, SwiftUI MVVM, Rust web), a rétegeket a
+mappáikkal és a fájlszámukkal, a tervezési mintákat (Repository, Factory, Strategy, Observer…), az egyértelmű szerep
+nélküli mappákat, és hogy a rétegek hogyan hívják egymást. A kód-gráf megerősíti: `extends Controller`,
+`implements *RepositoryInterface`, `defineStore`, és a rétegek közti hívások iránya. Kb. 15 sor; a `--full` mappánként
+részletez. Minden fájl kap egy szerepet bizonyossággal (magas / közepes / alacsony), vagy „ismeretlen” marad — nem
+találgat. MCP: a `project_profile` eszköz, és kapcsolódáskor egy tömör profil is megy.
+
+A rétegek a lekérdezésekben (mind kapcsolóra, az alapkimenet nem változik):
+
+```bash
+bash ~/.claude/skills/callgraph/callgraph.sh app --layer service                     # csak a service-fájlok (név,név...)
+bash ~/.claude/skills/callgraph/callgraph.sh app --format summary --layers           # summary rétegenként
+bash ~/.claude/skills/callgraph/callgraph.sh app --grep 'Repo::find' --depth 2 --by-layer   # hívók rétegek szerint
+```
+
+Semmitmondó (vagy nem angol) mappanevek? Egy commitolható `.callgraph-layers` fájl a projekt gyökerében
+hozzárendeli őket: `service = app/Szolgaltatasok, app/Logic`, `ignore-role = app/Legacy`.
+
 ### Nyelv
 
 A terminál-kimenet és a súgó alapból angol; magyarul is kérhető:
@@ -208,7 +274,7 @@ CALLGRAPH_LANG=hu bash ~/.claude/skills/callgraph/callgraph.sh app/Models/Order.
 
 A Claude Code-skill mellett (változatlan, teljes értékűen támogatott) ugyanaz a bináris
 [MCP](https://modelcontextprotocol.io)-szerver is stdio-n, így bármely MCP-kliens használhatja: `callgraph mcp`.
-Eszközök: `outline`, `method_body`, `find_callers`, `search`, `framework_view`, `notes`, `projects`, `guide`. Ugyanazt
+Eszközök: `locate`, `outline`, `method_body`, `find_callers`, `search`, `framework_view`, `notes`, `projects`, `guide`, `project_profile`. Ugyanazt
 a tömör szöveget adják, mint a CLI, ugyanazzal a kimeneti korláttal; csak olvas, az utak a projekt-gyökéren belül
 maradnak, a lekérdezések nem használnak hálózatot (csak a lenti, naponta egyszeri frissítés-ellenőrzés). Kapcsolódáskor a szerver rövid használati útmutatót küld a kliensnek a beállított
 nyelven (melyik eszköz mire, hogyan keresd a hívókat, hogyan olvasd a kimenetet); a Claude Code ezt az agent

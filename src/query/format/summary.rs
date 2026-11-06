@@ -12,7 +12,13 @@ impl Formatter for Summary {
     fn format(&self, rows: &[QueryResult], lang: Lang) -> String {
         let mut out = String::new();
         for row in rows {
-            let file = row.graph.file.rsplit('/').next().unwrap_or(&row.graph.file);
+            // a fájlnév mindkét elválasztóval (Windowson az út `\`-es)
+            let file = row
+                .graph
+                .file
+                .rsplit(['/', '\\'])
+                .next()
+                .unwrap_or(&row.graph.file);
             if row.graph.containers.is_empty() {
                 let n = row.graph.calls.len();
                 let line = match lang {

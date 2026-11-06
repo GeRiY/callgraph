@@ -87,6 +87,23 @@ $ callgraph.sh --project shop app --grep saveTranslations --depth 2
 | CSS / SCSS | `.css` `.scss` | rule blocks, mixins, functions, variables, `@use` / `@import` |
 | JSON / Markdown | `.json` `.md` | key paths; heading sections and links |
 
+### Which files are processed
+
+Only files with the extensions above, in upper or lower case (`B.PHP` counts as PHP); everything else is ignored.
+Also skipped, even with a supported extension: generated files (`package-lock.json`, `*.min.js`, `*.min.css`) and
+files with binary content. Each file is read once, even if a symlink points to it. Folders like `vendor/`,
+`node_modules/` and those listed in `.gitignore` are skipped too.
+
+To exclude more extensions in a project, put a `.callgraphignore` file in its root (or in any subfolder; the nearest
+one applies). Commit it, and the whole team gets the same results:
+
+```
+# callgraph: skip these extensions in this project
+md
+json
+*.vue
+```
+
 ### When *not* to use it
 
 - You need the exact text of a known line range: use `--lines` or a targeted read.
@@ -166,6 +183,7 @@ relative to a registered project root; without it, the current directory is the 
 
 | Task | Command |
 |---|---|
+| Where do I start with this task? | `callgraph.sh locate <term>... [--all]` |
 | Outline of a file / directory | `callgraph.sh <file\|dir>` |
 | One method only | `callgraph.sh <file>::<method>` (several selectors allowed) |
 | Method source, line-numbered | `callgraph.sh <file>::<method> --body` |
@@ -174,6 +192,32 @@ relative to a registered project root; without it, the current directory is the 
 | Impact analysis | `callgraph.sh <dir> --grep <pattern> --depth N [--guess]` |
 | String literal / constant usages | `callgraph.sh <dir> --strings <pattern>` · `--const <pattern>` |
 | Filter by call category | `callgraph.sh <dir> --category model_use,orm_relation` |
+
+### Where to start: `locate`
+
+Give `locate` the names and domain terms from the task in one call (function, class and file names, column names,
+routes); it answers from the project map, without reading the source, with a short ranked list of files to start
+from, each with the reason:
+
+```bash
+bash ~/.claude/skills/callgraph/callgraph.sh locate RefundController processRefund refund payment_status checkout.vue --project myapp
+```
+
+```
+locate: 5 terms · 14 matches in 6 files · start here ↓
+1. app/Http/Controllers/RefundController.php  ★★★
+   class RefundController  L6-16  ← "RefundController", "refund" (exact class)
+   store()  L14  calls RefundService::processRefund  ← "processRefund" (call)
+2. app/Services/RefundService.php  ★★
+   processRefund()  L6-9  callers: 2 (RefundController::store, RefundJob::handle)  ← "processRefund", "refund" (exact method)
+…
+```
+
+A match counts more the stronger it is: exact definition, then file name, then a part of a name (`refund` ~
+`RefundJob`, `refunds_table`, singular / plural), then a string literal, then a call. A file that matches several
+different terms ranks above one that matches a single term many times. By default 5 files are shown (`--all`: every
+match); terms without a match and terms that are too general are listed at the end. Plain text search (an exact
+message or config value) is still a job for grep; `locate` answers "where do I start?".
 
 ### Output formats (`--format`)
 
@@ -193,6 +237,28 @@ relative to a registered project root; without it, the current directory is the 
 Large results are capped (above 400 lines a directory outline turns into a summary, a single file into a method
 index); `--full` lifts the cap. Full reference: `callgraph.sh --help` and [`skill/SKILL.md`](skill/SKILL.md).
 
+### Project profile
+
+In an unfamiliar project, start with `bash ~/.claude/skills/callgraph/callgraph.sh profile [--project alias]`. From
+folder and file names (and the framework found in `composer.json` / `package.json` / `Cargo.toml`) it tells you the
+architecture (Laravel / Yii layered MVC, DDD / hexagonal, Vue / React frontend, SwiftUI MVVM, Rust web), the layers
+with their folders and file counts, the design patterns (Repository, Factory, Strategy, Observer…), the folders
+without a clear role, and how the layers call each other. The code graph confirms it: `extends Controller`,
+`implements *RepositoryInterface`, `defineStore`, and the direction of the calls between layers. About 15 lines;
+`--full` gives the per-folder details. Every file gets a role with a confidence (high / medium / low), or stays
+"unknown" — it never guesses. MCP: the `project_profile` tool, and a compact profile is sent on connect.
+
+Use the layers in queries (all opt-in, the default output does not change):
+
+```bash
+bash ~/.claude/skills/callgraph/callgraph.sh app --layer service                     # only the service files (name,name...)
+bash ~/.claude/skills/callgraph/callgraph.sh app --format summary --layers           # summary grouped by layer
+bash ~/.claude/skills/callgraph/callgraph.sh app --grep 'Repo::find' --depth 2 --by-layer   # callers by layer
+```
+
+Folder names that say nothing (or are not English)? A commit-able `.callgraph-layers` file in the project root maps
+them: `service = app/Szolgaltatasok, app/Logic`, `ignore-role = app/Legacy`.
+
 ### Language
 
 Terminal output and help are in English by default; Hungarian is available:
@@ -207,7 +273,7 @@ CALLGRAPH_LANG=hu bash ~/.claude/skills/callgraph/callgraph.sh app/Models/Order.
 
 Besides the Claude Code skill (unchanged, fully supported), the same binary is also an
 [MCP](https://modelcontextprotocol.io) server on stdio, so any MCP client can use it: `callgraph mcp`.
-Tools: `outline`, `method_body`, `find_callers`, `search`, `framework_view`, `notes`, `projects`, `guide`. They return
+Tools: `locate`, `outline`, `method_body`, `find_callers`, `search`, `framework_view`, `notes`, `projects`, `guide`, `project_profile`. They return
 the same compact text as the CLI, with the same output cap; read-only, paths are confined to the project root, and
 queries never use the network (only the once-a-day update check below does).
 On connect the server sends the client a short usage guide in your language (which tool to use when, how to find

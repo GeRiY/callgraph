@@ -15,6 +15,7 @@ ugyanaz a tömör kimenet, amit a `callgraph show` kiír (ez a token-hatékony r
 
 | Eszköz | Paraméterek | Mit ad | CLI-megfelelő |
 |---|---|---|---|
+| `locate` | `terms` (egy string vagy lista), `project?`, `all?` | honnan induljak: a feladat neveiből / fogalmaiból rangsorolt fájlok (alapból 5, `all: true`: mind), fájlonként az indoklással | `locate <kifejezés>… [--all]` |
 | `outline` | `path`, `project?`, `format?` (`outline`\|`api`\|`flow`\|`summary`\|`hotspots`\|`stats`), `method?`, `full?` | fájl / mappa szerkezete; `method`-dal egy metódus hívás-gráfja | `show <út>[::m] --format <f>` |
 | `method_body` | `path`, `method` (egy név stringként vagy névtömb), `project?`, `doc?`, `raw?`, `full?` | a metódus(ok) forrása sorszámozva, tömören (docblock és üres sorok nélkül, a törzsbeli megjegyzések maradnak; a kihagyott docblockot a fejléc jelzi); `doc: true`: docblockkal, `raw: true`: szűretlenül | `show <út>::m --body [--doc\|--raw]` |
 | `find_callers` | `pattern`, `path?`, `project?`, `depth?` (1–5), `guess?`, `full?` | ki hívja; `depth` > 1: hatáselemzés | `show <út> --grep <minta> --depth N [--guess]` |
@@ -23,6 +24,11 @@ ugyanaz a tömör kimenet, amit a `callgraph show` kiír (ez a token-hatékony r
 | `notes` (pilot) | `pattern?` (regex a szövegre / horgonyra; üres = mind), `path?`, `project?` | a fájlokhoz / metódusokhoz írt jegyzetek: `út[::metódus]  idő  📝 szöveg`, `[orphaned]`, ha a metódus már nincs | `show <út> --notes <minta>` |
 | `projects` | — | a regisztrált aliasok és gyökereik | `projects.sh list` |
 | `guide` | — | a teljes skill-útmutató (`SKILL.md` törzse, frontmatter nélkül) a beállított nyelven | `skill/SKILL.md` |
+| `project_profile` | `project?`, `full?` | projekt-profil: architektúra, rétegek mappával és fájlszámmal, minták, a rétegek közti hívásirány, ismeretlen mappák (~15 sor; `full`: mappánként) | `profile [--full]` |
+
+Réteg-paraméterek (opcionálisak, alapból a kimenet változatlan): `layer` (`outline`, `search`, `find_callers`: csak az
+adott réteg — vagy vesszős lista — fájljai, pl. `"service"`; CLI: `--layer`), `by_layer` (`find_callers`: a hívók
+rétegek szerint, a hívotthoz legközelebbi elöl, `[réteg]` címkével; CLI: `--by-layer`).
 
 Az eszköz-leírások (`tools/list`) rövidek, de mindegyikben van egy példa-hívás és a fő buktató (pl. `find_callers`:
 a név szerinti mintával kezdd; `method_body`: a `method` string vagy lista, alapból tömör, a `raw` adja a pontos
@@ -38,8 +44,9 @@ szöveget; `outline`: a metódus a `method` paraméterbe megy, nem `path::method
 ## Használati útmutató a kliensnek (`instructions`, `guide`)
 
 A CLI-s agent a `SKILL.md`-ből tanulja meg a használatot; MCP-n ez nincs meg, ezért a szerver az `initialize`
-válaszának `instructions` mezőjében tömör útmutatót küld (kb. 35 sor, ~3,5 KB; a Claude Code ezt az agent
-rendszer-promptjába teszi): melyik eszköz mire, szokásos menet (`outline` → `method_body` → `find_callers`), a
+válaszának `instructions` mezőjében tömör útmutatót küld (kb. 50 sor, ~4,5 KB; a Claude Code ezt az agent
+rendszer-promptjába teszi): a munkamegosztás (sima szöveg → Grep, „honnan induljak?” → `locate`, szerkezet / hívók /
+hatás → callgraph), melyik eszköz mire, szokásos menet (`locate` → `outline` → `method_body` → `find_callers`), a
 hívók keresése a név szerinti mintával (`(^|::|\.|->)név$`) és a `Típus::metódus` korlátja, a keresőkimenet olvasása
 (`root:` / `gyökér:` sor, `L12 │ kód`, `via <Típus>`, `?::név`, `… +N more`), a tömör törzs vs. `doc` / `raw`, a
 kimeneti korlát és a statikus elemzés korlátai.
@@ -52,6 +59,10 @@ kimeneti korlát és a statikus elemzés korlátai.
   nyelvben minden szakasz pontosan egyszer szerepel, a szöveg a méretkereten belül van, és nem marad benne
   CLI-kapcsoló.
 - **Nyelv:** mint a CLI-é (`CALLGRAPH_LANG` › `callgraph set-lang` › angol).
+- **Projekt-profil a végén:** ha a szerver munkakönyvtára projekt-mappa (`composer.json`, `package.json`,
+  `Cargo.toml`, `Package.swift`, `.git` vagy `.callgraph`), az útmutató végére a tömör profil kerül (csak a nevekből,
+  elemzés nélkül, egyszer számolva); különben egy mondat a `project_profile` eszközről. Az `initialize` emiatt nem
+  bukhat el.
 - **`guide` eszköz:** a teljes `SKILL.md`-törzs a beállított nyelven, a beágyazott forrásból (nem a fájlrendszerből),
   a jelölő-sorok nélkül — ha az agentnek a hosszú forma kell (nyelvenkénti részletek, formátumok, CLI-példák).
 

@@ -7,10 +7,12 @@ use crate::error::{CallgraphError, Result};
 use crate::lang::LanguageRegistry;
 use crate::query::format::BodyMode;
 
+use super::profile_args::{LayerArgs, parse_profile};
+
 fn usage() -> &'static str {
     crate::t!(
-        "callgraph [--lang <id,...>] [--cache <file>] [--no-cache] <file|dir> [...] | callgraph prune [--cache <file>] [--dry-run] | callgraph set-lang [en|hu] | callgraph self-update [--check] | callgraph note add|list|rm … | callgraph refresh [--project <alias|dir>] [--background] [<path>…] | callgraph hook install|uninstall|status | callgraph mcp [--auto-update] | callgraph --version",
-        "callgraph [--lang <id,...>] [--cache <fájl>] [--no-cache] <fájl|mappa> [...] | callgraph prune [--cache <fájl>] [--dry-run] | callgraph set-lang [en|hu] | callgraph self-update [--check] | callgraph note add|list|rm … | callgraph refresh [--project <alias|mappa>] [--background] [<út>…] | callgraph hook install|uninstall|status | callgraph mcp [--auto-update] | callgraph --version"
+        "callgraph [--lang <id,...>] [--cache <file>] [--no-cache] <file|dir> [...] | callgraph prune [--cache <file>] [--dry-run] | callgraph set-lang [en|hu] | callgraph self-update [--check] | callgraph note add|list|rm … | callgraph refresh [--project <alias|dir>] [--background] [<path>…] | callgraph locate <term>... [--all] [--project <alias|dir>] | callgraph hook install|uninstall|status | callgraph mcp [--auto-update] | callgraph --version",
+        "callgraph [--lang <id,...>] [--cache <fájl>] [--no-cache] <fájl|mappa> [...] | callgraph prune [--cache <fájl>] [--dry-run] | callgraph set-lang [en|hu] | callgraph self-update [--check] | callgraph note add|list|rm … | callgraph refresh [--project <alias|mappa>] [--background] [<út>…] | callgraph locate <kifejezés>... [--all] [--project <alias|mappa>] | callgraph hook install|uninstall|status | callgraph mcp [--auto-update] | callgraph --version"
     )
 }
 
@@ -23,15 +25,15 @@ fn prune_usage() -> &'static str {
 
 fn callers_usage() -> &'static str {
     crate::t!(
-        "callgraph callers <pattern> [--depth N] [--project <dir>]",
-        "callgraph callers <minta> [--depth N] [--project <mappa>]"
+        "callgraph callers <pattern> [--depth N] [--project <dir>] [--by-layer]",
+        "callgraph callers <minta> [--depth N] [--project <mappa>] [--by-layer]"
     )
 }
 
 fn show_usage() -> &'static str {
     crate::t!(
-        "callgraph show [--project <root>] [--label <name>] [--format <f>] [--body [--doc|--raw]|--lines <n>-<m>|--strings <pattern>|--const <pattern>] [--grep <pattern>] [--category <cat,...>] [--depth N] [--guess] [--notes <pattern>] [--full] <path[::m]>...",
-        "callgraph show [--project <gyökér>] [--label <név>] [--format <f>] [--body [--doc|--raw]|--lines <n>-<m>|--strings <minta>|--const <minta>] [--grep <minta>] [--category <kat,...>] [--depth N] [--guess] [--notes <minta>] [--full] <út[::m]>..."
+        "callgraph show [--project <root>] [--label <name>] [--format <f>] [--body [--doc|--raw]|--lines <n>-<m>|--strings <pattern>|--const <pattern>] [--grep <pattern>] [--category <cat,...>] [--depth N] [--guess] [--notes <pattern>] [--layer <name,...>] [--layers] [--by-layer] [--full] <path[::m]>...",
+        "callgraph show [--project <gyökér>] [--label <név>] [--format <f>] [--body [--doc|--raw]|--lines <n>-<m>|--strings <minta>|--const <minta>] [--grep <minta>] [--category <kat,...>] [--depth N] [--guess] [--notes <minta>] [--layer <név,...>] [--layers] [--by-layer] [--full] <út[::m]>..."
     )
 }
 
@@ -80,8 +82,10 @@ pub enum NoteAction {
     Rm { id: String },
 }
 
-/// A feldolgozott parancssori argumentumok — alparancsonként egy változat (Command minta bemenete).
+/// A feldolgozott parancssori argumentumok — alparancsonként egy változat (Command minta bemenete). Futásonként
+/// egyszer jön létre, ezért a nagy `Show`-változat dobozolása nem érné meg.
 #[derive(Debug, PartialEq)]
+#[allow(clippy::large_enum_variant)]
 pub enum CliArgs {
     /// Elemzendő fájlok és mappák; `cache`: explicit cache-fájl (`None` = alapértelmezett), `no_cache`: kikapcsolva.
     Analyze {
@@ -101,6 +105,8 @@ pub enum CliArgs {
         pattern: String,
         depth: usize,
         project: Option<PathBuf>,
+        /// `--by-layer`: a hívók rétegek szerint rendezve, `layer` mezővel.
+        by_layer: bool,
     },
     /// Egy vagy több fájl gráfjának lekérdezése.
     Show {
@@ -121,7 +127,11 @@ pub enum CliArgs {
         depth: usize,
         guess: bool,
         notes: Option<String>,
+        /// A réteg-kapcsolók (`--layer`, `--layers`, `--by-layer`; `profile_args.rs`).
+        layers: LayerArgs,
     },
+    /// `profile [--project <alias|mappa>] [--full]`: a projekt-profil (architektúra, rétegek, minták).
+    Profile { project: Option<String>, full: bool },
     /// `note add|list|rm` (PILOT); `project`: alias vagy gyökér-út.
     Note {
         action: NoteAction,
@@ -133,6 +143,13 @@ pub enum CliArgs {
         paths: Vec<PathBuf>,
         project: Option<String>,
         background: bool,
+    },
+    /// `locate`: kiindulópont-kereső a feladat neveire / fogalmaira; `all`: minden egyező fájl (alapból 5);
+    /// `project`: alias vagy gyökér-út.
+    Locate {
+        terms: Vec<String>,
+        all: bool,
+        project: Option<String>,
     },
     /// `hook post-edit|install|uninstall|status`; `settings`: a Claude Code `settings.json` helye (alapból
     /// `~/.claude/settings.json`).
@@ -185,8 +202,14 @@ impl CliArgs {
         if args.first().is_some_and(|a| a == "refresh") {
             return Self::parse_refresh(&args[1..]);
         }
+        if args.first().is_some_and(|a| a == "locate") {
+            return Self::parse_locate(&args[1..]);
+        }
         if args.first().is_some_and(|a| a == "hook") {
             return Self::parse_hook(&args[1..]);
+        }
+        if args.first().is_some_and(|a| a == "profile") {
+            return parse_profile(&args[1..]);
         }
         // a skill-parancsok maguk értelmezik az argumentumaikat (a hibáik error-id-t kapnak)
         if let Some(command) = args.first().filter(|a| {
@@ -226,8 +249,13 @@ impl CliArgs {
         let mut depth = 1;
         let mut guess = false;
         let mut notes = None;
+        let mut layers = LayerArgs::default();
         let mut i = 0;
         while i < args.len() {
+            if let Some(used) = layers.take(&args[i..])? {
+                i += used;
+                continue;
+            }
             match args[i].as_str() {
                 x if x.starts_with("CALLGRAPH_OUT_LIMIT=") => {
                     limit = x.split_once('=').and_then(|(_, v)| v.parse().ok());
@@ -368,6 +396,7 @@ impl CliArgs {
             depth,
             guess,
             notes,
+            layers,
         })
     }
 
@@ -451,6 +480,42 @@ impl CliArgs {
         })
     }
 
+    /// `locate <kifejezés>… [--all] [--project <alias|út>]`; `--` után minden kifejezés (a `-`-sel kezdődők is).
+    fn parse_locate(args: &[String]) -> Result<Self> {
+        let usage = || CallgraphError::Usage(crate::locate::usage().into());
+        let mut terms = Vec::new();
+        let mut project = None;
+        let mut all = false;
+        let mut i = 0;
+        while i < args.len() {
+            match args[i].as_str() {
+                "--" => {
+                    terms.extend(args[i + 1..].iter().cloned());
+                    break;
+                }
+                "--all" => all = true,
+                "--project" if i + 1 < args.len() => {
+                    project = Some(args[i + 1].clone());
+                    i += 1;
+                }
+                x if x.starts_with("--project=") => project = Some(x[10..].to_owned()),
+                x if x.starts_with('-') && x.len() > 1 => return Err(usage()),
+                x => terms.push(x.to_owned()),
+            }
+            i += 1;
+        }
+        if terms.iter().all(|t| t.trim().is_empty())
+            || project.as_deref().is_some_and(str::is_empty)
+        {
+            return Err(usage());
+        }
+        Ok(Self::Locate {
+            terms,
+            all,
+            project,
+        })
+    }
+
     /// `hook post-edit|install|uninstall|status [--settings <fájl>]`.
     fn parse_hook(args: &[String]) -> Result<Self> {
         let usage = || CallgraphError::Usage(hook_usage().into());
@@ -487,9 +552,14 @@ impl CliArgs {
         };
         let mut depth = 1;
         let mut project = None;
+        let mut by_layer = false;
         let mut i = 1;
         while i < args.len() {
             match args[i].as_str() {
+                "--by-layer" => {
+                    by_layer = true;
+                    i += 1;
+                }
                 "--depth" if i + 1 < args.len() => {
                     depth = args[i + 1]
                         .parse()
@@ -520,6 +590,7 @@ impl CliArgs {
             pattern: pattern.clone(),
             depth,
             project,
+            by_layer,
         })
     }
 
@@ -812,6 +883,38 @@ mod tests {
         );
         assert!(parse(&["refresh", "--bogus"]).is_err());
         assert!(parse(&["refresh", "--project="]).is_err());
+    }
+
+    #[test]
+    fn parses_locate() {
+        assert_eq!(
+            parse(&[
+                "locate",
+                "RefundController",
+                "--all",
+                "--project",
+                "sp",
+                "refund"
+            ])
+            .unwrap(),
+            CliArgs::Locate {
+                terms: vec!["RefundController".into(), "refund".into()],
+                all: true,
+                project: Some("sp".into()),
+            }
+        );
+        assert_eq!(
+            parse(&["locate", "--project=/x", "--", "-odd"]).unwrap(),
+            CliArgs::Locate {
+                terms: vec!["-odd".into()],
+                all: false,
+                project: Some("/x".into()),
+            }
+        );
+        assert!(parse(&["locate"]).is_err());
+        assert!(parse(&["locate", "--all"]).is_err());
+        assert!(parse(&["locate", "x", "--bogus"]).is_err());
+        assert!(parse(&["locate", "x", "--project="]).is_err());
     }
 
     #[test]

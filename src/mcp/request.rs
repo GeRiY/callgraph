@@ -1,20 +1,31 @@
 //! Eszköz-paraméter → `show`-lekérdezés leképezés. A lekérdezést a meglévő `show` parancs futtatja (ugyanaz a
-//! motor, ugyanaz a tömör kimenet és kimeneti korlát, mint a CLI-ben) — itt csak az argumentumlista készül.
+//! motor, ugyanaz a tömör kimenet és kimeneti korlát, mint a CLI-ben) — itt csak az argumentumlista készül. A
+//! `locate` eszköz ugyanígy a `locate` parancsot futtatja.
 
 use super::guard::ProjectRoot;
 use super::params::{
-    FindCallersParams, FrameworkViewParams, MethodBodyParams, NotesParams, OutlineParams,
-    SearchKind, SearchParams,
+    FindCallersParams, FrameworkViewParams, LocateParams, MethodBodyParams, NotesParams,
+    OutlineParams, SearchKind, SearchParams,
 };
 
 /// A `find_callers` megengedett mélysége.
 const MAX_DEPTH: u8 = 5;
 
-/// Egy `show`-hívás leírása, a gyökér feloldása előtt.
+/// A futtatott CLI-parancs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Subcommand {
+    /// `show` (minden eszköz, a `locate` kivételével).
+    Show,
+    /// `locate`: a kifejezések a cél helyett.
+    Locate,
+}
+
+/// Egy `show`- (vagy `locate`-) hívás leírása, a gyökér feloldása előtt.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ShowQuery {
     /// Projekt-alias (`None` = a szerver munkakönyvtára).
     pub project: Option<String>,
+    command: Subcommand,
     /// A cél (fájl vagy mappa), a gyökérhez képest.
     path: String,
     /// `::metódus` szelektorok a célhoz (üres = az egész cél).
@@ -32,6 +43,7 @@ impl ShowQuery {
         };
         Self {
             project,
+            command: Subcommand::Show,
             path,
             methods: Vec::new(),
             flags,
@@ -44,10 +56,20 @@ impl ShowQuery {
         self
     }
 
+    /// `--layer <név>`, ha meg van adva (üres = nincs szűrő).
+    fn layer(self, layer: Option<String>) -> Self {
+        match layer.filter(|l| !l.trim().is_empty()) {
+            Some(layer) => self.flag("--layer", layer),
+            None => self,
+        }
+    }
+
     /// `outline`: `--format <f>` és opcionálisan `<út>::<metódus>`.
     pub(crate) fn outline(p: OutlineParams) -> Result<Self, String> {
         let format = p.format.unwrap_or_default().as_str();
-        let mut query = Self::new(p.project, p.path, p.full).flag("--format", format);
+        let mut query = Self::new(p.project, p.path, p.full)
+            .flag("--format", format)
+            .layer(p.layer);
         if let Some(method) = p.method.filter(|m| !m.is_empty()) {
             query.methods.push(method);
         }
@@ -96,7 +118,10 @@ impl ShowQuery {
         if p.guess {
             query.flags.push("--guess".into());
         }
-        Ok(query)
+        if p.by_layer {
+            query.flags.push("--by-layer".into());
+        }
+        Ok(query.layer(p.layer))
     }
 
     /// `search`: `--strings <minta>` vagy `--const <minta>`.
@@ -106,7 +131,9 @@ impl ShowQuery {
             SearchKind::Constants => "--const",
         };
         let path = p.path.unwrap_or_default();
-        Ok(Self::new(p.project, path, p.full).flag(flag, non_empty(p.pattern)?))
+        Ok(Self::new(p.project, path, p.full)
+            .flag(flag, non_empty(p.pattern)?)
+            .layer(p.layer))
     }
 
     /// `framework_view`: `--format <nézet>`.
@@ -120,9 +147,55 @@ impl ShowQuery {
         Ok(Self::new(p.project, path, false).flag("--notes", p.pattern.unwrap_or_default()))
     }
 
+    /// `locate`: `--all` és a kifejezések (`--` után, hogy a `-`-sel kezdődő se legyen kapcsoló). A kifejezések
+    /// nem utak, nem kell őket a gyökérre ellenőrizni.
+    pub(crate) fn locate(p: LocateParams) -> Result<Self, String> {
+        let terms: Vec<String> = p
+            .terms
+            .into_vec()
+            .into_iter()
+            .filter(|t| !t.trim().is_empty())
+            .collect();
+        if terms.is_empty() {
+            return Err(crate::t!(
+                "'terms' needs at least one name or term from the task.",
+                "A 'terms' legalább egy nevet vagy fogalmat vár a feladatból."
+            )
+            .into());
+        }
+        let mut query = Self::new(p.project, String::new(), false);
+        query.command = Subcommand::Locate;
+        if p.all {
+            query.flags.push("--all".into());
+        }
+        query.flags.push("--".into());
+        query.flags.extend(terms);
+        Ok(query)
+    }
+
+    /// A parancs eleje: a parancs neve és a feloldott gyökér (a `show`-nál a kimenet címkéje is).
+    pub(crate) fn head(&self, root: &ProjectRoot) -> Vec<String> {
+        let mut args = vec![
+            match self.command {
+                Subcommand::Show => "show",
+                Subcommand::Locate => "locate",
+            }
+            .to_owned(),
+            "--project".to_owned(),
+            root.root().display().to_string(),
+        ];
+        if self.command == Subcommand::Show {
+            args.extend(["--label".to_owned(), root.label().to_owned()]);
+        }
+        args
+    }
+
     /// A `show` argumentumai (`show` és `--project`/`--label` nélkül): kapcsolók, majd a gyökéren belülre
-    /// ellenőrzött cél(ok).
+    /// ellenőrzött cél(ok). A `locate`-nél csak a kapcsolók és a kifejezések.
     pub(crate) fn to_args(&self, root: &ProjectRoot) -> Result<Vec<String>, String> {
+        if self.command == Subcommand::Locate {
+            return Ok(self.flags.clone());
+        }
         let target = root.resolve(&self.path)?;
         let mut args = self.flags.clone();
         if self.methods.is_empty() {
@@ -259,6 +332,7 @@ mod tests {
             pattern: "STATUS".into(),
             path: Some("src".into()),
             project: Some("alias".into()),
+            layer: None,
             full: false,
         })
         .unwrap();
@@ -281,6 +355,51 @@ mod tests {
     }
 
     #[test]
+    fn layer_params_map_to_the_layer_flags() {
+        let q = ShowQuery::outline(OutlineParams {
+            path: "src".into(),
+            layer: Some("service".into()),
+            ..OutlineParams::default()
+        })
+        .unwrap();
+        assert_eq!(
+            q.to_args(&root()).unwrap(),
+            s(&["--format", "outline", "--layer", "service", "src"])
+        );
+        let q = ShowQuery::find_callers(FindCallersParams {
+            pattern: "Repo::find".into(),
+            depth: Some(2),
+            layer: Some("controller".into()),
+            by_layer: true,
+            ..FindCallersParams::default()
+        })
+        .unwrap();
+        assert_eq!(
+            q.to_args(&root()).unwrap(),
+            s(&[
+                "--grep",
+                "Repo::find",
+                "--depth",
+                "2",
+                "--by-layer",
+                "--layer",
+                "controller",
+                "."
+            ])
+        );
+        let q = ShowQuery::search(SearchParams {
+            kind: SearchKind::Strings,
+            pattern: "x".into(),
+            path: None,
+            project: None,
+            layer: Some(" ".into()),
+            full: false,
+        })
+        .unwrap();
+        assert_eq!(q.to_args(&root()).unwrap(), s(&["--strings", "x", "."]));
+    }
+
+    #[test]
     fn notes_maps_to_the_notes_flag() {
         let q = ShowQuery::notes(NotesParams {
             pattern: Some("cache".into()),
@@ -291,6 +410,28 @@ mod tests {
         assert_eq!(q.to_args(&root()).unwrap(), s(&["--notes", "cache", "src"]));
         let q = ShowQuery::notes(NotesParams::default()).unwrap();
         assert_eq!(q.to_args(&root()).unwrap(), s(&["--notes", "", "."]));
+    }
+
+    #[test]
+    fn locate_maps_terms_after_a_separator() {
+        let q = ShowQuery::locate(LocateParams {
+            terms: OneOrMany::Many(s(&["RefundController", " ", "-odd"])),
+            project: Some("alias".into()),
+            all: true,
+        })
+        .unwrap();
+        assert_eq!(q.project.as_deref(), Some("alias"));
+        assert_eq!(
+            q.to_args(&root()).unwrap(),
+            s(&["--all", "--", "RefundController", "-odd"])
+        );
+        let head = q.head(&root());
+        assert_eq!(head[0], "locate");
+        assert!(!head.contains(&"--label".to_owned()), "{head:?}");
+        let show = ShowQuery::notes(NotesParams::default()).unwrap();
+        assert_eq!(show.head(&root())[0], "show");
+        assert!(show.head(&root()).contains(&"--label".to_owned()));
+        assert!(ShowQuery::locate(LocateParams::default()).is_err());
     }
 
     #[test]

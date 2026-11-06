@@ -1,4 +1,6 @@
-//! Fájlbejárás: a megadott fájlok / mappák (rekurzívan) fájljai a regisztrált nyelvek kiterjesztéseivel.
+//! Fájlbejárás: a megadott fájlok / mappák (rekurzívan) fájljai a regisztrált nyelvek kiterjesztéseivel
+//! (kis-/nagybetűtől függetlenül), a generált fájlok (`lang::filetype::is_generated`) és a projekt
+//! `.callgraphignore` fájljában kizárt kiterjesztések nélkül; minden fájl egyszer (a symlinkek célja is).
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -24,11 +26,58 @@ impl FileWalker {
         }
     }
 
+    /// Feldolgozandó-e a fájl: regisztrált kiterjesztés (kis-/nagybetűtől függetlenül), nem generált fájl, és a
+    /// legközelebbi `.callgraphignore` nem zárja ki a kiterjesztését.
     fn matches(&self, path: &Path) -> bool {
-        path.extension()
-            .and_then(|x| x.to_str())
-            .is_some_and(|x| self.extensions.contains(&x))
+        let excluded = path.parent().map(excluded_extensions).unwrap_or_default();
+        self.matches_in(path, &excluded)
     }
+
+    /// Mint a `matches`, a mappára érvényes kizárt kiterjesztésekkel (a bejárás mappánként egyszer olvassa be).
+    fn matches_in(&self, path: &Path, excluded: &[String]) -> bool {
+        let Some(ext) = crate::lang::filetype::extension_lower(path) else {
+            return false;
+        };
+        self.extensions.contains(&ext.as_str())
+            && !crate::lang::filetype::is_generated(path)
+            && !excluded.contains(&ext)
+    }
+
+    /// A `.callgraphignore` kizárja-e a fájl (regisztrált) kiterjesztését — a közvetlenül megadott fájl hibaüzenetéhez.
+    pub fn excluded_by_ignore_file(&self, path: &Path) -> bool {
+        crate::lang::filetype::extension_lower(path).is_some_and(|ext| {
+            path.parent()
+                .is_some_and(|dir| excluded_extensions(dir).contains(&ext))
+        })
+    }
+}
+
+/// A projektenként kizárt kiterjesztések fájlja (a `.gitignore`-hoz hasonlóan a projektben, commitolható).
+pub const IGNORE_FILE: &str = ".callgraphignore";
+
+/// A `dir`-re érvényes (a mappától felfelé a legközelebbi) `.callgraphignore` kizárt kiterjesztései, kisbetűvel.
+/// Soronként egy: `md`, `.md` vagy `*.md`; `#`-tel kezdődő sor megjegyzés, az üres sor nem számít.
+pub fn excluded_extensions(dir: &Path) -> Vec<String> {
+    let mut at = Some(dir);
+    while let Some(candidate) = at {
+        if let Ok(contents) = std::fs::read_to_string(candidate.join(IGNORE_FILE)) {
+            return parse_ignore(&contents);
+        }
+        at = candidate.parent();
+    }
+    Vec::new()
+}
+
+/// A `.callgraphignore` tartalmának kiterjesztései (`md`, `.md`, `*.md` → `md`), kisbetűvel.
+pub fn parse_ignore(contents: &str) -> Vec<String> {
+    contents
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with('#'))
+        .map(|line| line.trim_start_matches('*').trim_start_matches('.'))
+        .filter(|ext| !ext.is_empty() && !ext.contains(['/', '\\', '*', ' ']))
+        .map(str::to_ascii_lowercase)
+        .collect()
 }
 
 fn default_skip_dirs() -> Vec<String> {
@@ -56,6 +105,15 @@ impl FileWalker {
 
     /// A bemenetek fájljai rendezve; a hozzáférhetetlen mappákról a `warn` kap üzenetet.
     pub fn collect(&self, inputs: &[PathBuf], warn: &mut dyn FnMut(String)) -> Vec<PathBuf> {
+        let mut files = self.collect_all(inputs, warn);
+        // minden fájl egyszer: egy symlink (`out/link.php → src/A.php`) célja a kanonikus útjával kerül be,
+        // ahogy maga a fájl is — az első előfordulás marad
+        let mut seen = HashSet::new();
+        files.retain(|file| seen.insert(file.clone()));
+        files
+    }
+
+    fn collect_all(&self, inputs: &[PathBuf], warn: &mut dyn FnMut(String)) -> Vec<PathBuf> {
         let mut files = Vec::new();
         let mut visited = HashSet::new();
         for input in inputs {
@@ -91,6 +149,7 @@ impl FileWalker {
         }
         let dir = real_dir.as_path();
         let ignored = self.ignore_dirs_for(dir);
+        let excluded = excluded_extensions(dir);
         let entries = match std::fs::read_dir(dir) {
             Ok(e) => e,
             Err(e) => {
@@ -124,7 +183,7 @@ impl FileWalker {
                 }
             } else if metadata.is_dir() {
                 self.walk_dir(&path, files, visited, warn);
-            } else if self.matches(&path) {
+            } else if self.matches_in(&path, &excluded) {
                 files.push(path);
             }
         }
@@ -330,5 +389,59 @@ mod tests {
         assert!(walker.includes_dir(&root, &root));
         assert!(walker.includes_dir(&root, &root.join("src")));
         assert!(!walker.includes_dir(&root, &root.join("node_modules/pkg")));
+    }
+
+    /// Az MCP-figyelő, a hook és a `refresh` szűrője (`includes`): kis-/nagybetűs kiterjesztés, generált fájl és a
+    /// `.callgraphignore` ugyanúgy, mint a bejárásnál. A fájlnak nem kell léteznie.
+    #[test]
+    fn includes_applies_case_generated_and_ignore_file_rules() {
+        let temp = TempDir::new();
+        let root = temp.0.canonicalize().unwrap();
+        let walker = FileWalker::for_registry(&LanguageRegistry::with_defaults());
+        for name in [
+            "src/A.php",
+            "src/B.PHP",
+            "src/App.Vue",
+            "lib/x.TS",
+            "README.md",
+        ] {
+            assert!(walker.includes(&root, &root.join(name)), "{name}");
+        }
+        for name in [
+            "src/A.php.bak",
+            "src/noext",
+            "notes.txt",
+            "package-lock.json",
+            "dist/app.min.js",
+            "dist/site.MIN.CSS",
+            "vendor/x/A.php",
+        ] {
+            assert!(!walker.includes(&root, &root.join(name)), "{name}");
+        }
+        fs::write(root.join(super::IGNORE_FILE), "md\n*.Vue\n").unwrap();
+        assert!(!walker.includes(&root, &root.join("README.md")));
+        assert!(!walker.includes(&root, &root.join("src/App.vue")));
+        assert!(walker.includes(&root, &root.join("src/A.php")));
+        assert!(walker.excluded_by_ignore_file(&root.join("docs/guide.MD")));
+        assert!(!walker.excluded_by_ignore_file(&root.join("src/A.php")));
+    }
+
+    #[test]
+    fn ignore_file_lines_accept_bare_dotted_and_glob_extensions() {
+        assert_eq!(
+            super::parse_ignore("# comment\n\nmd\n.JSON\n*.vue\n  ts  \nsrc/\n*\n.\n"),
+            ["md", "json", "vue", "ts"]
+        );
+    }
+
+    #[test]
+    fn nearest_ignore_file_wins() {
+        let temp = TempDir::new();
+        let root = temp.0.canonicalize().unwrap();
+        fs::create_dir_all(root.join("a/b")).unwrap();
+        fs::write(root.join(super::IGNORE_FILE), "md\n").unwrap();
+        fs::write(root.join("a").join(super::IGNORE_FILE), "js\n").unwrap();
+        assert_eq!(super::excluded_extensions(&root), ["md"]);
+        assert_eq!(super::excluded_extensions(&root.join("a/b")), ["js"]);
     }
 }
