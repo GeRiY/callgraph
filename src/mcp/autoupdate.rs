@@ -349,6 +349,16 @@ impl QueryRunner for NoticeRunner {
     fn projects(&self) -> Result<String, String> {
         self.inner.projects().map(|text| self.append(text))
     }
+
+    fn profile(&self, project: Option<&str>, full: bool) -> Result<String, String> {
+        self.inner
+            .profile(project, full)
+            .map(|text| self.append(text))
+    }
+
+    fn startup_note(&self) -> String {
+        self.inner.startup_note()
+    }
 }
 
 /// A szerver végrehajtója az értesítéssel (kapcsoló nélküli mód); kikapcsolt ellenőrzésnél változatlan.

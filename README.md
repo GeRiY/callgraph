@@ -237,6 +237,28 @@ message or config value) is still a job for grep; `locate` answers "where do I s
 Large results are capped (above 400 lines a directory outline turns into a summary, a single file into a method
 index); `--full` lifts the cap. Full reference: `callgraph.sh --help` and [`skill/SKILL.md`](skill/SKILL.md).
 
+### Project profile
+
+In an unfamiliar project, start with `bash ~/.claude/skills/callgraph/callgraph.sh profile [--project alias]`. From
+folder and file names (and the framework found in `composer.json` / `package.json` / `Cargo.toml`) it tells you the
+architecture (Laravel / Yii layered MVC, DDD / hexagonal, Vue / React frontend, SwiftUI MVVM, Rust web), the layers
+with their folders and file counts, the design patterns (Repository, Factory, Strategy, Observer…), the folders
+without a clear role, and how the layers call each other. The code graph confirms it: `extends Controller`,
+`implements *RepositoryInterface`, `defineStore`, and the direction of the calls between layers. About 15 lines;
+`--full` gives the per-folder details. Every file gets a role with a confidence (high / medium / low), or stays
+"unknown" — it never guesses. MCP: the `project_profile` tool, and a compact profile is sent on connect.
+
+Use the layers in queries (all opt-in, the default output does not change):
+
+```bash
+bash ~/.claude/skills/callgraph/callgraph.sh app --layer service                     # only the service files (name,name...)
+bash ~/.claude/skills/callgraph/callgraph.sh app --format summary --layers           # summary grouped by layer
+bash ~/.claude/skills/callgraph/callgraph.sh app --grep 'Repo::find' --depth 2 --by-layer   # callers by layer
+```
+
+Folder names that say nothing (or are not English)? A commit-able `.callgraph-layers` file in the project root maps
+them: `service = app/Szolgaltatasok, app/Logic`, `ignore-role = app/Legacy`.
+
 ### Language
 
 Terminal output and help are in English by default; Hungarian is available:
@@ -251,7 +273,7 @@ CALLGRAPH_LANG=hu bash ~/.claude/skills/callgraph/callgraph.sh app/Models/Order.
 
 Besides the Claude Code skill (unchanged, fully supported), the same binary is also an
 [MCP](https://modelcontextprotocol.io) server on stdio, so any MCP client can use it: `callgraph mcp`.
-Tools: `locate`, `outline`, `method_body`, `find_callers`, `search`, `framework_view`, `notes`, `projects`, `guide`. They return
+Tools: `locate`, `outline`, `method_body`, `find_callers`, `search`, `framework_view`, `notes`, `projects`, `guide`, `project_profile`. They return
 the same compact text as the CLI, with the same output cap; read-only, paths are confined to the project root, and
 queries never use the network (only the once-a-day update check below does).
 On connect the server sends the client a short usage guide in your language (which tool to use when, how to find

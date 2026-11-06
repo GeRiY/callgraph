@@ -56,10 +56,20 @@ impl ShowQuery {
         self
     }
 
+    /// `--layer <név>`, ha meg van adva (üres = nincs szűrő).
+    fn layer(self, layer: Option<String>) -> Self {
+        match layer.filter(|l| !l.trim().is_empty()) {
+            Some(layer) => self.flag("--layer", layer),
+            None => self,
+        }
+    }
+
     /// `outline`: `--format <f>` és opcionálisan `<út>::<metódus>`.
     pub(crate) fn outline(p: OutlineParams) -> Result<Self, String> {
         let format = p.format.unwrap_or_default().as_str();
-        let mut query = Self::new(p.project, p.path, p.full).flag("--format", format);
+        let mut query = Self::new(p.project, p.path, p.full)
+            .flag("--format", format)
+            .layer(p.layer);
         if let Some(method) = p.method.filter(|m| !m.is_empty()) {
             query.methods.push(method);
         }
@@ -108,7 +118,10 @@ impl ShowQuery {
         if p.guess {
             query.flags.push("--guess".into());
         }
-        Ok(query)
+        if p.by_layer {
+            query.flags.push("--by-layer".into());
+        }
+        Ok(query.layer(p.layer))
     }
 
     /// `search`: `--strings <minta>` vagy `--const <minta>`.
@@ -118,7 +131,9 @@ impl ShowQuery {
             SearchKind::Constants => "--const",
         };
         let path = p.path.unwrap_or_default();
-        Ok(Self::new(p.project, path, p.full).flag(flag, non_empty(p.pattern)?))
+        Ok(Self::new(p.project, path, p.full)
+            .flag(flag, non_empty(p.pattern)?)
+            .layer(p.layer))
     }
 
     /// `framework_view`: `--format <nézet>`.
@@ -317,6 +332,7 @@ mod tests {
             pattern: "STATUS".into(),
             path: Some("src".into()),
             project: Some("alias".into()),
+            layer: None,
             full: false,
         })
         .unwrap();
@@ -336,6 +352,51 @@ mod tests {
             q.to_args(&root()).unwrap(),
             s(&["--format", "routes", "src"])
         );
+    }
+
+    #[test]
+    fn layer_params_map_to_the_layer_flags() {
+        let q = ShowQuery::outline(OutlineParams {
+            path: "src".into(),
+            layer: Some("service".into()),
+            ..OutlineParams::default()
+        })
+        .unwrap();
+        assert_eq!(
+            q.to_args(&root()).unwrap(),
+            s(&["--format", "outline", "--layer", "service", "src"])
+        );
+        let q = ShowQuery::find_callers(FindCallersParams {
+            pattern: "Repo::find".into(),
+            depth: Some(2),
+            layer: Some("controller".into()),
+            by_layer: true,
+            ..FindCallersParams::default()
+        })
+        .unwrap();
+        assert_eq!(
+            q.to_args(&root()).unwrap(),
+            s(&[
+                "--grep",
+                "Repo::find",
+                "--depth",
+                "2",
+                "--by-layer",
+                "--layer",
+                "controller",
+                "."
+            ])
+        );
+        let q = ShowQuery::search(SearchParams {
+            kind: SearchKind::Strings,
+            pattern: "x".into(),
+            path: None,
+            project: None,
+            layer: Some(" ".into()),
+            full: false,
+        })
+        .unwrap();
+        assert_eq!(q.to_args(&root()).unwrap(), s(&["--strings", "x", "."]));
     }
 
     #[test]

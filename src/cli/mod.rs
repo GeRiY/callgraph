@@ -3,9 +3,11 @@
 mod args;
 mod command;
 pub mod commands;
+mod profile_args;
 
 pub use args::{CliArgs, HookAction, NoteAction};
 pub use command::Command;
+pub use profile_args::LayerArgs;
 
 use crate::error::Result;
 use crate::lang::LanguageRegistry;
@@ -34,9 +36,10 @@ pub fn build_command(args: CliArgs) -> Result<Box<dyn Command>> {
             pattern,
             depth,
             project,
-        } => Ok(Box::new(commands::CallersCommand::new(
-            pattern, depth, project,
-        ))),
+            by_layer,
+        } => Ok(Box::new(
+            commands::CallersCommand::new(pattern, depth, project).by_layer(by_layer),
+        )),
         CliArgs::Show {
             paths,
             project,
@@ -54,6 +57,7 @@ pub fn build_command(args: CliArgs) -> Result<Box<dyn Command>> {
             depth,
             guess,
             notes,
+            layers,
         } => Ok(Box::new(commands::ShowCommand::new(
             paths,
             project,
@@ -71,6 +75,7 @@ pub fn build_command(args: CliArgs) -> Result<Box<dyn Command>> {
             depth,
             guess,
             notes,
+            layers,
         ))),
         CliArgs::Note { action, project } => Ok(Box::new(commands::NoteCommand::new(
             action,
@@ -103,6 +108,11 @@ pub fn build_command(args: CliArgs) -> Result<Box<dyn Command>> {
             crate::skill::SkillHome::from_env(),
         ))),
         CliArgs::Version => Ok(Box::new(commands::VersionCommand)),
+        CliArgs::Profile { project, full } => Ok(Box::new(commands::ProfileCommand::new(
+            project,
+            full,
+            crate::skill::SkillHome::from_env(),
+        ))),
         CliArgs::Mcp { auto_update } => Ok(Box::new(commands::McpCommand::new(
             crate::skill::SkillHome::from_env(),
             auto_update,

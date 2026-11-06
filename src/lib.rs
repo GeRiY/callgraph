@@ -15,6 +15,7 @@ pub mod locate;
 pub mod mcp;
 pub mod model;
 pub mod notes;
+pub mod profile;
 pub mod project;
 pub mod query;
 pub mod skill;

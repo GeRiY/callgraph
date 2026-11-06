@@ -41,6 +41,9 @@ src/
                                 facts.bin), fájlonként frissítve; folyamaton belül gyökerenként egy példány;
                                 előre-frissítés (refresh.rs: `callgraph refresh`, refresh.lock) és MCP-fájlfigyelő (watch.rs)
   hook/                         Claude Code PostToolUse hook: a hook JSON-ja → háttér-`refresh`; settings.json szerkesztése
+  profile/                      projekt-profil: szerep-/réteg-, architektúra- és minta-felismerés a mappa- és fájlnevekből
+                                (szabály-táblák adatként), megerősítés a gráfból; a `--layer` / `--layers` / `--by-layer`
+                                kapcsolók osztályozója; `.callgraph-layers` (saját elnevezések)
   query/                        QueryEngine (Facade), formázók (Strategy + FormatterRegistry), kimeneti korlát
   locate/                       kiindulópont-kereső (Facade: Locator): kifejezések bontása (terms), egyezés a szűkített
                                 tényeken (matcher), név szerinti hívószám (callers), rangsor (rank), indoklás + kimenet

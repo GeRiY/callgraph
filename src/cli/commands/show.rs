@@ -24,6 +24,8 @@ pub struct ShowCommand {
     guess: bool,
     /// `--notes <minta>` (PILOT): a jegyzetek keresése a célok alatt, elemzés helyett.
     notes: Option<String>,
+    /// A réteg-kapcsolók (`--layer`, `--layers`, `--by-layer`; `crate::profile`); alapból mind ki.
+    layers: crate::cli::LayerArgs,
 }
 impl ShowCommand {
     #[allow(clippy::too_many_arguments)]
@@ -44,6 +46,7 @@ impl ShowCommand {
         depth: usize,
         guess: bool,
         notes: Option<String>,
+        layers: crate::cli::LayerArgs,
     ) -> Self {
         Self {
             paths,
@@ -62,6 +65,7 @@ impl ShowCommand {
             depth,
             guess,
             notes,
+            layers,
         }
     }
 }
@@ -78,6 +82,15 @@ impl Command for ShowCommand {
         let engine = QueryEngine::new(self.project.as_deref(), self.label.clone())
             .use_project_graph(true)
             .use_slim_rows(self.slim_rows());
+        // réteg-kapcsolók nélkül nincs osztályozó: a kimenet bájtra azonos
+        let engine = if self.layers.any() {
+            match engine.with_layers(self.layers.layer.as_deref(), self.layers.by_layer) {
+                Ok(value) => value,
+                Err(error) => return Self::report(_err, error),
+            }
+        } else {
+            engine
+        };
         let mut rows =
             match engine.query_filtered(&selectors, self.grep.as_deref(), self.category.as_deref())
             {
@@ -103,6 +116,9 @@ impl Command for ShowCommand {
             write!(out, "{}", engine.relativize(&text))?;
             return Ok(0);
         }
+        if self.layers.by_layer {
+            engine.sort_by_layer(&mut rows);
+        }
         if let Some(pattern) = self.grep.as_deref() {
             let scope = engine.depth_scope();
             let text = match engine.grep_text(
@@ -127,6 +143,14 @@ impl Command for ShowCommand {
             Ok(value) => value,
             Err(error) => return Self::report(_err, error),
         };
+        // `--layers`: a summary rétegenként, az outline `FILE` soraiban a szerep
+        let text = match engine.layer_scope().filter(|_| self.layers.layers) {
+            Some(scope) if self.format == "summary" => {
+                crate::profile::layered_summary(&rows, scope, crate::i18n::lang())?
+            }
+            Some(scope) if self.format == "outline" => crate::profile::tag_file_lines(&text, scope),
+            _ => text,
+        };
         let index = FormatterRegistry::format("method-index", &rows)?;
         let limiter = OutputLimit::from_env(self.full).with_value(self.limit);
         // A callgraph kimenet-korlátja ezekre a formátumokra él: mappán summary, egy fájlon metódus-index.
@@ -140,12 +164,11 @@ impl Command for ShowCommand {
         let text = if !limited {
             text
         } else if rows.len() > 1 {
-            limiter.directory_summary(
-                text,
-                FormatterRegistry::format("summary", &rows)?,
-                &self.format,
-                rows.len(),
-            )
+            let summary = match engine.layer_scope().filter(|_| self.layers.layers) {
+                Some(scope) => crate::profile::layered_summary(&rows, scope, crate::i18n::lang())?,
+                None => FormatterRegistry::format("summary", &rows)?,
+            };
+            limiter.directory_summary(text, summary, &self.format, rows.len())
         } else {
             limiter.method_index_for(&self.format, text, index)
         };

@@ -8,6 +8,7 @@
 # (forwarded to `callgraph refresh`); `callgraph.sh hook install|uninstall|status` manages the Claude Code hook.
 # `callgraph.sh locate <term>… [--all] [--project alias]` lists where to start with a task (ranked files + reasons;
 # forwarded to `callgraph locate`).
+# `callgraph.sh profile [--project alias] [--full]` prints the project profile (forwarded to `callgraph profile`).
 # Help: skill/help/callgraph.en.txt and skill/help/callgraph.hu.txt (`callgraph.sh --help`).
 
 set -uo pipefail
@@ -37,6 +38,13 @@ if [[ "${1:-}" == --project && "${3:-}" == locate ]]; then
     run_callgraph locate --project "$2" "${@:4}"
 fi
 if [[ "${1:-}" == locate ]]; then
+    run_callgraph "$@"
+fi
+# projekt-profil: `callgraph.sh [--project alias] profile [--full]` → `callgraph profile …` (architektúra, rétegek, minták)
+if [[ "${1:-}" == --project && "${3:-}" == profile ]]; then
+    run_callgraph profile --project "$2" "${@:4}"
+fi
+if [[ "${1:-}" == profile ]]; then
     run_callgraph "$@"
 fi
 for a in "$@"; do
