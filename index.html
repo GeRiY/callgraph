@@ -181,30 +181,64 @@ callgraph.sh set-lang hu        # Hungarian output (back: set-lang en)</code></p
     <div class="card"><h3>🧰 Six tools</h3><p><code>outline</code>, <code>method_body</code>, <code>find_callers</code>,
       <code>search</code>, <code>framework_view</code>, <code>projects</code> — the same queries as the commands above.</p></div>
   </div>
-  <p>The binary is in the skill package: <code>~/.claude/skills/callgraph/bin/&lt;os&gt;-&lt;arch&gt;/callgraph</code>
-    (Windows: <code>callgraph.exe</code>). In JSON configs use the absolute path.</p>
-  <h3 style="margin-top:18px">Claude Code</h3>
-<pre class="code"><code>claude mcp add callgraph -- ~/.claude/skills/callgraph/bin/darwin-arm64/callgraph mcp</code></pre>
-  <h3 style="margin-top:18px">Claude Desktop (<code>claude_desktop_config.json</code>) · Cursor (<code>.cursor/mcp.json</code>)</h3>
+  <p>Pick your system — the commands use the binary from the installed skill package.</p>
+  <div class="tabs" role="tablist" aria-label="Platform for MCP setup">
+    <button role="tab" id="t-mcp-unix" aria-controls="p-mcp-unix" aria-selected="true">macOS / Linux</button>
+    <button role="tab" id="t-mcp-win" aria-controls="p-mcp-win" aria-selected="false" tabindex="-1">Windows</button>
+  </div>
+  <div class="panel" id="p-mcp-unix" role="tabpanel" aria-labelledby="t-mcp-unix">
+    <p>Claude Code (all projects):</p>
+<pre class="code"><code>claude mcp add -s user callgraph -- \
+  ~/.claude/skills/callgraph/bin/$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)/callgraph mcp</code></pre>
+    <p>For the JSON configs below you need the binary's absolute path — this prints it:</p>
+<pre class="code"><code>echo ~/.claude/skills/callgraph/bin/$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)/callgraph</code></pre>
+    <p>Claude Desktop (<code>claude_desktop_config.json</code>) · Cursor (<code>.cursor/mcp.json</code>):</p>
 <pre class="code"><code>{
   "mcpServers": {
     "callgraph": {
-      "command": "/Users/me/.claude/skills/callgraph/bin/darwin-arm64/callgraph",
+      "command": "/Users/you/.claude/skills/callgraph/bin/darwin-arm64/callgraph",
       "args": ["mcp"]
     }
   }
 }</code></pre>
-  <h3 style="margin-top:18px">VS Code (<code>.vscode/mcp.json</code>)</h3>
+    <p>VS Code (<code>.vscode/mcp.json</code>):</p>
 <pre class="code"><code>{
   "servers": {
     "callgraph": {
       "type": "stdio",
-      "command": "/Users/me/.claude/skills/callgraph/bin/darwin-arm64/callgraph",
+      "command": "/Users/you/.claude/skills/callgraph/bin/darwin-arm64/callgraph",
       "args": ["mcp"],
       "cwd": "${workspaceFolder}"
     }
   }
 }</code></pre>
+    <p class="sub">Replace the example path with the one printed above (folders: <code>darwin-arm64</code>, <code>darwin-x86_64</code>, <code>linux-x86_64</code>, <code>linux-aarch64</code>).</p>
+  </div>
+  <div class="panel" id="p-mcp-win" role="tabpanel" aria-labelledby="t-mcp-win" hidden>
+    <p>Claude Code (PowerShell, all projects):</p>
+<pre class="code"><code>claude mcp add -s user callgraph -- "$env:USERPROFILE\.claude\skills\callgraph\bin\windows-x86_64\callgraph.exe" mcp</code></pre>
+    <p>Claude Desktop (<code>claude_desktop_config.json</code>) · Cursor (<code>.cursor/mcp.json</code>):</p>
+<pre class="code"><code>{
+  "mcpServers": {
+    "callgraph": {
+      "command": "C:\\Users\\you\\.claude\\skills\\callgraph\\bin\\windows-x86_64\\callgraph.exe",
+      "args": ["mcp"]
+    }
+  }
+}</code></pre>
+    <p>VS Code (<code>.vscode/mcp.json</code>):</p>
+<pre class="code"><code>{
+  "servers": {
+    "callgraph": {
+      "type": "stdio",
+      "command": "C:\\Users\\you\\.claude\\skills\\callgraph\\bin\\windows-x86_64\\callgraph.exe",
+      "args": ["mcp"],
+      "cwd": "${workspaceFolder}"
+    }
+  }
+}</code></pre>
+    <p class="sub">Replace <code>you</code> with your Windows user name (in JSON every <code>\</code> is doubled).</p>
+  </div>
   <p class="sub" style="margin-top:14px">The skill and the MCP server work side by side. Clients that don't start in the project folder (e.g. Claude
     Desktop) use a registered project alias: <code>projects.sh add shop /path/to/shop</code>.</p>
 </section>
