@@ -262,21 +262,46 @@ fn body_is_compact_by_default_with_doc_and_raw_variants() {
         compact.contains("    29  pub async fn create_order(\n"),
         "{compact}"
     );
+    // a törzsbeli megjegyzés marad, a docblock kimarad — ezt a fejléc jelzi
     assert!(
-        compact.contains("    35      }\n    37      let id"),
+        compact.contains("    35      }\n    36      // TODO: validate"),
         "{compact}"
     );
-    assert!(!compact.contains("TODO"), "{compact}");
     assert!(!compact.contains("Creates an order"), "{compact}");
+    assert!(
+        compact.contains("create_order()  L29-40 (docblock L28 "),
+        "{compact}"
+    );
+    assert!(compact.contains(" --doc)\n"), "{compact}");
     let doc = sample.show(target, &["--body", "--doc"]);
     assert!(
         doc.contains("    28  /// Creates an order and returns its id.\n    29  pub async fn"),
         "{doc}"
     );
-    assert!(!doc.contains("TODO"), "{doc}");
+    assert!(doc.contains("    36      // TODO: validate"), "{doc}");
+    assert!(doc.contains("create_order()  L29-40\n"), "{doc}");
+    assert!(!doc.contains("docblock L"), "{doc}");
     let raw = sample.show(target, &["--raw"]);
     assert!(raw.contains("    28  /// Creates an order"), "{raw}");
     assert!(raw.contains("    36      // TODO: validate"), "{raw}");
+    assert!(raw.contains("create_order()  L29-40\n"), "{raw}");
+}
+
+#[test]
+fn body_without_docblock_has_no_omission_note() {
+    let sample = Sample::new();
+    fs::write(
+        sample.0.join("src/plain.rs"),
+        "pub fn plain(a: u8) -> u8 {\n    // why\n\n    /* block */\n    a + 1\n}\n",
+    )
+    .unwrap();
+    let out = sample.show("src/plain.rs::plain", &["--body"]);
+    assert!(out.contains("plain()  L1-6\n"), "{out}");
+    assert!(!out.contains("docblock"), "{out}");
+    assert!(
+        out.contains("     2      // why\n     4      /* block */\n     5      a + 1\n"),
+        "{out}"
+    );
 }
 
 #[test]
@@ -285,7 +310,7 @@ fn grep_with_body_prints_the_callers_source() {
     let out = sample.show("src", &["--grep", "AppState::next_id", "--body"]);
     assert!(out.contains("create_order()  L29-40"), "{out}");
     assert!(out.contains("let id = state.next_id();"), "{out}");
-    assert!(!out.contains("TODO"), "{out}");
+    assert!(out.contains("// TODO: validate"), "{out}");
 }
 
 #[test]

@@ -37,7 +37,8 @@ Usage:
   Paths: when several would repeat the project root, the first line is "root: /abs/project" and every path after it is
   relative to that root (usable as-is in the next call with the same --project).
   bash ~/.claude/skills/callgraph/callgraph.sh <file>::<method> [...] --body   source of the method(s), line-numbered, compact: no
-                                                docblock, blank or comment-only lines (the line numbers stay exact)
+                                                docblock or blank lines, comments inside the body are kept (the line
+                                                numbers stay exact; the "==" header says "docblock L…-… omitted")
                                                 --doc: with the docblock; --raw: the exact, unfiltered source
   bash ~/.claude/skills/callgraph/callgraph.sh <dir> --grep <pattern> --body    source of the caller methods found
   bash ~/.claude/skills/callgraph/callgraph.sh <file> --lines <n>-<m>           any line range, line-numbered (e.g. a view file)

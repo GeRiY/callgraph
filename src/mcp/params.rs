@@ -97,7 +97,7 @@ pub(crate) struct MethodBodyParams {
     /// Also include the docblock / doc comments above each method.
     #[serde(default)]
     pub doc: bool,
-    /// Exact, unfiltered source (docblock, blank and comment lines kept).
+    /// Exact, unfiltered source (docblock and blank lines kept).
     #[serde(default)]
     pub raw: bool,
     /// Disable the 400-line output cap.
