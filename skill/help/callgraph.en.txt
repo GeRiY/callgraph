@@ -69,6 +69,9 @@ Refresh ahead of time (after a git pull or many edits, so the next query does no
                                                 other settings are kept, a settings.json.bak backup is written first
   The MCP server (callgraph mcp) watches the projects it has loaded and refreshes changed files by itself
   (off: CALLGRAPH_WATCH=0).
+  Register the MCP server for Claude Code: bash ~/.claude/skills/callgraph/install.sh --mcp (asked when run
+  interactively; remove: claude mcp remove -s user callgraph). The server sends a short usage guide to the client
+  (when to use which tool, how to read the output); its guide tool returns the full SKILL.md.
 
 Language (of the terminal output and the help: en = English, default; hu = Hungarian):
   bash ~/.claude/skills/callgraph/callgraph.sh set-lang                 the current language and where it comes from

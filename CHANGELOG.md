@@ -21,6 +21,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   refreshes changed files a moment after they are saved, so queries stay fast. The answers are exactly the same as
   before. If watching is not possible on a system, it says so once and works as before. To switch it off, set
   `CALLGRAPH_WATCH=0`.
+- **The MCP server explains itself:** AI tools that use callgraph through MCP (Claude Code, Claude Desktop, Cursor,
+  VS Code) now get a short usage guide when they connect, in your language: which tool to use when, how to find every
+  caller of a function, and how to read the answers. A new `guide` tool gives them the full manual on request. The
+  tool descriptions now each carry an example and the most common mistake to avoid. The guide is made from the same
+  text as the skill's `SKILL.md`, so the two always say the same thing.
+- **The installer can set up the MCP server for Claude Code:** if the `claude` command is available, `install.sh`
+  asks whether to register callgraph as an MCP server (`install.sh --mcp` does it without asking, `--no-mcp` skips
+  it). Running it again does not create duplicates. It prints how to remove it (`claude mcp remove -s user callgraph`)
+  and where to find the setup for Claude Desktop, Cursor and VS Code. If this step fails, the rest of the install
+  still completes. The installer now ends with a reminder to restart Claude Code.
 
 ### Changed
 - **Comments inside a method stay in `--body`:** the short method view used to hide comment lines inside the method

@@ -37,11 +37,14 @@ bash $CG --project myapp app --grep 'Order::cancel' --body           # a talált
 bash $CG --project myapp app --category model_use,orm_relation       # szűrés hívás-kategóriára
 ```
 
+<!-- mcp:callers -->
 **Hívók keresése:** a név szerinti mintával kezdd: `'(^|::|\.|->)név$'`. Minden hívást megtalál, akkor is, ha a fogadó
 típusa ismeretlen, örökölt vagy trait-ből jön. A `Típus::metódus` csak az erre a típusra feloldott hívásokat adja (és
 az interfészén / szülőjén / trait-jén át menőket), ezért hívók maradhatnak ki; gyakori, zajos névnél (`save`, `find`,
 `get`) szűkítésre használd.
+<!-- /mcp -->
 
+<!-- mcp:output -->
 **A keresőkimenet olvasása** (`--grep`, `--depth`, `--strings`, `--const`, mappák):
 - Első sor `gyökér: /abs/út`: utána minden út ehhez a projektgyökérhez relatív; így add vissza őket (ugyanazzal a
   `--project`-tel).
@@ -50,6 +53,7 @@ az interfészén / szülőjén / trait-jén át menőket), ezért hívók maradh
 - `via Resolver`: a hívás a keresett típus interfészén, szülőosztályán vagy trait-jén át megy.
 - `L12, L40 │ …`: ugyanaz a hívás több soron; hívónként legfeljebb 3 sor, utána `… +2 további: L55, L61`.
 - `?` / `?::név`: ismeretlen fogadó-típus, csak név szerinti egyezés; lehet téves, nézd meg a sort.
+<!-- /mcp -->
 
 ## Melyik `--format` mire való
 
@@ -112,6 +116,32 @@ megfelelő típus `component`; a fájl-szintű függvények a `<Fájl>.swift` `m
 property típusa előtt látszik. Hívás-kategóriák: `swiftui_view`, `swiftui_modifier`, `component_use`,
 `native_swift`, `internal_helper`, `external_call`. Részletek: `docs/LANG-SWIFT.md`.
 
+## MCP-szerver (`callgraph mcp`)
+
+<!-- mcp:tools -->
+callgraph (`callgraph mcp`): AST-alapú, token-hatékony kód-térkép (PHP, Rust, JS / TS / Vue, Swift, SCSS); a CLI
+lekérdezései csak olvasó eszközként, azonos kimenettel. Kódfájl beolvasása előtt használd. Az utak a projektgyökérhez
+relatívak: regisztrált alias (`project`, lista: `projects`) vagy a szerver munkakönyvtára. Szokásos menet: `outline`
+→ `method_body` csak a szükséges metódusra → `find_callers` a név szerinti mintával (lásd lent).
+- `outline` `{path}`: fájl vagy mappa szerkezete: osztályok / komponensek, metódusok sortartománnyal, hívások
+  kategóriánként. Ezzel kezdd. `method`: egy metódus hívás-gráfja; `format`: `api`, `flow` (ágak), `summary`, `hotspots`.
+- `method_body` `{path, method}`: sorszámozott forrás; a `method` egy név vagy lista (`["store", "update"]`). Alapból
+  tömör (a fenti docblock és az üres sorok kiesnek, a kommentek maradnak, a sorszámok pontosak); a `doc: true` a
+  docblockot is hozza, a `raw: true` a pontos szöveget adja.
+- `find_callers` `{pattern}`: ki hívja (fájl, metódus, sortartomány, a hívás sora); a `path` szűkíti a kört, a `depth`
+  2–5 = hatáselemzés (a hívók hívói), a `guess: true` a csak név szerinti egyezéseket is hozza. JS / TS / Vue
+  kulcsok: `useForm.js::submit` (export), `route::orders.show`, `i18n::orders.title`, `vue::emit:save`, `Atoms/AtomButton.vue`.
+- `search` `{kind: strings | constants, pattern}`: hol van egy string-literál (hibaüzenet, kulcs) vagy konstans.
+- `framework_view` `{view, path}`: egy mappa `routes`, `middleware`, `validation`, `jobs`, `events`, `providers`,
+  `magic`, `di`, `views` nézete.
+- `notes`: fájlokhoz / metódusokhoz írt jegyzetek (`📝`, csak olvas). `guide`: ez az útmutató teljes terjedelmében
+  (CLI-példák, nyelvek).
+A kimenet 400 sornál korlátos (mappa → summary, fájl → metódus-index, keresés → találatonként 1 sor): előbb a `path`,
+a `method` vagy a `pattern` szűkítése; `full: true` csak indokolt esetben.
+<!-- /mcp -->
+CLI-megfelelők: `outline` = `bash $CG <út>` (`method` = `<út>::név`), `method_body` = `::név --body`,
+`find_callers` = `--grep`, `search` = `--strings` / `--const`, `framework_view` = `--format <nézet>`, `notes` = `--notes`.
+
 ## Kimenet-korlát
 
 400 sor fölött a mappás outline `summary`-ra, az egyfájlos outline metódus-indexre, a `--grep` találatonként
@@ -164,6 +194,8 @@ nem írható, cache nélkül fut. Takarítás: `callgraph prune` (lásd README).
 
 ## Korlát
 
+<!-- mcp:limits -->
 Statikus elemzés: dinamikus hívás (`$this->$method()`, `obj[key]()`), magic method és futásidőben összeállított
 osztálynév / regisztrált komponens nem oldható fel. A `--depth` alapból csak a biztos (feloldott) hívókat követi;
 a név szerinti egyezést a `--guess` mutatja „?” jellel. A pontos vezérlési logikához a `--body` kell (tömör, kommentekkel; a `--raw` a pontos szöveget adja).
+<!-- /mcp -->

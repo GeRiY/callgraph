@@ -208,8 +208,16 @@ CALLGRAPH_LANG=hu bash ~/.claude/skills/callgraph/callgraph.sh app/Models/Order.
 
 A Claude Code-skill mellett (változatlan, teljes értékűen támogatott) ugyanaz a bináris
 [MCP](https://modelcontextprotocol.io)-szerver is stdio-n, így bármely MCP-kliens használhatja: `callgraph mcp`.
-Eszközök: `outline`, `method_body`, `find_callers`, `search`, `framework_view`, `projects`. Ugyanazt a tömör szöveget
-adják, mint a CLI, ugyanazzal a kimeneti korláttal; csak olvas, hálózat nincs, az utak a projekt-gyökéren belül maradnak.
+Eszközök: `outline`, `method_body`, `find_callers`, `search`, `framework_view`, `notes`, `projects`, `guide`. Ugyanazt
+a tömör szöveget adják, mint a CLI, ugyanazzal a kimeneti korláttal; csak olvas, hálózat nincs, az utak a
+projekt-gyökéren belül maradnak. Kapcsolódáskor a szerver rövid használati útmutatót küld a kliensnek a beállított
+nyelven (melyik eszköz mire, hogyan keresd a hívókat, hogyan olvasd a kimenetet); a Claude Code ezt az agent
+utasításai közé teszi. A `guide` eszköz a teljes skill-útmutatót adja. Mindkettő a `SKILL.md` forrásából készül, így
+mindig egyezik vele.
+
+A telepítő a Claude Code-ban regisztrálni is tudja: a `bash install.sh` rákérdez (ha a `claude` parancs elérhető), a
+`bash install.sh --mcp` kérdés nélkül megcsinálja, a `--no-mcp` kihagyja. Eltávolítás:
+`claude mcp remove -s user callgraph`. Kézzel:
 
 ```bash
 # Claude Code, macOS / Linux (a géphez illő binárist választja):

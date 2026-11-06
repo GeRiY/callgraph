@@ -207,8 +207,15 @@ CALLGRAPH_LANG=hu bash ~/.claude/skills/callgraph/callgraph.sh app/Models/Order.
 
 Besides the Claude Code skill (unchanged, fully supported), the same binary is also an
 [MCP](https://modelcontextprotocol.io) server on stdio, so any MCP client can use it: `callgraph mcp`.
-Tools: `outline`, `method_body`, `find_callers`, `search`, `framework_view`, `projects`. They return the same compact
-text as the CLI, with the same output cap; read-only, no network, paths are confined to the project root.
+Tools: `outline`, `method_body`, `find_callers`, `search`, `framework_view`, `notes`, `projects`, `guide`. They return
+the same compact text as the CLI, with the same output cap; read-only, no network, paths are confined to the project root.
+On connect the server sends the client a short usage guide in your language (which tool to use when, how to find
+callers, how to read the output); Claude Code puts it into the agent's instructions. The `guide` tool returns the full
+skill manual. Both come from the same source as `SKILL.md`, so they always match.
+
+The installer can register it for Claude Code for you: `bash install.sh` asks (if the `claude` command is available),
+`bash install.sh --mcp` does it without asking, `--no-mcp` skips it. Remove it with
+`claude mcp remove -s user callgraph`. By hand:
 
 ```bash
 # Claude Code, macOS / Linux (picks the binary for your platform):

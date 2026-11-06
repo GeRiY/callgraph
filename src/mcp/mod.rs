@@ -3,6 +3,7 @@
 //! kimeneti korlát azonos a CLI-ével. Részletek: `docs/MCP.md`.
 
 mod guard;
+mod guide;
 mod params;
 mod request;
 mod runner;

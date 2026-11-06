@@ -7,9 +7,13 @@
    (`update --check`: csak megnézi, van-e újabb; a felhasználói adatok itt is megmaradnak).
 2. Futtasd a skill-mappában: `bash install.sh` — futtathatóvá teszi a scripteket és a binárist, macOS-en leveszi
    a letöltés karantén-jelzőjét, és ellenőrzi, hogy van-e a gépedhez illő bináris (`bin/<os>-<arch>/callgraph`).
+   Két dolgot kérdez (alapból mindkettő nem): a Claude Code-hookot (`--hooks` / `--no-hooks`), és — ha a `claude`
+   parancs elérhető — hogy regisztrálja-e a callgraph-ot MCP-szerverként a Claude Code-ban
+   (`claude mcp add -s user callgraph -- <bináris> mcp`; kérdés nélkül: `--mcp`, kihagyás: `--no-mcp`; eltávolítás:
+   `claude mcp remove -s user callgraph`). Claude Desktop / Cursor / VS Code beállítása: `docs/MCP.md`.
 3. Regisztrálj egy projektet: `bash ~/.claude/skills/callgraph/projects.sh add myapp /abszolút/út/a/projekthez`
 4. Próba: `bash ~/.claude/skills/callgraph/callgraph.sh --project myapp app/Models/User.php`
-5. Indítsd újra a Claude Code-ot, hogy a skillt (`SKILL.md`) betöltse.
+5. Indítsd újra a Claude Code-ot, hogy a skillt (`SKILL.md`) és — ha regisztráltad — az MCP-szervert betöltse.
 6. Nyelv (nem kötelező): a kimenet és a súgó alapból angol; magyarra: `bash ~/.claude/skills/callgraph/callgraph.sh set-lang hu`
    (vissza: `set-lang en`). Egy futásra a `CALLGRAPH_LANG=hu` környezeti változó is jó.
    A nyelvváltás a skill-utasítást (`SKILL.md`) is az adott nyelvűre cseréli; utána indítsd újra a Claude Code-ot.
