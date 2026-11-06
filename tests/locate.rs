@@ -174,7 +174,12 @@ fn the_best_starting_file_comes_first_with_its_reasons() {
     );
     assert!(out.contains("★★★"), "{out}");
     // a gyökér egyszer, elöl; utána minden út relatív
-    let root = project.0.display().to_string();
+    // Windowson a kanonikus út `\\?\C:\…`, a kiírt gyökér `C:\…` (a callgraph a verbatim-előtagot elhagyja)
+    let full = project.0.display().to_string();
+    let root = match full.strip_prefix(r"\\?\") {
+        Some(rest) if rest.as_bytes().get(1) == Some(&b':') => rest.to_owned(),
+        _ => full,
+    };
     assert!(out.lines().next().unwrap().starts_with("root: "), "{out}");
     assert_eq!(out.matches(&root).count(), 1, "{out}");
     // a hat találó fájlból öt látszik
