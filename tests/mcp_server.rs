@@ -87,6 +87,19 @@ fn initialize_list_and_call_outline() {
     let init = s.response(1);
     assert_eq!(init["result"]["serverInfo"]["name"], "callgraph");
     assert!(init["result"]["capabilities"]["tools"].is_object());
+    // a használati útmutató a SKILL-forrásból, MCP-nevekkel (a CLI-kapcsolók nélkül)
+    let instructions = init["result"]["instructions"].as_str().unwrap_or_default();
+    for item in [
+        "find_callers",
+        "(^|::|\\.|->)",
+        "`root: ",
+        "`via ",
+        "`raw: true`",
+        "`guide`",
+    ] {
+        assert!(instructions.contains(item), "{item}: {instructions}");
+    }
+    assert!(!instructions.contains("`--"), "{instructions}");
     s.send(json!({"jsonrpc": "2.0", "method": "notifications/initialized"}));
 
     s.send(json!({"jsonrpc": "2.0", "id": 2, "method": "tools/list"}));
@@ -103,6 +116,7 @@ fn initialize_list_and_call_outline() {
         [
             "find_callers",
             "framework_view",
+            "guide",
             "method_body",
             "notes",
             "outline",
@@ -110,6 +124,17 @@ fn initialize_list_and_call_outline() {
             "search"
         ]
     );
+
+    // `guide`: a teljes SKILL.md a beállított nyelven, frontmatter és jelölők nélkül
+    let guide = s.call(30, "guide", json!({}));
+    assert_ne!(guide["isError"], json!(true), "{guide}");
+    let manual = text(&guide);
+    assert!(
+        manual.starts_with("# callgraph — code map without Read\n"),
+        "{manual}"
+    );
+    assert!(manual.contains("## MCP server"), "{manual}");
+    assert!(!manual.contains("<!--"), "{manual}");
 
     let outline = s.call(
         3,

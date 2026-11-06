@@ -78,6 +78,14 @@ impl ProjectRegistry {
         Some(path.to_owned()).filter(|p| !p.is_empty())
     }
 
+    /// Minden regisztrált projekt gyökér-útja (a beszúrás sorrendjében; az üres / hibás bejegyzések kimaradnak).
+    pub fn roots(&self) -> Vec<String> {
+        self.map
+            .keys()
+            .filter_map(|alias| self.root(alias))
+            .collect()
+    }
+
     /// Egy projektenkénti extra beállítás (pl. `phpstan_level`); string-bejegyzésnél nincs.
     pub fn setting(&self, alias: &str, key: &str) -> Option<String> {
         match self.map.get(alias)?.get(key)? {

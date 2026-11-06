@@ -130,6 +130,42 @@ impl FileWalker {
         }
     }
 
+    /// Bejárná-e a `collect(&[root])` ezt a fájlt: a kiterjesztése regisztrált, és a gyökér alatti egyik mappája sincs
+    /// kihagyva (`includes_dir`). A fájlnak nem kell léteznie; a `root` és a `file` ugyanabban az alakban (kanonikus
+    /// út). Symlinkeket nem követ (a `callgraph refresh` / az MCP-figyelő szűrője).
+    pub fn includes(&self, root: &Path, file: &Path) -> bool {
+        self.matches(file)
+            && file
+                .parent()
+                .is_some_and(|dir| self.includes_dir(root, dir))
+    }
+
+    /// Bejárná-e a `collect(&[root])` ezt a mappát: a gyökér alatt van, és egyik szintje sincs kihagyva (beépített
+    /// név, `.gitignore`-os mappa, Cargo `target/`). A gyökér maga benne van.
+    pub fn includes_dir(&self, root: &Path, dir: &Path) -> bool {
+        let Ok(rel) = dir.strip_prefix(root) else {
+            return false;
+        };
+        let mut at = root.to_path_buf();
+        for component in rel.components() {
+            let std::path::Component::Normal(name) = component else {
+                return false;
+            };
+            let Some(name) = name.to_str() else {
+                return false;
+            };
+            if self
+                .ignore_dirs_for(&at)
+                .iter()
+                .any(|ignored| ignored == name)
+            {
+                return false;
+            }
+            at.push(name);
+        }
+        true
+    }
+
     fn ignore_dirs_for(&self, dir: &Path) -> Vec<String> {
         let mut ignored = self.skip_dirs.clone();
         // Cargo-csomag: a `target/` build-kimenet (generált .rs fájlokkal). Csak Cargo.toml mellett,
@@ -164,7 +200,7 @@ mod tests {
     use super::FileWalker;
     use crate::lang::LanguageRegistry;
     use std::fs;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
     use std::time::{SystemTime, UNIX_EPOCH};
 
     struct TempDir(PathBuf);
@@ -272,5 +308,27 @@ mod tests {
                 PathBuf::from("web/target/page.php")
             ]
         );
+    }
+
+    #[test]
+    fn includes_matches_what_collect_would_walk() {
+        let temp = TempDir::new();
+        let root = temp.0.canonicalize().unwrap();
+        fs::write(root.join(".gitignore"), "build/\n").unwrap();
+        fs::create_dir_all(root.join("crate")).unwrap();
+        fs::write(root.join("crate/Cargo.toml"), "[package]\n").unwrap();
+        let walker = FileWalker::for_registry(&LanguageRegistry::with_defaults());
+        assert!(walker.includes(&root, &root.join("a.php")));
+        assert!(walker.includes(&root, &root.join("src/deep/new.ts")));
+        assert!(!walker.includes(&root, &root.join("notes.txt")));
+        assert!(!walker.includes(&root, &root.join("vendor/x/a.php")));
+        // a .gitignore mappái a gyökér alatti szinteken (mint a bejárásnál)
+        assert!(!walker.includes(&root, &root.join("sub/build/a.php")));
+        assert!(!walker.includes(&root, &root.join("crate/target/out.rs")));
+        assert!(walker.includes(&root, &root.join("web/target/page.php")));
+        assert!(!walker.includes(&root, Path::new("/elsewhere/a.php")));
+        assert!(walker.includes_dir(&root, &root));
+        assert!(walker.includes_dir(&root, &root.join("src")));
+        assert!(!walker.includes_dir(&root, &root.join("node_modules/pkg")));
     }
 }

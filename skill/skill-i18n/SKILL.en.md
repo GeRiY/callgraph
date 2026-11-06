@@ -25,7 +25,7 @@ directory is the root.
 CG=<skill>/callgraph.sh
 bash $CG --project myapp app/Http/Controllers/X.php                  # outline: class, methods with line ranges, calls by category
 bash $CG --project myapp app/Http/Controllers/X.php::store           # only one method (several ::selectors, several files too)
-bash $CG --project myapp app/Http/Controllers/X.php::store --body    # the method's source, compact (no docblock / comment lines; --doc, --raw)
+bash $CG --project myapp app/Http/Controllers/X.php::store --body    # the method's source, compact (comments kept, docblock omitted: --doc; --raw = exact)
 bash $CG --project myapp app/Http/Controllers/X.php --lines 30-60    # any range, line-numbered (view, procedural file)
 bash $CG --project myapp app --strings 'Order not found'             # where a string literal (error message, key) is
 bash $CG --project myapp app --const STATUS_ACTIVE                   # constant: definition, references, re-exports
@@ -37,11 +37,14 @@ bash $CG --project myapp app --grep 'Order::cancel' --body           # source of
 bash $CG --project myapp app --category model_use,orm_relation       # filter by call category
 ```
 
+<!-- mcp:callers -->
 **Finding callers:** start with the name pattern `'(^|::|\.|->)name$'`. It catches every call, also where the receiver
 type is unknown, inherited or comes from a trait. `Type::method` finds only the calls resolved to that type (plus
 calls through its interface / parent / trait), so it can miss callers; use it to narrow a noisy common name
 (`save`, `find`, `get`).
+<!-- /mcp -->
 
+<!-- mcp:output -->
 **Reading search output** (`--grep`, `--depth`, `--strings`, `--const`, directories):
 - First line `root: /abs/path`: every path after it is relative to that project root; pass them back as they are
   (with the same `--project`).
@@ -50,6 +53,7 @@ calls through its interface / parent / trait), so it can miss callers; use it to
 - `via Resolver`: the call goes through an interface, parent class or trait of the searched type.
 - `L12, L40 │ …`: the same call on several lines; at most 3 rows per caller, then `… +2 more: L55, L61`.
 - `?` / `?::name`: the receiver type is unknown, a name-only match; it may be wrong, check the line.
+<!-- /mcp -->
 
 ## Which `--format` is for what
 
@@ -111,6 +115,31 @@ and the other computed properties are methods; the property wrapper (`@State`, `
 shown before the property type. Call categories: `swiftui_view`, `swiftui_modifier`, `component_use`,
 `native_swift`, `internal_helper`, `external_call`. Details: `docs/LANG-SWIFT.md`.
 
+## MCP server (`callgraph mcp`)
+
+<!-- mcp:tools -->
+callgraph (`callgraph mcp`): AST-based, token-efficient code map (PHP, Rust, JS / TS / Vue, Swift, SCSS); the CLI's
+queries as read-only tools, with the same output. Use it before reading a code file. Paths are relative to the project
+root: a registered alias (`project`, list: `projects`) or the server's working directory. Typical flow: `outline`
+→ `method_body` for just the method you need → `find_callers` with the name pattern (see below).
+- `outline` `{path}`: structure of a file or directory: classes / components, methods with line ranges, calls by
+  category. Start here. `method`: one method's call graph; `format`: `api`, `flow` (branches), `summary`, `hotspots`.
+- `method_body` `{path, method}`: line-numbered source; `method` is a name or a list (`["store", "update"]`). Compact
+  by default (docblock above and blank lines dropped, comments kept, line numbers exact); `doc: true` adds the
+  docblock, `raw: true` gives the exact text.
+- `find_callers` `{pattern}`: who calls it (file, method, line range, call line); `path` narrows the scope, `depth`
+  2–5 = impact analysis (callers of callers), `guess: true` adds name-only matches. JS / TS / Vue keys:
+  `useForm.js::submit` (export), `route::orders.show`, `i18n::orders.title`, `vue::emit:save`, `Atoms/AtomButton.vue`.
+- `search` `{kind: strings | constants, pattern}`: where a string literal (error message, key) or a constant is.
+- `framework_view` `{view, path}`: `routes`, `middleware`, `validation`, `jobs`, `events`, `providers`, `magic`,
+  `di`, `views` of a directory.
+- `notes`: notes left on files / methods (`📝`, read-only). `guide`: this manual in full (CLI examples, languages).
+Output is capped at 400 lines (directory → summary, file → method index, search → 1 line per match): narrow `path`,
+`method` or `pattern` first; `full: true` only when justified.
+<!-- /mcp -->
+CLI equivalents: `outline` = `bash $CG <path>` (`method` = `<path>::name`), `method_body` = `::name --body`,
+`find_callers` = `--grep`, `search` = `--strings` / `--const`, `framework_view` = `--format <view>`, `notes` = `--notes`.
+
 ## Output limit
 
 Above 400 lines the directory outline switches to `summary`, the single-file outline to a method index, `--grep` to
@@ -163,6 +192,8 @@ is not writable, it runs without a cache. Cleanup: `callgraph prune` (see README
 
 ## Limits
 
+<!-- mcp:limits -->
 Static analysis: dynamic calls (`$this->$method()`, `obj[key]()`), magic methods and class names / registered components
 assembled at runtime cannot be resolved. By default `--depth` follows only the certain (resolved) callers;
-name-only matches are shown by `--guess` with a "?" mark. For the exact control logic you need `--body` (compact; `--raw` gives the exact text with comments).
+name-only matches are shown by `--guess` with a "?" mark. For the exact control logic you need `--body` (compact, comments kept; `--raw` gives the exact text).
+<!-- /mcp -->

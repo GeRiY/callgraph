@@ -3,7 +3,8 @@
 <p align="center">
   <b>Token-hatékony kód-térkép AI kódoló agenteknek.</b><br>
   Szerkezet, kategorizált hívás-gráf, metódus-törzs, „ki hívja?” és hatáselemzés —
-  a teljes fájlok beolvasása nélkül.
+  a teljes fájlok beolvasása nélkül.<br>
+  🌐 <a href="https://callgraph.eu/hu/">callgraph.eu</a>
 </p>
 
 <p align="center">
@@ -207,15 +208,45 @@ CALLGRAPH_LANG=hu bash ~/.claude/skills/callgraph/callgraph.sh app/Models/Order.
 
 A Claude Code-skill mellett (változatlan, teljes értékűen támogatott) ugyanaz a bináris
 [MCP](https://modelcontextprotocol.io)-szerver is stdio-n, így bármely MCP-kliens használhatja: `callgraph mcp`.
-Eszközök: `outline`, `method_body`, `find_callers`, `search`, `framework_view`, `projects`. Ugyanazt a tömör szöveget
-adják, mint a CLI, ugyanazzal a kimeneti korláttal; csak olvas, hálózat nincs, az utak a projekt-gyökéren belül maradnak.
+Eszközök: `outline`, `method_body`, `find_callers`, `search`, `framework_view`, `notes`, `projects`, `guide`. Ugyanazt
+a tömör szöveget adják, mint a CLI, ugyanazzal a kimeneti korláttal; csak olvas, az utak a projekt-gyökéren belül
+maradnak, a lekérdezések nem használnak hálózatot (csak a lenti, naponta egyszeri frissítés-ellenőrzés). Kapcsolódáskor a szerver rövid használati útmutatót küld a kliensnek a beállított
+nyelven (melyik eszköz mire, hogyan keresd a hívókat, hogyan olvasd a kimenetet); a Claude Code ezt az agent
+utasításai közé teszi. A `guide` eszköz a teljes skill-útmutatót adja. Mindkettő a `SKILL.md` forrásából készül, így
+mindig egyezik vele.
+
+A telepítő a Claude Code-ban regisztrálni is tudja: a `bash install.sh` rákérdez (ha a `claude` parancs elérhető), a
+`bash install.sh --mcp` kérdés nélkül megcsinálja, a `--no-mcp` kihagyja. Eltávolítás:
+`claude mcp remove -s user callgraph`. Kézzel:
 
 ```bash
-claude mcp add callgraph -- ~/.claude/skills/callgraph/bin/linux-x86_64/callgraph mcp   # Claude Code
+# Claude Code, macOS / Linux (a géphez illő binárist választja):
+claude mcp add -s user callgraph -- \
+  ~/.claude/skills/callgraph/bin/$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)/callgraph mcp --auto-update
 ```
 
-Claude Desktop, Cursor és VS Code: JSON-bejegyzés `"command": "<a bináris abszolút útja>", "args": ["mcp"]` alakban.
+```powershell
+# Claude Code, Windows (PowerShell):
+claude mcp add -s user callgraph -- "$env:USERPROFILE\.claude\skills\callgraph\bin\windows-x86_64\callgraph.exe" mcp --auto-update
+```
+
+Claude Desktop, Cursor és VS Code: JSON-bejegyzés `"command": "<a bináris abszolút útja>", "args": ["mcp", "--auto-update"]` alakban.
+**Ajánlott: `--auto-update`** — indításkor (naponta legfeljebb egyszer) a szerver pontosan úgy telepíti az újabb
+kiadást, mint a `callgraph.sh update` (SHA-256-ellenőrzéssel, a beállításaid megmaradnak), és újraindul, így a kliens
+mindig a legújabb verzióval beszél; ha bármi nem sikerül, egyszerűen a jelenlegivel indul. A kapcsoló nélkül csak egy
+egysoros „újabb verzió érhető el” megjegyzést tesz a munkamenet első válasza végére. Csak a callgraph saját mappájába
+ír; minden frissítés-ellenőrzés kikapcsolható: `CALLGRAPH_UPDATE_CHECK=0`.
 Receptek, paraméterek, biztonság: [`docs/MCP.md`](docs/MCP.md).
+Futás közben az MCP-szerver figyeli a betöltött projekteket, és a változott fájlokat magától frissíti.
+
+### A projekt-térkép frissen tartása
+
+Egy `git pull` vagy sok szerkesztés után a `bash ~/.claude/skills/callgraph/callgraph.sh refresh [--project alias]`
+(`--background`-dal azonnal visszatér) előre frissíti a projekt-térképet, így a következő lekérdezésnek nem kell
+újraelemeznie. Opcionális Claude Code-hook: a `bash install.sh --hooks` (vagy `callgraph.sh hook install`) minden
+Claude által szerkesztett fájlt a háttérben frissít; egyetlen bejegyzést vesz fel a `~/.claude/settings.json`-ba, a
+többit megtartja, és előtte `settings.json.bak` mentést ír. Eltávolítás:
+`bash ~/.claude/skills/callgraph/callgraph.sh hook uninstall`. Részletek: [`docs/PROJECT-GRAPH.md`](docs/PROJECT-GRAPH.md).
 
 ### Visszajelzés az agentektől
 

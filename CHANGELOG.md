@@ -5,6 +5,61 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-11-06
+
+### Added
+- **Refresh the project map ahead of time:** `callgraph.sh refresh` brings the project map in `.callgraph/` up to
+  date right away — every changed, new or deleted file, or only the files / folders you name — and prints a one-line
+  summary. Handy after a `git pull` or after an agent wrote many files: the next query no longer has to re-analyse
+  them. `--background` returns at once and does the work in a separate process. Two refreshes never work on the same
+  project at the same time; if one is already running, the other simply skips.
+- **Optional Claude Code hook:** after Claude edits or writes a file, callgraph refreshes that file in the background,
+  so the next question about it is answered instantly. The installer asks whether to add it (`install.sh --hooks`
+  adds it without asking); it only adds one entry to `~/.claude/settings.json`, keeps all other settings and hooks,
+  and saves a `settings.json.bak` backup first. Check or remove it any time: `callgraph.sh hook status` /
+  `callgraph.sh hook uninstall`. It does nothing outside registered projects (or ones that already have a
+  `.callgraph/` folder).
+- **The MCP server keeps itself up to date:** while `callgraph mcp` runs, it watches the projects it has opened and
+  refreshes changed files a moment after they are saved, so queries stay fast. The answers are exactly the same as
+  before. If watching is not possible on a system, it says so once and works as before. To switch it off, set
+  `CALLGRAPH_WATCH=0`.
+- **The MCP server explains itself:** AI tools that use callgraph through MCP (Claude Code, Claude Desktop, Cursor,
+  VS Code) now get a short usage guide when they connect, in your language: which tool to use when, how to find every
+  caller of a function, and how to read the answers. A new `guide` tool gives them the full manual on request. The
+  tool descriptions now each carry an example and the most common mistake to avoid. The guide is made from the same
+  text as the skill's `SKILL.md`, so the two always say the same thing.
+- **The installer can set up the MCP server for Claude Code:** if the `claude` command is available, `install.sh`
+  asks whether to register callgraph as an MCP server (`install.sh --mcp` does it without asking, `--no-mcp` skips
+  it). Running it again does not create duplicates. It prints how to remove it (`claude mcp remove -s user callgraph`)
+  and where to find the setup for Claude Desktop, Cursor and VS Code. If this step fails, the rest of the install
+  still completes. The installer now ends with a reminder to restart Claude Code.
+- **The MCP server can update itself:** add `--auto-update` to the server's arguments in your AI tool's MCP settings
+  (`"args": ["mcp", "--auto-update"]`, recommended). When the tool starts the server — at most once a day — it checks
+  for a newer callgraph release, downloads it, checks that the file is exactly the published one (it never installs
+  a file whose checksum does not match), installs it just like `callgraph.sh update` (your projects and settings are
+  kept) and restarts itself, so the tool works with the new version right away. If anything goes wrong (no
+  internet, GitHub limit, a bad download, no write permission) it simply starts the version you have and writes one
+  line to the tool's log. It only writes into callgraph's own folder, never into your projects.
+- **The MCP server tells you about updates:** without `--auto-update`, the server checks for a newer release at most
+  once a day in the background (it never makes a request wait) and adds one line to the first answer of the session:
+  `ℹ callgraph X is available (installed: Y) — update: …/callgraph.sh update, or add --auto-update to the MCP
+  config`. `CALLGRAPH_UPDATE_CHECK=0` turns off all update checks (no network at all); they are also off in CI.
+
+### Changed
+- **Comments inside a method stay in `--body`:** the short method view used to hide comment lines inside the method
+  too, so an agent could think a line was missing and read the file again. Now only the docblock above the method
+  and blank lines are left out; comments inside the method (they often explain the intent) are shown. When a
+  docblock was left out, the header line says so, e.g. `(docblock L112-119 omitted: --doc)`. `--doc` still adds the
+  docblock, `--raw` still prints the exact source. The MCP `method_body` tool works the same way.
+- The project website has its own domain: https://callgraph.eu (the old `geriy.github.io/callgraph` address redirects).
+
+### Fixed
+- **"Who calls it" now finds calls from child classes:** searching for a method with its class name
+  (`--grep FrontendController::redirectToNewDashboard`, or the MCP `find_callers` tool) missed the places where a
+  child class calls the inherited method as `$this->redirectToNewDashboard()` — only the bare method name found them.
+  Now these calls are found too, marked with the child class (`L139 via EventeditController │ …`). A child class that
+  has its own version of the method is not counted, because its call runs its own version.
+
 ## [0.3.0] — 2026-11-06
 
 ### Changed
@@ -144,7 +199,8 @@ First release.
 - Built-in update: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Prebuilt packages for macOS (arm64, x86_64), Linux (x86_64, ARM64, static musl) and Windows.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.3.0...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.4.0...develop
+[0.4.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.4.0
 [0.3.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.3.0
 [0.2.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.2.0
 [0.1.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.1.0

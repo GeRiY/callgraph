@@ -16,12 +16,17 @@ ugyanaz a tömör kimenet, amit a `callgraph show` kiír (ez a token-hatékony r
 | Eszköz | Paraméterek | Mit ad | CLI-megfelelő |
 |---|---|---|---|
 | `outline` | `path`, `project?`, `format?` (`outline`\|`api`\|`flow`\|`summary`\|`hotspots`\|`stats`), `method?`, `full?` | fájl / mappa szerkezete; `method`-dal egy metódus hívás-gráfja | `show <út>[::m] --format <f>` |
-| `method_body` | `path`, `method` (egy név stringként vagy névtömb), `project?`, `doc?`, `raw?`, `full?` | a metódus(ok) forrása sorszámozva, tömören (docblock, üres és megjegyzés-sorok nélkül); `doc: true`: docblockkal, `raw: true`: szűretlenül | `show <út>::m --body [--doc\|--raw]` |
+| `method_body` | `path`, `method` (egy név stringként vagy névtömb), `project?`, `doc?`, `raw?`, `full?` | a metódus(ok) forrása sorszámozva, tömören (docblock és üres sorok nélkül, a törzsbeli megjegyzések maradnak; a kihagyott docblockot a fejléc jelzi); `doc: true`: docblockkal, `raw: true`: szűretlenül | `show <út>::m --body [--doc\|--raw]` |
 | `find_callers` | `pattern`, `path?`, `project?`, `depth?` (1–5), `guess?`, `full?` | ki hívja; `depth` > 1: hatáselemzés | `show <út> --grep <minta> --depth N [--guess]` |
 | `search` | `kind` (`strings`\|`constants`), `pattern`, `path?`, `project?`, `full?` | string-literál / konstans helye | `show <út> --strings` / `--const` |
 | `framework_view` | `view` (`routes`\|`middleware`\|`validation`\|`jobs`\|`events`\|`providers`\|`magic`\|`di`\|`views`), `path`, `project?`, `full?` | framework-nézet | `show <út> --format <nézet>` |
 | `notes` (pilot) | `pattern?` (regex a szövegre / horgonyra; üres = mind), `path?`, `project?` | a fájlokhoz / metódusokhoz írt jegyzetek: `út[::metódus]  idő  📝 szöveg`, `[orphaned]`, ha a metódus már nincs | `show <út> --notes <minta>` |
 | `projects` | — | a regisztrált aliasok és gyökereik | `projects.sh list` |
+| `guide` | — | a teljes skill-útmutató (`SKILL.md` törzse, frontmatter nélkül) a beállított nyelven | `skill/SKILL.md` |
+
+Az eszköz-leírások (`tools/list`) rövidek, de mindegyikben van egy példa-hívás és a fő buktató (pl. `find_callers`:
+a név szerinti mintával kezdd; `method_body`: a `method` string vagy lista, alapból tömör, a `raw` adja a pontos
+szöveget; `outline`: a metódus a `method` paraméterbe megy, nem `path::method` alakban).
 
 - A `path` a projekt-gyökérhez képest értendő; elhagyva (ahol opcionális) a teljes gyökér.
 - A `project` egy regisztrált alias (`projects.sh add <alias> <út>`, a `projects.json`-ból); nélküle a gyökér a
@@ -30,19 +35,78 @@ ugyanaz a tömör kimenet, amit a `callgraph show` kiír (ez a token-hatékony r
   vált (a küszöb: `CALLGRAPH_OUT_LIMIT`). A `full: true` a `--full` megfelelője, csak indokolt esetben.
 - A nyelv (angol / magyar) a szokásos beállítást követi: `CALLGRAPH_LANG` › `callgraph set-lang` › angol.
 
+## Használati útmutató a kliensnek (`instructions`, `guide`)
+
+A CLI-s agent a `SKILL.md`-ből tanulja meg a használatot; MCP-n ez nincs meg, ezért a szerver az `initialize`
+válaszának `instructions` mezőjében tömör útmutatót küld (kb. 35 sor, ~3,5 KB; a Claude Code ezt az agent
+rendszer-promptjába teszi): melyik eszköz mire, szokásos menet (`outline` → `method_body` → `find_callers`), a
+hívók keresése a név szerinti mintával (`(^|::|\.|->)név$`) és a `Típus::metódus` korlátja, a keresőkimenet olvasása
+(`root:` / `gyökér:` sor, `L12 │ kód`, `via <Típus>`, `?::név`, `… +N more`), a tömör törzs vs. `doc` / `raw`, a
+kimeneti korlát és a statikus elemzés korlátai.
+
+- **Egy forrás:** a szöveg a skill-utasítás forrásából készül (`skill/skill-i18n/SKILL.en.md` / `SKILL.hu.md`,
+  fordításkor beágyazva, `src/mcp/guide.rs`). Az oda tartozó szakaszokat `<!-- mcp:<név> -->` … `<!-- /mcp -->`
+  jelöli (`tools`, `callers`, `output`, `limits`; az útmutatóban ebben a sorrendben). A `tools` szakasz a SKILL.md
+  „MCP server” fejezete; a többi a CLI-szövegből jön, a CLI-kapcsolók az MCP-nevekre cserélve (`--grep` →
+  `find_callers`, `--body` → `method_body`, `--raw` → `raw: true`, `--depth` → `depth`, …). Teszt őrzi, hogy mindkét
+  nyelvben minden szakasz pontosan egyszer szerepel, a szöveg a méretkereten belül van, és nem marad benne
+  CLI-kapcsoló.
+- **Nyelv:** mint a CLI-é (`CALLGRAPH_LANG` › `callgraph set-lang` › angol).
+- **`guide` eszköz:** a teljes `SKILL.md`-törzs a beállított nyelven, a beágyazott forrásból (nem a fájlrendszerből),
+  a jelölő-sorok nélkül — ha az agentnek a hosszú forma kell (nyelvenkénti részletek, formátumok, CLI-példák).
+
 ## Biztonság
 
 - **Csak olvas.** Forrásfájlt nem ír; egyetlen mellékhatás a CLI-vel közös projekt-gráf a projekt
-  `.callgraph/` mappájában (ha írható). A jegyzeteket (pilot, `docs/NOTES.md`) is csak olvassa: írni (`note add` / `rm`)
+  `.callgraph/` mappájában (ha írható; a fájlfigyelő is csak ezt frissíti). A jegyzeteket (pilot, `docs/NOTES.md`) is csak olvassa: írni (`note add` / `rm`)
   csak a CLI-vel lehet, MCP-n nincs író eszköz.
 - **Projekt-gráf a memóriában:** a szerver a betöltött projekt-gráfot (`docs/PROJECT-GRAPH.md`: manifest, szűkített tények, a már betöltött teljes rekordok) és a hívó-indexet
   kérésről kérésre megtartja; kérésenként csak a változott fájlok frissülnek, egy közben szerkesztett fájl a következő
   kérésben már látszik.
+- **Fájlfigyelő:** a szerver a már betöltött projekt-gyökereket figyeli (`notify`: macOS FSEvents, Linux inotify,
+  Windows), és a változott fájlokat röviddel (300 ms csend) a változás után a háttérben frissíti a memóriában és a
+  `.callgraph/` tárolóban — így a következő kérés nem elemez. A `.callgraph/`, `.git/`, `target/`, `node_modules/`,
+  `vendor/` és a bejárás által kihagyott fájlok kimaradnak. A válaszok szövege ettől nem változik. Ha a figyelés nem
+  indul (pl. elfogyott az inotify-keret), egyszer szól a stderr-en, és marad a kérésenkénti ellenőrzés. Kikapcsolás:
+  `CALLGRAPH_WATCH=0` a szerver környezetében. Részletek: `docs/PROJECT-GRAPH.md`.
 - **Útvonal-őr:** minden út a projekt-gyökérhez (alias vagy munkakönyvtár) képest oldódik fel; a gyökérből kilépő út
   (`..`, gyökéren kívüli abszolút út, kifelé mutató symlink) hibát ad. A `::` az útban nem megengedett (a metódus
   külön paraméter).
-- **Nincs hálózat** az MCP-úton (a frissítés-ellenőrzés csak a `callgraph.sh` burokban fut).
+- **Hálózat csak a frissítéshez:** a lekérdezések soha nem használnak hálózatot; naponta legfeljebb egyszer a
+  legutóbbi kiadás lekérdezése (és `--auto-update` mellett a letöltése) — lásd lent: [Frissítés](#frissítés).
 - **Hibák:** eszköz-hibaként (`isError: true`) jönnek vissza a beállított nyelvű üzenettel — a szerver nem áll le.
+
+## Frissítés
+
+Az MCP-kliensek (Claude Code, Claude Desktop, Cursor, VS Code) a munkamenet elején indítják a szervert — ugyanazt a
+binárist, amit a skill is használ. Ajánlott beállítás: **`"args": ["mcp", "--auto-update"]`**.
+
+- **`--auto-update` (ajánlott, önkéntes):** indításkor, még a kézfogás előtt, naponta legfeljebb egyszer megnézi a
+  legutóbbi kiadást (rövid időkorlátokkal: 3 s kapcsolódás, 30 s kérésenként). Ha újabb van, letölti, a kiadás
+  `SHA256SUMS`-a szerint **kötelezően** ellenőrzi (eltérő vagy hiányzó összegnél semmi nem települ), telepíti
+  pontosan úgy, mint a `callgraph.sh update` (bináris + skill-fájlok; a `projects.json`, `lang`, hibanapló stb.
+  marad), majd az új binárissal újraindul ugyanazokkal az argumentumokkal — a kliens már az új verzióval beszél.
+  - Unix (macOS, Linux): `exec` — ugyanaz a folyamat (PID) és ugyanaz a stdin/stdout.
+  - Windows: a futó `.exe` nem írható felül, ezért a telepítő `callgraph.exe.old`-ra nevezi, és az új az eredeti
+    helyére kerül; a régi folyamat ezt gyerekként indítja az örökölt stdin/stdout/stderr-rel, megvárja, és a
+    kilépési kódját továbbadja. A `.old` fájlt egy későbbi indítás törli.
+  - Az újraindított folyamat a `CALLGRAPH_MCP_REEXEC=1` jelzőt kapja, és kihagyja a frissítési lépést (nem lehet
+    hurok).
+  - **Bármilyen hibánál** (nincs hálózat, rate limit, eltérő ellenőrzőösszeg, írási jog) egy sor megy a stderr-re
+    (`callgraph: auto-update skipped, continuing with …`; a kliensek naplózzák), és a szerver a jelenlegi verzióval
+    indul. Aznap nem próbálkozik újra.
+- **Kapcsoló nélkül:** a szerver a háttérben (külön szálon, a kéréseket soha nem várakoztatva) naponta legfeljebb
+  egyszer megnézi a legutóbbi kiadást; ha újabb van, a munkamenet első (sikeres) eszköz-eredménye végére egy sor kerül:
+  `ℹ callgraph X is available (installed: Y) — update: bash <skill>/callgraph.sh update, or add --auto-update to the
+  MCP config`. Ugyanarról a verzióról 24 óránként legfeljebb egyszer szól (közösen a `callgraph.sh` értesítésével).
+
+**Mit ír:** csak a callgraph saját telepítési mappájába (a skill-mappa, pl. `~/.claude/skills/callgraph/`): az
+`update-check.json` állapotfájlt (utolsó ellenőrzés, legutóbbi verzió, utolsó értesítés / frissítési kísérlet), és
+frissítéskor a csomag fájljait. Projektfájlokat soha. **A stdout a protokollé:** ide a frissítés semmit nem ír.
+
+**Kikapcsolás:** `CALLGRAPH_UPDATE_CHECK=0` a szerver környezetében (a kliens-konfig `env` mezőjében) — ekkor
+semmilyen hálózati kérés nincs, `--auto-update` mellett sem. CI-ben (`CI` be van állítva) és skill-telepítésen
+kívüli binárisnál (pl. `target/release/callgraph`) automatikusan ki van kapcsolva.
 
 ## Kliens-beállítás
 
@@ -53,8 +117,33 @@ projektmappában indítja a szervert.
 
 ### Claude Code
 
+**A telepítővel:** a `bash install.sh` a hook-kérdés után — ha a `claude` parancs a PATH-on van — rákérdez, hogy
+regisztrálja-e az MCP-szervert (alapból nem; nem interaktívan csak a `--mcp` kapcsolóval, a `--no-mcp` kérdés nélkül
+kihagyja). Ilyenkor ezt futtatja: `claude mcp add -s user callgraph -- "<a platform binárisának abszolút útja>" mcp`
+(Windows Git Bashben az út `cygpath -w`-vel Windows-alakú). Idempotens: ha a `claude mcp get callgraph` már ezt az
+utat mutatja, nem nyúl hozzá; más úttal regisztráltat előbb eltávolít (`claude mcp remove -s user callgraph`), aztán
+újra felvesz. Ha a lépés nem sikerül, csak figyelmeztet és kiírja a kézi parancsot — a telepítés nem áll le.
+Eltávolítás: `claude mcp remove -s user callgraph`. Utána indítsd újra a Claude Code-ot.
+
+**Kézzel**, macOS / Linux (az `uname` alapján a géphez illő binárist választja; `-s user`: minden projektben elérhető):
+
 ```bash
-claude mcp add callgraph -- ~/.claude/skills/callgraph/bin/linux-x86_64/callgraph mcp
+claude mcp add -s user callgraph -- \
+  ~/.claude/skills/callgraph/bin/$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)/callgraph mcp --auto-update
+```
+
+Windows (PowerShell):
+
+```powershell
+claude mcp add -s user callgraph -- "$env:USERPROFILE\.claude\skills\callgraph\bin\windows-x86_64\callgraph.exe" mcp --auto-update
+```
+
+(A `--auto-update` elhagyható: akkor a szerver csak szól, ha újabb verzió van — lásd [Frissítés](#frissítés).)
+
+A JSON-beállításokhoz kellő abszolút utat ez írja ki (macOS / Linux):
+
+```bash
+echo ~/.claude/skills/callgraph/bin/$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)/callgraph
 ```
 
 (Claude Code-ban a skill is elérhető; a kettő megfér egymás mellett.)
@@ -66,7 +155,7 @@ claude mcp add callgraph -- ~/.claude/skills/callgraph/bin/linux-x86_64/callgrap
   "mcpServers": {
     "callgraph": {
       "command": "/Users/me/.claude/skills/callgraph/bin/darwin-arm64/callgraph",
-      "args": ["mcp"]
+      "args": ["mcp", "--auto-update"]
     }
   }
 }
@@ -81,7 +170,7 @@ A Claude Desktop nem a projektmappában indít: add meg a `project` aliast (lás
   "mcpServers": {
     "callgraph": {
       "command": "/Users/me/.claude/skills/callgraph/bin/darwin-arm64/callgraph",
-      "args": ["mcp"]
+      "args": ["mcp", "--auto-update"]
     }
   }
 }
@@ -95,7 +184,7 @@ A Claude Desktop nem a projektmappában indít: add meg a `project` aliast (lás
     "callgraph": {
       "type": "stdio",
       "command": "/Users/me/.claude/skills/callgraph/bin/darwin-arm64/callgraph",
-      "args": ["mcp"],
+      "args": ["mcp", "--auto-update"],
       "cwd": "${workspaceFolder}"
     }
   }

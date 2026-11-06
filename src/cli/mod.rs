@@ -4,7 +4,7 @@ mod args;
 mod command;
 pub mod commands;
 
-pub use args::{CliArgs, NoteAction};
+pub use args::{CliArgs, HookAction, NoteAction};
 pub use command::Command;
 
 use crate::error::Result;
@@ -77,9 +77,25 @@ pub fn build_command(args: CliArgs) -> Result<Box<dyn Command>> {
             project,
             crate::skill::SkillHome::from_env(),
         ))),
-        CliArgs::Version => Ok(Box::new(commands::VersionCommand)),
-        CliArgs::Mcp => Ok(Box::new(commands::McpCommand::new(
+        CliArgs::Refresh {
+            paths,
+            project,
+            background,
+        } => Ok(Box::new(commands::RefreshCommand::new(
+            paths,
+            project,
+            background,
             crate::skill::SkillHome::from_env(),
+        ))),
+        CliArgs::Hook { action, settings } => Ok(Box::new(commands::HookCommand::new(
+            action,
+            settings,
+            crate::skill::SkillHome::from_env(),
+        ))),
+        CliArgs::Version => Ok(Box::new(commands::VersionCommand)),
+        CliArgs::Mcp { auto_update } => Ok(Box::new(commands::McpCommand::new(
+            crate::skill::SkillHome::from_env(),
+            auto_update,
         ))),
         CliArgs::Skill { command, args } => {
             let home = crate::skill::SkillHome::from_env();

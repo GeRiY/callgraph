@@ -37,7 +37,8 @@ Usage:
   Paths: when several would repeat the project root, the first line is "root: /abs/project" and every path after it is
   relative to that root (usable as-is in the next call with the same --project).
   bash ~/.claude/skills/callgraph/callgraph.sh <file>::<method> [...] --body   source of the method(s), line-numbered, compact: no
-                                                docblock, blank or comment-only lines (the line numbers stay exact)
+                                                docblock or blank lines, comments inside the body are kept (the line
+                                                numbers stay exact; the "==" header says "docblock L…-… omitted")
                                                 --doc: with the docblock; --raw: the exact, unfiltered source
   bash ~/.claude/skills/callgraph/callgraph.sh <dir> --grep <pattern> --body    source of the caller methods found
   bash ~/.claude/skills/callgraph/callgraph.sh <file> --lines <n>-<m>           any line range, line-numbered (e.g. a view file)
@@ -56,6 +57,22 @@ Notes (pilot — a short note on a file or method, stored outside the source in 
   The outline shows "📝 2026-11-05 20:27 · <text>" under the file header / the method (newest first, max 3),
   --body above the method source. Times are UTC.
 
+Refresh ahead of time (after a git pull or many edits, so the next query does not have to re-analyse):
+  bash ~/.claude/skills/callgraph/callgraph.sh refresh [--project alias]     every changed / new / deleted file of the project
+  bash ~/.claude/skills/callgraph/callgraph.sh refresh <file|dir> ... [--project alias]   only these (paths relative to the root)
+                                                prints "refresh: N updated, N removed, N unchanged"; --background: returns
+                                                at once and refreshes in a detached process; if another refresh is running
+                                                it is skipped ("refresh: skipped")
+  bash ~/.claude/skills/callgraph/callgraph.sh hook install|uninstall|status   Claude Code hook (~/.claude/settings.json):
+                                                after Edit / Write / MultiEdit the edited file is refreshed in the background
+                                                (only in registered projects or ones that already have .callgraph/);
+                                                other settings are kept, a settings.json.bak backup is written first
+  The MCP server (callgraph mcp) watches the projects it has loaded and refreshes changed files by itself
+  (off: CALLGRAPH_WATCH=0).
+  Register the MCP server for Claude Code: bash ~/.claude/skills/callgraph/install.sh --mcp (asked when run
+  interactively; remove: claude mcp remove -s user callgraph). The server sends a short usage guide to the client
+  (when to use which tool, how to read the output); its guide tool returns the full SKILL.md.
+
 Language (of the terminal output and the help: en = English, default; hu = Hungarian):
   bash ~/.claude/skills/callgraph/callgraph.sh set-lang                 the current language and where it comes from
   bash ~/.claude/skills/callgraph/callgraph.sh set-lang <en|hu>         save the language (to the skill dir's lang file)
@@ -72,6 +89,10 @@ Update (from GitHub Releases; projects.json, lang, errors.jsonl, feedback.jsonl,
   --insecure-skip-checksum skips this. --from: verified by --sha256 <hex> or a SHA256SUMS next to the zip, else a warning.
   Automatic check: at most once a day, in the background; a newer release adds one "ℹ callgraph X is available" line
   to the end of the output. Off: CALLGRAPH_UPDATE_CHECK=0 (also off when CI is set or outside a skill installation).
+  MCP server: "args": ["mcp", "--auto-update"] (recommended) installs a newer release at server start (at most once a
+  day, SHA256SUMS required, same files as update) and restarts itself; on any failure it runs the current version and
+  writes one line to stderr. Without the flag the first tool result of a session gets the "ℹ callgraph X is available"
+  line. Both only write into the skill dir; CALLGRAPH_UPDATE_CHECK=0 turns off all network access.
 
 Output limit: above 400 lines the directory outline switches to summary, the single-file one to a method index;
 

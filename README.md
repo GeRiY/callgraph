@@ -3,7 +3,8 @@
 <p align="center">
   <b>A token-efficient code map for AI coding agents.</b><br>
   Structure, categorized call graph, method bodies, "who calls this?" and impact analysis —
-  without reading whole files.
+  without reading whole files.<br>
+  🌐 <a href="https://callgraph.eu/">callgraph.eu</a>
 </p>
 
 <p align="center">
@@ -206,15 +207,45 @@ CALLGRAPH_LANG=hu bash ~/.claude/skills/callgraph/callgraph.sh app/Models/Order.
 
 Besides the Claude Code skill (unchanged, fully supported), the same binary is also an
 [MCP](https://modelcontextprotocol.io) server on stdio, so any MCP client can use it: `callgraph mcp`.
-Tools: `outline`, `method_body`, `find_callers`, `search`, `framework_view`, `projects`. They return the same compact
-text as the CLI, with the same output cap; read-only, no network, paths are confined to the project root.
+Tools: `outline`, `method_body`, `find_callers`, `search`, `framework_view`, `notes`, `projects`, `guide`. They return
+the same compact text as the CLI, with the same output cap; read-only, paths are confined to the project root, and
+queries never use the network (only the once-a-day update check below does).
+On connect the server sends the client a short usage guide in your language (which tool to use when, how to find
+callers, how to read the output); Claude Code puts it into the agent's instructions. The `guide` tool returns the full
+skill manual. Both come from the same source as `SKILL.md`, so they always match.
+
+The installer can register it for Claude Code for you: `bash install.sh` asks (if the `claude` command is available),
+`bash install.sh --mcp` does it without asking, `--no-mcp` skips it. Remove it with
+`claude mcp remove -s user callgraph`. By hand:
 
 ```bash
-claude mcp add callgraph -- ~/.claude/skills/callgraph/bin/linux-x86_64/callgraph mcp   # Claude Code
+# Claude Code, macOS / Linux (picks the binary for your platform):
+claude mcp add -s user callgraph -- \
+  ~/.claude/skills/callgraph/bin/$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)/callgraph mcp --auto-update
 ```
 
-Claude Desktop, Cursor and VS Code use a JSON entry with `"command": "<absolute path to the binary>", "args": ["mcp"]`.
+```powershell
+# Claude Code, Windows (PowerShell):
+claude mcp add -s user callgraph -- "$env:USERPROFILE\.claude\skills\callgraph\bin\windows-x86_64\callgraph.exe" mcp --auto-update
+```
+
+Claude Desktop, Cursor and VS Code use a JSON entry with `"command": "<absolute path to the binary>", "args": ["mcp", "--auto-update"]`.
+**Recommended: `--auto-update`** — at start (at most once a day) the server installs a newer release exactly like
+`callgraph.sh update` (SHA-256 checked, your settings kept) and restarts itself, so the client always talks to the
+latest version; if anything fails it just starts the current one. Without the flag it only adds a one-line
+"newer version available" note to the first answer of the session. It writes only into callgraph's own folder; opt
+out of all update checks with `CALLGRAPH_UPDATE_CHECK=0`.
 Recipes, tool parameters and safety notes (Hungarian): [`docs/MCP.md`](docs/MCP.md).
+While it runs, the MCP server watches the projects it has loaded and refreshes changed files by itself.
+
+### Keeping the project map fresh
+
+After a `git pull` or many edits, `bash ~/.claude/skills/callgraph/callgraph.sh refresh [--project alias]` (add
+`--background` to return at once) updates the project map in advance, so the next query does not have to re-analyse.
+Optional Claude Code hook: `bash install.sh --hooks` (or `callgraph.sh hook install`) refreshes every file Claude
+edits in the background; it adds one entry to `~/.claude/settings.json`, keeps everything else and writes a
+`settings.json.bak` backup first. Remove it with `bash ~/.claude/skills/callgraph/callgraph.sh hook uninstall`.
+Details (Hungarian): [`docs/PROJECT-GRAPH.md`](docs/PROJECT-GRAPH.md).
 
 ### Feedback from agents
 

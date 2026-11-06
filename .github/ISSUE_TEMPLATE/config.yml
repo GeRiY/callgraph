@@ -4,5 +4,5 @@ contact_links:
     url: https://github.com/GeRiY/callgraph/security/advisories/new
     about: "Report privately, not in a public issue. · Privátban jelezd, ne nyilvános issue-ban."
   - name: "📖 Usage and FAQ / Használat és GYIK"
-    url: https://geriy.github.io/callgraph/#usage
+    url: https://callgraph.eu/#usage
     about: "How to install and use callgraph. · A callgraph telepítése és használata."

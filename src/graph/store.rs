@@ -57,6 +57,14 @@ type Work<'a> = (&'a Path, FileStamp);
 /// Egy elemzés eredménye: kulcs, bélyeg, tények és a pack-keret.
 type Analyzed = (String, FileStamp, FileFacts, Vec<u8>);
 
+/// Egy `ProjectGraph::update` eredménye: hány fájl elemződött újra, hány került ki (törölt), hány volt naprakész.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Refreshed {
+    pub updated: usize,
+    pub removed: usize,
+    pub unchanged: usize,
+}
+
 /// Mérőszámok a tesztekhez: hány tároló-fájlt nyitott meg és hány teljes rekordot olvasott a példány.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(not(test), allow(dead_code))]
@@ -174,6 +182,77 @@ impl ProjectGraph {
             }
         }
         Ok(())
+    }
+
+    /// Frissítés a `callgraph refresh` / az MCP-figyelő számára: a `files` bélyegének ellenőrzése, a változott /
+    /// új fájlok elemzése (mint a `refresh`), a `gone` kulcsok (törölt fájlok) eltávolítása, és a `files` szűkített
+    /// tényei naprakészen (`facts.bin`) — így a következő lekérdezés semmit sem elemez. `full`: mint a `refresh`.
+    pub(crate) fn update(
+        &mut self,
+        files: &[PathBuf],
+        gone: &[String],
+        full: bool,
+        analyzer: &Analyzer,
+    ) -> Result<Refreshed> {
+        let pruned = if full {
+            let keep: HashSet<String> = files
+                .iter()
+                .map(|file| file.to_string_lossy().into_owned())
+                .collect();
+            self.tracked
+                .keys()
+                .filter(|key| !keep.contains(*key))
+                .count()
+        } else {
+            0
+        };
+        let analyzed = self.stats.analyzed;
+        self.refresh(files, full, analyzer)?;
+        let updated = self.stats.analyzed - analyzed;
+        self.load_facts(files, analyzer)?;
+        let removed = pruned + self.forget(gone);
+        Ok(Refreshed {
+            updated,
+            removed,
+            unchanged: files.len().saturating_sub(updated),
+        })
+    }
+
+    /// A megadott kulcsú (törölt) fájlok eltávolítása a gráfból; a ténylegesen ismert fájlok száma.
+    fn forget(&mut self, keys: &[String]) -> usize {
+        if keys.is_empty() {
+            return 0;
+        }
+        let drop: HashSet<&str> = keys.iter().map(String::as_str).collect();
+        let before = self.tracked.len();
+        self.tracked.retain(|path, _| !drop.contains(path.as_str()));
+        let removed = before - self.tracked.len();
+        self.loaded.retain(|path, _| !drop.contains(path.as_str()));
+        if let Some(facts) = self.facts.as_mut() {
+            let before = facts.len();
+            facts.retain(|path, _| !drop.contains(path.as_str()));
+            self.facts_dirty |= facts.len() != before;
+        }
+        let order = self.order.len();
+        self.order.retain(|path| !drop.contains(path.as_str()));
+        if removed > 0 || order != self.order.len() {
+            self.manifest_dirty = true;
+            self.callers_fresh = false;
+        }
+        removed
+    }
+
+    /// Az ismert fájlok kulcsai, amelyek a megadott út (fájl vagy mappa) alatt vannak — a `refresh` ezekből tudja,
+    /// melyik fájl tűnt el.
+    pub(crate) fn tracked_under(&self, path: &Path) -> Vec<String> {
+        let mut keys: Vec<String> = self
+            .tracked
+            .keys()
+            .filter(|key| Path::new(key.as_str()).starts_with(path))
+            .cloned()
+            .collect();
+        keys.sort();
+        keys
     }
 
     /// A teljes projekt-listában nem szereplő fájlok eltávolítása (a pack-rekordjuk holt terület lesz).

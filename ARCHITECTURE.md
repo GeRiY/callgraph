@@ -38,10 +38,12 @@ src/
   io/                           walker (a registry kiterjesztéseivel), cache (CacheStore + JsonlCacheStore), jsonl_writer
   index/                        CallerIndex (fordított hívó-index, mindkét irány) + TypeHierarchy (via-illesztés)
   graph/                        ProjectGraph: perzisztens projekt-gráf (.callgraph/: index.bin manifest, graph.pack,
-                                facts.bin), fájlonként frissítve; folyamaton belül gyökerenként egy példány
+                                facts.bin), fájlonként frissítve; folyamaton belül gyökerenként egy példány;
+                                előre-frissítés (refresh.rs: `callgraph refresh`, refresh.lock) és MCP-fájlfigyelő (watch.rs)
+  hook/                         Claude Code PostToolUse hook: a hook JSON-ja → háttér-`refresh`; settings.json szerkesztése
   query/                        QueryEngine (Facade), formázók (Strategy + FormatterRegistry), kimeneti korlát
   cli/                          Command minta; args, parancsok (analyze, prune)
-  mcp/                          MCP-szerver (`callgraph mcp`, rmcp, stdio): eszköz-paraméter → `show`-lekérdezés, útvonal-őr
+  mcp/                          MCP-szerver (`callgraph mcp`, rmcp, stdio): eszköz-paraméter → `show`-lekérdezés, útvonal-őr, frissítés (`--auto-update`, napi értesítés)
 tests/                          integrációs tesztek (pl. languages.rs: teszt-nyelvek a registryn)
 docs/                           ARCHITECTURE-uj.md, UJ-NYELV.md
 ```

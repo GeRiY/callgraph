@@ -21,6 +21,7 @@ mod limit;
 mod selector;
 pub(crate) mod snippet;
 
+pub(crate) use engine::strip_verbatim;
 pub use engine::{QueryEngine, QueryResult, ViaCall};
 pub use limit::OutputLimit;
 pub use selector::{Selector, SelectorSet};

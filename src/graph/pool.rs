@@ -3,6 +3,7 @@
 //! ott a gráf és a hívó-index kérésről kérésre megmarad, és kérésenként csak a változott fájlok frissülnek.
 
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock, PoisonError};
 
@@ -22,10 +23,17 @@ pub(crate) fn shared(root: &Path) -> Option<SharedGraph> {
     store.ensure().ok()?;
     let pool = POOL.get_or_init(Default::default);
     let mut pool = pool.lock().unwrap_or_else(PoisonError::into_inner);
-    let graph = pool
-        .entry(root)
-        .or_insert_with(|| Arc::new(Mutex::new(ProjectGraph::open(store.dir().to_path_buf()))));
-    Some(Arc::clone(graph))
+    match pool.entry(root) {
+        Entry::Occupied(entry) => Some(Arc::clone(entry.get())),
+        Entry::Vacant(entry) => {
+            let graph = Arc::new(Mutex::new(ProjectGraph::open(store.dir().to_path_buf())));
+            // az MCP-szerverben (`watch::enable`) az első betöltéskor a gyökér figyelése is elindul
+            if super::watch::enabled() {
+                super::watch::start(entry.key().clone(), Arc::clone(&graph));
+            }
+            Some(Arc::clone(entry.insert(graph)))
+        }
+    }
 }
 
 /// A gráf zárolása; egy korábbi, pánikkal megszakadt kérés után is használható (a gráf minden kérésnél frissül).
