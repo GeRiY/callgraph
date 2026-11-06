@@ -191,6 +191,11 @@ for changed files, so repeated searches are fast; the directory is created autom
 with a `*` `.gitignore`, so it never gets into version control). Nothing is written outside the project. If the directory
 is not writable, it runs without a cache. Cleanup: `callgraph prune` (see README).
 
+Processed files: only the supported extensions (upper case too: `B.PHP`), without generated files
+(`package-lock.json`, `*.min.js`, `*.min.css`) and binary content. A `.callgraphignore` file in the project (the
+nearest one applies) lists further extensions to skip, one per line (`md`, `.json`, `*.vue`); a file named directly
+with such an extension is refused with the reason.
+
 ## Limits
 
 <!-- mcp:limits -->

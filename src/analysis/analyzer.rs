@@ -25,13 +25,27 @@ impl Analyzer {
         &self.registry
     }
 
-    /// Fájl beolvasása és elemzése a kiterjesztése szerinti nyelvvel.
+    /// Fájl beolvasása és elemzése a kiterjesztése szerinti nyelvvel. Nem támogatott kiterjesztésre és generált
+    /// fájlra (`package-lock.json`, `*.min.js`, `*.min.css`) hiba; bináris tartalomra üres, `binary` jelölésű gráf
+    /// (a lekérdezések kihagyják, a közvetlenül megadott fájlnál hibát adnak).
     pub fn analyze_path(&self, path: &Path) -> Result<Analysis> {
         let language = self
             .registry
             .for_path(path)
             .ok_or_else(|| CallgraphError::Unsupported(path.to_path_buf()))?;
-        language.analyze(&SourceFile::read(path)?)
+        if crate::lang::filetype::is_generated(path) {
+            return Err(CallgraphError::Generated(path.to_path_buf()));
+        }
+        let source = SourceFile::read(path)?;
+        if crate::lang::filetype::looks_binary(&source.text) {
+            let mut builder = crate::model::FileGraphBuilder::new(source.path_string());
+            builder.binary(true);
+            return Ok(Analysis {
+                graph: builder.build(),
+                warnings: Vec::new(),
+            });
+        }
+        language.analyze(&source)
     }
 }
 

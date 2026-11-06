@@ -59,7 +59,9 @@ fn registry_routes_swift_to_frontend() {
     let r = LanguageRegistry::with_defaults();
     let l = r.for_path(Path::new("App/ContentView.swift")).unwrap();
     assert_eq!((l.id(), l.role()), ("swift", LanguageRole::Frontend));
-    assert!(r.for_path(Path::new("App/ContentView.SWIFT")).is_none());
+    // a nagybetűs kiterjesztés is Swift
+    let upper = r.for_path(Path::new("App/ContentView.SWIFT")).unwrap();
+    assert_eq!(upper.id(), "swift");
 }
 
 #[test]

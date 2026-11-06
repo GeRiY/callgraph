@@ -23,6 +23,7 @@ pub struct FileGraphBuilder {
     control_flow: Vec<ControlFlow>,
     strings: Vec<StringLit>,
     writes: Vec<Write>,
+    binary: bool,
 }
 
 impl FileGraphBuilder {
@@ -35,6 +36,12 @@ impl FileGraphBuilder {
 
     pub fn module(&mut self, module: Option<String>) -> &mut Self {
         self.module = module;
+        self
+    }
+
+    /// Bináris tartalmú fájl jelölése (üres gráf, a lekérdezések kihagyják).
+    pub fn binary(&mut self, binary: bool) -> &mut Self {
+        self.binary = binary;
         self
     }
 
@@ -157,6 +164,7 @@ impl FileGraphBuilder {
             control_flow: self.control_flow,
             strings: self.strings,
             writes: self.writes,
+            binary: self.binary,
         }
     }
 }

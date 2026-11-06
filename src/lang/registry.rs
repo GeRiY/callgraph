@@ -52,10 +52,12 @@ impl LanguageRegistry {
         self.documents.push(language);
     }
 
-    /// A fájl kiterjesztését kezelő nyelv (kis-/nagybetű érzékeny); ismeretlen kiterjesztésre `None`.
+    /// A fájl kiterjesztését kezelő nyelv (kis-/nagybetűtől függetlenül: `B.PHP` is PHP); ismeretlen
+    /// kiterjesztésre `None`.
     pub fn for_path(&self, path: &Path) -> Option<&dyn Language> {
-        let ext = path.extension()?.to_str()?;
-        self.languages().find(|l| l.extensions().contains(&ext))
+        let ext = super::filetype::extension_lower(path)?;
+        self.languages()
+            .find(|l| l.extensions().contains(&ext.as_str()))
     }
 
     /// Az összes regisztrált kiterjesztés (a bejáró ezt használja), regisztrációs sorrendben.
@@ -188,8 +190,11 @@ mod tests {
     }
 
     #[test]
-    fn extension_match_is_case_sensitive() {
-        assert_eq!(id_of(&registry(), "a/B.PY"), None);
+    fn extension_match_ignores_case() {
+        // a `B.PY` ugyanaz, mint a `b.py` (Windowson / macOS-en gyakori a nagybetűs kiterjesztés)
+        assert_eq!(id_of(&registry(), "a/B.PY"), Some("py"));
+        assert_eq!(id_of(&registry(), "a/b.Md"), Some("md"));
+        assert_eq!(id_of(&registry(), "a/B.RB"), None);
     }
 
     #[test]

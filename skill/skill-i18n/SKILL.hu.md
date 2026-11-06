@@ -192,6 +192,11 @@ változott fájlok frissülnek, így az ismételt keresés gyors; a mappa magát
 `*`-os `.gitignore`-ral, így a verziókezelésbe nem kerül). A projekten kívül semmi nem íródik. Ha a mappa
 nem írható, cache nélkül fut. Takarítás: `callgraph prune` (lásd README).
 
+Feldolgozott fájlok: csak a támogatott kiterjesztésűek (nagybetűvel is: `B.PHP`), a generált fájlok
+(`package-lock.json`, `*.min.js`, `*.min.css`) és a bináris tartalom nélkül. A projekt `.callgraphignore` fájlja
+(a legközelebbi érvényes) további kizárt kiterjesztéseket sorol fel, soronként egyet (`md`, `.json`, `*.vue`); az
+ilyen kiterjesztésű, közvetlenül megadott fájlt indoklással elutasítja.
+
 ## Korlát
 
 <!-- mcp:limits -->

@@ -5,6 +5,23 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+### Added
+- **Exclude extensions per project:** a `.callgraphignore` file in the project root (or in any subfolder; the nearest
+  one applies) lists extensions callgraph should skip there, one per line (`md`, `.json` or `*.vue`; `#` starts a
+  comment). Commit it, and everyone on the team gets the same results. A file you name directly with an excluded
+  extension is refused with a clear message.
+
+### Changed
+- **Only supported files are processed, more strictly:** callgraph already ignored files with other extensions; now
+  it also skips generated files (`package-lock.json`, `*.min.js`, `*.min.css`) and files with binary content, even
+  when their extension is supported. Naming one of them directly gives a clear reason instead of a result.
+- **Upper-case extensions count:** `B.PHP`, `App.TS` or `Main.Vue` are now processed like their lower-case versions
+  (before, they were silently skipped).
+
+### Fixed
+- **A file reached through a symlink is no longer listed twice:** if a symlink pointed to a file inside the project,
+  that file appeared (and was analysed) twice in folder results.
+
 ## [0.4.0] — 2026-11-06
 
 ### Added

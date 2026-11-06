@@ -53,6 +53,7 @@ fn graph(name: &str) -> crate::model::FileGraph {
         writes: vec![],
         module: None,
         sfc: None,
+        binary: false,
     }
 }
 

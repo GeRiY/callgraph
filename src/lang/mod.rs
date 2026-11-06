@@ -3,6 +3,7 @@
 mod backend;
 pub mod css;
 mod document;
+pub mod filetype;
 mod frontend;
 pub mod js;
 pub mod json;

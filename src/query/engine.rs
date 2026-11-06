@@ -152,6 +152,16 @@ impl QueryEngine {
                 Some(graph) => graph,
                 None => self.analyze(&abs)?,
             };
+            if graph.binary {
+                if selectors
+                    .items
+                    .iter()
+                    .any(|input| self.root.join(&input.file) == abs)
+                {
+                    return Err(CallgraphError::Binary(abs));
+                }
+                continue;
+            }
             let methods = methods.map(|names| {
                 // névegyezés: egy név több metódusra is illeszkedhet (Rust: több impl, PHP/Swift: túlterhelés),
                 // ezért a hiányt név szerint nézzük, nem darabszámra
@@ -258,6 +268,13 @@ impl QueryEngine {
     }
     fn files(&self, selectors: &SelectorSet) -> Result<Vec<(PathBuf, Option<Vec<String>>)>> {
         let mut result: Vec<(PathBuf, Option<Vec<String>>)> = Vec::new();
+        let walker = FileWalker::for_registry(self.analyzer.registry());
+        for input in &selectors.items {
+            let abs = self.root.join(&input.file);
+            if abs.is_file() && walker.excluded_by_ignore_file(&abs) {
+                return Err(CallgraphError::Excluded(abs));
+            }
+        }
         if selectors.selected {
             for s in &selectors.items {
                 let rel = s.file.clone();
@@ -275,8 +292,7 @@ impl QueryEngine {
                     result.push((input.file.clone(), None));
                 } else if abs.is_dir() {
                     let mut warn = |_| {};
-                    let files = FileWalker::for_registry(self.analyzer.registry())
-                        .collect(std::slice::from_ref(&abs), &mut warn);
+                    let files = walker.collect(std::slice::from_ref(&abs), &mut warn);
                     for f in self.legacy_order(files) {
                         result.push((f.strip_prefix(&self.root).unwrap_or(&f).to_path_buf(), None));
                     }

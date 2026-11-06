@@ -26,6 +26,39 @@ pub enum CallgraphError {
     /// Hibás parancssori használat.
     #[error("{}", usage_msg(.0))]
     Usage(String),
+    /// Generált fájl (lock-fájl, minifikált kód): a támogatott kiterjesztése ellenére kimarad.
+    #[error("{}", generated_msg(.0))]
+    Generated(PathBuf),
+    /// Bináris tartalmú fájl: a támogatott kiterjesztése ellenére kimarad.
+    #[error("{}", binary_msg(.0))]
+    Binary(PathBuf),
+    /// A projekt `.callgraphignore` fájlja kizárja a kiterjesztését.
+    #[error("{}", excluded_msg(.0))]
+    Excluded(PathBuf),
+}
+
+fn generated_msg(path: &std::path::Path) -> String {
+    crate::tf!(
+        "{}: generated file (lock file or minified code), skipped",
+        "{}: generált fájl (lock-fájl vagy minifikált kód), kihagyva",
+        path.display()
+    )
+}
+
+fn binary_msg(path: &std::path::Path) -> String {
+    crate::tf!(
+        "{}: binary file, skipped",
+        "{}: bináris fájl, kihagyva",
+        path.display()
+    )
+}
+
+fn excluded_msg(path: &std::path::Path) -> String {
+    crate::tf!(
+        "{}: its extension is excluded by .callgraphignore",
+        "{}: a kiterjesztését a .callgraphignore kizárja",
+        path.display()
+    )
 }
 
 fn read_msg(path: &std::path::Path, source: &std::io::Error) -> String {
