@@ -228,6 +228,8 @@ All data goes into the project's own `.callgraph/` directory (cache, project map
 for changed files, so repeated searches are fast; the directory is created automatically,
 with a `*` `.gitignore`, so it never gets into version control). Nothing is written outside the project. If the directory
 is not writable, it runs without a cache. Cleanup: `callgraph prune` (see README).
+Local usage stats (counts and ranges only, no paths or names, never sent anywhere): `bash <skill>/callgraph.sh stats`
+when the user asks how callgraph is used; off: `CALLGRAPH_STATS=0`.
 
 Processed files: only the supported extensions (upper case too: `B.PHP`), without generated files
 (`package-lock.json`, `*.min.js`, `*.min.css`) and binary content. A `.callgraphignore` file in the project (the

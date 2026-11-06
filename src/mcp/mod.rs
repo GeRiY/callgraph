@@ -35,7 +35,8 @@ pub(crate) fn serve_stdio(home: SkillHome, auto_update: bool) -> Result<()> {
         if !auto_update {
             runner = autoupdate::with_notice(runner, &home);
         }
-        let server = server::CallgraphServer::new(runner);
+        let stats = crate::stats::McpStats::from_env(&home);
+        let server = server::CallgraphServer::new(runner, stats);
         let service = server
             .serve(rmcp::transport::stdio())
             .await

@@ -28,12 +28,23 @@ where
     I: IntoIterator<Item = S>,
     S: AsRef<std::ffi::OsStr>,
 {
+    spawn_detached_as(args, "background")
+}
+
+/// Mint a `spawn_detached`, a gyerek a `client` jelzőt kapja a helyi statisztikához (`stats::CLIENT_ENV`):
+/// `hook` = a hook háttér-frissítése (mérjük), `background` = nem mérjük (a szülő már mért).
+pub(crate) fn spawn_detached_as<I, S>(args: I, client: &str) -> bool
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<std::ffi::OsStr>,
+{
     let Ok(exe) = std::env::current_exe() else {
         return false;
     };
     let mut command = Command::new(exe);
     command
         .args(args)
+        .env(crate::stats::CLIENT_ENV, client)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());

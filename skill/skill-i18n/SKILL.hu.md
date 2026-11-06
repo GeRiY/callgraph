@@ -229,6 +229,8 @@ Minden adat a projekt saját `.callgraph/` mappájába kerül (cache, projekt-t�
 változott fájlok frissülnek, így az ismételt keresés gyors; a mappa magától létrejön,
 `*`-os `.gitignore`-ral, így a verziókezelésbe nem kerül). A projekten kívül semmi nem íródik. Ha a mappa
 nem írható, cache nélkül fut. Takarítás: `callgraph prune` (lásd README).
+Helyi használati statisztika (csak darabszámok és sávok, út és név nélkül, sehova nem megy):
+`bash <skill>/callgraph.sh stats`, ha a felhasználó kérdezi, hogyan használják a callgraph-ot; kikapcsolás: `CALLGRAPH_STATS=0`.
 
 Feldolgozott fájlok: csak a támogatott kiterjesztésűek (nagybetűvel is: `B.PHP`), a generált fájlok
 (`package-lock.json`, `*.min.js`, `*.min.css`) és a bináris tartalom nélkül. A projekt `.callgraphignore` fájlja

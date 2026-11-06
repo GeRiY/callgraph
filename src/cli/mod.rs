@@ -4,6 +4,7 @@ mod args;
 mod command;
 pub mod commands;
 mod profile_args;
+mod stats_args;
 
 pub use args::{CliArgs, HookAction, NoteAction};
 pub use command::Command;
@@ -108,6 +109,10 @@ pub fn build_command(args: CliArgs) -> Result<Box<dyn Command>> {
             crate::skill::SkillHome::from_env(),
         ))),
         CliArgs::Version => Ok(Box::new(commands::VersionCommand)),
+        CliArgs::Stats { days } => Ok(Box::new(commands::StatsCommand::new(
+            days,
+            crate::skill::SkillHome::from_env(),
+        ))),
         CliArgs::Profile { project, full } => Ok(Box::new(commands::ProfileCommand::new(
             project,
             full,

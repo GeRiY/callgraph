@@ -67,7 +67,7 @@ impl HookCommand {
             return;
         }
         if let Some(args) = self.post_edit_args(&json) {
-            crate::update::check::spawn_detached(args);
+            crate::update::check::spawn_detached_as(args, "hook");
         }
     }
 

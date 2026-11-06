@@ -173,6 +173,12 @@ impl ShowQuery {
         Ok(query)
     }
 
+    /// A cél (fájl vagy mappa) a gyökérhez képest, ahogy a kérésben állt (a `locate`-nél üres). Csak a memóriában
+    /// élő `locate`-követés használja (`stats::McpStats`), nem tárolódik.
+    pub(crate) fn path(&self) -> &str {
+        &self.path
+    }
+
     /// A parancs eleje: a parancs neve és a feloldott gyökér (a `show`-nál a kimenet címkéje is).
     pub(crate) fn head(&self, root: &ProjectRoot) -> Vec<String> {
         let mut args = vec![

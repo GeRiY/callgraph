@@ -314,6 +314,16 @@ Claude által szerkesztett fájlt a háttérben frissít; egyetlen bejegyzést v
 többit megtartja, és előtte `settings.json.bak` mentést ír. Eltávolítás:
 `bash ~/.claude/skills/callgraph/callgraph.sh hook uninstall`. Részletek: [`docs/PROJECT-GRAPH.md`](docs/PROJECT-GRAPH.md).
 
+### Helyi használati statisztika
+
+A callgraph a gépeden egy kis használati összesítőt vezet: melyik parancs vagy MCP-eszköz hányszor futott, volt-e
+hiba, és sávokban mennyi ideig tartott és mekkora volt a kimenete. Az MCP-n futó `locate`-nél azt is, hogy az agent
+utána az első találatot nyitotta-e meg. Utat, fájl- és szimbólumnevet, keresési kifejezést, projektnevet és
+hibaszöveget soha nem rögzít, és **semmit nem küld el sehova** (hálózatot nem használ). Megtekintés:
+`bash ~/.claude/skills/callgraph/callgraph.sh stats [--days N]` (alapból az elmúlt 7 nap). Az adat helye:
+`~/.claude/skills/callgraph/stats/` (havonta egy kis fájl, kb. 90 napig marad meg); kikapcsolás:
+`CALLGRAPH_STATS=0`. CI-ben és skill-telepítésen kívül magától ki van kapcsolva.
+
 ### Visszajelzés az agentektől
 
 Minden hibaüzenet kap egy `[error-id: …]` azonosítót. Az agent (vagy te) megjegyzést fűzhet hozzá, így a rossz

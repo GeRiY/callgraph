@@ -9,6 +9,7 @@
 # `callgraph.sh locate <term>… [--all] [--project alias]` lists where to start with a task (ranked files + reasons;
 # forwarded to `callgraph locate`).
 # `callgraph.sh profile [--project alias] [--full]` prints the project profile (forwarded to `callgraph profile`).
+# `callgraph.sh stats [--days N]` shows the local usage stats (forwarded to `callgraph stats`; nothing is sent anywhere).
 # Help: skill/help/callgraph.en.txt and skill/help/callgraph.hu.txt (`callgraph.sh --help`).
 
 set -uo pipefail
@@ -45,6 +46,10 @@ if [[ "${1:-}" == --project && "${3:-}" == profile ]]; then
     run_callgraph profile --project "$2" "${@:4}"
 fi
 if [[ "${1:-}" == profile ]]; then
+    run_callgraph "$@"
+fi
+# helyi használati statisztika: `callgraph.sh stats [--days N]` → `callgraph stats …` (hálózat nincs)
+if [[ "${1:-}" == stats ]]; then
     run_callgraph "$@"
 fi
 for a in "$@"; do

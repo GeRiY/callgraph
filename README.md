@@ -313,6 +313,16 @@ edits in the background; it adds one entry to `~/.claude/settings.json`, keeps e
 `settings.json.bak` backup first. Remove it with `bash ~/.claude/skills/callgraph/callgraph.sh hook uninstall`.
 Details (Hungarian): [`docs/PROJECT-GRAPH.md`](docs/PROJECT-GRAPH.md).
 
+### Local usage stats
+
+callgraph keeps a small usage summary on your computer: how often each command or MCP tool ran, whether it
+failed, and how long it took and how big its output was, in ranges. For `locate` over MCP it also notes whether the
+file the agent opened next was the first result. It never records paths, file or symbol names, search terms,
+project names or error texts, and **nothing is sent anywhere** (there is no network involved). See it with
+`bash ~/.claude/skills/callgraph/callgraph.sh stats [--days N]` (last 7 days by default). The data lives in
+`~/.claude/skills/callgraph/stats/` (one small file per month, kept for about 90 days); turn it off with
+`CALLGRAPH_STATS=0`. It is also off in CI and when callgraph does not run from a skill install.
+
 ### Feedback from agents
 
 Every error message carries an `[error-id: …]`. Agents (or you) can attach a note to it, which makes broken
