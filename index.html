@@ -39,7 +39,7 @@
 "offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}
 </script>
 <script type="application/ld+json">
-{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "What is callgraph?", "acceptedAnswer": {"@type": "Answer", "text": "A command-line code map for AI coding agents. It parses a file or folder and answers what is in it, which method lives on which lines, what it calls, who calls it and what is affected by a change — in a few dozen lines instead of the whole file."}}, {"@type": "Question", "name": "Which languages are supported?", "acceptedAnswer": {"@type": "Answer", "text": "PHP (with Laravel and Yii awareness), JavaScript, TypeScript, Vue single-file components, Rust, Swift and SwiftUI, CSS, SCSS, JSON and Markdown."}}, {"@type": "Question", "name": "Do I need PHP, Node or Rust installed?", "acceptedAnswer": {"@type": "Answer", "text": "No. callgraph is a single static binary. The only runtime requirement is bash."}}, {"@type": "Question", "name": "Does it work without Claude Code?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. It is a Claude Code skill, but the commands work from any terminal or script, and any MCP client (Claude Desktop, Cursor, VS Code) can use it as an offline MCP server: callgraph mcp."}}, {"@type": "Question", "name": "How do I update it?", "acceptedAnswer": {"@type": "Answer", "text": "Run callgraph.sh update. It downloads the newest release from GitHub and keeps your projects and settings."}}, {"@type": "Question", "name": "Where do I report a bug or suggest a feature?", "acceptedAnswer": {"@type": "Answer", "text": "Open a GitHub issue using the bug report or the idea/feedback form. Report security issues privately through a GitHub security advisory."}}]}
+{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "What is callgraph?", "acceptedAnswer": {"@type": "Answer", "text": "A command-line code map for AI coding agents. It parses a file or folder and answers what is in it, which method lives on which lines, what it calls, who calls it and what is affected by a change — in a few dozen lines instead of the whole file."}}, {"@type": "Question", "name": "Which languages are supported?", "acceptedAnswer": {"@type": "Answer", "text": "PHP (with Laravel and Yii awareness), JavaScript, TypeScript, Vue single-file components, Rust, Swift and SwiftUI, CSS, SCSS, JSON and Markdown."}}, {"@type": "Question", "name": "Do I need PHP, Node or Rust installed?", "acceptedAnswer": {"@type": "Answer", "text": "No. callgraph is a single static binary. The only runtime requirement is bash."}}, {"@type": "Question", "name": "Does it work without Claude Code?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. It is a Claude Code skill, but the commands work from any terminal or script, and any MCP client (Claude Desktop, Cursor, VS Code) can use it as a local MCP server: callgraph mcp."}}, {"@type": "Question", "name": "How do I update it?", "acceptedAnswer": {"@type": "Answer", "text": "Run callgraph.sh update. It downloads the newest release from GitHub and keeps your projects and settings."}}, {"@type": "Question", "name": "Where do I report a bug or suggest a feature?", "acceptedAnswer": {"@type": "Answer", "text": "Open a GitHub issue using the bug report or the idea/feedback form. Report security issues privately through a GitHub security advisory."}}]}
 </script>
 </head>
 <body>
@@ -174,14 +174,19 @@ callgraph.sh set-lang hu        # Hungarian output (back: set-lang en)</code></p
   <p class="sub">callgraph is also an MCP server: <code>callgraph mcp</code>. Claude Desktop, Cursor, VS Code, Claude Code
     or any other MCP client calls the same queries as typed tools, with the same compact output.</p>
   <div class="grid">
-    <div class="card"><h3>🔌 Fully offline</h3><p>Your client starts it on your machine and talks to it over stdin/stdout.
-      No server, no network: your code never leaves the computer.</p></div>
+    <div class="card"><h3>🔌 Runs locally</h3><p>Your client starts it on your machine and talks to it over stdin/stdout.
+      No server, and queries never touch the network: your code never leaves the computer. The only network call
+      is a once-a-day update check against GitHub Releases.</p></div>
     <div class="card"><h3>🔒 Read-only</h3><p>It never writes your source files, and only reads inside the project folder;
       paths that point outside are refused.</p></div>
-    <div class="card"><h3>🧰 Six tools</h3><p><code>outline</code>, <code>method_body</code>, <code>find_callers</code>,
-      <code>search</code>, <code>framework_view</code>, <code>projects</code> — the same queries as the commands above.</p></div>
+    <div class="card"><h3>🧰 Eight tools</h3><p><code>outline</code>, <code>method_body</code>, <code>find_callers</code>,
+      <code>search</code>, <code>framework_view</code>, <code>projects</code>, <code>notes</code>, plus <code>guide</code> —
+      the same queries as the commands above, and a short how-to for the agent.</p></div>
   </div>
-  <p>Pick your system — the commands use the binary from the installed skill package.</p>
+  <p>Pick your system — the commands use the binary from the installed skill package. With <code>--auto-update</code>
+    (recommended) the server checks once a day at start-up, installs a new release (checksum-verified) and restarts
+    itself; without it, it only tells the agent that an update is available. Turn the check off with
+    <code>CALLGRAPH_UPDATE_CHECK=0</code>.</p>
   <div class="tabs" role="tablist" aria-label="Platform for MCP setup">
     <button role="tab" id="t-mcp-unix" aria-controls="p-mcp-unix" aria-selected="true">macOS / Linux</button>
     <button role="tab" id="t-mcp-win" aria-controls="p-mcp-win" aria-selected="false" tabindex="-1">Windows</button>
@@ -189,7 +194,7 @@ callgraph.sh set-lang hu        # Hungarian output (back: set-lang en)</code></p
   <div class="panel" id="p-mcp-unix" role="tabpanel" aria-labelledby="t-mcp-unix">
     <p>Claude Code (all projects):</p>
 <pre class="code"><code>claude mcp add -s user callgraph -- \
-  ~/.claude/skills/callgraph/bin/$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)/callgraph mcp</code></pre>
+  ~/.claude/skills/callgraph/bin/$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)/callgraph mcp --auto-update</code></pre>
     <p>For the JSON configs below you need the binary's absolute path — this prints it:</p>
 <pre class="code"><code>echo ~/.claude/skills/callgraph/bin/$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)/callgraph</code></pre>
     <p>Claude Desktop (<code>claude_desktop_config.json</code>) · Cursor (<code>.cursor/mcp.json</code>):</p>
@@ -197,7 +202,7 @@ callgraph.sh set-lang hu        # Hungarian output (back: set-lang en)</code></p
   "mcpServers": {
     "callgraph": {
       "command": "/Users/you/.claude/skills/callgraph/bin/darwin-arm64/callgraph",
-      "args": ["mcp"]
+      "args": ["mcp", "--auto-update"]
     }
   }
 }</code></pre>
@@ -207,7 +212,7 @@ callgraph.sh set-lang hu        # Hungarian output (back: set-lang en)</code></p
     "callgraph": {
       "type": "stdio",
       "command": "/Users/you/.claude/skills/callgraph/bin/darwin-arm64/callgraph",
-      "args": ["mcp"],
+      "args": ["mcp", "--auto-update"],
       "cwd": "${workspaceFolder}"
     }
   }
@@ -216,13 +221,13 @@ callgraph.sh set-lang hu        # Hungarian output (back: set-lang en)</code></p
   </div>
   <div class="panel" id="p-mcp-win" role="tabpanel" aria-labelledby="t-mcp-win" hidden>
     <p>Claude Code (PowerShell, all projects):</p>
-<pre class="code"><code>claude mcp add -s user callgraph -- "$env:USERPROFILE\.claude\skills\callgraph\bin\windows-x86_64\callgraph.exe" mcp</code></pre>
+<pre class="code"><code>claude mcp add -s user callgraph -- "$env:USERPROFILE\.claude\skills\callgraph\bin\windows-x86_64\callgraph.exe" mcp --auto-update</code></pre>
     <p>Claude Desktop (<code>claude_desktop_config.json</code>) · Cursor (<code>.cursor/mcp.json</code>):</p>
 <pre class="code"><code>{
   "mcpServers": {
     "callgraph": {
       "command": "C:\\Users\\you\\.claude\\skills\\callgraph\\bin\\windows-x86_64\\callgraph.exe",
-      "args": ["mcp"]
+      "args": ["mcp", "--auto-update"]
     }
   }
 }</code></pre>
@@ -232,7 +237,7 @@ callgraph.sh set-lang hu        # Hungarian output (back: set-lang en)</code></p
     "callgraph": {
       "type": "stdio",
       "command": "C:\\Users\\you\\.claude\\skills\\callgraph\\bin\\windows-x86_64\\callgraph.exe",
-      "args": ["mcp"],
+      "args": ["mcp", "--auto-update"],
       "cwd": "${workspaceFolder}"
     }
   }
@@ -265,7 +270,8 @@ callgraph.sh set-lang hu        # Hungarian output (back: set-lang en)</code></p
   <details><summary>What is callgraph?</summary><p>A command-line code map for AI coding agents. It parses a file or folder and answers what is in it, which method lives on which lines, what it calls, who calls it and what is affected by a change — in a few dozen lines instead of the whole file.</p></details>
   <details><summary>Do I need PHP, Node or Rust installed?</summary><p>No. callgraph is a single static binary. The only runtime requirement is bash.</p></details>
   <details><summary>Does it work without Claude Code?</summary><p>Yes. It ships as a Claude Code skill, but every command works from any terminal or script, and any MCP client (Claude Desktop, Cursor, VS Code…) can use it through <code>callgraph mcp</code>.</p></details>
-  <details><summary>Is my code sent anywhere?</summary><p>No. Everything runs locally; the only network call is the optional <code>update</code> check against GitHub Releases.</p></details>
+  <details><summary>Is my code sent anywhere?</summary><p>No. Everything runs locally; your code is never uploaded. The only network call is the update check against GitHub Releases
+    (at most once a day; off with <code>CALLGRAPH_UPDATE_CHECK=0</code>).</p></details>
   <details><summary>Where do I report a bug or suggest a feature?</summary><p>On GitHub: <a href="https://github.com/GeRiY/callgraph/issues/new?template=bug_report.yml">bug report</a> or <a href="https://github.com/GeRiY/callgraph/issues/new?template=feature_request.yml">idea / feedback</a>. Security issues go to a <a href="https://github.com/GeRiY/callgraph/security/advisories/new">private advisory</a>.</p></details>
   <details><summary>How much does it cost?</summary><p>Nothing. callgraph is open source under the MIT license.</p></details>
 </section>
