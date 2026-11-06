@@ -42,6 +42,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 ### Fixed
 - **A file reached through a symlink is no longer listed twice:** if a symlink pointed to a file inside the project,
   that file appeared (and was analysed) twice in folder results.
+- **Windows: the short summary shows file names again:** when a folder's output was too long and callgraph showed the
+  one-line-per-file summary instead, Windows listed each file with its full path instead of just its name.
 
 ## [0.4.0] — 2026-11-06
 
