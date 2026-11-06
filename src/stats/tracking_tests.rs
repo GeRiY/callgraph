@@ -176,7 +176,10 @@ fn the_day_file_holds_no_paths_or_names() {
         &Ok("FILE app/Http/RefundController.php\n  processRefund L10-20\n".into()),
     );
     stats.tool_call(
-        &call(CommandKind::MethodBody, Some("/home/me/SecretShop/app/Http/X.php")),
+        &call(
+            CommandKind::MethodBody,
+            Some("/home/me/SecretShop/app/Http/X.php"),
+        ),
         &Err("Nem található: /home/me/SecretShop/app/Http/X.php::processRefund".into()),
     );
     stats.tool_call(

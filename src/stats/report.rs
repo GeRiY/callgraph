@@ -47,11 +47,7 @@ pub(crate) fn render(totals: &Totals, today: Day, days: u32, dir: &Path, enabled
         "idő: {time} · kimenet (token): {size}\n"
     ));
     table(&mut out, totals);
-    if let Some(line) = totals
-        .commands
-        .get(&CommandKind::Locate)
-        .and_then(hit_line)
-    {
+    if let Some(line) = totals.commands.get(&CommandKind::Locate).and_then(hit_line) {
         out.push_str(&line);
     }
     out.push_str(&tail);

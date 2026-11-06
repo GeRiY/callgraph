@@ -15,8 +15,7 @@ impl LatencyBucket {
     /// A sávok száma (a napi fájl tömbjének hossza).
     pub(crate) const COUNT: usize = 5;
     /// A sávok címkéi a riportban, sorrendben.
-    pub(crate) const LABELS: [&str; Self::COUNT] =
-        ["<50ms", "50-200ms", "0.2-1s", "1-5s", "5s+"];
+    pub(crate) const LABELS: [&str; Self::COUNT] = ["<50ms", "50-200ms", "0.2-1s", "1-5s", "5s+"];
 
     /// Ezredmásodpercből; a határ a felső sávba tartozik (50 ms → 50–200 ms).
     pub(crate) fn from_millis(ms: u128) -> Self {

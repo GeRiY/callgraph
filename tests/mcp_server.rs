@@ -492,8 +492,13 @@ fn locate_hit_rank_is_recorded_in_the_local_stats() {
     s.response(1);
     s.send(json!({"jsonrpc": "2.0", "method": "notifications/initialized"}));
     let found = s.call(2, "locate", json!({"terms": ["processRefund"]}));
+    // egyetlen találatnál az út abszolút (mint a többi lekérdezésnél); a találat-követés mindkét alakot kezeli
     let body = text(&found).replace('\\', "/");
-    assert!(body.contains("1. src/RefundService.php"), "{body}");
+    assert!(
+        body.lines()
+            .any(|line| line.starts_with("1. ") && line.contains("src/RefundService.php")),
+        "{body}"
+    );
     let outline = s.call(3, "outline", json!({"path": "src/RefundService.php"}));
     assert_ne!(outline["isError"], json!(true), "{outline}");
     drop(s);
@@ -513,7 +518,10 @@ fn locate_hit_rank_is_recorded_in_the_local_stats() {
     );
     for entry in std::fs::read_dir(&stats).unwrap() {
         let text = std::fs::read_to_string(entry.unwrap().path()).unwrap();
-        assert!(!text.contains('/') && !text.contains("RefundService"), "{text}");
+        assert!(
+            !text.contains('/') && !text.contains("RefundService"),
+            "{text}"
+        );
     }
     let _ = std::fs::remove_dir_all(&base);
 }

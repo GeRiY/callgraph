@@ -66,13 +66,7 @@ fn latency_and_size_bucket_boundaries() {
         assert_eq!(SizeBucket::from_chars(chars), bucket, "{chars} chars");
     }
     use RankBucket::*;
-    for (rank, bucket) in [
-        (1, First),
-        (2, Top5),
-        (5, Top5),
-        (6, Beyond),
-        (40, Beyond),
-    ] {
+    for (rank, bucket) in [(1, First), (2, Top5), (5, Top5), (6, Beyond), (40, Beyond)] {
         assert_eq!(RankBucket::from_rank(rank), bucket, "rank {rank}");
     }
     assert_eq!(LatencyBucket::LABELS.len(), LatencyBucket::COUNT);
@@ -140,8 +134,14 @@ fn records_and_sums_days_across_months() {
     assert_eq!(locate.hits, [1, 0, 0, 0]);
 
     // egy nap egyedül; egy üres időszak
-    assert_eq!(store.totals(day("2026-10-20"), day("2026-10-20")).calls(), 1);
-    assert_eq!(store.totals(day("2026-09-01"), day("2026-09-30")).calls(), 0);
+    assert_eq!(
+        store.totals(day("2026-10-20"), day("2026-10-20")).calls(),
+        1
+    );
+    assert_eq!(
+        store.totals(day("2026-09-01"), day("2026-09-30")).calls(),
+        0
+    );
     let _ = std::fs::remove_dir_all(dir);
 }
 
@@ -238,7 +238,12 @@ fn report_is_short_and_shows_the_locate_hit_rate() {
     }
     store.record(
         today.minus(2),
-        &event(CommandKind::Show, Client::Cli, Outcome::Error(ErrorKind::Usage), 20),
+        &event(
+            CommandKind::Show,
+            Client::Cli,
+            Outcome::Error(ErrorKind::Usage),
+            20,
+        ),
     );
     store.record_hit(today, RankBucket::First);
     store.record_hit(today, RankBucket::NotListed);

@@ -133,7 +133,8 @@ impl<W: Write> Write for Meter<W> {
         // a UTF-8 folytató bájtok (10xxxxxx) nem új karakterek
         self.chars += written.iter().filter(|b| (**b & 0xC0) != 0x80).count();
         let room = HEAD_BYTES.saturating_sub(self.head.len());
-        self.head.extend_from_slice(&written[..room.min(written.len())]);
+        self.head
+            .extend_from_slice(&written[..room.min(written.len())]);
         Ok(n)
     }
 

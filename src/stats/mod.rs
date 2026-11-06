@@ -25,8 +25,8 @@ mod tests;
 #[cfg(test)]
 mod tracking_tests;
 
-pub use cli_probe::{CliProbe, Meter};
 pub(crate) use cli_probe::CLIENT_ENV;
+pub use cli_probe::{CliProbe, Meter};
 pub(crate) use day::Day;
 pub(crate) use event::CommandKind;
 pub(crate) use mcp_probe::{McpStats, ToolCall};

@@ -142,7 +142,12 @@ impl ErrorKind {
             "Nem található",
             "Nincs ilyen metódus",
         ];
-        const USAGE: [&str; 4] = ["usage:", "használat:", "Unknown project", "Ismeretlen projekt"];
+        const USAGE: [&str; 4] = [
+            "usage:",
+            "használat:",
+            "Unknown project",
+            "Ismeretlen projekt",
+        ];
         if NOT_FOUND.iter().any(|p| message.starts_with(p)) {
             Self::NotFound
         } else if USAGE.iter().any(|p| message.starts_with(p)) {

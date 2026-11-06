@@ -93,7 +93,10 @@ fn records_cli_runs_and_reports_them() {
     let report = run(&root, &skill, dir, &["stats", "--days", "3"]);
     assert!(report.status.success(), "{report:?}");
     let report = String::from_utf8_lossy(&report.stdout);
-    assert!(report.starts_with("callgraph stats · last 3 days"), "{report}");
+    assert!(
+        report.starts_with("callgraph stats · last 3 days"),
+        "{report}"
+    );
     assert!(report.contains(" · 3 calls: cli 3\n"), "{report}");
     assert_eq!(row(&report, "show")[1..3], ["2", "1"], "{report}");
     assert_eq!(row(&report, "locate")[1..3], ["1", "0"], "{report}");
