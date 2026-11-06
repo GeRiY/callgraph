@@ -4,7 +4,10 @@
   <b>Token-hatékony kód-térkép AI kódoló agenteknek.</b><br>
   Szerkezet, kategorizált hívás-gráf, metódus-törzs, „ki hívja?” és hatáselemzés —
   a teljes fájlok beolvasása nélkül.<br>
-  🌐 <a href="https://callgraph.eu/hu/">callgraph.eu</a>
+  🌐 <a href="https://callgraph.eu/hu/">callgraph.eu</a><br>
+  Útmutatók: <a href="https://callgraph.eu/hu/mcp/">MCP-beállítás</a> · <a href="https://callgraph.eu/hu/php/">PHP</a> · <a href="https://callgraph.eu/hu/rust/">Rust</a> ·
+  <a href="https://callgraph.eu/hu/typescript/">TypeScript / Vue</a> · <a href="https://callgraph.eu/hu/swift/">Swift</a> · <a href="https://callgraph.eu/hu/locate/">locate</a> ·
+  <a href="https://callgraph.eu/hu/profile/">Projekt-profil</a> · <a href="https://callgraph.eu/hu/changelog/">Változásnapló</a>
 </p>
 
 <p align="center">
@@ -76,6 +79,8 @@ $ callgraph.sh --project shop app --grep saveTranslations --depth 2
 - **Angol vagy magyar kimenet**, egy paranccsal váltható.
 
 ### Támogatott nyelvek
+
+Nyelvenkénti útmutatók példákkal: [PHP](https://callgraph.eu/hu/php/) · [Rust](https://callgraph.eu/hu/rust/) · [TypeScript / JavaScript / Vue](https://callgraph.eu/hu/typescript/) · [Swift / SwiftUI](https://callgraph.eu/hu/swift/).
 
 | Nyelv | Kiterjesztések | Mit kapsz |
 |---|---|---|
@@ -196,6 +201,8 @@ mellett az utak a regisztrált projekt gyökeréhez képest értendők; nélkül
 
 ### Honnan induljak: `locate`
 
+Bővebben a weboldalon: [callgraph.eu/hu/locate](https://callgraph.eu/hu/locate/).
+
 Add át a `locate`-nek a feladat neveit és fogalmait egy hívásban (függvény-, osztály- és fájlnevek, oszlopnevek,
 útvonalak); a projekt-térképből válaszol, a forrás beolvasása nélkül: rövid, rangsorolt lista arról, melyik fájllal
 kezdj, mindegyik az indoklásával:
@@ -240,6 +247,8 @@ a `--full` feloldja. Teljes referencia: `callgraph.sh --help` és [`skill/SKILL.
 
 ### Projekt-profil
 
+Bővebben a weboldalon: [callgraph.eu/hu/profile](https://callgraph.eu/hu/profile/).
+
 Ismeretlen projektben kezdd ezzel: `bash ~/.claude/skills/callgraph/callgraph.sh profile [--project alias]`. A mappa-
 és fájlnevekből (és a `composer.json` / `package.json` / `Cargo.toml` frameworkjéből) megmondja az architektúrát
 (Laravel / Yii rétegzett MVC, DDD / hexagonális, Vue / React frontend, SwiftUI MVVM, Rust web), a rétegeket a
@@ -271,6 +280,8 @@ CALLGRAPH_LANG=hu bash ~/.claude/skills/callgraph/callgraph.sh app/Models/Order.
 ```
 
 ### Más AI-eszközökkel (MCP)
+
+Lépésről lépésre, kliensenként (Claude Code, Claude Desktop, Cursor, VS Code): [callgraph.eu/hu/mcp](https://callgraph.eu/hu/mcp/).
 
 A Claude Code-skill mellett (változatlan, teljes értékűen támogatott) ugyanaz a bináris
 [MCP](https://modelcontextprotocol.io)-szerver is stdio-n, így bármely MCP-kliens használhatja: `callgraph mcp`.

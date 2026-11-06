@@ -4,7 +4,10 @@
   <b>A token-efficient code map for AI coding agents.</b><br>
   Structure, categorized call graph, method bodies, "who calls this?" and impact analysis —
   without reading whole files.<br>
-  🌐 <a href="https://callgraph.eu/">callgraph.eu</a>
+  🌐 <a href="https://callgraph.eu/">callgraph.eu</a><br>
+  Guides: <a href="https://callgraph.eu/mcp/">MCP setup</a> · <a href="https://callgraph.eu/php/">PHP</a> · <a href="https://callgraph.eu/rust/">Rust</a> ·
+  <a href="https://callgraph.eu/typescript/">TypeScript / Vue</a> · <a href="https://callgraph.eu/swift/">Swift</a> · <a href="https://callgraph.eu/locate/">locate</a> ·
+  <a href="https://callgraph.eu/profile/">Project profile</a> · <a href="https://callgraph.eu/changelog/">Changelog</a>
 </p>
 
 <p align="center">
@@ -76,6 +79,8 @@ $ callgraph.sh --project shop app --grep saveTranslations --depth 2
 - **English or Hungarian output**, switchable with one command.
 
 ### Supported languages
+
+Per-language guides with examples: [PHP](https://callgraph.eu/php/) · [Rust](https://callgraph.eu/rust/) · [TypeScript / JavaScript / Vue](https://callgraph.eu/typescript/) · [Swift / SwiftUI](https://callgraph.eu/swift/).
 
 | Language | Extensions | What you get |
 |---|---|---|
@@ -195,6 +200,8 @@ relative to a registered project root; without it, the current directory is the 
 
 ### Where to start: `locate`
 
+More on the website: [callgraph.eu/locate](https://callgraph.eu/locate/).
+
 Give `locate` the names and domain terms from the task in one call (function, class and file names, column names,
 routes); it answers from the project map, without reading the source, with a short ranked list of files to start
 from, each with the reason:
@@ -239,6 +246,8 @@ index); `--full` lifts the cap. Full reference: `callgraph.sh --help` and [`skil
 
 ### Project profile
 
+More on the website: [callgraph.eu/profile](https://callgraph.eu/profile/).
+
 In an unfamiliar project, start with `bash ~/.claude/skills/callgraph/callgraph.sh profile [--project alias]`. From
 folder and file names (and the framework found in `composer.json` / `package.json` / `Cargo.toml`) it tells you the
 architecture (Laravel / Yii layered MVC, DDD / hexagonal, Vue / React frontend, SwiftUI MVVM, Rust web), the layers
@@ -270,6 +279,8 @@ CALLGRAPH_LANG=hu bash ~/.claude/skills/callgraph/callgraph.sh app/Models/Order.
 ```
 
 ### Use with other AI tools (MCP)
+
+Step-by-step setup per client (Claude Code, Claude Desktop, Cursor, VS Code): [callgraph.eu/mcp](https://callgraph.eu/mcp/).
 
 Besides the Claude Code skill (unchanged, fully supported), the same binary is also an
 [MCP](https://modelcontextprotocol.io) server on stdio, so any MCP client can use it: `callgraph mcp`.
