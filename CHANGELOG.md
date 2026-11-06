@@ -21,6 +21,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   refreshes changed files a moment after they are saved, so queries stay fast. The answers are exactly the same as
   before. If watching is not possible on a system, it says so once and works as before. To switch it off, set
   `CALLGRAPH_WATCH=0`.
+- **The MCP server can update itself:** add `--auto-update` to the server's arguments in your AI tool's MCP settings
+  (`"args": ["mcp", "--auto-update"]`, recommended). When the tool starts the server — at most once a day — it checks
+  for a newer callgraph release, downloads it, checks that the file is exactly the published one (it never installs
+  a file whose checksum does not match), installs it just like `callgraph.sh update` (your projects and settings are
+  kept) and restarts itself, so the tool works with the new version right away. If anything goes wrong (no
+  internet, GitHub limit, a bad download, no write permission) it simply starts the version you have and writes one
+  line to the tool's log. It only writes into callgraph's own folder, never into your projects.
+- **The MCP server tells you about updates:** without `--auto-update`, the server checks for a newer release at most
+  once a day in the background (it never makes a request wait) and adds one line to the first answer of the session:
+  `ℹ callgraph X is available (installed: Y) — update: …/callgraph.sh update, or add --auto-update to the MCP
+  config`. `CALLGRAPH_UPDATE_CHECK=0` turns off all update checks (no network at all); they are also off in CI.
 
 ### Changed
 - **Comments inside a method stay in `--body`:** the short method view used to hide comment lines inside the method

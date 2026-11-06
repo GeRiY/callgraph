@@ -43,7 +43,7 @@ src/
   hook/                         Claude Code PostToolUse hook: a hook JSON-ja → háttér-`refresh`; settings.json szerkesztése
   query/                        QueryEngine (Facade), formázók (Strategy + FormatterRegistry), kimeneti korlát
   cli/                          Command minta; args, parancsok (analyze, prune)
-  mcp/                          MCP-szerver (`callgraph mcp`, rmcp, stdio): eszköz-paraméter → `show`-lekérdezés, útvonal-őr
+  mcp/                          MCP-szerver (`callgraph mcp`, rmcp, stdio): eszköz-paraméter → `show`-lekérdezés, útvonal-őr, frissítés (`--auto-update`, napi értesítés)
 tests/                          integrációs tesztek (pl. languages.rs: teszt-nyelvek a registryn)
 docs/                           ARCHITECTURE-uj.md, UJ-NYELV.md
 ```

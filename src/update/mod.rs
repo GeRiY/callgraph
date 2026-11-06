@@ -17,7 +17,8 @@ mod version;
 pub(crate) mod tests;
 
 pub(crate) use fetch::{
-    ASSET_LIMIT, BACKGROUND_TIMEOUT, FOREGROUND_TIMEOUT, FetchError, Fetcher, HttpFetcher,
+    ASSET_LIMIT, AUTO_UPDATE_CONNECT_TIMEOUT, AUTO_UPDATE_TIMEOUT, BACKGROUND_TIMEOUT,
+    FOREGROUND_TIMEOUT, FetchError, Fetcher, HttpFetcher,
 };
 pub(crate) use install::{InstallError, Installer};
 pub(crate) use platform::Platform;

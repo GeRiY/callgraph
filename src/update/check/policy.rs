@@ -74,6 +74,29 @@ pub(crate) fn decide(state: &CheckState, now: u64, current: &Version, succeeded:
     }
 }
 
+/// Az MCP `--auto-update` indításkori döntése: `Some(új állapot)` = próbáljuk meg (az állapotot a hálózat előtt
+/// menteni kell, hogy a párhuzamosan induló szerverek ne próbálkozzanak újra), `None` = most nem.
+/// Naponta legfeljebb egy kísérlet (`auto_update_at`); azon belül is csak akkor, ha a gyorsítótár (`checked_at`,
+/// `latest`) lejárt, vagy már tudjuk, hogy van újabb stabil verzió.
+pub(crate) fn decide_auto(state: &CheckState, now: u64, current: &Version) -> Option<CheckState> {
+    if state.auto_update_at.is_some_and(|at| !expired(at, now)) {
+        return None;
+    }
+    let newer = state
+        .latest
+        .as_deref()
+        .and_then(Version::parse)
+        .is_some_and(|latest| &latest > current && !latest.is_prerelease());
+    if !newer && !expired(state.checked_at, now) {
+        return None;
+    }
+    Some(CheckState {
+        checked_at: now,
+        auto_update_at: Some(now),
+        ..state.clone()
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -186,5 +209,41 @@ mod tests {
             let d = decide(&state(NOW, Some(latest)), NOW, &current, true);
             assert!(d.notice.is_none(), "{latest}");
         }
+    }
+
+    #[test]
+    fn auto_update_is_attempted_at_most_once_a_day() {
+        let current = v("0.1.0");
+        // még soha: próbálkozás, a két időbélyeg azonnal beírva
+        let next = decide_auto(&CheckState::default(), NOW, &current).unwrap();
+        assert_eq!((next.checked_at, next.auto_update_at), (NOW, Some(NOW)));
+        // egy napon belül nem újra — akkor sem, ha közben kiderült, hogy van újabb
+        let tried = CheckState {
+            latest: Some("0.2.0".into()),
+            ..next
+        };
+        assert_eq!(decide_auto(&tried, NOW + DAY - 1, &current), None);
+        assert!(decide_auto(&tried, NOW + DAY, &current).is_some());
+        // visszaállított óra: lejártnak számít
+        assert!(decide_auto(&tried, NOW - DAY, &current).is_some());
+    }
+
+    #[test]
+    fn auto_update_reuses_a_fresh_cache() {
+        let current = v("0.1.0");
+        // ma már ellenőrizte (pl. a wrap háttér-ellenőrzése), nincs újabb: nincs hálózat
+        for latest in [None, Some("0.1.0"), Some("0.0.9"), Some("0.2.0-rc.1")] {
+            assert_eq!(
+                decide_auto(&state(NOW - 60, latest), NOW, &current),
+                None,
+                "{latest:?}"
+            );
+        }
+        // ma ellenőrizte, és van újabb: most frissít (a friss gyorsítótár nem tartja vissza)
+        let next = decide_auto(&state(NOW - 60, Some("0.2.0")), NOW, &current).unwrap();
+        assert_eq!(next.auto_update_at, Some(NOW));
+        assert_eq!(next.latest.as_deref(), Some("0.2.0"));
+        // régi gyorsítótár: újra megnézzük
+        assert!(decide_auto(&state(NOW - DAY, None), NOW, &current).is_some());
     }
 }

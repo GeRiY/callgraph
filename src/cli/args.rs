@@ -9,8 +9,8 @@ use crate::query::format::BodyMode;
 
 fn usage() -> &'static str {
     crate::t!(
-        "callgraph [--lang <id,...>] [--cache <file>] [--no-cache] <file|dir> [...] | callgraph prune [--cache <file>] [--dry-run] | callgraph set-lang [en|hu] | callgraph self-update [--check] | callgraph note add|list|rm … | callgraph refresh [--project <alias|dir>] [--background] [<path>…] | callgraph hook install|uninstall|status | callgraph mcp | callgraph --version",
-        "callgraph [--lang <id,...>] [--cache <fájl>] [--no-cache] <fájl|mappa> [...] | callgraph prune [--cache <fájl>] [--dry-run] | callgraph set-lang [en|hu] | callgraph self-update [--check] | callgraph note add|list|rm … | callgraph refresh [--project <alias|mappa>] [--background] [<út>…] | callgraph hook install|uninstall|status | callgraph mcp | callgraph --version"
+        "callgraph [--lang <id,...>] [--cache <file>] [--no-cache] <file|dir> [...] | callgraph prune [--cache <file>] [--dry-run] | callgraph set-lang [en|hu] | callgraph self-update [--check] | callgraph note add|list|rm … | callgraph refresh [--project <alias|dir>] [--background] [<path>…] | callgraph hook install|uninstall|status | callgraph mcp [--auto-update] | callgraph --version",
+        "callgraph [--lang <id,...>] [--cache <fájl>] [--no-cache] <fájl|mappa> [...] | callgraph prune [--cache <fájl>] [--dry-run] | callgraph set-lang [en|hu] | callgraph self-update [--check] | callgraph note add|list|rm … | callgraph refresh [--project <alias|mappa>] [--background] [<út>…] | callgraph hook install|uninstall|status | callgraph mcp [--auto-update] | callgraph --version"
     )
 }
 
@@ -142,8 +142,8 @@ pub enum CliArgs {
     },
     /// `--version` / `-V`: a verzió és a platform.
     Version,
-    /// `mcp`: MCP-szerver stdio-n (argumentum nélkül).
-    Mcp,
+    /// `mcp [--auto-update]`: MCP-szerver stdio-n; `--auto-update`: indításkor naponta egyszer frissít.
+    Mcp { auto_update: bool },
     /// Skill-parancs (`project`, `feedback`, `wrap`, `error`, `set-lang`, `self-update`, `skill-sync`) nyers argumentumokkal.
     Skill { command: String, args: Vec<String> },
 }
@@ -156,16 +156,19 @@ impl CliArgs {
             return Ok(Self::Version);
         }
         if args.first().is_some_and(|a| a == "mcp") {
-            if args.len() > 1 {
+            let auto_update = args
+                .get(1)
+                .is_some_and(|a| a == crate::mcp::AUTO_UPDATE_FLAG);
+            if args.len() > 1 + usize::from(auto_update) {
                 return Err(CallgraphError::Usage(
                     crate::t!(
-                        "callgraph mcp (MCP server on stdio, no arguments)",
-                        "callgraph mcp (MCP-szerver stdio-n, argumentum nélkül)"
+                        "callgraph mcp [--auto-update] (MCP server on stdio; --auto-update: update itself at start, at most once a day)",
+                        "callgraph mcp [--auto-update] (MCP-szerver stdio-n; --auto-update: indításkor frissíti magát, naponta legfeljebb egyszer)"
                     )
                     .into(),
                 ));
             }
-            return Ok(Self::Mcp);
+            return Ok(Self::Mcp { auto_update });
         }
         if args.first().is_some_and(|a| a == "prune") {
             return Self::parse_prune(&args[1..]);
@@ -843,8 +846,17 @@ mod tests {
     fn parses_version_and_self_update() {
         assert_eq!(parse(&["--version"]).unwrap(), CliArgs::Version);
         assert_eq!(parse(&["-V"]).unwrap(), CliArgs::Version);
-        assert_eq!(parse(&["mcp"]).unwrap(), CliArgs::Mcp);
+        assert_eq!(
+            parse(&["mcp"]).unwrap(),
+            CliArgs::Mcp { auto_update: false }
+        );
+        assert_eq!(
+            parse(&["mcp", "--auto-update"]).unwrap(),
+            CliArgs::Mcp { auto_update: true }
+        );
         assert!(parse(&["mcp", "x"]).is_err());
+        assert!(parse(&["mcp", "--auto-update", "x"]).is_err());
+        assert!(parse(&["mcp", "x", "--auto-update"]).is_err());
         assert_eq!(
             parse(&["self-update", "--check"]).unwrap(),
             CliArgs::Skill {

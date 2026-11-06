@@ -209,20 +209,26 @@ CALLGRAPH_LANG=hu bash ~/.claude/skills/callgraph/callgraph.sh app/Models/Order.
 A Claude Code-skill mellett (változatlan, teljes értékűen támogatott) ugyanaz a bináris
 [MCP](https://modelcontextprotocol.io)-szerver is stdio-n, így bármely MCP-kliens használhatja: `callgraph mcp`.
 Eszközök: `outline`, `method_body`, `find_callers`, `search`, `framework_view`, `projects`. Ugyanazt a tömör szöveget
-adják, mint a CLI, ugyanazzal a kimeneti korláttal; csak olvas, hálózat nincs, az utak a projekt-gyökéren belül maradnak.
+adják, mint a CLI, ugyanazzal a kimeneti korláttal; csak olvas, az utak a projekt-gyökéren belül maradnak, a
+lekérdezések nem használnak hálózatot (csak a lenti, naponta egyszeri frissítés-ellenőrzés).
 
 ```bash
 # Claude Code, macOS / Linux (a géphez illő binárist választja):
 claude mcp add -s user callgraph -- \
-  ~/.claude/skills/callgraph/bin/$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)/callgraph mcp
+  ~/.claude/skills/callgraph/bin/$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)/callgraph mcp --auto-update
 ```
 
 ```powershell
 # Claude Code, Windows (PowerShell):
-claude mcp add -s user callgraph -- "$env:USERPROFILE\.claude\skills\callgraph\bin\windows-x86_64\callgraph.exe" mcp
+claude mcp add -s user callgraph -- "$env:USERPROFILE\.claude\skills\callgraph\bin\windows-x86_64\callgraph.exe" mcp --auto-update
 ```
 
-Claude Desktop, Cursor és VS Code: JSON-bejegyzés `"command": "<a bináris abszolút útja>", "args": ["mcp"]` alakban.
+Claude Desktop, Cursor és VS Code: JSON-bejegyzés `"command": "<a bináris abszolút útja>", "args": ["mcp", "--auto-update"]` alakban.
+**Ajánlott: `--auto-update`** — indításkor (naponta legfeljebb egyszer) a szerver pontosan úgy telepíti az újabb
+kiadást, mint a `callgraph.sh update` (SHA-256-ellenőrzéssel, a beállításaid megmaradnak), és újraindul, így a kliens
+mindig a legújabb verzióval beszél; ha bármi nem sikerül, egyszerűen a jelenlegivel indul. A kapcsoló nélkül csak egy
+egysoros „újabb verzió érhető el” megjegyzést tesz a munkamenet első válasza végére. Csak a callgraph saját mappájába
+ír; minden frissítés-ellenőrzés kikapcsolható: `CALLGRAPH_UPDATE_CHECK=0`.
 Receptek, paraméterek, biztonság: [`docs/MCP.md`](docs/MCP.md).
 Futás közben az MCP-szerver figyeli a betöltött projekteket, és a változott fájlokat magától frissíti.
 
