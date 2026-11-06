@@ -69,6 +69,9 @@ Előre-frissítés (git pull vagy sok szerkesztés után, hogy a következő lek
                                                 a többi beállítás marad, előtte settings.json.bak mentés készül
   Az MCP-szerver (callgraph mcp) a betöltött projekteket figyeli, és a változott fájlokat magától frissíti
   (kikapcsolás: CALLGRAPH_WATCH=0).
+  Az MCP-szerver regisztrálása a Claude Code-ban: bash ~/.claude/skills/callgraph/install.sh --mcp (interaktív
+  futásnál rákérdez; eltávolítás: claude mcp remove -s user callgraph). A szerver rövid használati útmutatót küld a
+  kliensnek (melyik eszköz mire, hogyan olvasd a kimenetet); a guide eszköze a teljes SKILL.md-t adja.
 
 Nyelv (a terminál-kimenet és a súgó nyelve: en = angol, alapértelmezett; hu = magyar):
   bash ~/.claude/skills/callgraph/callgraph.sh set-lang                 az aktuális nyelv és a forrása

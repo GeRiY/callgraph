@@ -22,6 +22,11 @@ ugyanaz a tömör kimenet, amit a `callgraph show` kiír (ez a token-hatékony r
 | `framework_view` | `view` (`routes`\|`middleware`\|`validation`\|`jobs`\|`events`\|`providers`\|`magic`\|`di`\|`views`), `path`, `project?`, `full?` | framework-nézet | `show <út> --format <nézet>` |
 | `notes` (pilot) | `pattern?` (regex a szövegre / horgonyra; üres = mind), `path?`, `project?` | a fájlokhoz / metódusokhoz írt jegyzetek: `út[::metódus]  idő  📝 szöveg`, `[orphaned]`, ha a metódus már nincs | `show <út> --notes <minta>` |
 | `projects` | — | a regisztrált aliasok és gyökereik | `projects.sh list` |
+| `guide` | — | a teljes skill-útmutató (`SKILL.md` törzse, frontmatter nélkül) a beállított nyelven | `skill/SKILL.md` |
+
+Az eszköz-leírások (`tools/list`) rövidek, de mindegyikben van egy példa-hívás és a fő buktató (pl. `find_callers`:
+a név szerinti mintával kezdd; `method_body`: a `method` string vagy lista, alapból tömör, a `raw` adja a pontos
+szöveget; `outline`: a metódus a `method` paraméterbe megy, nem `path::method` alakban).
 
 - A `path` a projekt-gyökérhez képest értendő; elhagyva (ahol opcionális) a teljes gyökér.
 - A `project` egy regisztrált alias (`projects.sh add <alias> <út>`, a `projects.json`-ból); nélküle a gyökér a
@@ -29,6 +34,26 @@ ugyanaz a tömör kimenet, amit a `callgraph show` kiír (ez a token-hatékony r
 - **Kimeneti korlát:** mint a CLI-ben — 400 sor fölött a mappás outline `summary`-ra, az egyfájlos metódus-indexre
   vált (a küszöb: `CALLGRAPH_OUT_LIMIT`). A `full: true` a `--full` megfelelője, csak indokolt esetben.
 - A nyelv (angol / magyar) a szokásos beállítást követi: `CALLGRAPH_LANG` › `callgraph set-lang` › angol.
+
+## Használati útmutató a kliensnek (`instructions`, `guide`)
+
+A CLI-s agent a `SKILL.md`-ből tanulja meg a használatot; MCP-n ez nincs meg, ezért a szerver az `initialize`
+válaszának `instructions` mezőjében tömör útmutatót küld (kb. 35 sor, ~3,5 KB; a Claude Code ezt az agent
+rendszer-promptjába teszi): melyik eszköz mire, szokásos menet (`outline` → `method_body` → `find_callers`), a
+hívók keresése a név szerinti mintával (`(^|::|\.|->)név$`) és a `Típus::metódus` korlátja, a keresőkimenet olvasása
+(`root:` / `gyökér:` sor, `L12 │ kód`, `via <Típus>`, `?::név`, `… +N more`), a tömör törzs vs. `doc` / `raw`, a
+kimeneti korlát és a statikus elemzés korlátai.
+
+- **Egy forrás:** a szöveg a skill-utasítás forrásából készül (`skill/skill-i18n/SKILL.en.md` / `SKILL.hu.md`,
+  fordításkor beágyazva, `src/mcp/guide.rs`). Az oda tartozó szakaszokat `<!-- mcp:<név> -->` … `<!-- /mcp -->`
+  jelöli (`tools`, `callers`, `output`, `limits`; az útmutatóban ebben a sorrendben). A `tools` szakasz a SKILL.md
+  „MCP server” fejezete; a többi a CLI-szövegből jön, a CLI-kapcsolók az MCP-nevekre cserélve (`--grep` →
+  `find_callers`, `--body` → `method_body`, `--raw` → `raw: true`, `--depth` → `depth`, …). Teszt őrzi, hogy mindkét
+  nyelvben minden szakasz pontosan egyszer szerepel, a szöveg a méretkereten belül van, és nem marad benne
+  CLI-kapcsoló.
+- **Nyelv:** mint a CLI-é (`CALLGRAPH_LANG` › `callgraph set-lang` › angol).
+- **`guide` eszköz:** a teljes `SKILL.md`-törzs a beállított nyelven, a beágyazott forrásból (nem a fájlrendszerből),
+  a jelölő-sorok nélkül — ha az agentnek a hosszú forma kell (nyelvenkénti részletek, formátumok, CLI-példák).
 
 ## Biztonság
 
@@ -59,7 +84,15 @@ projektmappában indítja a szervert.
 
 ### Claude Code
 
-macOS / Linux (az `uname` alapján a géphez illő binárist választja; `-s user`: minden projektben elérhető):
+**A telepítővel:** a `bash install.sh` a hook-kérdés után — ha a `claude` parancs a PATH-on van — rákérdez, hogy
+regisztrálja-e az MCP-szervert (alapból nem; nem interaktívan csak a `--mcp` kapcsolóval, a `--no-mcp` kérdés nélkül
+kihagyja). Ilyenkor ezt futtatja: `claude mcp add -s user callgraph -- "<a platform binárisának abszolút útja>" mcp`
+(Windows Git Bashben az út `cygpath -w`-vel Windows-alakú). Idempotens: ha a `claude mcp get callgraph` már ezt az
+utat mutatja, nem nyúl hozzá; más úttal regisztráltat előbb eltávolít (`claude mcp remove -s user callgraph`), aztán
+újra felvesz. Ha a lépés nem sikerül, csak figyelmeztet és kiírja a kézi parancsot — a telepítés nem áll le.
+Eltávolítás: `claude mcp remove -s user callgraph`. Utána indítsd újra a Claude Code-ot.
+
+**Kézzel**, macOS / Linux (az `uname` alapján a géphez illő binárist választja; `-s user`: minden projektben elérhető):
 
 ```bash
 claude mcp add -s user callgraph -- \

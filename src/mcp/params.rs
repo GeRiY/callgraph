@@ -89,7 +89,7 @@ impl OneOrMany {
 pub(crate) struct MethodBodyParams {
     /// File path, relative to the project root.
     pub path: String,
-    /// Method/function name, or an array of names.
+    /// Method/function name (`"cancel"`), or an array of names (`["cancel", "refund"]`).
     pub method: OneOrMany,
     /// Registered project alias; default: the server's working directory.
     #[serde(default)]
@@ -97,7 +97,7 @@ pub(crate) struct MethodBodyParams {
     /// Also include the docblock / doc comments above each method.
     #[serde(default)]
     pub doc: bool,
-    /// Exact, unfiltered source (docblock and blank lines kept).
+    /// Exact, unfiltered source (docblock and blank lines kept), e.g. before an exact edit.
     #[serde(default)]
     pub raw: bool,
     /// Disable the 400-line output cap.
@@ -108,7 +108,8 @@ pub(crate) struct MethodBodyParams {
 /// `find_callers`: hívók / hatáselemzés.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, JsonSchema)]
 pub(crate) struct FindCallersParams {
-    /// What is called, e.g. `Order::cancel`, `useForm.js::submit`, `route::orders.show`, `Repo::find`.
+    /// What is called (regex on the callee): start with `(^|::|\.|->)cancel$` (every call of the name);
+    /// `Order::cancel` = only calls resolved to that type; JS keys: `useForm.js::submit`, `route::orders.show`.
     pub pattern: String,
     /// Search scope (file or directory) relative to the project root; default: the whole root.
     #[serde(default)]
