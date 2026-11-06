@@ -106,8 +106,6 @@ Every release with its date, newest first: what was added, changed and fixed. Do
 
 - **Bug reporting via GitHub:** bilingual issue forms (bug report, idea / feedback), a private security report link and `SECURITY.md`. Error messages now point to the bug form; `feedback.sh show <error-id>` prints the details to paste.
 
-- **English skill instructions:** `SKILL.md` now exists in English and Hungarian (`skill/skill-i18n/SKILL.<en|hu>.md`). The skill follows the language: `callgraph.sh set-lang <en|hu>` rewrites `SKILL.md` in that language (the other one disappears); the first install (`install.sh` → new `callgraph skill-sync`) and `update` keep the user's language. Restart Claude Code to reload the skill.
-
 - **Release checksums:** every release has a `SHA256SUMS` asset (`sha256sum` format, all assets). `update` verifies the downloaded zip's SHA-256 before installing and installs nothing on a mismatch; a release without `SHA256SUMS` (v0.1.0) is refused unless `--insecure-skip-checksum` is given. `update --from <zip>` checks `--sha256 <hex>` or a `SHA256SUMS` next to the zip, otherwise it warns in one line and installs.
 
 - **MCP server mode:** `callgraph mcp` runs a Model Context Protocol server on stdio (official Rust SDK `rmcp`), so Claude Desktop, Cursor, VS Code or any MCP client can use callgraph. Tools: `outline`, `method_body`, `find_callers`, `search`, `framework_view`, `projects` — the same compact text and output cap as the CLI. Read-only, no network, paths confined to the project root. The skill / CLI usage is unchanged. Setup recipes: `docs/MCP.md`.
@@ -124,19 +122,11 @@ Every release with its date, newest first: what was added, changed and fixed. Do
 
 ### Changed
 
-- **Faster builds:** `tools/dev.sh check` / `test` / `clippy` use the debug profile (like CI now; `check-release` keeps the LTO variant), the dev container shares one build cache across all checkouts (`CALLGRAPH_DEV_TARGET`), and CI caches the compiled dependencies (`Swatinem/rust-cache`) and runs clippy + tests without LTO. The released binaries are built exactly as before (release profile, LTO).
-
 - **Shorter result lists:** when the project root would repeat on many lines (`--grep`, `--depth`, `--strings`, `--const`, folder outlines, framework views…), the first line is now `root: /abs/path/to/project` and every path after it is relative to that root. Outputs with a single path, and the machine formats (`json`, `mermaid`, `dot`, `callers`), are unchanged.
-
-- The committed / packaged default `SKILL.md` is now English (generated from `skill-i18n/SKILL.en.md`).
 
 - `SKILL.md` now recommends finding callers by name (`--grep '(^|::|\.|->)name$'`), which also catches inherited, trait and unknown-receiver calls; `Type::method` is for narrowing a common name. It also explains the new search output (`root:` line, `L<n> │ code`, `via`, `?::`) and the new Rust / JS options.
 
 - `--const` also lists the matching constant definitions (marked `[definition]`), not only the references.
-
-- Version lookup for `update` / `update --check` uses the `releases/latest` redirect instead of the GitHub API, so the API rate limit (HTTP 403) no longer applies.
-
-- The project page moved to the `gh-pages` branch ([https://geriy.github.io/callgraph/](https://geriy.github.io/callgraph/)); page edits no longer touch `main`.
 
 ### Fixed
 
