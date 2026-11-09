@@ -370,7 +370,8 @@ fn route_terms_match_equal_strings_and_the_definition_in_routes() {
     let mut controller = graph("app/Http/Controllers/EventController.php");
     controller.strings.push(string(8, "events.show"));
     let mut nav = graph("resources/js/nav.js");
-    nav.calls.push(call("nav", "goEvent", 2, "route::events.show"));
+    nav.calls
+        .push(call("nav", "goEvent", 2, "route::events.show"));
     let mut other = graph("app/Show.php");
     other.containers.push(container("EventsShow", 1, 9));
     let terms = Term::parse_all(&["route::events.show"]);
@@ -396,7 +397,8 @@ fn route_terms_match_equal_strings_and_the_definition_in_routes() {
 #[test]
 fn a_phrase_matches_strings_as_a_whole() {
     let mut lang = graph("lang/hu.php");
-    lang.strings.push(string(3, "Szervező\n  további eseményei"));
+    lang.strings
+        .push(string(3, "Szervező\n  további eseményei"));
     lang.strings.push(string(4, "Eseményeim"));
     let mut vue = graph("resources/js/Pages/Events.vue");
     vue.containers.push(container("Eseményei", 1, 9));

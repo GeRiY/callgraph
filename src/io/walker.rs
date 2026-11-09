@@ -214,7 +214,11 @@ impl FileWalker {
             let Some(name) = name.to_str() else {
                 return false;
             };
-            if self.skip_names_for(&at).iter().any(|skipped| skipped == name) {
+            if self
+                .skip_names_for(&at)
+                .iter()
+                .any(|skipped| skipped == name)
+            {
                 return false;
             }
             let child = at.join(name);

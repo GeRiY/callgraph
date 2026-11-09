@@ -209,8 +209,7 @@ mod tests {
         }
 
         fn walker(gitignore: bool) -> FileWalker {
-            FileWalker::for_registry(&LanguageRegistry::with_defaults())
-                .with_gitignore(gitignore)
+            FileWalker::for_registry(&LanguageRegistry::with_defaults()).with_gitignore(gitignore)
         }
 
         /// A bejárt fájlok a gyökérhez relatívan, `/`-rel, rendezve.

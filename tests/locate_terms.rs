@@ -33,9 +33,10 @@ impl Project {
     fn locate(&self, args: &[&str]) -> String {
         let out = Command::new(env!("CARGO_BIN_EXE_callgraph"))
             .arg("locate")
-            .args(args)
+            // a `--project` elöl: a `--` után minden argumentum kifejezés
             .arg("--project")
             .arg(&self.0)
+            .args(args)
             .current_dir(&self.0)
             .env("CALLGRAPH_LANG", "en")
             .env("CALLGRAPH_UPDATE_CHECK", "0")

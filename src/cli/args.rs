@@ -962,7 +962,9 @@ mod tests {
             .to_vec();
         assert!(take_no_gitignore(&mut args));
         assert_eq!(args, ["show", "src"]);
-        let mut args: Vec<String> = ["locate", "--", "--no-gitignore"].map(String::from).to_vec();
+        let mut args: Vec<String> = ["locate", "--", "--no-gitignore"]
+            .map(String::from)
+            .to_vec();
         assert!(!take_no_gitignore(&mut args));
         assert_eq!(args.len(), 3);
         let mut args: Vec<String> = ["--no-gitignore", "locate", "x", "--", "--no-gitignore"]
@@ -1006,7 +1008,10 @@ mod tests {
         assert_eq!(parse(&["-V"]).unwrap(), CliArgs::Version);
         assert_eq!(parse(&["version"]).unwrap(), CliArgs::Version);
         // több argumentummal a `version` egy elemzendő út (mint eddig)
-        assert!(matches!(parse(&["version", "x"]).unwrap(), CliArgs::Analyze { .. }));
+        assert!(matches!(
+            parse(&["version", "x"]).unwrap(),
+            CliArgs::Analyze { .. }
+        ));
         assert_eq!(
             parse(&["mcp"]).unwrap(),
             CliArgs::Mcp { auto_update: false }
