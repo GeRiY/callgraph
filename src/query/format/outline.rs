@@ -174,8 +174,8 @@ fn heading_level(m: &Method) -> Option<usize> {
 
 /// A tag neve után `()`, ha hívható; a CSS-szabály / at-szabály, a JSON-kulcs és a Markdown-címsor nem az.
 pub(super) fn parens(m: &Method) -> &'static str {
-    let plain = matches!(m.kind.as_deref(), Some("rule" | "at-rule" | "key"))
-        || heading_level(m).is_some();
+    let plain =
+        matches!(m.kind.as_deref(), Some("rule" | "at-rule" | "key")) || heading_level(m).is_some();
     if plain { "" } else { "()" }
 }
 

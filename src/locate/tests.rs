@@ -256,7 +256,10 @@ fn json_keys_match_exactly_by_full_path_or_last_segment() {
             .map(|h| (h.kind, h.symbol.clone()))
             .collect()
     };
-    assert_eq!(found(0), [json_key("devDependencies.laravel-vite-plugin", 2)]);
+    assert_eq!(
+        found(0),
+        [json_key("devDependencies.laravel-vite-plugin", 2)]
+    );
     assert_eq!(found(1), [json_key("scripts.build", 1)]);
     // csak pontos egyezés: a név-részlet és az érték nem illeszkedik
     assert!(found(2).is_empty(), "{hits:?}");

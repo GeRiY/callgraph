@@ -11,7 +11,10 @@ fn outline(path: &str, text: &str) -> String {
     let language = LanguageRegistry::with_defaults();
     let file = SourceFile::new(path, text.as_bytes().to_vec(), None);
     let analyzer = language.for_path(std::path::Path::new(path)).unwrap();
-    let rows = [QueryResult::new(analyzer.analyze(&file).unwrap().graph, None)];
+    let rows = [QueryResult::new(
+        analyzer.analyze(&file).unwrap().graph,
+        None,
+    )];
     FormatterRegistry::with_defaults()
         .in_lang(Lang::En)
         .render_with("outline", &rows, None, None)
