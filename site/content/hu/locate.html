@@ -1,0 +1,77 @@
+<section class="hero page" aria-labelledby="title">
+  <div>
+    <h1 id="title">locate: honnan induljon egy kódolási feladat</h1>
+    <p class="lead">Add át a <code>locate</code>-nek egy hívásban a feladat neveit és fogalmait. A projekt-térképből
+      válaszol, a forrás beolvasása nélkül: rövid, rangsorolt lista azokról a fájlokról, amiket először érdemes
+      megnyitni — a legjobbal kezdve, mindegyik az indoklásával.</p>
+    <div class="cta">
+      <a class="btn primary" href="/hu/#install">Telepítés</a>
+      <a class="btn" href="/hu/mcp/">A <code>locate</code> MCP-eszköz</a>
+    </div>
+  </div>
+</section>
+
+<section id="example" aria-labelledby="h-example">
+  <h2 id="h-example">Példa</h2>
+  <p>Függvény-, osztály- és fájlnevek, oszlopnevek, útvonalak — mind egyszerre:</p>
+```
+bash ~/.claude/skills/callgraph/callgraph.sh locate RefundController processRefund refund payment_status checkout.vue --project myapp
+```
+  <p class="label">Kimenet (rövidítve)</p>
+```out
+locate: 5 kifejezés · 14 találat 6 fájlban · innen indulj ↓
+1. app/Http/Controllers/RefundController.php  ★★★
+   class RefundController  L6-16  ← "RefundController", "refund" (pontos class)
+   store()  L14  hívja: RefundService::processRefund  ← "processRefund" (hívás)
+2. app/Services/RefundService.php  ★★
+   processRefund()  L6-9  hívók: 2 (RefundController::store, RefundJob::handle)  ← "processRefund", "refund" (pontos metódus)
+…
+```
+  <p>Minden fájl mellett ott vannak az illeszkedő osztályok vagy metódusok, a sortartományuk és az egyező kifejezések,
+    így az agent egyből a jó hely <a href="/hu/#usage">outline</a>-jára vagy <code>--body</code>-jára léphet.</p>
+</section>
+
+<section id="ranking" aria-labelledby="h-ranking">
+  <h2 id="h-ranking">Hogyan rangsorol</h2>
+  <ul>
+    <li>Az egyezés annál többet ér, minél erősebb: pontos definíció, aztán fájlnév, aztán egy név része
+      (<code>refund</code> ~ <code>RefundJob</code>, <code>refunds_table</code>, egyes / többes szám), aztán
+      string-literál, végül hívás.</li>
+    <li>Az a fájl, amelyik több különböző kifejezésre illik, előrébb kerül, mint amelyik egyre sokszor.</li>
+    <li>Alapból 5 fájl látszik; a <code>--all</code> minden találatot listáz.</li>
+    <li>A végén a találat nélküli és a túl általános kifejezések.</li>
+  </ul>
+  <p><b>Tipp:</b> a nem angol szakmai szó mellé add meg az angol kódbeli nevét is (pl. a <i>visszatérítés</i> mellé a
+    <code>refund</code>-ot).</p>
+</section>
+
+<section id="grep" aria-labelledby="h-grep">
+  <h2 id="h-grep">locate, grep vagy callgraph?</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th scope="col">A kérdés</th><th scope="col">Ezt használd</th></tr></thead>
+    <tbody>
+      <tr><td>Pontos string, naplóüzenet vagy konfig-érték</td><td>grep — a sima szövegkeresés ebben a legjobb</td></tr>
+      <tr><td>Honnan induljak ezzel a feladattal?</td><td><code>locate</code></td></tr>
+      <tr><td>Definíciók, szerkezet, hívók, hatás</td><td>callgraph: outline, <code>--body</code>, <code>--grep</code>, <code>--depth</code></td></tr>
+    </tbody>
+  </table></div>
+  <p>Egy feladat szokásos menete: <code>locate</code> → a legjobb fájlok outline-ja → <code>--body</code> csak a
+    szükséges metódusra → <code>--grep</code> a hívóihoz.</p>
+</section>
+
+<section id="mcp" aria-labelledby="h-mcp">
+  <h2 id="h-mcp">MCP-n át</h2>
+  <p>A <code>locate</code> eszköz a <code>terms</code> paramétert (egy string vagy lista), egy opcionális
+    <code>project</code> aliast és az <code>all: true</code>-t (minden találat) kapja. A szerver kapcsolódáskor küldött
+    útmutatója azt kéri az agenttől, hogy ez legyen a feladat első hívása. <a href="/hu/mcp/">Az MCP-szerver beállítása</a>.</p>
+</section>
+
+<section id="related" aria-labelledby="h-related">
+  <h2 id="h-related">Kapcsolódó oldalak</h2>
+  <div class="grid">
+    <a class="card" href="/hu/profile/"><h3>Projekt-profil</h3><p>Ismeretlen projektben előbb ezt futtasd egyszer.</p></a>
+    <a class="card" href="/hu/php/"><h3>PHP</h3><p>Outline, hívók és Laravel- / Yii-nézetek.</p></a>
+    <a class="card" href="/hu/typescript/"><h3>TypeScript / Vue</h3><p>Route-ok, i18n-kulcsok és komponensek mint keresőkulcsok.</p></a>
+    <a class="card" href="/hu/changelog/#v0.5.0"><h3>Újdonság a v0.5.0-ban</h3><p>A <code>locate</code> a 0.5.0-val érkezett.</p></a>
+  </div>
+</section>

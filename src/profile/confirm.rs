@@ -1,7 +1,9 @@
 //! C jel: megerősítés a már kész gráfból — az öröklés / interfész / trait (közvetlen és a hatókör
-//! típus-hierarchiáján át tranzitív ősök), és néhány árulkodó hívás (Vue / Pinia `defineStore`). Csak megerősít
-//! (a bizonyosság magasra nő); szerepet nem ad és nem vesz el, így a `--layer` szűrő (ami csak az utat nézi) és a
-//! profil ugyanazt a besorolást látja.
+//! típus-hierarchiáján át tranzitív ősök), néhány árulkodó hívás (Vue / Pinia `defineStore`), és egy névtérben lévő
+//! metódus (Laravel listener: `handle(OrderShipped $e)` a `Listeners` névtérben). Általában csak megerősít (a
+//! bizonyosság magasra nő); a kód-jelet kívánó szerepeknél (`event`, `listener`, `job`) a profil megerősítés nélkül
+//! a tartalék besorolást használja (`Classification::fallback`). A `--layer` szűrő (csak az út) ezeket a mappanévből
+//! adja.
 
 use std::collections::HashSet;
 
@@ -11,11 +13,13 @@ use crate::model::FileGraph;
 use super::role::Role;
 
 /// Egy megerősítő szabály: a szerep, az ősök rövid nevei (kisbetűvel; `*x` = `x`-re végződő), az árulkodó hívások
-/// rövid nevei, és a profilban kiírt címke.
+/// rövid nevei, a metódus-jel (név, legalább egy paraméterrel, a megadott névtér-szegmensben), és a kiírt címke.
 pub(crate) struct ConfirmRule {
     pub role: &'static str,
     pub ancestors: &'static [&'static str],
     pub calls: &'static [&'static str],
+    pub methods: &'static [&'static str],
+    pub namespace: Option<&'static str>,
     pub label: &'static str,
 }
 
@@ -29,6 +33,25 @@ const fn rule(
         role,
         ancestors,
         calls,
+        methods: &[],
+        namespace: None,
+        label,
+    }
+}
+
+/// Metódus-jel: a `namespace` szegmensű (kisbetűvel) névtérben egy `methods` nevű, paraméteres metódus.
+const fn method_rule(
+    role: &'static str,
+    methods: &'static [&'static str],
+    namespace: &'static str,
+    label: &'static str,
+) -> ConfirmRule {
+    ConfirmRule {
+        role,
+        ancestors: &[],
+        calls: &[],
+        methods,
+        namespace: Some(namespace),
         label,
     }
 }
@@ -56,6 +79,41 @@ pub(crate) static CONFIRM_RULES: &[ConfirmRule] = &[
     ),
     rule("request", &["formrequest"], &[], "extends FormRequest"),
     rule("job", &["shouldqueue"], &[], "implements ShouldQueue"),
+    rule(
+        "job",
+        &["dispatchable", "*job", "*jobinterface"],
+        &[],
+        "uses Dispatchable / extends *Job",
+    ),
+    rule(
+        "event",
+        &[
+            "dispatchable",
+            "shouldbroadcast",
+            "shouldbroadcastnow",
+            "*event",
+            "*eventinterface",
+        ],
+        &[],
+        "uses Dispatchable / extends *Event",
+    ),
+    rule(
+        "listener",
+        &[
+            "*listener",
+            "*listenerinterface",
+            "*subscriber",
+            "*subscriberinterface",
+        ],
+        &[],
+        "implements *Listener / *Subscriber",
+    ),
+    method_rule(
+        "listener",
+        &["handle", "__invoke", "subscribe"],
+        "listeners",
+        "handle(…) in Listeners",
+    ),
     rule("command", &["command"], &[], "extends Command"),
     rule(
         "provider",
@@ -116,8 +174,25 @@ pub(crate) fn confirm(
                 .iter()
                 .any(|wanted| ancestors.iter().any(|name| matches(wanted, name)))
                 || rule.calls.iter().any(|wanted| calls.contains(*wanted))
+                || method_signal(rule, graph)
         })
         .map(|rule| rule.label)
+}
+
+/// A szabály metódus-jele: a névtér egyik szegmense (kisbetűvel) a megadott, és van ilyen nevű, paraméteres metódus.
+fn method_signal(rule: &ConfirmRule, graph: &FileGraph) -> bool {
+    let Some(wanted) = rule.namespace else {
+        return false;
+    };
+    let in_namespace = graph
+        .namespace
+        .as_deref()
+        .is_some_and(|ns| ns.split('\\').any(|s| s.eq_ignore_ascii_case(wanted)));
+    in_namespace
+        && graph
+            .methods
+            .iter()
+            .any(|m| !m.params.is_empty() && rule.methods.contains(&m.name.as_str()))
 }
 
 /// `*x`: `x`-re végződik; különben pontos egyezés (kisbetűvel).

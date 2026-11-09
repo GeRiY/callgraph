@@ -4,8 +4,9 @@ mod args;
 mod command;
 pub mod commands;
 mod profile_args;
+mod stats_args;
 
-pub use args::{CliArgs, HookAction, NoteAction};
+pub use args::{CliArgs, HookAction, NO_GITIGNORE_FLAG, NoteAction, take_no_gitignore};
 pub use command::Command;
 pub use profile_args::LayerArgs;
 
@@ -108,11 +109,18 @@ pub fn build_command(args: CliArgs) -> Result<Box<dyn Command>> {
             crate::skill::SkillHome::from_env(),
         ))),
         CliArgs::Version => Ok(Box::new(commands::VersionCommand)),
-        CliArgs::Profile { project, full } => Ok(Box::new(commands::ProfileCommand::new(
-            project,
-            full,
+        CliArgs::Stats { days } => Ok(Box::new(commands::StatsCommand::new(
+            days,
             crate::skill::SkillHome::from_env(),
         ))),
+        CliArgs::Profile {
+            project,
+            full,
+            with_vendor,
+        } => Ok(Box::new(
+            commands::ProfileCommand::new(project, full, crate::skill::SkillHome::from_env())
+                .with_vendor(with_vendor),
+        )),
         CliArgs::Mcp { auto_update } => Ok(Box::new(commands::McpCommand::new(
             crate::skill::SkillHome::from_env(),
             auto_update,

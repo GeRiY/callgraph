@@ -9,6 +9,9 @@
 # `callgraph.sh locate <term>… [--all] [--project alias]` lists where to start with a task (ranked files + reasons;
 # forwarded to `callgraph locate`).
 # `callgraph.sh profile [--project alias] [--full]` prints the project profile (forwarded to `callgraph profile`).
+# `callgraph.sh stats [--days N]` shows the local usage stats (forwarded to `callgraph stats`; nothing is sent anywhere).
+# `callgraph.sh --version` (or `-V`, `version`) prints the binary's version and platform, and the binary's path.
+# `--no-gitignore` with any command: the .gitignore files are not applied (.callgraphignore still is).
 # Help: skill/help/callgraph.en.txt and skill/help/callgraph.hu.txt (`callgraph.sh --help`).
 
 set -uo pipefail
@@ -46,6 +49,18 @@ if [[ "${1:-}" == --project && "${3:-}" == profile ]]; then
 fi
 if [[ "${1:-}" == profile ]]; then
     run_callgraph "$@"
+fi
+# helyi használati statisztika: `callgraph.sh stats [--days N]` → `callgraph stats …` (hálózat nincs)
+if [[ "${1:-}" == stats ]]; then
+    run_callgraph "$@"
+fi
+# verzió: `callgraph.sh --version|-V|version` → `callgraph --version` + a bináris helye (nem a show-súgó)
+if [[ $# -eq 1 && ( "$1" == --version || "$1" == -V || "$1" == version ) ]]; then
+    bin="$(callgraph_bin)"
+    [[ -n "$bin" ]] || run_callgraph --version   # nincs bináris: a run_callgraph hibaüzenete, kilépési kód 1
+    CALLGRAPH_SKILL_DIR="$LIB_DIR" "$bin" --version || exit $?
+    msg "binary: $bin" "bináris: $bin"
+    exit 0
 fi
 for a in "$@"; do
     case "$a" in --help|-h|help) print_help "${BASH_SOURCE[0]}"; exit 0 ;; esac

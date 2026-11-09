@@ -1,5 +1,6 @@
 //! `callgraph wrap …` — a `callgraph.sh` burok logikája: projekt-alias feloldása, `show` futtatása,
-//! hibánál error-id-s naplózás, utána az automatikus frissítés-ellenőrzés (`update::check`: naponta legfeljebb
+//! belső hibánál error-id-s naplózás (a felhasználói hiba — hibás kapcsoló, rétegnév, nem létező fájl — csak az
+//! üzenet), utána az automatikus frissítés-ellenőrzés (`update::check`: naponta legfeljebb
 //! egy háttérfolyamat, újabb verziónál egysoros értesítés a kimenet végén). A burok csak a súgót írja ki és ide továbbít.
 
 use std::io::Write;
@@ -125,10 +126,15 @@ impl WrapCommand {
         show.extend(p.targets);
         // a show hibaszövege (stderr) lesz az üzenet; sikeres futásnál a stderr-t a régi burok is eldobta
         let mut captured = Vec::new();
+        // 2 = felhasználói hiba (a `show` így jelzi: hibás kapcsoló, rétegnév, nem létező fájl), 1 = belső hiba
         let code = match CliArgs::parse(show).and_then(build_command) {
             Ok(command) => command.run(out, &mut captured).or_else(|e| {
                 writeln!(captured, "{e}")?;
-                Ok::<i32, crate::error::CallgraphError>(1)
+                let code = match e {
+                    crate::error::CallgraphError::Usage(_) => 2,
+                    _ => 1,
+                };
+                Ok::<i32, crate::error::CallgraphError>(code)
             })?,
             Err(e) => {
                 writeln!(captured, "{e}")?;
@@ -143,8 +149,10 @@ impl WrapCommand {
             .to_owned();
         if NOT_FOUND_PREFIXES.iter().any(|p| message.starts_with(p)) {
             Err(SkillFailure::not_found(message))
-        } else {
+        } else if code == 2 {
             Err(SkillFailure::usage(message))
+        } else {
+            Err(SkillFailure::internal(message))
         }
     }
 

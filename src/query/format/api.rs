@@ -23,6 +23,7 @@ impl Formatter for Api {
                     .unwrap_or_default()
             )
             .unwrap();
+            out.push_str(&super::parse_error_lines(&row.graph, lang));
             out.push('\n');
             if row.graph.containers.is_empty() {
                 out.push_str(lang.pick(

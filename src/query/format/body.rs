@@ -52,9 +52,10 @@ impl Formatter for Body {
                     has_doc: method.doc.is_some(),
                 };
                 let source = method_source(&lines, syntax, span, self.mode);
+                let parens = super::outline::parens(method);
                 write!(
                     out,
-                    "== {}  {container}::{}()  L{}-{end}",
+                    "== {}  {container}::{}{parens}  L{}-{end}",
                     row.graph.file, method.name, method.line
                 )
                 .unwrap();

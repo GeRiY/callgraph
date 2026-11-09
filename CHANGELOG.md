@@ -5,6 +5,103 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+## [0.5.1] — 2026-11-09
+
+### Added
+- **Local usage stats:** `callgraph.sh stats` shows how you (and your agents) used callgraph in the last 7 days
+  (`--days N` for up to 90): how many calls per command and MCP tool, how many failed, how long they took and how big
+  the output was, and for `locate` how often the first result was the file the agent opened next. Everything stays on
+  your computer: nothing is sent anywhere, and no paths, names or search terms are recorded — only counts in ranges.
+  The data is in the skill folder (`stats/`, about 90 days); turn it off with `CALLGRAPH_STATS=0`.
+- **`--no-gitignore`:** add it to any command (show, folder views, `locate`, `profile`, `refresh`, `callers`) to also
+  map the files your `.gitignore` excludes; for the MCP server and the hook set `CALLGRAPH_GITIGNORE=0`.
+  `.callgraphignore` and the always-skipped folders (`vendor`, `node_modules`, …) still apply.
+- **`locate route::events.show`:** finds a route by its name: the definition (`->name('events.show')` in
+  `routes/*.php`) comes first, then every `route('events.show')`, `to_route(…)` and `redirect()->route(…)` in PHP and
+  JavaScript / TypeScript / Vue. If nothing is found, it says what it looked for.
+- **`callgraph.sh --version`** (also `-V` and `version`) prints the version, the platform and where the binary is.
+
+### Changed
+- **`.callgraphignore` accepts paths:** a line like `md`, `.md` or `*.md` still skips an extension, and every other
+  line is now a path pattern written like in `.gitignore` (`public/build/`, `/storage/`, `!keep.js`), relative to the
+  folder of the file. A bare word such as `build` is still an extension; write `build/` for a folder.
+- **`locate` ranks exact matches first:** a file whose class, component or function name (or file name) is one of the
+  terms now always comes before files that only contain the terms as text, such as translation files or build
+  output.
+- **A quoted phrase is one `locate` term:** `locate "Organizer's other events"` searches for the whole text in the
+  strings of the code (labels, translations) instead of splitting it into words that matched unrelated names.
+- **`locate` always shows a `root:` line** and paths relative to it, also when only one file matches.
+- **The profile lists the layers by file count:** the biggest layer comes first, so a main layer such as `model` no
+  longer hides behind `… +6 more layers` while layers with one or two files are shown.
+- **`--by-layer` shows a header for each layer:** every group of callers starts with a line such as
+  `[service]  3 calls`, in the normal and in the short ("one line per call") `--grep` view, and in every level of
+  `--depth`. The group closest to the called method comes first (model → repository → service → controller), as
+  the help says; before, only a `[service]` tag at the end of some lines showed the layer.
+- **User mistakes are no longer logged as tool errors:** a mistyped layer name, an unknown option or a file that does
+  not exist now prints just the message — no `[error-id: …]` line, no bug-report link, and nothing is written to
+  `errors.jsonl`. Real internal errors are still logged and get an error-id.
+- **JSON outlines show the values:** `scripts.build = "vite build"` and `devDependencies.vite = "^6.0"` instead of
+  just `string`; numbers, `true` / `false` and `null` as they are, strings over 60 characters cut with `…`, and
+  objects and lists with their size (`object (3)`, `array (2)`).
+- **Read one JSON key:** `callgraph.sh package.json::scripts --body` prints that key with its exact lines; use dots
+  for deeper keys (`scripts.build`) and numbers for list items (`files.0`). Before, it said "No such method".
+- **`locate` finds JSON keys:** `locate laravel-vite-plugin` now lists `package.json` with the line of the key. Only
+  the exact key name (or the whole dotted path) counts, so searches for other words do not fill up with JSON files.
+- **Markdown headings show their level:** the outline indents sub-headings and marks them with `#`, `##`, `###`, and
+  no longer writes `()` after a heading (`## Docker / build  L51-61`).
+- **CSS and SCSS rules are no longer written like functions:** `.p-toast  L29-31` instead of `.p-toast()`; mixins and
+  functions keep their `()`.
+
+### Fixed
+- **CSS outlines list every rule:** some rules were missing (a rule with the selector `.p-toast` was always left out,
+  and so was the first rule after `@charset`), and at-rules were not shown at all. Now every rule and at-rule is listed with its
+  lines: `@import`, `@tailwind`, `@media`, `@supports`, `@layer`, `@keyframes`, `@font-face`, and the Tailwind v4
+  `@theme`, `@utility`, `@custom-variant`, `@variant`, `@plugin`, `@source` and `@config`.
+- **CSS rules start on the right line:** a rule after a comment or another rule showed the line where the previous
+  rule ended (`.p-datepicker-panel  L31-41` instead of `L39-41`).
+- **CSS paths with `/*` inside quotes stay whole:** `@source '../**/*.blade.php'` was cut, because the `/*` in the
+  path was taken for the start of a comment.
+- **PHP and JavaScript layers are no longer mixed up in the profile:** in a project with PHP controllers and
+  AngularJS (or other JavaScript) controllers, the profile showed one `controller` layer with all of them. A role
+  that exists in more than one language is now shown apart, e.g. `controller (php)` and `controller (js)`, and the
+  call direction (`flow:`) no longer joins the backend and the frontend through a shared name such as `service`.
+  Projects with one language look exactly as before. `--layer controller` still finds both; `--layer controller:js`
+  (or `--layer "controller (js)"`) only the JavaScript ones.
+- **Third-party code no longer makes up the project's architecture:** an SDK or library copied into the project (a
+  subfolder with its own `composer.json`, `package.json` or `LICENSE`, or folders such as `vendors/`, `third_party/`,
+  `extensions/`, `external/`, `libs/`) gave the profile layers and patterns (Builder, Factory, Handler…) that the
+  project itself does not have. These files are now left out of the profile, and one line says so, e.g.
+  `vendor: 312 files skipped (extensions/Facebook, vendors/phpoffice, …)`. Searches and folder views still see them.
+  `profile --with-vendor` counts them again.
+- **Copies of build output are left out of the profile:** folders named `dist`, `build` or `*.min` (such as
+  `web/assets.min`) and minified files no longer count twice as layers; a `generated: N files skipped (…)` line shows
+  them.
+- **A folder named after a business topic is not an event layer:** `app/Services/Event` or a JavaScript
+  `controllers/event` folder became an `event` layer. `event`, `listener` and `job` now need proof in the code — an
+  Event / Listener / Subscriber base class or interface, Laravel's `Dispatchable` or `ShouldQueue`, or a `handle(…)`
+  method in a `Listeners` namespace; otherwise the file keeps its other role (`service`, `controller`, `model` for
+  `app/Models/Job.php`).
+- **Files your `.gitignore` excludes no longer show up:** the build output of a Laravel + Vite project
+  (`public/build/assets/app-CBW7lKWe.js`, listed in `.gitignore` as `/public/build`) appeared in `locate` and folder
+  views. `.gitignore` now works the way git reads it: patterns with a leading `/`, nested paths, `**`, `!` exceptions
+  and a `.gitignore` in any subfolder. The same rules apply everywhere callgraph looks at files, including the MCP
+  server's file watcher and the editor hook.
+- **Minified and bundled JavaScript / CSS is skipped even without a `.min.` name or a `.gitignore`:** a file whose
+  first lines are extremely long is recognised as generated and left out.
+- **`locate --orange-500`** (a CSS variable) was rejected as an unknown option; it is now searched for. The known
+  options (`--all`, `--project`) still work as before.
+- **`callgraph.sh --version`** printed the usage of `show` and logged an error.
+- **Files with a syntax error are no longer shown as if they were complete:** a file you are in the middle of editing,
+  or one with a merge conflict, could come back with no functions at all (JavaScript, TypeScript, Vue, Rust) or
+  without any notice (PHP, Swift). A search then said "no such method" or found no callers, which could make an agent
+  think the code was unused. Now the parts before the error are kept (functions `a` and `b` stay visible when `c` is
+  broken), and every result says so: `⚠ syntax error at L3: … — this file's outline may be incomplete` under the file,
+  a closing line such as `⚠ 2 files had syntax errors (results may be incomplete): src/tail.js L3, src/v.vue L4` when
+  a folder, a search (`--grep`, `--depth`), `locate` or `profile` read a broken file, `parseErrors` in `--format
+  json`, and a warning on the error output of `callers`. The exit code stays 0, because the rest of the result is
+  still correct and useful. Covers JavaScript, TypeScript, Vue, PHP, Rust, Swift and JSON (CSS, SCSS and Markdown
+  are read leniently and are not flagged).
+
 ## [0.5.0] — 2026-11-06
 
 ### Added
@@ -241,7 +338,8 @@ First release.
 - Built-in update: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Prebuilt packages for macOS (arm64, x86_64), Linux (x86_64, ARM64, static musl) and Windows.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.5.0...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.5.1...develop
+[0.5.1]: https://github.com/GeRiY/callgraph/releases/tag/v0.5.1
 [0.5.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.5.0
 [0.4.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.4.0
 [0.3.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.3.0

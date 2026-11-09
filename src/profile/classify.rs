@@ -9,6 +9,7 @@
 
 use std::path::Path;
 
+use super::layer::Layer;
 use super::layers_file::Overrides;
 use super::names::{NameHit, name_hit};
 use super::role::{Confidence, Kind, Role};
@@ -48,6 +49,16 @@ pub(crate) struct Classification {
     pub anchor: String,
     /// A minta példája a profilban: a mappa, vagy `mappa/*Végződés`.
     pub pattern_example: Option<String>,
+    /// Kód-jelet kívánó szerepnél (`event`, `listener`, `job`; lásd `role::CODE_SIGNAL_ROLES`) a besorolás e
+    /// szerepek nélkül: a profil ezt használja, ha a gráf nem erősíti meg a szerepet (vagy nincs gráf).
+    pub fallback: Option<Box<Classification>>,
+}
+
+impl Classification {
+    /// A réteg (szerep + ökoszisztéma), ha van szerep.
+    pub(crate) fn layer(&self) -> Option<Layer> {
+        self.role.map(|role| Layer::new(role, self.eco))
+    }
 }
 
 /// A név-alapú osztályozó; a projekt saját hozzárendeléseivel (`.callgraph-layers`).
@@ -83,8 +94,23 @@ impl Classifier {
         self.classify(rel).and_then(|c| c.role)
     }
 
+    /// Csak a réteg (szerep + ökoszisztéma).
+    pub(crate) fn layer_of(&self, rel: &str) -> Option<Layer> {
+        self.classify(rel).and_then(|c| c.layer())
+    }
+
     /// A projekt-gyökérhez relatív, `/`-rel elválasztott út besorolása; `None`, ha nem kódfájl (CSS, JSON, MD…).
+    /// Kód-jelet kívánó szerepnél a `fallback` is kitöltve (a `.callgraph-layers` hozzárendelésénél nem).
     pub(crate) fn classify(&self, rel: &str) -> Option<Classification> {
+        let mut class = self.classify_by(rel, false)?;
+        if class.reason != Reason::Override && class.role.is_some_and(Role::needs_code_signal) {
+            class.fallback = self.classify_by(rel, true).map(Box::new);
+        }
+        Some(class)
+    }
+
+    /// A besorolás; `strict`: a kód-jelet kívánó szerepek mappa- és névszabályai nélkül.
+    fn classify_by(&self, rel: &str, strict: bool) -> Option<Classification> {
         let (dir, file) = rel.rsplit_once('/').unwrap_or(("", rel));
         let (stem, ext) = file.rsplit_once('.')?;
         let eco = Eco::of_extension(ext)?;
@@ -101,11 +127,12 @@ impl Classifier {
                 pattern: mapping.role.and_then(|r| r.info().pattern),
                 anchor: mapping.prefix.clone(),
                 pattern_example: None,
+                fallback: None,
             });
         }
-        let name = name_hit(stem, eco);
+        let name = name_hit(stem, eco).filter(|hit| !(strict && hit.role.needs_code_signal()));
         // a DDD-kontextus mappa (`Domain/…`) csak akkor dönt, ha a fájlnév semmit sem mond
-        let folder = folder_hit(dir, eco)
+        let folder = folder_hit(dir, eco, strict)
             .filter(|folder| name.is_none() || folder.role.kind() != Kind::Context);
         let base = Classification {
             eco,
@@ -115,6 +142,7 @@ impl Classifier {
             pattern: None,
             anchor: dir.to_owned(),
             pattern_example: None,
+            fallback: None,
         };
         let example = |hit: &NameHit| hit.suffix.map(|s| suffix_example(dir, s));
         Some(match (folder, name) {
@@ -212,8 +240,8 @@ fn rule_matches(rule: &FolderRule, name: &str, parent: &str, eco: Eco) -> bool {
 }
 
 /// A mappák alapján: teszt-mappa bárhol → `test`; különben a legmélyebb nem-kontextus mappa, végül a legmélyebb
-/// kontextus-mappa.
-fn folder_hit(dir: &str, eco: Eco) -> Option<FolderHit> {
+/// kontextus-mappa. `strict`: a kód-jelet kívánó szerepek mappái nem számítanak.
+fn folder_hit(dir: &str, eco: Eco, strict: bool) -> Option<FolderHit> {
     if dir.is_empty() {
         return None;
     }
@@ -229,7 +257,8 @@ fn folder_hit(dir: &str, eco: Eco) -> Option<FolderHit> {
         let found = FOLDER_RULES
             .iter()
             .filter(|rule| rule_matches(rule, &normalized[at], parent, eco))
-            .find_map(|rule| Role::named(rule.role).map(|role| (role, rule.confidence)));
+            .find_map(|rule| Role::named(rule.role).map(|role| (role, rule.confidence)))
+            .filter(|(role, _)| !(strict && role.needs_code_signal()));
         if let Some((role, confidence)) = found {
             hits.push((at, role, confidence));
         }

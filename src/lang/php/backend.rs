@@ -31,7 +31,7 @@ impl<P: PhpParser> PhpBackend<P> {
     pub fn analyze_source(&self, path: &str, source: &[u8]) -> Analysis {
         self.parser.parse(path, source, |parsed| {
             let mut ctx = AnalysisContext::new(path);
-            ctx.warnings.extend(parsed.errors().iter().map(|e| {
+            ctx.warnings.extend(parsed.errors().iter().map(|(_, e)| {
                 crate::tf!(
                     "{path}: syntax error: {e}",
                     "{path}: szintaktikai hiba: {e}"
@@ -43,6 +43,9 @@ impl<P: PhpParser> PhpBackend<P> {
                 .filter(|p| !p.as_os_str().is_empty())
                 .unwrap_or_else(|| Path::new("."));
             builder.framework(detect_framework_name(dir));
+            for error in parsed.parse_errors() {
+                builder.parse_error(error);
+            }
             for v in &self.visitors {
                 v.visit(parsed, &mut ctx, &mut builder);
             }

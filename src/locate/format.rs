@@ -4,7 +4,7 @@
 
 use super::rank::{FileMatch, stars};
 use super::reasons::{describe, group, pick};
-use super::terms::Term;
+use super::terms::{Term, TermKind};
 
 /// Alapból ennyi fájl jelenik meg.
 pub(crate) const DEFAULT_FILES: usize = 5;
@@ -77,6 +77,19 @@ impl Report<'_> {
         if !missing.is_empty() {
             let list = missing.join(", ");
             out.push_str(&crate::tf!("no match: {list}\n", "nincs találat: {list}\n"));
+        }
+        // a találat nélküli útvonalnévnél: mit kerestünk
+        for (i, term) in self.terms.iter().enumerate() {
+            let TermKind::Route(name) = &term.kind else {
+                continue;
+            };
+            if files_per_term[i] == 0 {
+                out.push_str(&crate::tf!(
+                    "  {}: searched the definition ->name('{name}') in routes/*.php and the string '{name}' in PHP / JS / TS / Vue (route(), to_route(), redirect()->route() arguments)\n",
+                    "  {}: keresve a ->name('{name}') definíció a routes/*.php-ban és a '{name}' string a PHP / JS / TS / Vue fájlokban (route(), to_route(), redirect()->route() argumentumai)\n",
+                    term.raw
+                ));
+            }
         }
         let general = names(&|count| count > TOO_GENERAL);
         if !general.is_empty() {

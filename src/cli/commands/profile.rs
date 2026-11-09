@@ -1,8 +1,10 @@
-//! `callgraph profile [--project <alias|mappa>] [--full]`: a projekt-profil — architektúra, rétegek mappánként,
-//! tervezési minták, ismeretlen mappák és a rétegek közti hívásirány (`crate::profile`). Tömör (~15 sor)
-//! alapból; `--full`: mappánként, bizonyosság szerint, a hívásirány párjaival.
+//! `callgraph profile [--project <alias|mappa>] [--full] [--with-vendor]`: a projekt-profil — architektúra,
+//! rétegek mappánként, tervezési minták, ismeretlen mappák és a rétegek közti hívásirány (`crate::profile`). Tömör
+//! (~15 sor) alapból; `--full`: mappánként, bizonyosság szerint, a hívásirány párjaival; `--with-vendor`: a
+//! beágyazott külső kód sem marad ki.
 
 use std::io::Write;
+use std::path::Path;
 
 use crate::cli::Command;
 use crate::error::Result;
@@ -14,6 +16,7 @@ use crate::skill::SkillHome;
 pub struct ProfileCommand {
     project: Option<String>,
     full: bool,
+    with_vendor: bool,
     home: SkillHome,
 }
 
@@ -22,20 +25,49 @@ impl ProfileCommand {
         Self {
             project,
             full,
+            with_vendor: false,
             home,
         }
+    }
+
+    /// `--with-vendor`: a beágyazott külső kód (vendor) is számít a profilban.
+    pub fn with_vendor(mut self, on: bool) -> Self {
+        self.with_vendor = on;
+        self
     }
 }
 
 impl Command for ProfileCommand {
     fn run(&self, out: &mut dyn Write, _err: &mut dyn Write) -> Result<i32> {
         let root = super::project_root(&self.home, self.project.as_deref())?;
-        let profile = with_graph(&root);
+        let profile = with_graph(&root, self.with_vendor);
+        let lang = crate::i18n::lang();
+        write!(out, "{}", render(&profile, lang, self.full, Tip::Show))?;
+        // a gráf-alapú megerősítés hibás fájlnál hiányos: a záró `⚠` sor (hiba nélkül üres)
+        let issues = parse_issues(&root);
         write!(
             out,
             "{}",
-            render(&profile, crate::i18n::lang(), self.full, Tip::Show)
+            crate::query::format::parse_trailer(&issues, lang)
         )?;
         Ok(0)
     }
+}
+
+/// A projekt-gráfban (a `with_graph` frissítette) a szintaktikai hibás fájlok: gyökérhez relatív út, az első hiba
+/// sora, út szerint rendezve; gráf nélkül üres.
+fn parse_issues(root: &Path) -> Vec<(String, u32)> {
+    let root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
+    let Some(shared) = crate::graph::shared(&root) else {
+        return Vec::new();
+    };
+    let graph = crate::graph::lock(&shared);
+    graph
+        .tracked_under(&root)
+        .iter()
+        .filter_map(|key| {
+            let stored = graph.slim_graph(key)?;
+            crate::query::format::parse_issue(&root, Path::new(key), stored)
+        })
+        .collect()
 }

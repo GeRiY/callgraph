@@ -1,5 +1,7 @@
 //! A projekt-profil összesítése a fájlok besorolásából (fájlrendszer nélkül, tesztelhető): architektúra, rétegek
-//! mappánként és darabszámmal, minták példákkal, ismeretlen mappák, és (ha van gráf) a hívásirány.
+//! (szerep + ökoszisztéma) mappánként és darabszámmal, minták példákkal, ismeretlen mappák, és (ha van gráf) a
+//! hívásirány. A rétegek fájlszám szerint csökkenő sorrendben (azonos számnál név szerint), hogy a fő réteg a tömör
+//! nézetben se csússzon a `… +N további` mögé.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -7,7 +9,8 @@ use std::path::PathBuf;
 use super::architecture::{self, Architecture, RoleCounts};
 use super::classify::Classification;
 use super::flow::FlowStats;
-use super::role::{Confidence, Role};
+use super::layer::{Layer, Mixed};
+use super::role::{Confidence, Kind};
 
 /// Egy fájl a profilhoz: a relatív útja, a besorolása, és a gráfból jött megerősítés címkéje (C jel).
 #[derive(Debug, Clone)]
@@ -31,7 +34,9 @@ impl FileEntry {
 /// Egy réteg összesítése.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct LayerSummary {
-    pub role: Role,
+    pub layer: Layer,
+    /// A kiírt név: `controller`, vagy ha a szerep több ökoszisztémában is van: `controller (js)`.
+    pub label: String,
     pub files: usize,
     /// (mappa, fájlszám), csökkenő sorrendben.
     pub folders: Vec<(String, usize)>,
@@ -56,14 +61,20 @@ pub(crate) struct ProjectProfile {
     pub architectures: Vec<Architecture>,
     pub frameworks: Vec<String>,
     pub layers: Vec<LayerSummary>,
+    /// A több ökoszisztémában is előforduló szerepek (a réteg-nevek minősítőjéhez, a hívásirányban is).
+    pub mixed: Mixed,
     pub patterns: Vec<PatternSummary>,
     /// Az ismeretlen szerepű fájlok mappái (mappa, fájlszám), csökkenő sorrendben.
     pub unknown: Vec<(String, usize)>,
-    /// Kódfájlok száma (PHP, JS / TS / Vue, Swift, Rust).
+    /// Kódfájlok száma (PHP, JS / TS / Vue, Swift, Rust), a kihagyott vendor- és generált fájlok nélkül.
     pub files: usize,
     pub flow: Option<FlowStats>,
     /// A C jel (gráf) lefutott-e.
     pub graph_checked: bool,
+    /// A kihagyott vendor-kód (egység-mappa, fájlszám), csökkenő sorrendben.
+    pub vendor: Vec<(String, usize)>,
+    /// A kihagyott generált kód (mappa, fájlszám), csökkenő sorrendben.
+    pub generated: Vec<(String, usize)>,
     /// A `.callgraph-layers` helye és a fel nem ismert sorai.
     pub overrides: Option<PathBuf>,
     pub warnings: Vec<String>,
@@ -78,20 +89,21 @@ impl ProjectProfile {
         graph_checked: bool,
     ) -> Self {
         let mut counts: RoleCounts = HashMap::new();
-        let mut layers: HashMap<Role, LayerSummary> = HashMap::new();
-        let mut labels: HashMap<Role, HashMap<&'static str, usize>> = HashMap::new();
-        let mut folders: HashMap<Role, HashMap<&str, usize>> = HashMap::new();
+        let mut layers: HashMap<Layer, LayerSummary> = HashMap::new();
+        let mut labels: HashMap<Layer, HashMap<&'static str, usize>> = HashMap::new();
+        let mut folders: HashMap<Layer, HashMap<&str, usize>> = HashMap::new();
         let mut unknown: HashMap<&str, usize> = HashMap::new();
         let mut patterns: HashMap<&'static str, (usize, HashMap<&str, usize>)> = HashMap::new();
         for entry in entries {
             let class = &entry.class;
-            let Some(role) = class.role else {
+            let Some(key) = class.layer() else {
                 *unknown.entry(class.anchor.as_str()).or_default() += 1;
                 continue;
             };
-            *counts.entry((class.eco, role)).or_default() += 1;
-            let layer = layers.entry(role).or_insert_with(|| LayerSummary {
-                role,
+            *counts.entry((class.eco, key.role)).or_default() += 1;
+            let layer = layers.entry(key).or_insert_with(|| LayerSummary {
+                layer: key,
+                label: String::new(),
                 files: 0,
                 folders: Vec::new(),
                 confirmed: 0,
@@ -107,10 +119,10 @@ impl ProjectProfile {
             layer.by_confidence[slot] += 1;
             if let Some(label) = entry.confirmed {
                 layer.confirmed += 1;
-                *labels.entry(role).or_default().entry(label).or_default() += 1;
+                *labels.entry(key).or_default().entry(label).or_default() += 1;
             }
             *folders
-                .entry(role)
+                .entry(key)
                 .or_default()
                 .entry(class.anchor.as_str())
                 .or_default() += 1;
@@ -122,21 +134,31 @@ impl ProjectProfile {
                 }
             }
         }
+        let mixed = Mixed::of(layers.keys().copied());
         let mut layers: Vec<LayerSummary> = layers
             .into_values()
             .map(|mut layer| {
-                layer.folders = ranked(folders.remove(&layer.role).unwrap_or_default())
+                layer.label = layer.layer.label(&mixed);
+                layer.folders = ranked(folders.remove(&layer.layer).unwrap_or_default())
                     .into_iter()
                     .map(|(folder, n)| (shown_folder(folder), n))
                     .collect();
                 layer.confirm_label = labels
-                    .remove(&layer.role)
+                    .remove(&layer.layer)
                     .and_then(|l| ranked(l).into_iter().next())
                     .map(|(label, _)| label);
                 layer
             })
             .collect();
-        layers.sort_by_key(|layer| layer.role.display_order());
+        // elöl az architektúra rétegei, utánuk a kontextus- és minta-mappák, a végén a kiszolgáló fájlok (teszt,
+        // migráció, konfiguráció); csoporton belül fájlszám szerint — így a fő réteg (model) nem csúszik a sok
+        // teszt- vagy migrációs fájl mögé
+        layers.sort_by(|a, b| {
+            group(a.layer.role.kind())
+                .cmp(&group(b.layer.role.kind()))
+                .then_with(|| b.files.cmp(&a.files))
+                .then_with(|| a.label.cmp(&b.label))
+        });
         let mut patterns: Vec<PatternSummary> = patterns
             .into_iter()
             .map(|(name, (files, examples))| PatternSummary {
@@ -158,11 +180,14 @@ impl ProjectProfile {
             architectures: architecture::detect(&counts, &frameworks),
             frameworks,
             layers,
+            mixed,
             patterns,
             unknown,
             files: entries.len(),
             flow,
             graph_checked,
+            vendor: Vec::new(),
+            generated: Vec::new(),
             overrides: None,
             warnings: Vec::new(),
         }
@@ -190,4 +215,14 @@ fn ranked<K: Ord + Copy>(counts: HashMap<K, usize>) -> Vec<(K, usize)> {
     let mut out: Vec<(K, usize)> = counts.into_iter().collect();
     out.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
     out
+}
+
+/// A rétegsor csoportja a rendezéshez: architektúra-réteg, kontextus, minta, kiszolgáló.
+fn group(kind: Kind) -> u8 {
+    match kind {
+        Kind::Layer => 0,
+        Kind::Context => 1,
+        Kind::Pattern => 2,
+        Kind::Support => 3,
+    }
 }

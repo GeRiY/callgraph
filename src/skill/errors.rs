@@ -97,12 +97,17 @@ pub fn fail(
 pub(crate) const ISSUE_FORM: &str =
     "https://github.com/GeRiY/callgraph/issues/new?template=bug_report.yml";
 
-/// Egy skill-parancs hibája: a `fail` kontextusa (`usage` / `not_found`) és az üzenet.
+/// Egy skill-parancs hibája: a `fail` kontextusa és az üzenet. A felhasználói hibák (`usage`, `not_found`: hibás
+/// kapcsoló, ismeretlen alias / rétegnév, nem létező fájl) nem az eszköz hibái: csak az üzenet íródik ki, napló és
+/// error-id nélkül; a többi kontextus (`error`, `io`, `network`, `checksum`…) naplózott belső hiba.
 #[derive(Debug)]
 pub struct SkillFailure {
     pub context: &'static str,
     pub message: String,
 }
+
+/// A felhasználói hibák kontextusai (naplózás nélkül).
+const USER_CONTEXTS: &[&str] = &["usage", "not_found"];
 
 impl SkillFailure {
     pub fn usage(message: impl Into<String>) -> Self {
@@ -118,21 +123,41 @@ impl SkillFailure {
             message: message.into(),
         }
     }
+
+    /// Belső hiba (naplózva, error-id-vel).
+    pub fn internal(message: impl Into<String>) -> Self {
+        Self {
+            context: "error",
+            message: message.into(),
+        }
+    }
+
+    /// Felhasználói hiba-e (naplózás nélkül).
+    pub fn is_user_error(&self) -> bool {
+        USER_CONTEXTS.contains(&self.context)
+    }
 }
 
 impl From<crate::error::CallgraphError> for SkillFailure {
     fn from(e: crate::error::CallgraphError) -> Self {
-        Self::usage(e.to_string())
+        match e {
+            crate::error::CallgraphError::Usage(_) => Self::usage(e.to_string()),
+            other => Self::internal(other.to_string()),
+        }
     }
 }
 
 impl From<std::io::Error> for SkillFailure {
     fn from(e: std::io::Error) -> Self {
-        Self::usage(crate::error::CallgraphError::Write(e).to_string())
+        Self {
+            context: "io",
+            message: crate::error::CallgraphError::Write(e).to_string(),
+        }
     }
 }
 
-/// Egy skill-parancs eredménye kilépési kóddá: siker → 0, hiba → `fail` (napló + error-id sor) → 1.
+/// Egy skill-parancs eredménye kilépési kóddá: siker → 0; felhasználói hiba → csak az üzenet → 1; belső hiba →
+/// `fail` (napló + error-id sor) → 1.
 pub fn finish(
     home: &SkillHome,
     source: &str,
@@ -141,6 +166,10 @@ pub fn finish(
 ) -> Result<i32> {
     match result {
         Ok(()) => Ok(0),
+        Err(f) if f.is_user_error() => {
+            writeln!(err, "{}", home.localize(&f.message))?;
+            Ok(1)
+        }
         Err(f) => fail(home, source, f.context, &f.message, err),
     }
 }

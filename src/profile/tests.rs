@@ -287,15 +287,23 @@ fn aggregates_a_laravel_project() {
     let controller = profile
         .layers
         .iter()
-        .find(|l| l.role.name() == "controller")
+        .find(|l| l.layer.role.name() == "controller")
         .unwrap();
     assert_eq!(controller.files, 2);
     assert_eq!(controller.folders, [("app/Http/Controllers".to_owned(), 2)]);
-    // a rétegek a várt hívásirány sorrendjében
-    let order: Vec<&str> = profile.layers.iter().map(|l| l.role.name()).collect();
-    let at = |name: &str| order.iter().position(|n| *n == name).unwrap();
-    assert!(at("controller") < at("service") && at("service") < at("repository"));
-    assert!(at("repository") < at("model"));
+    // előbb az architektúra rétegei, utánuk a minták; csoporton belül fájlszám szerint, azonos számnál név szerint
+    let order: Vec<&str> = profile.layers.iter().map(|l| l.label.as_str()).collect();
+    assert_eq!(
+        order,
+        [
+            "controller",
+            "model",
+            "repository",
+            "service",
+            "request",
+            "factory"
+        ]
+    );
     let patterns: Vec<(&str, usize)> = profile.patterns.iter().map(|p| (p.name, p.files)).collect();
     assert!(patterns.contains(&("Repository", 2)), "{patterns:?}");
     assert!(patterns.contains(&("Strategy", 1)), "{patterns:?}");
@@ -460,7 +468,7 @@ fn flow_counts_cross_layer_calls_in_the_expected_direction() {
         .iter()
         .map(|(rel, graph)| FlowFile {
             rel,
-            role: c.role_of(rel),
+            layer: c.layer_of(rel),
             graph,
         })
         .collect();
@@ -473,7 +481,7 @@ fn flow_counts_cross_layer_calls_in_the_expected_direction() {
     let chain: Vec<Vec<&str>> = flow
         .chain
         .iter()
-        .map(|group| group.iter().map(|r| r.name()).collect())
+        .map(|group| group.iter().map(|l| l.role.name()).collect())
         .collect();
     assert_eq!(
         chain,
@@ -485,7 +493,7 @@ fn flow_counts_cross_layer_calls_in_the_expected_direction() {
     assert_eq!(flow.pairs[0].1, 2);
     let alone = [FlowFile {
         rel: "app/Models/User.php",
-        role: c.role_of("app/Models/User.php"),
+        layer: c.layer_of("app/Models/User.php"),
         graph: &store,
     }];
     assert!(compute(&alone).is_none());

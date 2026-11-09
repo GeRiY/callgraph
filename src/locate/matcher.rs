@@ -1,14 +1,17 @@
 //! Egy fájl egyezései a kifejezésekre, a szűkített tényekből (definíciók, fájlnév, név-részletek, string-literálok,
 //! hívások) — forrásfájl olvasása nélkül. A kifejezések kevesen vannak, ezért fájlonként egyetlen menet a tényeken.
+//! A több szavas kifejezés (`Phrase`) csak string-literálra illeszt, egészében; a `route::név` (`Route`) a névvel
+//! egyenlő string-literálra (a `routes/*.php` fájlban definíció: `->name('név')`) és a `route::név` hívásra.
 
 use super::callers::{CallerCounts, Callers};
-use super::terms::{Term, split_member, words};
+use super::terms::{Term, TermKind, split_member, words};
 use crate::model::FileGraph;
 
 /// Az egyezés fajtája, a legerősebbtől a leggyengébbig (a sorrend a rangsor és a kiírás sorrendje is).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum Kind {
-    /// A konténer (osztály, struct, komponens, modul), metódus / függvény vagy konstans neve maga a kifejezés.
+    /// A konténer (osztály, struct, komponens, modul), metódus / függvény vagy konstans neve maga a kifejezés; a
+    /// `route::név` kifejezésnél az útvonal definíciója (`routes/*.php`: `->name('név')`).
     Definition,
     /// A fájl neve a kifejezés (kiterjesztéssel vagy anélkül), vagy az út vége (`pages/checkout.vue`).
     FileName,
@@ -38,6 +41,11 @@ pub(crate) enum Symbol {
         callers: Callers,
     },
     Constant {
+        name: String,
+        line: u32,
+    },
+    /// JSON-kulcs (a teljes kulcs-út: `devDependencies.laravel-vite-plugin`).
+    Key {
         name: String,
         line: u32,
     },
@@ -71,17 +79,37 @@ impl<'a> Matcher<'a> {
         Self { terms, callers }
     }
 
-    /// A fájl összes egyezése. `rel`: a gyökérhez relatív út; `code`: kódfájl-e (dokumentum / adat — md, json — csak
-    /// a fájlnevével illeszthető, a címsorai és kulcsai zajt adnának).
+    /// A fájl összes egyezése. `rel`: a gyökérhez relatív út; `code`: kódfájl-e. A dokumentum / adat (md, json) a
+    /// fájlnevével, a JSON még a kulcsával is illeszthető — de csak pontosan (a teljes kulcs-út vagy az utolsó
+    /// tagja, `laravel-vite-plugin`, `scripts.build`): a címsorok és a név-részletek zajt adnának.
     pub(crate) fn file_hits(&self, rel: &str, graph: &FileGraph, code: bool) -> Vec<Hit> {
         let mut hits = Vec::new();
         self.file_name(rel, code, &mut hits);
         if code {
             self.definitions(graph, &mut hits);
-            self.strings(graph, &mut hits);
+            self.strings(rel, graph, &mut hits);
             self.calls(graph, &mut hits);
+        } else {
+            self.document_keys(graph, &mut hits);
         }
         hits
+    }
+
+    /// A JSON-kulcsok (`kind: key`) pontos egyezése: a teljes kulcs-út vagy az utolsó tagja.
+    fn document_keys(&self, graph: &FileGraph, hits: &mut Vec<Hit>) {
+        for key in graph.constants.iter().filter(|k| k.kind == "key") {
+            let path = key.name.to_lowercase();
+            let last = path.rsplit('.').next().unwrap_or(&path);
+            for (i, term) in self.terms.iter().enumerate() {
+                if term.is_plain() && (term.lower == path || term.lower == last) {
+                    let symbol = Symbol::Key {
+                        name: key.name.clone(),
+                        line: key.line,
+                    };
+                    Self::push(hits, i, Kind::Definition, symbol);
+                }
+            }
+        }
     }
 
     fn push(hits: &mut Vec<Hit>, term: usize, kind: Kind, symbol: Symbol) {
@@ -96,6 +124,9 @@ impl<'a> Matcher<'a> {
         let original = rel.rsplit(['/', '\\']).next().unwrap_or(rel);
         let stem_words = words(original.rsplit_once('.').map_or(original, |(stem, _)| stem));
         for (i, term) in self.terms.iter().enumerate() {
+            if !term.is_plain() {
+                continue;
+            }
             let t = term.lower.replace('\\', "/");
             let exact = name == t
                 || stem == t
@@ -151,6 +182,9 @@ impl<'a> Matcher<'a> {
         let (inner_owner, bare) = split_member(&lower);
         let mut name_words: Option<Vec<String>> = None;
         for (i, term) in self.terms.iter().enumerate() {
+            if !term.is_plain() {
+                continue;
+            }
             let exact = term.is_name(name)
                 || term.is_member(owner.as_deref(), &lower)
                 || term.is_member(inner_owner, bare);
@@ -162,16 +196,35 @@ impl<'a> Matcher<'a> {
         }
     }
 
-    fn strings(&self, graph: &FileGraph, hits: &mut Vec<Hit>) {
+    /// String-literálok: a név / fogalom részstringként (legalább 3 betű), a több szavas kifejezés egészében (a
+    /// szóközök számától függetlenül), az útvonalnév pontosan — a `routes/` alatti PHP-fájlban definícióként.
+    fn strings(&self, rel: &str, graph: &FileGraph, hits: &mut Vec<Hit>) {
+        let route_kind = if is_route_file(rel) {
+            Kind::Definition
+        } else {
+            Kind::StringLit
+        };
         for s in &graph.strings {
             let value = s.value.to_lowercase();
+            let mut flat: Option<String> = None;
             for (i, term) in self.terms.iter().enumerate() {
-                if term.lower.chars().count() >= 3 && value.contains(&term.lower) {
+                let kind = match &term.kind {
+                    TermKind::Name => {
+                        let found = term.lower.chars().count() >= 3 && value.contains(&term.lower);
+                        found.then_some(Kind::StringLit)
+                    }
+                    TermKind::Phrase => {
+                        let flat = flat.get_or_insert_with(|| collapse_spaces(&value));
+                        flat.contains(&term.lower).then_some(Kind::StringLit)
+                    }
+                    TermKind::Route(name) => (value.trim() == name.as_str()).then_some(route_kind),
+                };
+                if let Some(kind) = kind {
                     let symbol = Symbol::Str {
                         value: s.value.clone(),
                         line: s.line,
                     };
-                    Self::push(hits, i, Kind::StringLit, symbol);
+                    Self::push(hits, i, kind, symbol);
                 }
             }
         }
@@ -193,6 +246,22 @@ impl<'a> Matcher<'a> {
             // a szavak az eredeti írásmódból (`processRefund` → `process`, `refund`)
             let mut bare_words: Option<Vec<String>> = None;
             for (i, term) in self.terms.iter().enumerate() {
+                match term.kind {
+                    TermKind::Name => {}
+                    TermKind::Phrase => continue,
+                    // a JS-ben a `route('név')` hívás célja `route::név` (Ziggy)
+                    TermKind::Route(_) => {
+                        if lower == term.lower {
+                            let symbol = Symbol::Call {
+                                caller: call.caller.clone(),
+                                target: short.to_owned(),
+                                line: call.line,
+                            };
+                            Self::push(hits, i, Kind::Call, symbol);
+                        }
+                        continue;
+                    }
+                }
                 let exact = bare_lower == term.lower
                     || short_lower == term.lower
                     || lower == term.lower
@@ -208,4 +277,16 @@ impl<'a> Matcher<'a> {
             }
         }
     }
+}
+
+/// Útvonal-definíciós fájl-e: PHP-fájl a `routes/` mappában (Laravel: `routes/web.php`, `routes/api.php`; a
+/// projekt-gyökérhez vagy egy modulhoz relatívan).
+fn is_route_file(rel: &str) -> bool {
+    let path = rel.replace('\\', "/").to_ascii_lowercase();
+    path.ends_with(".php") && (path.starts_with("routes/") || path.contains("/routes/"))
+}
+
+/// A szóközök (sortörés, tab, több szóköz) egy szóközre cserélve.
+fn collapse_spaces(text: &str) -> String {
+    text.split_whitespace().collect::<Vec<_>>().join(" ")
 }

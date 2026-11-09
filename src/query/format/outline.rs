@@ -54,6 +54,8 @@ fn outline(row: &QueryResult, lang: Lang, source: Option<&SourceLines>) -> Strin
             .unwrap_or_default()
     )
     .unwrap();
+    // szintaktikai hiba: közvetlenül a FILE sor alatt (hiba nélkül nincs sor)
+    s.push_str(&super::parse_error_lines(g, lang));
     // jegyzetek (PILOT): fájl-jegyzetek, és a nem listázott (konténer nélküli) függvényeiké
     crate::notes::file_lines(&mut s, &row.notes);
     crate::notes::unlisted_lines(&mut s, &row.notes, g);
@@ -163,11 +165,34 @@ fn outline(row: &QueryResult, lang: Lang, source: Option<&SourceLines>) -> Strin
     }
     s
 }
+/// A Markdown-címsor szintje (a szakasz `visibility`-je `h1` … `h6`); más tagnál `None`.
+fn heading_level(m: &Method) -> Option<usize> {
+    let digits = m.visibility.as_deref()?.strip_prefix('h')?;
+    let level = digits.parse::<usize>().ok()?;
+    (1..=6).contains(&level).then_some(level)
+}
+
+/// A tag neve után `()`, ha hívható; a CSS-szabály / at-szabály, a JSON-kulcs és a Markdown-címsor nem az.
+pub(super) fn parens(m: &Method) -> &'static str {
+    let plain =
+        matches!(m.kind.as_deref(), Some("rule" | "at-rule" | "key")) || heading_level(m).is_some();
+    if plain { "" } else { "()" }
+}
+
 pub(super) fn method_line(s: &mut String, m: &Method) {
+    // a címsor a szintje szerint behúzva, `#`-jelekkel (`## Docker / build`)
+    if let Some(level) = heading_level(m) {
+        let indent = "  ".repeat(level - 1);
+        let hashes = "#".repeat(level);
+        let end = m.end_line.unwrap_or(m.line);
+        writeln!(s, "  {indent}{hashes} {}  L{}-{end}", m.name, m.line).unwrap();
+        return;
+    }
     writeln!(
         s,
-        "  {}()  L{}-{}{}{}",
+        "  {}{}  L{}-{}{}{}",
         m.name,
+        parens(m),
         m.line,
         m.end_line.unwrap_or(m.line),
         if m.is_static { " [static]" } else { "" },

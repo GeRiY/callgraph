@@ -119,25 +119,13 @@ const TERMS: [&str; 5] = [
     "checkout.vue",
 ];
 
-/// A rangsor fájl-sorai (`1. út  ★★★`): az utak a gyökérhez relatívan (egyetlen fájlnál a kimenet abszolút utat
-/// ír), a `/` elválasztóval.
+/// A rangsor fájl-sorai (`1. út  ★★★`): az utak mindig a gyökérhez relatívan (a `root:` sor után), `/`-rel.
 fn ranked(out: &str) -> Vec<String> {
     out.lines()
         .filter_map(|line| line.split_once(". "))
         .filter(|(n, _)| n.parse::<usize>().is_ok())
         .map(|(_, rest)| rest.split("  ").next().unwrap_or(rest))
-        .map(|path| {
-            let path = path.replace('\\', "/");
-            let start = path
-                .split_once("/app/")
-                .or_else(|| path.split_once("/resources/"))
-                .filter(|(prefix, _)| std::path::Path::new(prefix).is_absolute())
-                .map(|(prefix, _)| prefix.len() + 1);
-            match start {
-                Some(at) => path[at..].to_owned(),
-                None => path,
-            }
-        })
+        .map(|path| path.replace('\\', "/"))
         .collect()
 }
 
@@ -231,8 +219,11 @@ fn unknown_terms_are_listed_and_a_typo_free_term_still_matches() {
         "{out}"
     );
     let none = project.run(&["zzzunknownzzz"], true);
+    // a `root:` sor után (találat nélkül is)
+    assert!(none.starts_with("root: "), "{none}");
+    let head = none.lines().nth(1).unwrap_or("");
     assert!(
-        none.starts_with("locate: 1 terms · no match in the project map"),
+        head.starts_with("locate: 1 terms · no match in the project map"),
         "{none}"
     );
     assert!(ranked(&none).is_empty(), "{none}");
@@ -281,7 +272,8 @@ fn the_project_graph_and_the_no_graph_path_give_the_same_answer() {
 #[test]
 fn usage_errors() {
     let project = Project::empty();
-    for args in [&[][..], &["--all"][..], &["x", "--bogus"][..]] {
+    // egy ismeretlen `--név` kifejezés (CSS-változó), nem hiba; az egy kötőjeles ismeretlen kapcsoló igen
+    for args in [&[][..], &["--all"][..], &["x", "-b"][..]] {
         let out = project.command(args, true);
         assert!(!out.status.success(), "{args:?}");
         let err = String::from_utf8_lossy(&out.stderr);

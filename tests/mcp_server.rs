@@ -19,11 +19,17 @@ impl Session {
 
     /// A szerver a megadott munkakönyvtárral (ez a projekt-gyökér alias nélkül).
     fn start_in(dir: &std::path::Path) -> Self {
+        Self::start_with(dir, &[])
+    }
+
+    /// Mint a `start_in`, további környezeti változókkal (pl. `CALLGRAPH_STATS_DIR`).
+    fn start_with(dir: &std::path::Path, env: &[(&str, &std::ffi::OsStr)]) -> Self {
         let mut child = Command::new(env!("CARGO_BIN_EXE_callgraph"))
             .arg("mcp")
             .current_dir(dir)
             .env("CALLGRAPH_LANG", "en")
             .env("CALLGRAPH_REGISTRY", "/nonexistent/projects.json")
+            .envs(env.iter().copied())
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
@@ -341,7 +347,10 @@ fn locate_ranks_the_starting_files_like_the_cli() {
     assert!(body.contains("no match: nothingLikeThis"), "{body}");
     // egyetlen string is elég
     let single = s.call(3, "locate", json!({"terms": "Order"}));
-    assert!(text(&single).contains("Order.php"), "{single}");
+    // egyetlen találatnál is a `root:` sor és relatív út
+    let one = text(&single).replace('\\', "/");
+    assert!(one.starts_with("root: "), "{one}");
+    assert!(one.contains("1. src/Order.php"), "{one}");
     let empty = s.call(4, "locate", json!({"terms": []}));
     assert_eq!(empty["isError"], json!(true), "{empty}");
     // a CLI-vel azonos (egy későbbi hívás: az esetleges frissítés-értesítés csak az első eredmény végén áll)
@@ -446,4 +455,76 @@ fn project_profile_and_the_layer_parameter() {
     assert!(text(&wrong).contains("Unknown layer: nope"), "{wrong}");
     drop(s);
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A helyi statisztika `locate`-találata: `locate`, utána `outline` a lista első fájljára → a `callgraph stats`
+/// (ugyanazzal a `CALLGRAPH_STATS_DIR`-rel) „1 of 1” első-találatot mutat. Út a napi fájlba nem kerül.
+#[test]
+fn locate_hit_rank_is_recorded_in_the_local_stats() {
+    let id = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let base =
+        std::env::temp_dir().join(format!("callgraph-mcp-stats-{}-{id}", std::process::id()));
+    let dir = base.join("project");
+    let stats = base.join("stats");
+    let files = [
+        (
+            "src/RefundService.php",
+            "<?php\nnamespace App;\n\nclass RefundService\n{\n    public function processRefund(int $id): void\n    {\n    }\n}\n",
+        ),
+        (
+            "src/Order.php",
+            "<?php\nnamespace App;\n\nclass Order\n{\n    public function paid(): string\n    {\n        return 'refund';\n    }\n}\n",
+        ),
+    ];
+    for (path, body) in files {
+        let path = dir.join(path);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, body).unwrap();
+    }
+    std::fs::create_dir_all(&stats).unwrap();
+    let dir = dir.canonicalize().unwrap();
+    let mut s = Session::start_with(&dir, &[("CALLGRAPH_STATS_DIR", stats.as_os_str())]);
+    s.send(
+        json!({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
+        "protocolVersion": "2025-06-18", "capabilities": {},
+        "clientInfo": {"name": "test", "version": "0"}}}),
+    );
+    s.response(1);
+    s.send(json!({"jsonrpc": "2.0", "method": "notifications/initialized"}));
+    let found = s.call(2, "locate", json!({"terms": ["processRefund"]}));
+    // egyetlen találatnál az út abszolút (mint a többi lekérdezésnél); a találat-követés mindkét alakot kezeli
+    let body = text(&found).replace('\\', "/");
+    assert!(
+        body.lines()
+            .any(|line| line.starts_with("1. ") && line.contains("src/RefundService.php")),
+        "{body}"
+    );
+    let outline = s.call(3, "outline", json!({"path": "src/RefundService.php"}));
+    assert_ne!(outline["isError"], json!(true), "{outline}");
+    drop(s);
+
+    let report = Command::new(env!("CARGO_BIN_EXE_callgraph"))
+        .arg("stats")
+        .env("CALLGRAPH_LANG", "en")
+        .env("CALLGRAPH_STATS_DIR", &stats)
+        .env_remove("CALLGRAPH_STATS")
+        .output()
+        .unwrap();
+    let report = String::from_utf8_lossy(&report.stdout);
+    assert!(report.contains(" · 2 calls: mcp 2\n"), "{report}");
+    assert!(
+        report.contains("first result was the one opened: 1 of 1, top 5: 1 of 1"),
+        "{report}"
+    );
+    for entry in std::fs::read_dir(&stats).unwrap() {
+        let text = std::fs::read_to_string(entry.unwrap().path()).unwrap();
+        assert!(
+            !text.contains('/') && !text.contains("RefundService"),
+            "{text}"
+        );
+    }
+    let _ = std::fs::remove_dir_all(&base);
 }

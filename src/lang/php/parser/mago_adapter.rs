@@ -4,6 +4,7 @@ use std::borrow::Cow;
 
 use mago_allocator::prelude::LocalArena;
 use mago_database::file::{File, FileType};
+use mago_span::HasSpan;
 
 use super::{ParsedFile, PhpParser};
 
@@ -21,7 +22,11 @@ impl PhpParser for MagoAdapter {
             Cow::Owned(source.to_vec()),
         );
         let program = mago_syntax::parser::parse_file(&arena, &file);
-        let errors = program.errors.iter().map(|e| e.to_string()).collect();
+        let errors = program
+            .errors
+            .iter()
+            .map(|e| (e.span().start.offset, e.to_string()))
+            .collect();
         consume(&ParsedFile::new(program, &file, source, errors))
     }
 }
@@ -40,5 +45,12 @@ mod tests {
     fn reports_syntax_errors() {
         let n = MagoAdapter.parse("a.php", b"<?php\nfunction f( { \n", |p| p.errors().len());
         assert!(n > 0);
+    }
+
+    #[test]
+    fn syntax_error_carries_its_line() {
+        let src = b"<?php\nclass K {\n  public function ok() { return 1; }\n  public function broken( { return $x + ; }\n  public function after() { return 2; }\n}\n";
+        let errors = MagoAdapter.parse("k.php", src, |p| p.parse_errors());
+        assert_eq!(errors.first().map(|e| e.line), Some(4), "{errors:?}");
     }
 }

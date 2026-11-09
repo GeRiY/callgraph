@@ -29,6 +29,32 @@ fn syntax_error_is_a_warning_with_file_container() {
     assert!(a.warnings[0].contains("src/bad.rs"));
     assert_eq!(a.graph.containers.len(), 1);
     assert_eq!(a.graph.containers[0].name, "bad");
+    assert_eq!(a.graph.parse_errors.len(), 1);
+    assert_eq!(a.graph.parse_errors[0].line, 1);
+}
+
+#[test]
+fn syntax_error_keeps_the_intact_prefix() {
+    let src = "fn a() -> u32 { 1 }\nfn b() -> u32 { 2 }\nfn c( {\n";
+    let a = RustBackend::with_defaults().analyze_source("src/r.rs", src.as_bytes());
+    let names: Vec<&str> = a.graph.methods.iter().map(|m| m.name.as_str()).collect();
+    assert_eq!(names, ["a", "b"]);
+    assert_eq!(a.graph.parse_errors.len(), 1);
+    assert_eq!(
+        a.graph.parse_errors[0].line, 3,
+        "{:?}",
+        a.graph.parse_errors
+    );
+    // a fájl-container a teljes fájlt fedi
+    let module = &a.graph.containers[0];
+    assert_eq!((module.line, module.end_line), (1, 3));
+    assert_eq!(a.warnings.len(), 1);
+}
+
+#[test]
+fn valid_file_has_no_parse_errors() {
+    let a = RustBackend::with_defaults().analyze_source("src/ok.rs", b"fn a() {}\n");
+    assert!(a.graph.parse_errors.is_empty());
 }
 
 #[test]

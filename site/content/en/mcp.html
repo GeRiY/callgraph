@@ -1,0 +1,219 @@
+<section class="hero page" aria-labelledby="title">
+  <div>
+    <h1 id="title">Set up the callgraph MCP server</h1>
+    <p class="lead">callgraph is also a <a href="https://modelcontextprotocol.io">Model Context Protocol</a> server on stdio:
+      <code>callgraph mcp</code>. Claude Code, Claude Desktop, Cursor, VS Code or any other MCP client calls the same
+      queries as typed tools — with the same compact text and the same output cap as the command line.</p>
+    <div class="cta">
+      <a class="btn primary" href="#clients">Pick your client</a>
+      <a class="btn" href="#tools">The ten tools</a>
+      <a class="btn" href="/#install">Install callgraph first</a>
+    </div>
+  </div>
+</section>
+
+<section id="before" aria-labelledby="h-before">
+  <h2 id="h-before">Before you start</h2>
+  <p>The MCP server is the same binary the skill uses, so <a href="/#install">install the callgraph package</a> first.
+    The binary is in the skill package: <code>~/.claude/skills/callgraph/bin/&lt;os&gt;-&lt;arch&gt;/callgraph</code>
+    (folders: <code>darwin-arm64</code>, <code>darwin-x86_64</code>, <code>linux-x86_64</code>, <code>linux-aarch64</code>;
+    Windows: <code>bin\windows-x86_64\callgraph.exe</code>).</p>
+  <p>JSON configs need the <b>absolute path</b> (<code>~</code> is not expanded there). This prints it on macOS / Linux:</p>
+```
+echo ~/.claude/skills/callgraph/bin/$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)/callgraph
+```
+  <p>Not every client starts the server in your project folder, so register your projects as aliases once:</p>
+```
+bash ~/.claude/skills/callgraph/projects.sh add shop /absolute/path/to/shop
+```
+</section>
+
+<section id="clients" aria-labelledby="h-clients">
+  <h2 id="h-clients">Configure your client</h2>
+  <p class="sub">Every example uses <code>--auto-update</code> (recommended, see <a href="#updates">updates</a>).
+    Replace <code>/Users/you/…/darwin-arm64/callgraph</code> with the path printed above.</p>
+  <div class="tabs" role="tablist" aria-label="MCP client">
+    <button role="tab" id="t-cc" aria-controls="p-cc" aria-selected="true">Claude Code</button>
+    <button role="tab" id="t-cd" aria-controls="p-cd" aria-selected="false" tabindex="-1">Claude Desktop</button>
+    <button role="tab" id="t-cu" aria-controls="p-cu" aria-selected="false" tabindex="-1">Cursor</button>
+    <button role="tab" id="t-vs" aria-controls="p-vs" aria-selected="false" tabindex="-1">VS Code</button>
+  </div>
+
+  <div class="panel" id="p-cc" role="tabpanel" aria-labelledby="t-cc">
+    <h3 class="tab-title" id="claude-code">Claude Code</h3>
+    <p><b>With the installer:</b> if the <code>claude</code> command is on your PATH, <code>bash install.sh</code> asks
+      whether to register the MCP server; <code>bash install.sh --mcp</code> does it without asking, <code>--no-mcp</code>
+      skips it. Running it again does not create duplicates.</p>
+    <p><b>By hand</b>, macOS / Linux (picks the binary for your platform; <code>-s user</code> makes it available in every project):</p>
+```
+claude mcp add -s user callgraph -- \
+  ~/.claude/skills/callgraph/bin/$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)/callgraph mcp --auto-update
+```
+    <p>Windows (PowerShell):</p>
+```
+claude mcp add -s user callgraph -- "$env:USERPROFILE\.claude\skills\callgraph\bin\windows-x86_64\callgraph.exe" mcp --auto-update
+```
+    <p><b>Check it:</b> <code>claude mcp get callgraph</code> shows the registered command. Restart Claude Code; the
+      callgraph tools are then available. Remove it with <code>claude mcp remove -s user callgraph</code>.
+      In Claude Code the skill works too — the two run side by side.</p>
+  </div>
+
+  <div class="panel" id="p-cd" role="tabpanel" aria-labelledby="t-cd">
+    <h3 class="tab-title" id="claude-desktop">Claude Desktop</h3>
+    <p>Add this to <code>claude_desktop_config.json</code>:</p>
+```
+{
+  "mcpServers": {
+    "callgraph": {
+      "command": "/Users/you/.claude/skills/callgraph/bin/darwin-arm64/callgraph",
+      "args": ["mcp", "--auto-update"]
+    }
+  }
+}
+```
+    <p>Claude Desktop does not start the server in your project folder: name the registered alias (for example
+      <code>shop</code>) when you ask, so the tools get the <code>project</code> parameter.</p>
+    <p><b>Check it:</b> restart Claude Desktop and ask it to list callgraph's tools, or to call the <code>projects</code>
+      tool — it returns your registered aliases.</p>
+  </div>
+
+  <div class="panel" id="p-cu" role="tabpanel" aria-labelledby="t-cu">
+    <h3 class="tab-title" id="cursor">Cursor</h3>
+    <p>Add this to <code>.cursor/mcp.json</code>:</p>
+```
+{
+  "mcpServers": {
+    "callgraph": {
+      "command": "/Users/you/.claude/skills/callgraph/bin/darwin-arm64/callgraph",
+      "args": ["mcp", "--auto-update"]
+    }
+  }
+}
+```
+    <p><b>Check it:</b> restart Cursor and ask it to list callgraph's tools.</p>
+  </div>
+
+  <div class="panel" id="p-vs" role="tabpanel" aria-labelledby="t-vs">
+    <h3 class="tab-title" id="vs-code">VS Code</h3>
+    <p>Add this to <code>.vscode/mcp.json</code>:</p>
+```
+{
+  "servers": {
+    "callgraph": {
+      "type": "stdio",
+      "command": "/Users/you/.claude/skills/callgraph/bin/darwin-arm64/callgraph",
+      "args": ["mcp", "--auto-update"],
+      "cwd": "${workspaceFolder}"
+    }
+  }
+}
+```
+    <p><b>Check it:</b> restart VS Code and ask the agent to list callgraph's tools.</p>
+  </div>
+
+  <h3 id="windows" style="margin-top:22px">Windows paths in JSON</h3>
+  <p>On Windows the binary is <code>callgraph.exe</code> under <code>bin\windows-x86_64\</code>. In JSON every
+    <code>\</code> is doubled; replace <code>you</code> with your Windows user name:</p>
+```
+{
+  "mcpServers": {
+    "callgraph": {
+      "command": "C:\\Users\\you\\.claude\\skills\\callgraph\\bin\\windows-x86_64\\callgraph.exe",
+      "args": ["mcp", "--auto-update"]
+    }
+  }
+}
+```
+  <p class="sub">For VS Code, use the same <code>command</code> value in the <code>servers</code> entry above.</p>
+</section>
+
+<section id="tools" aria-labelledby="h-tools">
+  <h2 id="h-tools">The ten tools</h2>
+  <p class="sub">Paths are relative to the project root: a registered alias (<code>project</code>) or the server's
+    working directory. A typical flow: <code>locate</code> → <code>outline</code> → <code>method_body</code> →
+    <code>find_callers</code>.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th scope="col">Tool</th><th scope="col">What it gives</th><th scope="col">CLI equivalent</th></tr></thead>
+    <tbody>
+      <tr><td><a href="/locate/"><code>locate</code></a></td><td>Where to start: ranked files from the names and terms of a task, each with the reason (5 by default, <code>all: true</code> for every match).</td><td><code>locate &lt;term&gt;… [--all]</code></td></tr>
+      <tr><td><a href="/profile/"><code>project_profile</code></a></td><td>Architecture, layers with folders and file counts, patterns, call direction between layers, unknown folders.</td><td><code>profile [--full]</code></td></tr>
+      <tr><td><code>outline</code></td><td>Structure of a file or folder: classes / components, methods with line ranges, calls by category; <code>format</code>: <code>api</code>, <code>flow</code>, <code>summary</code>, <code>hotspots</code>, <code>stats</code>.</td><td><code>&lt;path&gt;[::m] --format &lt;f&gt;</code></td></tr>
+      <tr><td><code>method_body</code></td><td>Line-numbered source of one or more methods, compact by default; <code>doc: true</code> adds the docblock, <code>raw: true</code> gives the exact text.</td><td><code>::m --body [--doc|--raw]</code></td></tr>
+      <tr><td><code>find_callers</code></td><td>Who calls it; <code>depth</code> 2–5 for impact analysis, <code>guess: true</code> for name-only matches.</td><td><code>--grep &lt;pattern&gt; --depth N</code></td></tr>
+      <tr><td><code>search</code></td><td>Where a string literal or a constant is (<code>kind</code>: <code>strings</code> | <code>constants</code>).</td><td><code>--strings</code> / <code>--const</code></td></tr>
+      <tr><td><code>framework_view</code></td><td><code>routes</code>, <code>middleware</code>, <code>validation</code>, <code>jobs</code>, <code>events</code>, <code>providers</code>, <code>magic</code>, <code>di</code>, <code>views</code> of a folder.</td><td><code>--format &lt;view&gt;</code></td></tr>
+      <tr><td><code>notes</code></td><td>Notes left on files and methods (read-only; writing notes is CLI only).</td><td><code>--notes &lt;pattern&gt;</code></td></tr>
+      <tr><td><code>projects</code></td><td>The registered aliases and their roots.</td><td><code>projects.sh list</code></td></tr>
+      <tr><td><code>guide</code></td><td>The full skill manual in your language.</td><td><code>SKILL.md</code></td></tr>
+    </tbody>
+  </table></div>
+  <p>Optional layer parameters (the default output does not change): <code>layer</code> on <code>outline</code>,
+    <code>search</code> and <code>find_callers</code> keeps only the files of that layer; <code>by_layer</code> on
+    <code>find_callers</code> orders callers by layer. See <a href="/profile/">project profile</a>.</p>
+  <p>On connect the server sends the client a short usage guide in your language (which tool to use when, how to find
+    callers, how to read the output); Claude Code puts it into the agent's instructions. If the server starts in a
+    project folder, a compact project profile is appended.</p>
+</section>
+
+<section id="local" aria-labelledby="h-local">
+  <h2 id="h-local">What runs locally</h2>
+  <div class="grid">
+    <div class="card"><h3>On your machine</h3><p>Your client starts the server and talks to it over stdin/stdout.
+      Queries never use the network: your code never leaves the computer.</p></div>
+    <div class="card"><h3>Read-only</h3><p>It never writes your source files. Its only side effect is the project map in
+      the project's <code>.callgraph/</code> folder, shared with the CLI.</p></div>
+    <div class="card"><h3>Confined to the project</h3><p>Every path resolves against the project root; paths that leave
+      it (<code>..</code>, absolute paths outside, symlinks pointing out) are refused.</p></div>
+    <div class="card"><h3>Keeps itself fresh</h3><p>While it runs, it watches the projects it has loaded and refreshes
+      changed files shortly after they are saved. Off with <code>CALLGRAPH_WATCH=0</code>.</p></div>
+  </div>
+  <p>The only network call is the update check below: at most once a day it looks up the latest GitHub release (and,
+    with <code>--auto-update</code>, downloads it).</p>
+</section>
+
+<section id="updates" aria-labelledby="h-updates">
+  <h2 id="h-updates">Updates: <code>--auto-update</code></h2>
+  <ul>
+    <li><b>With <code>--auto-update</code> (recommended):</b> at start, at most once a day, the server checks the latest
+      release. If there is a newer one, it downloads it, verifies it against the release's <code>SHA256SUMS</code>
+      (nothing is installed on a mismatch or a missing checksum), installs it exactly like
+      <code>callgraph.sh update</code> (your projects and settings are kept) and restarts itself, so the client talks to
+      the new version right away.</li>
+    <li>If anything fails (no network, rate limit, bad checksum, no write permission), it writes one line to stderr —
+      <code>callgraph: auto-update skipped, continuing with …</code>, which clients log — and starts the current version.</li>
+    <li><b>Without the flag:</b> the server checks in the background and adds one line to the first answer of the
+      session: <code>ℹ callgraph X is available (installed: Y) — update: …</code>.</li>
+    <li>It writes only into callgraph's own folder, never into your projects.</li>
+    <li><b>Turn all update checks off</b> with <code>CALLGRAPH_UPDATE_CHECK=0</code> in the server's environment (the
+      <code>env</code> field of the client config): then there is no network request at all. Checks are also off in CI.</li>
+  </ul>
+</section>
+
+<section id="troubleshooting" aria-labelledby="h-trouble">
+  <h2 id="h-trouble">Troubleshooting</h2>
+  <details><summary>The client cannot start the server</summary><p>JSON configs need the absolute path to the binary;
+    <code>~</code> is not expanded there. Print the path with the <code>echo</code> command from
+    <a href="#before">Before you start</a>.</p></details>
+  <details><summary>Paths are not found, or the wrong folder is used</summary><p>Some clients (for example Claude Desktop)
+    do not start in the project folder. Register the project with <code>projects.sh add &lt;alias&gt; &lt;path&gt;</code>
+    and use the alias as the <code>project</code> parameter; the <code>projects</code> tool lists them.</p></details>
+  <details><summary>A tool returns an error</summary><p>Errors come back as tool errors in your language; the server
+    keeps running. Paths with <code>::</code> are not allowed — the method goes into its own parameter.</p></details>
+  <details><summary>The answer was cut short</summary><p>Output is capped at 400 lines (a folder outline turns into a
+    summary, a file into a method index). Narrow <code>path</code>, <code>method</code> or <code>pattern</code>;
+    use <code>full: true</code> only when needed.</p></details>
+  <details><summary>File watching does not start</summary><p>If watching is not possible (for example the inotify limit
+    is used up), the server says so once on stderr and checks changed files per request instead.</p></details>
+  <details><summary>I want to test the server by hand</summary><p>With a graphical inspector:
+    <code>npx @modelcontextprotocol/inspector &lt;path-to-binary&gt; mcp</code>.</p></details>
+</section>
+
+<section id="related" aria-labelledby="h-related">
+  <h2 id="h-related">Related</h2>
+  <div class="grid">
+    <a class="card" href="/#install"><h3>Install</h3><p>The one-line install for macOS / Linux, and Windows.</p></a>
+    <a class="card" href="/locate/"><h3>locate</h3><p>The first call of a task: where to start.</p></a>
+    <a class="card" href="/profile/"><h3>Project profile</h3><p>How an unfamiliar project is built.</p></a>
+    <a class="card" href="/changelog/"><h3>Changelog</h3><p>What changed in each release.</p></a>
+  </div>
+</section>

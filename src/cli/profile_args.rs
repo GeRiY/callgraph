@@ -1,4 +1,5 @@
-//! A projekt-profil kapcsolói: a `profile` parancs (`callgraph profile [--project <alias|mappa>] [--full]`), és a
+//! A projekt-profil kapcsolói: a `profile` parancs (`callgraph profile [--project <alias|mappa>] [--full]
+//! [--with-vendor]`), és a
 //! `show` réteg-kapcsolói (`--layer <név,…>`, `--layers`, `--by-layer`). Külön fájlban, hogy az `args.rs` csak
 //! egy-egy sorral bővüljön.
 
@@ -8,8 +9,8 @@ use super::CliArgs;
 
 fn profile_usage() -> &'static str {
     crate::t!(
-        "callgraph profile [--project <alias|dir>] [--full]  (architecture, layers and patterns from folder and file names, checked against the graph)",
-        "callgraph profile [--project <alias|mappa>] [--full]  (architektúra, rétegek és minták a mappa- és fájlnevekből, a gráffal ellenőrizve)"
+        "callgraph profile [--project <alias|dir>] [--full] [--with-vendor]  (architecture, layers and patterns from folder and file names, checked against the graph; --with-vendor: embedded third-party code counts too)",
+        "callgraph profile [--project <alias|mappa>] [--full] [--with-vendor]  (architektúra, rétegek és minták a mappa- és fájlnevekből, a gráffal ellenőrizve; --with-vendor: a beágyazott külső kód is számít)"
     )
 }
 
@@ -66,15 +67,20 @@ impl LayerArgs {
     }
 }
 
-/// `profile [--project <alias|mappa>] [--full]`.
+/// `profile [--project <alias|mappa>] [--full] [--with-vendor]`.
 pub(crate) fn parse_profile(args: &[String]) -> Result<CliArgs> {
     let mut project = None;
     let mut full = false;
+    let mut with_vendor = false;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
             "--full" => {
                 full = true;
+                i += 1;
+            }
+            "--with-vendor" => {
+                with_vendor = true;
                 i += 1;
             }
             "--project" if i + 1 < args.len() => {
@@ -88,7 +94,11 @@ pub(crate) fn parse_profile(args: &[String]) -> Result<CliArgs> {
             _ => return Err(CallgraphError::Usage(profile_usage().into())),
         }
     }
-    Ok(CliArgs::Profile { project, full })
+    Ok(CliArgs::Profile {
+        project,
+        full,
+        with_vendor,
+    })
 }
 
 #[cfg(test)]
@@ -131,14 +141,24 @@ mod tests {
             parse_profile(&s(&["--project", "sp", "--full"])).unwrap(),
             CliArgs::Profile {
                 project: Some("sp".into()),
-                full: true
+                full: true,
+                with_vendor: false
             }
         );
         assert_eq!(
             parse_profile(&[]).unwrap(),
             CliArgs::Profile {
                 project: None,
-                full: false
+                full: false,
+                with_vendor: false
+            }
+        );
+        assert_eq!(
+            parse_profile(&s(&["--with-vendor"])).unwrap(),
+            CliArgs::Profile {
+                project: None,
+                full: false,
+                with_vendor: true
             }
         );
         assert!(parse_profile(&s(&["--bogus"])).is_err());

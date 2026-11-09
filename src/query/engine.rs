@@ -1,6 +1,8 @@
 //! A query facade: projektútvonalakból elemzett vagy cache-elt gráfokat ad.
 
 mod grep_text;
+mod issues;
+mod json_keys;
 mod layer;
 mod loader;
 
@@ -63,6 +65,9 @@ pub struct QueryEngine {
     slim: bool,
     /// A réteg-kapcsolók (`with_layers`: `--layer`, `--layers`, `--by-layer`); `None` = nincs (alapértelmezés).
     layers: Option<crate::profile::LayerScope>,
+    /// A lekérdezés során beolvasott, szintaktikai hibás fájlok (gyökérhez relatív út, az első hiba sora), a
+    /// beolvasás sorrendjében — a szűrés (`--grep`) előtt gyűjtve, a kimenet záró `⚠` sorához (`parse_issues`).
+    parse_issues: std::sync::Mutex<Vec<(String, u32)>>,
 }
 
 impl QueryEngine {
@@ -88,6 +93,7 @@ impl QueryEngine {
             graph: false,
             slim: false,
             layers: None,
+            parse_issues: std::sync::Mutex::new(Vec::new()),
         }
     }
     /// A sorok a projekt-gráf szűkített tényeiből jöjjenek (`facts.bin`: egyetlen fájl a teljes hatókörre) — a
@@ -152,17 +158,22 @@ impl QueryEngine {
                     }
                 })
                 .cloned();
-            let graph = match stored {
+            let mut graph = match stored {
                 Some(graph) => graph,
                 None => self.analyze(&abs)?,
             };
+            // JSON: a kért kulcs-út (`package.json::scripts`) szakasz lesz, a forrás-soraival
+            if let Some(names) = &methods {
+                json_keys::add_key_sections(&abs, &mut graph, names);
+            }
+            self.note_parse_issue(&abs, &graph);
             if graph.binary {
                 if selectors
                     .items
                     .iter()
                     .any(|input| self.root.join(&input.file) == abs)
                 {
-                    return Err(CallgraphError::Binary(abs));
+                    return Err(crate::lang::filetype::skipped_content_error(&abs));
                 }
                 continue;
             }
@@ -177,12 +188,19 @@ impl QueryEngine {
                 };
                 let found = graph.methods.iter().filter(|m| names.iter().any(|n| matches(n, &m.name))).map(|m| m.name.clone()).collect::<Vec<_>>();
                 if let Some(missing) = names.iter().find(|n| !found.iter().any(|f| matches(n, f))) {
-                    return Err(CallgraphError::Usage(tf!(
+                    let message = tf!(
                         "No such method: {}::{} (see --format outline for the file's full list)",
                         "Nincs ilyen metódus: {}::{} (lásd: --format outline a fájl teljes listájához)",
                         abs.display(),
                         missing
-                    )));
+                    );
+                    // hibás fájlnál a hiány a parser feladásából is jöhet: ne tűnjön biztos „nincs ilyen”-nek
+                    let hint = graph.parse_errors.first().map(|error| tf!(
+                        " — note: the file has a syntax error at L{} and may be only partly mapped; read the file directly",
+                        " — megjegyzés: a fájlban szintaktikai hiba van itt: L{}, a térkép hiányos lehet; olvasd közvetlenül a fájlt",
+                        error.line
+                    )).unwrap_or_default();
+                    return Err(CallgraphError::Usage(format!("{message}{hint}")));
                 }
                 Ok(found)
             }).transpose()?;

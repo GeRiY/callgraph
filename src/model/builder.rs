@@ -1,8 +1,8 @@
 //! Builder: a visitorok ebbe gyűjtenek, a végén immutábilis `FileGraph` lesz belőle.
 
 use super::{
-    Call, Comment, Constant, Container, ControlFlow, FileGraph, Imports, Method, Property,
-    StringLit, Write,
+    Call, Comment, Constant, Container, ControlFlow, FileGraph, Imports, Method, ParseError,
+    Property, StringLit, Write,
 };
 
 /// A `FileGraph` lépésenkénti összeállítója.
@@ -24,6 +24,7 @@ pub struct FileGraphBuilder {
     strings: Vec<StringLit>,
     writes: Vec<Write>,
     binary: bool,
+    parse_errors: Vec<ParseError>,
 }
 
 impl FileGraphBuilder {
@@ -42,6 +43,12 @@ impl FileGraphBuilder {
     /// Bináris tartalmú fájl jelölése (üres gráf, a lekérdezések kihagyják).
     pub fn binary(&mut self, binary: bool) -> &mut Self {
         self.binary = binary;
+        self
+    }
+
+    /// Egy szintaktikai hiba felvétele (a `build` sor szerint rendezi és korlátozza: `ParseError::finish`).
+    pub fn parse_error(&mut self, error: ParseError) -> &mut Self {
+        self.parse_errors.push(error);
         self
     }
 
@@ -165,6 +172,7 @@ impl FileGraphBuilder {
             strings: self.strings,
             writes: self.writes,
             binary: self.binary,
+            parse_errors: ParseError::finish(self.parse_errors),
         }
     }
 }

@@ -4,7 +4,7 @@ use super::callers::{CallerCounts, Callers};
 use super::matcher::{Hit, Kind, Matcher, Symbol};
 use super::rank::{FileMatch, rank, score};
 use super::reasons::{group, pick};
-use super::terms::{Term, same_word, split_member, words};
+use super::terms::{Term, TermKind, same_word, split_member, words};
 use crate::model::{Call, Container, FileGraph, Method, StringLit};
 
 fn w(text: &str) -> Vec<String> {
@@ -42,7 +42,8 @@ fn plural_tolerance_is_symmetric_and_simple() {
 
 #[test]
 fn terms_are_trimmed_split_lowercased_and_deduplicated() {
-    let terms = Term::parse_all(&["'RefundController'", "refund, Refund  payment_status", ""]);
+    // szóköz nélkül vessző mentén bontva (régebben a szóköz is bontott: most egy szóközös elem egyetlen kifejezés)
+    let terms = Term::parse_all(&["'RefundController'", "refund,Refund,payment_status", ""]);
     let raw: Vec<&str> = terms.iter().map(|t| t.raw.as_str()).collect();
     assert_eq!(raw, ["RefundController", "refund", "payment_status"]);
     assert_eq!(terms[0].lower, "refundcontroller");
@@ -60,6 +61,23 @@ fn terms_are_trimmed_split_lowercased_and_deduplicated() {
         split_member("$this->repo->find"),
         (Some("$this->repo"), "find")
     );
+}
+
+#[test]
+fn a_quoted_phrase_and_a_route_name_are_single_terms() {
+    let terms = Term::parse_all(&["Szervező  további\teseményei", "route::events.show"]);
+    assert_eq!(terms.len(), 2);
+    assert_eq!(terms[0].raw, "Szervező további eseményei");
+    assert_eq!(terms[0].lower, "szervező további eseményei");
+    assert_eq!(terms[0].kind, TermKind::Phrase);
+    // nem bontva, név-részletként nem illeszt
+    assert!(terms[0].words.is_empty() && terms[0].member.is_none());
+    assert!(!terms[0].matches_words(&w("eseményeim")));
+    assert_eq!(terms[1].kind, TermKind::Route("events.show".into()));
+    assert!(terms[1].member.is_none());
+    assert_eq!(Term::new("x").unwrap().kind, TermKind::Name);
+    // a `route::` önmagában név
+    assert_eq!(Term::new("route::").unwrap().kind, TermKind::Name);
 }
 
 #[test]
@@ -141,6 +159,7 @@ fn graph(file: &str) -> FileGraph {
         writes: Vec::new(),
         sfc: None,
         binary: false,
+        parse_errors: Vec::new(),
     }
 }
 
@@ -207,6 +226,44 @@ fn matcher_finds_every_kind_of_match() {
     doc.methods.push(method(None, "processRefund", 1, 3));
     let hits = matcher.file_hits("docs/refund.md", &doc, false);
     assert!(hits.is_empty(), "{hits:?}");
+}
+
+fn json_key(name: &str, line: u32) -> (Kind, Symbol) {
+    let symbol = Symbol::Key {
+        name: name.into(),
+        line,
+    };
+    (Kind::Definition, symbol)
+}
+
+const PACKAGE_JSON: &[u8] = br#"{"scripts": {"build": "vite build"},
+"devDependencies": {"laravel-vite-plugin": "^1.0"}}
+"#;
+
+#[test]
+fn json_keys_match_exactly_by_full_path_or_last_segment() {
+    use crate::lang::Language;
+    use crate::lang::json::JsonDocument;
+    let file = crate::core::SourceFile::new("package.json", PACKAGE_JSON.to_vec(), None);
+    let json = JsonDocument.analyze(&file).unwrap().graph;
+    let terms = Term::parse_all(&["laravel-vite-plugin", "scripts.build", "vite", "laravel"]);
+    let callers = CallerCounts::build([&json]);
+    let matcher = Matcher::new(&terms, &callers);
+    let hits = matcher.file_hits("package.json", &json, false);
+    let found = |term: usize| -> Vec<(Kind, Symbol)> {
+        hits.iter()
+            .filter(|h| h.term == term)
+            .map(|h| (h.kind, h.symbol.clone()))
+            .collect()
+    };
+    assert_eq!(
+        found(0),
+        [json_key("devDependencies.laravel-vite-plugin", 2)]
+    );
+    assert_eq!(found(1), [json_key("scripts.build", 1)]);
+    // csak pontos egyezés: a név-részlet és az érték nem illeszkedik
+    assert!(found(2).is_empty(), "{hits:?}");
+    assert!(found(3).is_empty(), "{hits:?}");
 }
 
 fn hit(term: usize, kind: Kind) -> Hit {
@@ -330,4 +387,111 @@ fn reasons_merge_lines_and_prefer_new_terms() {
     let picked = pick(reasons, 3);
     assert_eq!(picked.len(), 3);
     assert!(picked.iter().any(|r| r.terms.contains(&1)), "{picked:?}");
+}
+
+fn string(line: u32, value: &str) -> StringLit {
+    StringLit {
+        container: None,
+        caller: None,
+        line,
+        end_line: None,
+        value: value.into(),
+    }
+}
+
+#[test]
+fn route_terms_match_equal_strings_and_the_definition_in_routes() {
+    let mut routes = graph("routes/web.php");
+    routes.strings.push(string(5, "/events/{e}"));
+    routes.strings.push(string(5, "events.show"));
+    routes.strings.push(string(6, "events.show.extra"));
+    let mut controller = graph("app/Http/Controllers/EventController.php");
+    controller.strings.push(string(8, "events.show"));
+    let mut nav = graph("resources/js/nav.js");
+    nav.calls
+        .push(call("nav", "goEvent", 2, "route::events.show"));
+    let mut other = graph("app/Show.php");
+    other.containers.push(container("EventsShow", 1, 9));
+    let terms = Term::parse_all(&["route::events.show"]);
+    let callers = CallerCounts::build([&routes, &controller, &nav, &other]);
+    let matcher = Matcher::new(&terms, &callers);
+    let kinds = |rel: &str, graph: &FileGraph| -> Vec<Kind> {
+        matcher
+            .file_hits(rel, graph, true)
+            .iter()
+            .map(|h| h.kind)
+            .collect()
+    };
+    assert_eq!(kinds("routes/web.php", &routes), [Kind::Definition]);
+    assert_eq!(
+        kinds("app/Http/Controllers/EventController.php", &controller),
+        [Kind::StringLit]
+    );
+    assert_eq!(kinds("resources/js/nav.js", &nav), [Kind::Call]);
+    // név-részlet / fájlnév nem illeszt
+    assert!(kinds("app/Show.php", &other).is_empty());
+}
+
+#[test]
+fn a_phrase_matches_strings_as_a_whole() {
+    let mut lang = graph("lang/hu.php");
+    lang.strings
+        .push(string(3, "Szervező\n  további eseményei"));
+    lang.strings.push(string(4, "Eseményeim"));
+    let mut vue = graph("resources/js/Pages/Events.vue");
+    vue.containers.push(container("Eseményei", 1, 9));
+    let terms = Term::parse_all(&["szervező további eseményei", "eseményei"]);
+    let callers = CallerCounts::build([&lang, &vue]);
+    let matcher = Matcher::new(&terms, &callers);
+    let hits = matcher.file_hits("lang/hu.php", &lang, true);
+    let phrase: Vec<u32> = hits
+        .iter()
+        .filter(|h| h.term == 0)
+        .filter_map(|h| match &h.symbol {
+            Symbol::Str { line, .. } => Some(*line),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(phrase, [3]);
+    // a több szavas kifejezés definícióra nem illeszt
+    let hits = matcher.file_hits("resources/js/Pages/Events.vue", &vue, true);
+    assert!(hits.iter().all(|h| h.term == 1), "{hits:?}");
+}
+
+#[test]
+fn exact_matches_rank_before_files_matching_more_terms_by_strings() {
+    // a „Szervező további eseményei” + EventDetailContent eset: a sok kifejezésre stringgel illő fordítási /
+    // build-fájlok se előzzék meg a komponenst
+    let mut files = vec![
+        FileMatch::new(
+            "resources/js/Components/EventDetailContent.vue".into(),
+            vec![hit(1, Kind::FileName), hit(1, Kind::Definition)],
+        )
+        .unwrap(),
+    ];
+    for n in 0..4 {
+        files.push(
+            FileMatch::new(
+                format!("lang/l{n}.php"),
+                vec![
+                    hit(0, Kind::StringLit),
+                    hit(1, Kind::StringLit),
+                    hit(2, Kind::StringLit),
+                    hit(3, Kind::StringLit),
+                ],
+            )
+            .unwrap(),
+        );
+    }
+    let ranked = rank(files, super::rank::is_test_path);
+    assert_eq!(
+        ranked[0].path,
+        "resources/js/Components/EventDetailContent.vue"
+    );
+    // a többi pontszám szerint, út szerint holtversenyben
+    let rest: Vec<&str> = ranked[1..].iter().map(|f| f.path.as_str()).collect();
+    assert_eq!(
+        rest,
+        ["lang/l0.php", "lang/l1.php", "lang/l2.php", "lang/l3.php"]
+    );
 }

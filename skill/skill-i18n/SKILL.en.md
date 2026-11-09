@@ -31,10 +31,16 @@ visszatérítés → `refund`). It answers from the project map without reading 
 match), each with its reasons (exact definition, file name, name part, string, call, `callers: N`). Continue on
 those files with the outline / `--body` / `--grep`.
 <!-- /mcp -->
+Special terms: a quoted phrase with spaces (`"Szervező további eseményei"`) is ONE term, matched as a whole against
+string literals (UI labels, translations), never split into words; `route::events.show` finds the route definition
+(`->name('events.show')` in `routes/*.php`, ranked first) and its `route()` / `to_route()` / `redirect()->route()`
+calls in PHP and JS / TS / Vue; `--orange-500` is a CSS custom property, not a flag. Files with an exact definition or
+file name rank before files that only match strings (translations, build output).
 
 ```bash
 bash <skill>/callgraph.sh locate RefundController processRefund refund payment_status checkout.vue --project myapp   # where to start: ranked files + reasons
 bash <skill>/callgraph.sh locate refund --all --project myapp                                                       # every matching file, not just the top 5
+bash <skill>/callgraph.sh locate route::events.show "Szervező további eseményei" --project myapp                     # a route (definition first) and a UI phrase
 ```
 
 ## Quick commands
@@ -45,6 +51,7 @@ bash $CG --project myapp app/Http/Controllers/X.php                  # outline: 
 bash $CG --project myapp app/Http/Controllers/X.php::store           # only one method (several ::selectors, several files too)
 bash $CG --project myapp app/Http/Controllers/X.php::store --body    # the method's source, compact (comments kept, docblock omitted: --doc; --raw = exact)
 bash $CG --project myapp app/Http/Controllers/X.php --lines 30-60    # any range, line-numbered (view, procedural file)
+bash $CG --project myapp package.json::scripts --body                # one JSON key with its exact lines (dot path: scripts.build, files.0)
 bash $CG --project myapp app --strings 'Order not found'             # where a string literal (error message, key) is
 bash $CG --project myapp app --const STATUS_ACTIVE                   # constant: definition, references, re-exports
 bash $CG --project myapp app --grep '(^|::|\.|->)cancel$'           # who calls it: EVERY call of the name, with the call line
@@ -79,15 +86,26 @@ calls through its interface / parent / trait), so it can miss callers; use it to
 bash $CG profile --project myapp                                     # architecture, layers (folders, file counts), patterns, call direction, unknown folders
 bash $CG profile --project myapp --full                              # per folder, confidence counts, the call pairs between layers
 bash $CG --project myapp app --layer service                         # only the files of one layer (several: service,repository)
+bash $CG --project myapp . --layer controller:js                     # one ecosystem only (php, js, swift, rust) when a role is in both
 bash $CG --project myapp app --format summary --layers               # summary grouped by layer
-bash $CG --project myapp app --grep 'Repo::find' --depth 2 --by-layer # callers ordered by layer, closest to the callee first
+bash $CG --project myapp app --grep 'Repo::find' --depth 2 --by-layer # callers grouped by layer, a "[service]  3 callers" header per group
 ```
 
 In an unfamiliar project run `profile` once at the start (~15 lines) instead of listing folders: it says which folder
 holds which layer, so you can narrow a query with `--layer <name>` without knowing the folder names. A layer is a name
 from the profile (`controller`, `service`, `repository`, `model`, `component`, `store`…), not a path. Roles come from
-folder and file names, confirmed by the graph (confidence high / medium / low; "unknown" when unclear). A layer never
-hides results by itself: only `--layer` filters, `--layers` / `--by-layer` only group and order. Own folder names:
+folder and file names, confirmed by the graph (confidence high / medium / low; "unknown" when unclear). Layers are
+listed by file count. When a role is in both the backend and the frontend, the profile shows them apart
+(`controller (php)` / `controller (js)`) and the call direction never chains them; `--layer controller` matches both,
+`--layer controller:js` (or `"controller (js)"`) one. Third-party code copied into the project (a subfolder with its
+own `composer.json` / `package.json` / `LICENSE`, or `vendors/`, `third_party/`, `extensions/`, `external/`, `libs/`)
+and build output (`dist/`, `build/`, `*.min/`, minified files) are left out of the profile — one `vendor: N files
+skipped (…)` line says so; queries still see these files (`profile --with-vendor` counts them). `event`, `listener` and
+`job` need code proof (an Event / Listener base class or interface, `Dispatchable`, `ShouldQueue`, `handle(…)` in a
+`Listeners` namespace); a folder named `Event` alone is not an event layer. A layer never hides results by itself:
+only `--layer` filters, `--layers` / `--by-layer` only group and order. `--by-layer` groups the calls (with `--depth`:
+per level) by layer, the layer closest to the callee first (the deepest layer in the call direction: model →
+repository → service → controller), each group under a `[service]  3 calls` header. Own folder names:
 `.callgraph-layers` in the project root (`service = app/Logic`, `ignore-role = app/Legacy`). MCP: the
 `project_profile` tool and the `layer` / `by_layer` parameters.
 
@@ -227,11 +245,16 @@ All data goes into the project's own `.callgraph/` directory (cache, project map
 for changed files, so repeated searches are fast; the directory is created automatically,
 with a `*` `.gitignore`, so it never gets into version control). Nothing is written outside the project. If the directory
 is not writable, it runs without a cache. Cleanup: `callgraph prune` (see README).
+Local usage stats (counts and ranges only, no paths or names, never sent anywhere): `bash <skill>/callgraph.sh stats`
+when the user asks how callgraph is used; off: `CALLGRAPH_STATS=0`.
 
 Processed files: only the supported extensions (upper case too: `B.PHP`), without generated files
-(`package-lock.json`, `*.min.js`, `*.min.css`) and binary content. A `.callgraphignore` file in the project (the
-nearest one applies) lists further extensions to skip, one per line (`md`, `.json`, `*.vue`); a file named directly
-with such an extension is refused with the reason.
+(`package-lock.json`, `*.min.js`, `*.min.css`, minified / bundled JS / CSS by content), binary content, the built-in
+folders (`vendor`, `node_modules`, …) and what the `.gitignore` files exclude (git rules; every folder's own file). A
+`.callgraphignore` file in the project: a line `md` / `.md` / `*.md` skips an extension (the nearest file applies; a
+file named directly with such an extension is refused with the reason), any other line is a `.gitignore` pattern
+relative to its folder (`public/build`, `/storage/`, `!keep.js`). `--no-gitignore` (any command) or
+`CALLGRAPH_GITIGNORE=0` (MCP server, hook) turns the `.gitignore` files off; `.callgraphignore` still applies.
 
 ## Limits
 
@@ -239,4 +262,5 @@ with such an extension is refused with the reason.
 Static analysis: dynamic calls (`$this->$method()`, `obj[key]()`), magic methods and class names / registered components
 assembled at runtime cannot be resolved. By default `--depth` follows only the certain (resolved) callers;
 name-only matches are shown by `--guess` with a "?" mark. For the exact control logic you need `--body` (compact, comments kept; `--raw` gives the exact text).
+A `⚠ syntax error` line means a file did not parse fully: the result may be incomplete — read that file directly.
 <!-- /mcp -->

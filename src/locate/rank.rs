@@ -2,7 +2,10 @@
 //! definíció messze a legtöbbet ér, a név-részlet és a string-literál jóval kevesebbet), a kifejezés ritkasága
 //! szerint súlyozva (a sok fájlban előforduló, általános kifejezés kevesebbet ér — IDF), és a tesztfájlok kisebb
 //! súllyal (az agent jellemzően a megvalósítást keresi; a teszt a listában marad, csak hátrébb). Egy kifejezés sok
-//! találata csak kis, korlátos előnyt ad. Holtversenyben az út dönt (stabil).
+//! találata csak kis, korlátos előnyt ad. A rangsor két szintű: elöl a pontos egyezésű fájlok (egy definíció neve
+//! vagy a fájlnév maga egy kifejezés — több kifejezésnél se előzze meg egy pontos komponenst a sok kifejezésre csak
+//! stringgel illő fordítási / build-fájl), utánuk a többi; szinten belül a pontszám. Holtversenyben az út dönt
+//! (stabil).
 
 use std::collections::{HashMap, HashSet};
 
@@ -106,7 +109,8 @@ pub(crate) fn is_test_path(path: &str) -> bool {
 
 /// Rangsor: a pontszám a kifejezések ritkaságával súlyozva (IDF: `1 + ln(fájlok / a kifejezésre illő fájlok)`,
 /// ezrelékben), tesztfájlnál (`is_test`: a gyökérhez relatív úton dönt, pl. `is_test_path`) kisebb szorzóval;
-/// csökkenő pontszám, holtversenyben út szerint növekvő sorrend.
+/// elöl a pontos egyezésű fájlok (`exact`), szinten belül csökkenő pontszám, holtversenyben út szerint növekvő
+/// sorrend.
 pub(crate) fn rank(mut files: Vec<FileMatch>, is_test: impl Fn(&str) -> bool) -> Vec<FileMatch> {
     let total = files.len().max(1) as f64;
     let mut df: HashMap<usize, usize> = HashMap::new();
@@ -132,8 +136,21 @@ pub(crate) fn rank(mut files: Vec<FileMatch>, is_test: impl Fn(&str) -> bool) ->
         }
         file.score = score;
     }
-    files.sort_by(|a, b| b.score.cmp(&a.score).then_with(|| a.path.cmp(&b.path)));
+    files.sort_by(|a, b| {
+        exact(b)
+            .cmp(&exact(a))
+            .then_with(|| b.score.cmp(&a.score))
+            .then_with(|| a.path.cmp(&b.path))
+    });
     files
+}
+
+/// Pontos egyezésű-e a fájl: egy definíció neve (osztály, komponens, függvény, konstans, útvonal-definíció) vagy a
+/// fájl neve / törzse maga egy kifejezés.
+fn exact(file: &FileMatch) -> bool {
+    file.hits
+        .iter()
+        .any(|hit| matches!(hit.kind, Kind::Definition | Kind::FileName))
 }
 
 /// Csillagok a kiíráshoz, a legjobb fájlhoz mért pontszám szerint (★★★ / ★★ / ★).

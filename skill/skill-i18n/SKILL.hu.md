@@ -31,10 +31,16 @@ kódnév-megfelelőjét is (pl. visszatérítés → `refund`). A projekt-térk�
 fájl (`--all`: minden találat), mindegyik az indoklásával (pontos definíció, fájlnév, név-részlet, string, hívás,
 `hívók: N`). Ezekkel a fájlokkal folytasd: outline / `--body` / `--grep`.
 <!-- /mcp -->
+Különleges kifejezések: a szóközös, idézőjeles kifejezés (`"Szervező további eseményei"`) EGY kifejezés, egészében a
+string-literálokra illesztve (feliratok, fordítások), szavakra sosem bontva; a `route::events.show` az útvonal
+definícióját (`->name('events.show')` a `routes/*.php`-ban, elöl) és a `route()` / `to_route()` / `redirect()->route()`
+hívásait adja a PHP- és JS / TS / Vue-fájlokban; a `--orange-500` CSS custom property, nem kapcsoló. A pontos
+definíciójú vagy fájlnevű fájlok megelőzik a csak stringgel illőket (fordítások, build-kimenet).
 
 ```bash
 bash <skill>/callgraph.sh locate RefundController processRefund refund payment_status checkout.vue --project myapp   # honnan induljak: rangsorolt fájlok + indoklás
 bash <skill>/callgraph.sh locate refund --all --project myapp                                                       # minden egyező fájl, nem csak az első 5
+bash <skill>/callgraph.sh locate route::events.show "Szervező további eseményei" --project myapp                     # egy útvonal (a definíció elöl) és egy felirat
 ```
 
 ## Gyors parancsok
@@ -45,6 +51,7 @@ bash $CG --project myapp app/Http/Controllers/X.php                  # outline: 
 bash $CG --project myapp app/Http/Controllers/X.php::store           # csak egy metódus (több ::szelektor, több fájl is)
 bash $CG --project myapp app/Http/Controllers/X.php::store --body    # a metódus forrása, tömören (kommentekkel, docblock nélkül: --doc; --raw = pontos)
 bash $CG --project myapp app/Http/Controllers/X.php --lines 30-60    # tetszőleges sáv sorszámozva (view, procedurális fájl)
+bash $CG --project myapp package.json::scripts --body                # egy JSON-kulcs a pontos soraival (pontokkal tagolt út: scripts.build, files.0)
 bash $CG --project myapp app --strings 'Order not found'             # string-literál (hibaüzenet, kulcs) helye
 bash $CG --project myapp app --const STATUS_ACTIVE                   # konstans: definíció, hivatkozások, továbbexportálás
 bash $CG --project myapp app --grep '(^|::|\.|->)cancel$'           # ki hívja: a név MINDEN hívása, a hívás sorával
@@ -79,16 +86,27 @@ az interfészén / szülőjén / trait-jén át menőket), ezért hívók maradh
 bash $CG profile --project myapp                                     # architektúra, rétegek (mappák, fájlszám), minták, hívásirány, ismeretlen mappák
 bash $CG profile --project myapp --full                              # mappánként, bizonyosság szerint, a rétegek közti hívás-párok
 bash $CG --project myapp app --layer service                         # csak egy réteg fájljai (több: service,repository)
+bash $CG --project myapp . --layer controller:js                     # csak egy ökoszisztéma (php, js, swift, rust), ha a szerep mindkettőben van
 bash $CG --project myapp app --format summary --layers               # summary rétegenként csoportosítva
-bash $CG --project myapp app --grep 'Repo::find' --depth 2 --by-layer # hívók rétegek szerint, a hívotthoz legközelebbi elöl
+bash $CG --project myapp app --grep 'Repo::find' --depth 2 --by-layer # hívók rétegenként csoportosítva, csoportonként "[service]  3 hívó" fejléccel
 ```
 
 Ismeretlen projektben a mappák listázása helyett futtasd egyszer az elején a `profile`-t (~15 sor): megmondja, melyik
 mappában melyik réteg van, így a mappaneveket nem ismerve is szűkíthetsz a `--layer <név>`-vel. A réteg egy név a
 profilból (`controller`, `service`, `repository`, `model`, `component`, `store`…), nem út. A szerepek a mappa- és
 fájlnevekből jönnek, a gráffal megerősítve (bizonyosság magas / közepes / alacsony; „ismeretlen”, ha nem egyértelmű).
+A rétegek fájlszám szerint sorakoznak. Ha egy szerep a backendben és a frontendben is megvan, a profil külön mutatja
+(`controller (php)` / `controller (js)`), és a hívásirány-lánc sem köti össze őket; a `--layer controller` mindkettőt
+adja, a `--layer controller:js` (vagy `"controller (js)"`) csak az egyiket. A projektbe bemásolt külső kód (saját
+`composer.json` / `package.json` / `LICENSE` fájlos almappa, vagy `vendors/`, `third_party/`, `extensions/`,
+`external/`, `libs/`) és a build-kimenet (`dist/`, `build/`, `*.min/`, minifikált fájlok) kimarad a profilból — erről
+egy `vendor: N fájl kihagyva (…)` sor szól; a lekérdezések ezeket is látják (`profile --with-vendor`: a profil is
+számol velük). Az `event`, `listener` és `job` réteghez kód-jel kell (Event / Listener ősosztály vagy interfész,
+`Dispatchable`, `ShouldQueue`, `handle(…)` a `Listeners` névtérben); egy `Event` nevű mappa magában nem event-réteg.
 A réteg magától soha nem rejt el találatot: csak a `--layer` szűr, a `--layers` / `--by-layer` csak csoportosít és
-sorrendez. Saját mappanevek: `.callgraph-layers` a projekt gyökerében (`service = app/Logic`,
+sorrendez. A `--by-layer` a hívásokat (`--depth`-tel szintenként) rétegenként csoportosítja, a hívotthoz legközelebbi
+réteg elöl (a hívásirányban a legmélyebb: model → repository → service → controller), minden csoport előtt egy
+`[service]  3 hívás` fejléccel. Saját mappanevek: `.callgraph-layers` a projekt gyökerében (`service = app/Logic`,
 `ignore-role = app/Legacy`). MCP: a `project_profile` eszköz és a `layer` / `by_layer` paraméter.
 
 ## Melyik `--format` mire való
@@ -229,11 +247,17 @@ Minden adat a projekt saját `.callgraph/` mappájába kerül (cache, projekt-t�
 változott fájlok frissülnek, így az ismételt keresés gyors; a mappa magától létrejön,
 `*`-os `.gitignore`-ral, így a verziókezelésbe nem kerül). A projekten kívül semmi nem íródik. Ha a mappa
 nem írható, cache nélkül fut. Takarítás: `callgraph prune` (lásd README).
+Helyi használati statisztika (csak darabszámok és sávok, út és név nélkül, sehova nem megy):
+`bash <skill>/callgraph.sh stats`, ha a felhasználó kérdezi, hogyan használják a callgraph-ot; kikapcsolás: `CALLGRAPH_STATS=0`.
 
 Feldolgozott fájlok: csak a támogatott kiterjesztésűek (nagybetűvel is: `B.PHP`), a generált fájlok
-(`package-lock.json`, `*.min.js`, `*.min.css`) és a bináris tartalom nélkül. A projekt `.callgraphignore` fájlja
-(a legközelebbi érvényes) további kizárt kiterjesztéseket sorol fel, soronként egyet (`md`, `.json`, `*.vue`); az
-ilyen kiterjesztésű, közvetlenül megadott fájlt indoklással elutasítja.
+(`package-lock.json`, `*.min.js`, `*.min.css`, a tartalma szerint minifikált / bundlolt JS / CSS), a bináris tartalom,
+a beépített mappák (`vendor`, `node_modules`, …) és a `.gitignore` fájlok által kizártak nélkül (git-szabályok; minden
+mappa saját fájlja). A projekt `.callgraphignore` fájlja: az `md` / `.md` / `*.md` sor egy kiterjesztést zár ki (a
+legközelebbi fájl érvényes; az ilyen kiterjesztésű, közvetlenül megadott fájlt indoklással elutasítja), minden más sor
+a mappájához relatív `.gitignore`-minta (`public/build`, `/storage/`, `!keep.js`). A `--no-gitignore` (bármely
+parancsnál) vagy a `CALLGRAPH_GITIGNORE=0` (MCP-szerver, hook) kikapcsolja a `.gitignore` fájlokat; a
+`.callgraphignore` ekkor is érvényes.
 
 ## Korlát
 
@@ -241,4 +265,5 @@ ilyen kiterjesztésű, közvetlenül megadott fájlt indoklással elutasítja.
 Statikus elemzés: dinamikus hívás (`$this->$method()`, `obj[key]()`), magic method és futásidőben összeállított
 osztálynév / regisztrált komponens nem oldható fel. A `--depth` alapból csak a biztos (feloldott) hívókat követi;
 a név szerinti egyezést a `--guess` mutatja „?” jellel. A pontos vezérlési logikához a `--body` kell (tömör, kommentekkel; a `--raw` a pontos szöveget adja).
+A `⚠ szintaktikai hiba` sor: egy fájl nem elemezhető teljesen, az eredmény hiányos lehet — azt a fájlt olvasd közvetlenül.
 <!-- /mcp -->

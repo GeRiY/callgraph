@@ -78,6 +78,7 @@ impl FileFacts {
             writes: Vec::new(),
             sfc: None,
             binary: source.binary,
+            parse_errors: source.parse_errors.clone(),
         };
         Self {
             graph,

@@ -63,16 +63,36 @@ Where to start with a task (one call with the names and domain terms of the task
                                                 3 reasons: exact definition, file name, name part (camelCase / snake_case /
                                                 kebab-case, singular / plural), string literal, call; "callers: N";
                                                 top 5 files, --all: every matching file; "no match: …" lists the terms
-                                                not found, "too general" the ones matching more than 30 files
+                                                not found, "too general" the ones matching more than 30 files;
+                                                exact definitions / file names rank first
+                                                "a quoted phrase" (with spaces): one term, matched as a whole against
+                                                string literals (UI labels); route::events.show: the route definition
+                                                (->name() in routes/*.php) first, then the route() / to_route() /
+                                                redirect()->route() calls; --orange-500: a CSS custom property
+
+Excluded files: built-in folders (vendor, node_modules, …), minified / bundled JS / CSS, every folder's .gitignore
+  (git rules), and .callgraphignore: "md" / ".md" / "*.md" excludes an extension, any other line is a .gitignore
+  pattern relative to its folder ("public/build", "/storage/", "!keep.js"). --no-gitignore (any command) or
+  CALLGRAPH_GITIGNORE=0 (MCP server, hook): the .gitignore files are not applied (.callgraphignore still is).
+  bash ~/.claude/skills/callgraph/callgraph.sh --version                       version, platform and the binary's path
 
 Project profile (architecture, layers and patterns from folder / file names, checked against the graph):
-  bash ~/.claude/skills/callgraph/callgraph.sh profile [--project alias] [--full]
+  bash ~/.claude/skills/callgraph/callgraph.sh profile [--project alias] [--full] [--with-vendor]
                                                 ~15 lines: architecture, layers with folders and file counts, patterns,
-                                                call direction between layers, unknown folders; --full: per folder
-  bash ~/.claude/skills/callgraph/callgraph.sh <dir> --layer service           only the files of that layer (name,name...)
+                                                call direction between layers, unknown folders; --full: per folder;
+                                                embedded third-party code and build output are skipped (--with-vendor:
+                                                counted too); a role in both PHP and JS: controller (php) / controller (js)
+  bash ~/.claude/skills/callgraph/callgraph.sh <dir> --layer service           only the files of that layer (name,name...;
+                                                one ecosystem: controller:php, controller:js, …:swift, …:rust)
   bash ~/.claude/skills/callgraph/callgraph.sh <dir> --layers                  summary grouped by layer, [role] on FILE lines
-  bash ~/.claude/skills/callgraph/callgraph.sh <dir> --grep <pattern> --depth 2 --by-layer   callers ordered by layer
+  bash ~/.claude/skills/callgraph/callgraph.sh <dir> --grep <pattern> --depth 2 --by-layer   callers grouped by layer
+                                                (closest to the callee first), a "[service]  3 calls" header per group
   Own folder names: a .callgraph-layers file in the project root ("service = app/Logic", "ignore-role = app/Legacy").
+
+Local usage stats (stays on this computer, nothing is sent anywhere; no paths, names or search terms):
+  bash ~/.claude/skills/callgraph/callgraph.sh stats [--days N]
+                                                calls per command / MCP tool, errors, time and output size in ranges,
+                                                locate hit rate; last 7 days (max 90); turn off: CALLGRAPH_STATS=0
 
 Refresh ahead of time (after a git pull or many edits, so the next query does not have to re-analyse):
   bash ~/.claude/skills/callgraph/callgraph.sh refresh [--project alias]     every changed / new / deleted file of the project

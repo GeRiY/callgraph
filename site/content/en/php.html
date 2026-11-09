@@ -1,0 +1,128 @@
+<section class="hero page" aria-labelledby="title">
+  <div>
+    <h1 id="title">PHP call graph and impact analysis for AI agents</h1>
+    <p class="lead">callgraph reads your <code>.php</code> files from the syntax tree and tells your agent what is in a
+      class, which method lives on which lines, what each method calls — sorted by category — and who calls it, across
+      the whole project. Laravel and Yii aware, without reading whole files.</p>
+    <div class="cta">
+      <a class="btn primary" href="/#install">Install</a>
+      <a class="btn" href="/mcp/">Use it over MCP</a>
+    </div>
+  </div>
+</section>
+
+<section id="extracts" aria-labelledby="h-extracts">
+  <h2 id="h-extracts">What callgraph extracts from PHP</h2>
+  <ul>
+    <li>Classes, traits and enums, with <code>extends</code> and the namespace.</li>
+    <li>Methods with exact line ranges, properties, constants and docblocks.</li>
+    <li>Calls with type tracking, each labelled with a category.</li>
+    <li>String literals and <code>if</code> / <code>match</code> / <code>switch</code> branches (<code>--format flow</code>).</li>
+    <li>Framework detection: Laravel and Yii.</li>
+  </ul>
+  <p>Call categories you will see in a PHP outline include <code>native_php</code>, <code>orm_relation</code>,
+    <code>model_use</code>, <code>global_helper</code>, <code>internal_helper</code>, <code>external_call</code> and
+    <code>framework_use</code>, so the agent sees intent, not just names. Filter by them with
+    <code>--category model_use,orm_relation</code>.</p>
+</section>
+
+<section id="example" aria-labelledby="h-example">
+  <h2 id="h-example">Outline of a model</h2>
+  <p>One command instead of reading the file:</p>
+```
+bash ~/.claude/skills/callgraph/callgraph.sh --project shop app/Models/Order.php
+```
+  <p class="label">Output</p>
+```out
+FILE  /srv/shop/app/Models/Order.php  NS:App\Models
+
+class Order extends Illuminate\Database\Eloquent\Model  L7-23
+  constants (1):
+    STATUS_OPEN = 'open'
+  properties (1):
+    mixed $fillable
+  saveTranslations()  L13-20
+    external_call     create, info
+    global_helper     logger
+    internal_helper   translations
+  translations()  L22-22
+    orm_relation      hasMany
+```
+  <p>Then read only the method you need, line-numbered (the docblock above it and blank lines are left out, comments
+    inside stay; <code>--doc</code> adds the docblock, <code>--raw</code> prints the exact source):</p>
+```
+bash ~/.claude/skills/callgraph/callgraph.sh --project shop app/Models/Order.php::save --body
+```
+</section>
+
+<section id="callers" aria-labelledby="h-callers">
+  <h2 id="h-callers">Who calls this PHP method?</h2>
+  <p>Start with the name pattern — it catches every call, also where the receiver type is unknown, inherited or comes
+    from a trait. <code>Type::method</code> finds only the calls resolved to that type, so use it to narrow a common
+    name like <code>save</code> or <code>find</code>:</p>
+```
+bash ~/.claude/skills/callgraph/callgraph.sh --project shop app --grep '(^|::|\.|->)cancel$'
+bash ~/.claude/skills/callgraph/callgraph.sh --project shop app --grep 'Order::cancel'
+bash ~/.claude/skills/callgraph/callgraph.sh --project shop app --grep 'Order::cancel' --depth 3
+```
+  <p>With <code>--depth N</code> callgraph walks callers of callers for impact analysis:</p>
+```out
+$ callgraph.sh --project shop app --grep saveTranslations --depth 2
+== level 1 — directly calls: /saveTranslations/
+  /srv/shop/app/Models/Order.php  Caller::run()  L25-25
+
+== level 2 — calls the previous level
+  (no more callers)
+```
+  <ul>
+    <li>Every match shows the call's own source line, e.g. <code>L25 │ $this-&gt;repo-&gt;find($id)</code>, so the
+      agent sees the arguments without another read.</li>
+    <li>Searching <code>Class::method</code> also finds calls made through its interface, abstract parent or trait,
+      marked <code>via Resolver</code>.</li>
+    <li>Calls from child classes that use the inherited method as <code>$this-&gt;method()</code> are found too, marked
+      with the child class (<code>L139 via EventeditController │ …</code>). A child class with its own version of the
+      method is not counted.</li>
+    <li><code>--guess</code> adds name-only matches, marked <code>?</code>.</li>
+  </ul>
+</section>
+
+<section id="framework" aria-labelledby="h-framework">
+  <h2 id="h-framework">Laravel and Yii views</h2>
+  <p>Framework views run on a directory and give one focused list each: <code>routes</code>, <code>middleware</code>,
+    <code>validation</code>, <code>jobs</code>, <code>events</code>, <code>providers</code>, <code>magic</code>,
+    <code>di</code> and <code>views</code>.</p>
+```
+bash ~/.claude/skills/callgraph/callgraph.sh --project shop routes --format routes
+bash ~/.claude/skills/callgraph/callgraph.sh --project shop app --format validation
+```
+  <p>Over MCP the same views are the <code>framework_view</code> tool. In an unfamiliar Laravel or Yii project,
+    <a href="/profile/"><code>profile</code></a> shows the layered MVC structure first: which folder holds the
+    controllers, services, repositories and models.</p>
+</section>
+
+<section id="search" aria-labelledby="h-search">
+  <h2 id="h-search">Strings and constants</h2>
+```
+bash ~/.claude/skills/callgraph/callgraph.sh --project shop app --strings 'Order not found'
+bash ~/.claude/skills/callgraph/callgraph.sh --project shop app --const STATUS_ACTIVE
+```
+  <p><code>--const</code> lists the definition, the references and re-exports such as <code>use const App\NAME;</code>,
+    marked <code>[re-export]</code>.</p>
+</section>
+
+<section id="limits" aria-labelledby="h-limits">
+  <h2 id="h-limits">Limits</h2>
+  <p>This is static analysis: dynamic calls (<code>$this-&gt;$method()</code>), magic methods and class names assembled at
+    runtime cannot be resolved. By default <code>--depth</code> follows only resolved callers; <code>--guess</code>
+    shows the name-only ones. For exact control logic, read the method with <code>--body</code>.</p>
+</section>
+
+<section id="related" aria-labelledby="h-related">
+  <h2 id="h-related">Related</h2>
+  <div class="grid">
+    <a class="card" href="/locate/"><h3>locate</h3><p>Ranked files to start a task with.</p></a>
+    <a class="card" href="/profile/"><h3>Project profile</h3><p>Layers and patterns of a Laravel / Yii project.</p></a>
+    <a class="card" href="/mcp/"><h3>MCP server</h3><p>The same queries in Claude Desktop, Cursor or VS Code.</p></a>
+    <a class="card" href="/typescript/"><h3>TypeScript / Vue</h3><p>The frontend side of a Laravel + Vue app.</p></a>
+  </div>
+</section>

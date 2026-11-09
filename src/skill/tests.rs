@@ -115,6 +115,31 @@ fn fail_logs_and_prints_feedback_line() {
 }
 
 #[test]
+fn user_errors_are_not_logged_internal_errors_are() {
+    let t = Tmp::new();
+    let home = t.home();
+    for failure in [
+        SkillFailure::usage("Unknown layer: nope"),
+        SkillFailure::not_found("Not found: x.php"),
+        SkillFailure::from(crate::error::CallgraphError::Usage("bad flag".into())),
+    ] {
+        let mut err = Vec::new();
+        let code = finish(&home, "callgraph.sh", Err(failure), &mut err).unwrap();
+        assert_eq!(code, 1);
+        let text = String::from_utf8(err).unwrap();
+        assert!(!text.contains("error-id"), "{text}");
+        assert_eq!(text.lines().count(), 1, "{text}");
+    }
+    assert!(!home.errors_file().exists());
+    let mut err = Vec::new();
+    let failure = SkillFailure::from(std::io::Error::other("disk full"));
+    let code = finish(&home, "callgraph.sh", Err(failure), &mut err).unwrap();
+    assert_eq!(code, 1);
+    assert!(String::from_utf8(err).unwrap().contains("[error-id: "));
+    assert_eq!(ErrorLog::new(home.errors_file()).all().len(), 1);
+}
+
+#[test]
 fn feedback_add_resolve_list_show() {
     let t = Tmp::new();
     let home = t.home();

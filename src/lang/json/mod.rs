@@ -1,5 +1,9 @@
 //! JSON/JSONC dokumentum-indexelő.
 
+mod value;
+
+pub(crate) use value::key_lines;
+
 use std::path::{Path, PathBuf};
 
 use jsonc_parser::{
@@ -32,17 +36,6 @@ impl JsonDocument {
             .collect()
     }
 
-    fn value_type(value: &Value<'_>) -> &'static str {
-        match value {
-            Value::StringLit(_) => "string",
-            Value::NumberLit(_) => "number",
-            Value::BooleanLit(_) => "boolean",
-            Value::Object(_) => "object",
-            Value::Array(_) => "array",
-            Value::NullKeyword(_) => "null",
-        }
-    }
-
     fn scalar(value: &Value<'_>) -> Option<String> {
         match value {
             Value::StringLit(value) => Some(value.value.to_string()),
@@ -71,7 +64,7 @@ impl JsonDocument {
                     kind: "key".into(),
                     name: child_path.clone(),
                     line: Self::line(property.name.range().start, starts),
-                    value: Some(Self::value_type(&property.value).into()),
+                    value: Some(value::display(&property.value)),
                     visibility: Some("public".into()),
                     caller: None,
                     doc: None,
@@ -151,7 +144,14 @@ impl Language for JsonDocument {
                 }
                 Vec::new()
             }
-            Err(error) => vec![format!("JSONC parse warning: {error}")],
+            Err(error) => {
+                let line = u32::try_from(error.line_display()).unwrap_or(u32::MAX);
+                b.parse_error(crate::model::ParseError::new(
+                    line,
+                    &error.kind().to_string(),
+                ));
+                vec![format!("JSONC parse warning: {error}")]
+            }
         };
         Ok(Analysis {
             graph: b.build(),
@@ -195,6 +195,23 @@ mod tests {
                 .map(|c| c.name.as_str())
                 .collect::<Vec<_>>(),
             ["scripts", "scripts.build", "items", "items.name"]
+        );
+    }
+
+    #[test]
+    fn syntax_error_is_recorded_with_its_line() {
+        let file = SourceFile::new("b.json", b"{\n  \"a\": 1,\n  \"b\": ]\n}\n".to_vec(), None);
+        let graph = JsonDocument.analyze(&file).unwrap().graph;
+        assert_eq!(graph.parse_errors.len(), 1);
+        assert_eq!(graph.parse_errors[0].line, 3, "{:?}", graph.parse_errors);
+        let ok = SourceFile::new("c.json", b"{\"a\": 1}\n".to_vec(), None);
+        assert!(
+            JsonDocument
+                .analyze(&ok)
+                .unwrap()
+                .graph
+                .parse_errors
+                .is_empty()
         );
     }
 

@@ -3,8 +3,9 @@
 
 use super::role::Confidence::{self, High, Medium};
 
-/// A fájl ökoszisztémája a kiterjesztéséből (a szabályok ezek szerint szűrnek).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+/// A fájl ökoszisztémája a kiterjesztéséből (a szabályok ezek szerint szűrnek; a réteg ezzel minősül, ha egy szerep
+/// több ökoszisztémában is előfordul: `controller (php)` / `controller (js)`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub(crate) enum Eco {
     Php,
     Js,
@@ -20,6 +21,27 @@ impl Eco {
             "js" | "jsx" | "ts" | "tsx" | "mjs" | "cjs" | "mts" | "cts" | "vue" => Some(Self::Js),
             "swift" => Some(Self::Swift),
             "rs" => Some(Self::Rust),
+            _ => None,
+        }
+    }
+
+    /// A kiírt név (a réteg-minősítőben és a `--layer controller:js` szűrőben).
+    pub(crate) fn name(self) -> &'static str {
+        match self {
+            Self::Php => "php",
+            Self::Js => "js",
+            Self::Swift => "swift",
+            Self::Rust => "rust",
+        }
+    }
+
+    /// Felhasználói bemenet (`php`, `js` / `ts` / `vue`, `swift`, `rust` / `rs`), kisbetűsítve.
+    pub(crate) fn parse(input: &str) -> Option<Self> {
+        match input.trim().to_ascii_lowercase().as_str() {
+            "php" => Some(Self::Php),
+            "js" | "ts" | "vue" | "javascript" | "typescript" => Some(Self::Js),
+            "swift" => Some(Self::Swift),
+            "rust" | "rs" => Some(Self::Rust),
             _ => None,
         }
     }

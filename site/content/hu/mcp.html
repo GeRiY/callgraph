@@ -1,0 +1,219 @@
+<section class="hero page" aria-labelledby="title">
+  <div>
+    <h1 id="title">A callgraph MCP-szerver beállítása</h1>
+    <p class="lead">A callgraph <a href="https://modelcontextprotocol.io">Model Context Protocol</a>-szerver is, stdio-n:
+      <code>callgraph mcp</code>. A Claude Code, a Claude Desktop, a Cursor, a VS Code vagy bármely más MCP-kliens
+      ugyanazokat a lekérdezéseket típusos eszközként hívja — ugyanazzal a tömör szöveggel és kimeneti korláttal, mint a
+      parancssor.</p>
+    <div class="cta">
+      <a class="btn primary" href="#clients">Válaszd ki a kliensed</a>
+      <a class="btn" href="#tools">A tíz eszköz</a>
+      <a class="btn" href="/hu/#install">Előbb a telepítés</a>
+    </div>
+  </div>
+</section>
+
+<section id="before" aria-labelledby="h-before">
+  <h2 id="h-before">Mielőtt belekezdesz</h2>
+  <p>Az MCP-szerver ugyanaz a bináris, amit a skill is használ, ezért előbb <a href="/hu/#install">telepítsd a
+    callgraph-csomagot</a>. A bináris a skill-csomagban van: <code>~/.claude/skills/callgraph/bin/&lt;os&gt;-&lt;arch&gt;/callgraph</code>
+    (mappák: <code>darwin-arm64</code>, <code>darwin-x86_64</code>, <code>linux-x86_64</code>, <code>linux-aarch64</code>;
+    Windows: <code>bin\windows-x86_64\callgraph.exe</code>).</p>
+  <p>A JSON-beállításokba <b>abszolút út</b> kell (a <code>~</code> ott nem bővül). macOS-en / Linuxon ez kiírja:</p>
+```
+echo ~/.claude/skills/callgraph/bin/$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)/callgraph
+```
+  <p>Nem minden kliens a projektmappában indítja a szervert, ezért egyszer regisztráld a projekteket aliasként:</p>
+```
+bash ~/.claude/skills/callgraph/projects.sh add shop /abszolút/út/a/shophoz
+```
+</section>
+
+<section id="clients" aria-labelledby="h-clients">
+  <h2 id="h-clients">A kliens beállítása</h2>
+  <p class="sub">Minden példa az <code>--auto-update</code>-et használja (ajánlott, lásd <a href="#updates">frissítés</a>).
+    A <code>/Users/te/…/darwin-arm64/callgraph</code> helyére a fent kiírt út kerül.</p>
+  <div class="tabs" role="tablist" aria-label="MCP-kliens">
+    <button role="tab" id="t-cc" aria-controls="p-cc" aria-selected="true">Claude Code</button>
+    <button role="tab" id="t-cd" aria-controls="p-cd" aria-selected="false" tabindex="-1">Claude Desktop</button>
+    <button role="tab" id="t-cu" aria-controls="p-cu" aria-selected="false" tabindex="-1">Cursor</button>
+    <button role="tab" id="t-vs" aria-controls="p-vs" aria-selected="false" tabindex="-1">VS Code</button>
+  </div>
+
+  <div class="panel" id="p-cc" role="tabpanel" aria-labelledby="t-cc">
+    <h3 class="tab-title" id="claude-code">Claude Code</h3>
+    <p><b>A telepítővel:</b> ha a <code>claude</code> parancs a PATH-on van, a <code>bash install.sh</code> rákérdez,
+      hogy regisztrálja-e az MCP-szervert; a <code>bash install.sh --mcp</code> kérdés nélkül megteszi, a
+      <code>--no-mcp</code> kihagyja. Újrafuttatva nem vesz fel duplán.</p>
+    <p><b>Kézzel</b>, macOS / Linux (a géphez illő binárist választja; a <code>-s user</code> miatt minden projektben elérhető):</p>
+```
+claude mcp add -s user callgraph -- \
+  ~/.claude/skills/callgraph/bin/$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)/callgraph mcp --auto-update
+```
+    <p>Windows (PowerShell):</p>
+```
+claude mcp add -s user callgraph -- "$env:USERPROFILE\.claude\skills\callgraph\bin\windows-x86_64\callgraph.exe" mcp --auto-update
+```
+    <p><b>Ellenőrzés:</b> a <code>claude mcp get callgraph</code> kiírja a regisztrált parancsot. Indítsd újra a Claude
+      Code-ot; ezután elérhetők a callgraph eszközei. Eltávolítás: <code>claude mcp remove -s user callgraph</code>.
+      Claude Code-ban a skill is működik — a kettő megfér egymás mellett.</p>
+  </div>
+
+  <div class="panel" id="p-cd" role="tabpanel" aria-labelledby="t-cd">
+    <h3 class="tab-title" id="claude-desktop">Claude Desktop</h3>
+    <p>Ezt írd a <code>claude_desktop_config.json</code>-ba:</p>
+```
+{
+  "mcpServers": {
+    "callgraph": {
+      "command": "/Users/te/.claude/skills/callgraph/bin/darwin-arm64/callgraph",
+      "args": ["mcp", "--auto-update"]
+    }
+  }
+}
+```
+    <p>A Claude Desktop nem a projektmappában indítja a szervert: kérdéskor nevezd meg a regisztrált aliast (például
+      <code>shop</code>), így az eszközök megkapják a <code>project</code> paramétert.</p>
+    <p><b>Ellenőrzés:</b> indítsd újra a Claude Desktopot, és kérd meg, hogy sorolja fel a callgraph eszközeit, vagy
+      hívja meg a <code>projects</code> eszközt — ez a regisztrált aliasokat adja vissza.</p>
+  </div>
+
+  <div class="panel" id="p-cu" role="tabpanel" aria-labelledby="t-cu">
+    <h3 class="tab-title" id="cursor">Cursor</h3>
+    <p>Ezt írd a <code>.cursor/mcp.json</code>-ba:</p>
+```
+{
+  "mcpServers": {
+    "callgraph": {
+      "command": "/Users/te/.claude/skills/callgraph/bin/darwin-arm64/callgraph",
+      "args": ["mcp", "--auto-update"]
+    }
+  }
+}
+```
+    <p><b>Ellenőrzés:</b> indítsd újra a Cursort, és kérd meg, hogy sorolja fel a callgraph eszközeit.</p>
+  </div>
+
+  <div class="panel" id="p-vs" role="tabpanel" aria-labelledby="t-vs">
+    <h3 class="tab-title" id="vs-code">VS Code</h3>
+    <p>Ezt írd a <code>.vscode/mcp.json</code>-ba:</p>
+```
+{
+  "servers": {
+    "callgraph": {
+      "type": "stdio",
+      "command": "/Users/te/.claude/skills/callgraph/bin/darwin-arm64/callgraph",
+      "args": ["mcp", "--auto-update"],
+      "cwd": "${workspaceFolder}"
+    }
+  }
+}
+```
+    <p><b>Ellenőrzés:</b> indítsd újra a VS Code-ot, és kérd meg az agentet, hogy sorolja fel a callgraph eszközeit.</p>
+  </div>
+
+  <h3 id="windows" style="margin-top:22px">Windows-utak a JSON-ban</h3>
+  <p>Windowson a bináris a <code>bin\windows-x86_64\</code> alatti <code>callgraph.exe</code>. A JSON-ban minden
+    <code>\</code> dupla; a <code>te</code> helyére a Windows-felhasználóneved kerül:</p>
+```
+{
+  "mcpServers": {
+    "callgraph": {
+      "command": "C:\\Users\\te\\.claude\\skills\\callgraph\\bin\\windows-x86_64\\callgraph.exe",
+      "args": ["mcp", "--auto-update"]
+    }
+  }
+}
+```
+  <p class="sub">VS Code-ban ugyanezt a <code>command</code> értéket írd a fenti <code>servers</code> bejegyzésbe.</p>
+</section>
+
+<section id="tools" aria-labelledby="h-tools">
+  <h2 id="h-tools">A tíz eszköz</h2>
+  <p class="sub">Az utak a projektgyökérhez relatívak: egy regisztrált alias (<code>project</code>) vagy a szerver
+    munkakönyvtára. Szokásos menet: <code>locate</code> → <code>outline</code> → <code>method_body</code> →
+    <code>find_callers</code>.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th scope="col">Eszköz</th><th scope="col">Mit ad</th><th scope="col">CLI-megfelelő</th></tr></thead>
+    <tbody>
+      <tr><td><a href="/hu/locate/"><code>locate</code></a></td><td>Honnan induljak: rangsorolt fájlok a feladat neveiből és fogalmaiból, mindegyik indoklással (alapból 5, <code>all: true</code>: minden találat).</td><td><code>locate &lt;kifejezés&gt;… [--all]</code></td></tr>
+      <tr><td><a href="/hu/profile/"><code>project_profile</code></a></td><td>Architektúra, rétegek mappával és fájlszámmal, minták, a rétegek közti hívásirány, ismeretlen mappák.</td><td><code>profile [--full]</code></td></tr>
+      <tr><td><code>outline</code></td><td>Fájl vagy mappa szerkezete: osztályok / komponensek, metódusok sortartománnyal, hívások kategóriánként; <code>format</code>: <code>api</code>, <code>flow</code>, <code>summary</code>, <code>hotspots</code>, <code>stats</code>.</td><td><code>&lt;út&gt;[::m] --format &lt;f&gt;</code></td></tr>
+      <tr><td><code>method_body</code></td><td>Egy vagy több metódus sorszámozott forrása, alapból tömören; a <code>doc: true</code> a docblockot is hozza, a <code>raw: true</code> a pontos szöveget adja.</td><td><code>::m --body [--doc|--raw]</code></td></tr>
+      <tr><td><code>find_callers</code></td><td>Ki hívja; a <code>depth</code> 2–5 hatáselemzéshez, a <code>guess: true</code> a csak név szerinti egyezésekhez.</td><td><code>--grep &lt;minta&gt; --depth N</code></td></tr>
+      <tr><td><code>search</code></td><td>Hol van egy string-literál vagy konstans (<code>kind</code>: <code>strings</code> | <code>constants</code>).</td><td><code>--strings</code> / <code>--const</code></td></tr>
+      <tr><td><code>framework_view</code></td><td>Egy mappa <code>routes</code>, <code>middleware</code>, <code>validation</code>, <code>jobs</code>, <code>events</code>, <code>providers</code>, <code>magic</code>, <code>di</code>, <code>views</code> nézete.</td><td><code>--format &lt;nézet&gt;</code></td></tr>
+      <tr><td><code>notes</code></td><td>A fájlokhoz és metódusokhoz írt jegyzetek (csak olvas; jegyzetet írni csak a CLI-vel lehet).</td><td><code>--notes &lt;minta&gt;</code></td></tr>
+      <tr><td><code>projects</code></td><td>A regisztrált aliasok és a gyökereik.</td><td><code>projects.sh list</code></td></tr>
+      <tr><td><code>guide</code></td><td>A teljes skill-útmutató a beállított nyelven.</td><td><code>SKILL.md</code></td></tr>
+    </tbody>
+  </table></div>
+  <p>Opcionális réteg-paraméterek (alapból a kimenet nem változik): a <code>layer</code> az <code>outline</code>, a
+    <code>search</code> és a <code>find_callers</code> eszközön csak az adott réteg fájljait hagyja meg; a
+    <code>by_layer</code> a <code>find_callers</code> hívóit rétegek szerint rendezi. Lásd: <a href="/hu/profile/">projekt-profil</a>.</p>
+  <p>Kapcsolódáskor a szerver rövid használati útmutatót küld a kliensnek a beállított nyelven (melyik eszköz mire
+    való, hogyan keresd a hívókat, hogyan olvasd a kimenetet); a Claude Code ezt az agent utasításai közé teszi. Ha a
+    szerver projektmappában indul, a végére egy tömör projekt-profil is kerül.</p>
+</section>
+
+<section id="local" aria-labelledby="h-local">
+  <h2 id="h-local">Mi fut helyben</h2>
+  <div class="grid">
+    <div class="card"><h3>A saját gépeden</h3><p>A kliens indítja a szervert, és stdin/stdout-on beszélgetnek. A
+      lekérdezések nem használnak hálózatot: a kódod nem hagyja el a gépet.</p></div>
+    <div class="card"><h3>Csak olvas</h3><p>A forrásfájlokat soha nem írja. Egyetlen mellékhatása a CLI-vel közös
+      projekt-térkép a projekt <code>.callgraph/</code> mappájában.</p></div>
+    <div class="card"><h3>A projekten belül marad</h3><p>Minden út a projektgyökérhez képest oldódik fel; a gyökérből
+      kilépő utat (<code>..</code>, kívül eső abszolút út, kifelé mutató symlink) elutasítja.</p></div>
+    <div class="card"><h3>Magától naprakész</h3><p>Futás közben figyeli a betöltött projekteket, és a változott fájlokat
+      röviddel a mentés után frissíti. Kikapcsolás: <code>CALLGRAPH_WATCH=0</code>.</p></div>
+  </div>
+  <p>Az egyetlen hálózati hívás a lenti frissítés-ellenőrzés: naponta legfeljebb egyszer megnézi a legutóbbi
+    GitHub-kiadást (és az <code>--auto-update</code> mellett letölti).</p>
+</section>
+
+<section id="updates" aria-labelledby="h-updates">
+  <h2 id="h-updates">Frissítés: <code>--auto-update</code></h2>
+  <ul>
+    <li><b>Az <code>--auto-update</code>-tel (ajánlott):</b> induláskor, naponta legfeljebb egyszer megnézi a legutóbbi
+      kiadást. Ha újabb van, letölti, a kiadás <code>SHA256SUMS</code> fájlja szerint ellenőrzi (eltérő vagy hiányzó
+      összegnél semmi nem települ), pontosan úgy telepíti, mint a <code>callgraph.sh update</code> (a projektek és a
+      beállítások megmaradnak), és újraindul — a kliens már az új verzióval beszél.</li>
+    <li>Bármilyen hibánál (nincs hálózat, rate limit, eltérő ellenőrzőösszeg, nincs írási jog) egy sort ír a stderr-re —
+      <code>callgraph: auto-update skipped, continuing with …</code>, ezt a kliensek naplózzák —, és a jelenlegi verzióval indul.</li>
+    <li><b>Kapcsoló nélkül:</b> a háttérben ellenőriz, és a munkamenet első válasza végére egy sort tesz:
+      <code>ℹ callgraph X is available (installed: Y) — update: …</code>.</li>
+    <li>Csak a callgraph saját mappájába ír, a projektjeidbe soha.</li>
+    <li><b>Minden frissítés-ellenőrzés kikapcsolása:</b> <code>CALLGRAPH_UPDATE_CHECK=0</code> a szerver környezetében (a
+      kliens-konfig <code>env</code> mezőjében): ekkor semmilyen hálózati kérés nincs. CI-ben magától is ki van kapcsolva.</li>
+  </ul>
+</section>
+
+<section id="troubleshooting" aria-labelledby="h-trouble">
+  <h2 id="h-trouble">Hibakeresés</h2>
+  <details><summary>A kliens nem tudja elindítani a szervert</summary><p>A JSON-beállításokba a bináris abszolút útja
+    kell; a <code>~</code> ott nem bővül. Az utat a <a href="#before">Mielőtt belekezdesz</a> részben lévő
+    <code>echo</code> parancs írja ki.</p></details>
+  <details><summary>Nem találja az utakat, vagy rossz mappát használ</summary><p>Egyes kliensek (például a Claude
+    Desktop) nem a projektmappában indulnak. Regisztráld a projektet a <code>projects.sh add &lt;alias&gt; &lt;út&gt;</code>
+    paranccsal, és add meg az aliast <code>project</code> paraméterként; a <code>projects</code> eszköz listázza őket.</p></details>
+  <details><summary>Egy eszköz hibát ad</summary><p>A hibák eszköz-hibaként jönnek vissza a beállított nyelven; a szerver
+    nem áll le. Az útban nem lehet <code>::</code> — a metódus külön paraméterbe kerül.</p></details>
+  <details><summary>A válasz rövidebb a vártnál</summary><p>A kimenet 400 sornál korlátos (a mappás outline summary-ra,
+    az egyfájlos metódus-indexre vált). Szűkítsd a <code>path</code>, <code>method</code> vagy <code>pattern</code>
+    értékét; a <code>full: true</code> csak indokolt esetben kell.</p></details>
+  <details><summary>Nem indul a fájlfigyelés</summary><p>Ha a figyelés nem lehetséges (például elfogyott az
+    inotify-keret), a szerver egyszer szól a stderr-en, és kérésenként ellenőrzi a változott fájlokat.</p></details>
+  <details><summary>Kézzel szeretném kipróbálni a szervert</summary><p>Grafikus felülettel:
+    <code>npx @modelcontextprotocol/inspector &lt;út-a-binárishoz&gt; mcp</code>.</p></details>
+</section>
+
+<section id="related" aria-labelledby="h-related">
+  <h2 id="h-related">Kapcsolódó oldalak</h2>
+  <div class="grid">
+    <a class="card" href="/hu/#install"><h3>Telepítés</h3><p>Egysoros telepítés macOS-re / Linuxra, és Windowsra.</p></a>
+    <a class="card" href="/hu/locate/"><h3>locate</h3><p>A feladat első hívása: honnan induljak.</p></a>
+    <a class="card" href="/hu/profile/"><h3>Projekt-profil</h3><p>Hogyan épül fel egy ismeretlen projekt.</p></a>
+    <a class="card" href="/hu/changelog/"><h3>Változásnapló</h3><p>Mi változott az egyes kiadásokban.</p></a>
+  </div>
+</section>

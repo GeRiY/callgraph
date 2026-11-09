@@ -4,7 +4,10 @@
   <b>A token-efficient code map for AI coding agents.</b><br>
   Structure, categorized call graph, method bodies, "who calls this?" and impact analysis —
   without reading whole files.<br>
-  🌐 <a href="https://callgraph.eu/">callgraph.eu</a>
+  🌐 <a href="https://callgraph.eu/">callgraph.eu</a><br>
+  Guides: <a href="https://callgraph.eu/mcp/">MCP setup</a> · <a href="https://callgraph.eu/php/">PHP</a> · <a href="https://callgraph.eu/rust/">Rust</a> ·
+  <a href="https://callgraph.eu/typescript/">TypeScript / Vue</a> · <a href="https://callgraph.eu/swift/">Swift</a> · <a href="https://callgraph.eu/locate/">locate</a> ·
+  <a href="https://callgraph.eu/profile/">Project profile</a> · <a href="https://callgraph.eu/changelog/">Changelog</a>
 </p>
 
 <p align="center">
@@ -77,6 +80,8 @@ $ callgraph.sh --project shop app --grep saveTranslations --depth 2
 
 ### Supported languages
 
+Per-language guides with examples: [PHP](https://callgraph.eu/php/) · [Rust](https://callgraph.eu/rust/) · [TypeScript / JavaScript / Vue](https://callgraph.eu/typescript/) · [Swift / SwiftUI](https://callgraph.eu/swift/).
+
 | Language | Extensions | What you get |
 |---|---|---|
 | PHP | `.php` | classes, traits, enums, methods, properties, constants, calls with type tracking, framework detection (Laravel, Yii) |
@@ -84,25 +89,38 @@ $ callgraph.sh --project shop app --grep saveTranslations --depth 2
 | JavaScript / TypeScript | `.js` `.mjs` `.cjs` `.jsx` `.ts` `.tsx` | modules, functions, classes, imports with alias resolution (`jsconfig` / `tsconfig`) |
 | Vue | `.vue` | props, emits, `setup`, template components and event handlers, `computed`, `watch`, lifecycle hooks, Options API |
 | Swift / SwiftUI | `.swift` | classes, structs, enums, protocols, actors, extensions; `View` types as components; `func` / `init` / computed properties (`body`); property wrappers (`@State`, `@Binding`, `@Published`, …); SwiftUI views and modifiers as their own call categories |
-| CSS / SCSS | `.css` `.scss` | rule blocks, mixins, functions, variables, `@use` / `@import` |
-| JSON / Markdown | `.json` `.md` | key paths; heading sections and links |
+| CSS / SCSS | `.css` `.scss` | rule blocks and at-rules (`@media`, `@layer`, Tailwind v4 `@theme` / `@utility` / `@source` …), mixins, functions, variables, `@use` / `@import` |
+| JSON / Markdown | `.json` `.md` | key paths with their short values (`package.json::scripts --body` prints one key); heading sections by level, and links |
 
 ### Which files are processed
 
 Only files with the extensions above, in upper or lower case (`B.PHP` counts as PHP); everything else is ignored.
 Also skipped, even with a supported extension: generated files (`package-lock.json`, `*.min.js`, `*.min.css`) and
-files with binary content. Each file is read once, even if a symlink points to it. Folders like `vendor/`,
-`node_modules/` and those listed in `.gitignore` are skipped too.
+files with binary content. Minified or bundled JavaScript / CSS is recognised by its content too (very long lines,
+e.g. a Vite `app-CBW7lKWe.js`) and skipped. Each file is read once, even if a symlink points to it. Folders like
+`vendor/` and `node_modules/` are skipped, and so is everything your `.gitignore` files exclude, with the same rules as
+git: `/public/build`, `public/build/`, `build/`, `**/assets`, `*.log`, `!keep.js`, and the `.gitignore` of every
+subfolder relative to that folder.
 
-To exclude more extensions in a project, put a `.callgraphignore` file in its root (or in any subfolder; the nearest
-one applies). Commit it, and the whole team gets the same results:
+To exclude more in a project, put a `.callgraphignore` file in its root (or in any subfolder). Commit it, and the whole
+team gets the same results. A line that is just an extension (`md`, `.md` or `*.md`) skips that extension (the
+nearest `.callgraphignore` applies, as before); any other line is a `.gitignore`-style path pattern, relative to the
+folder of the file:
 
 ```
 # callgraph: skip these extensions in this project
 md
 json
 *.vue
+# and these paths (same syntax as .gitignore)
+public/build/
+/storage/
+legacy/**/*.php
 ```
+
+To map files your `.gitignore` excludes, add `--no-gitignore` to any command (or set `CALLGRAPH_GITIGNORE=0` for the
+MCP server and the hook); `.callgraphignore` and the built-in skipped folders still apply. Note: a bare word such as
+`build` in `.callgraphignore` is an extension rule; write `build/` or `/build` for a folder.
 
 ### When *not* to use it
 
@@ -110,6 +128,8 @@ json
 - Non-code files (plain text, data dumps): the outline adds little.
 - Macro- or reflection-heavy code: dynamic calls that can't be resolved statically are shown as name-only matches
   (`?`) with `--guess`, or not at all.
+- Files with a syntax error (mid-edit, merge conflict) are flagged with `⚠ syntax error at L<n>` and a closing `⚠`
+  line: the part before the error is still mapped, the rest may be missing — read such a file directly.
 
 ## Quick start
 
@@ -195,6 +215,8 @@ relative to a registered project root; without it, the current directory is the 
 
 ### Where to start: `locate`
 
+More on the website: [callgraph.eu/locate](https://callgraph.eu/locate/).
+
 Give `locate` the names and domain terms from the task in one call (function, class and file names, column names,
 routes); it answers from the project map, without reading the source, with a short ranked list of files to start
 from, each with the reason:
@@ -204,6 +226,7 @@ bash ~/.claude/skills/callgraph/callgraph.sh locate RefundController processRefu
 ```
 
 ```
+root: /home/me/myapp
 locate: 5 terms · 14 matches in 6 files · start here ↓
 1. app/Http/Controllers/RefundController.php  ★★★
    class RefundController  L6-16  ← "RefundController", "refund" (exact class)
@@ -215,9 +238,26 @@ locate: 5 terms · 14 matches in 6 files · start here ↓
 
 A match counts more the stronger it is: exact definition, then file name, then a part of a name (`refund` ~
 `RefundJob`, `refunds_table`, singular / plural), then a string literal, then a call. A file that matches several
-different terms ranks above one that matches a single term many times. By default 5 files are shown (`--all`: every
-match); terms without a match and terms that are too general are listed at the end. Plain text search (an exact
-message or config value) is still a job for grep; `locate` answers "where do I start?".
+different terms ranks above one that matches a single term many times, and files with an exact definition or file
+name always come before files that only match strings (translations, build output). By default 5 files are shown
+(`--all`: every match); terms without a match and terms that are too general are listed at the end. Paths are always
+relative to the `root:` line. Plain text search (an exact message or config value) is still a job for grep; `locate`
+answers "where do I start?".
+
+Special terms:
+
+- **A phrase**: a quoted argument with spaces (`"Organizer's other events"`) is one term. It is matched as a whole
+  (case-insensitive) against string literals, such as UI labels and translations, and is never split into words.
+- **A route name**: `route::events.show` lists the route definition first (`->name('events.show')` in
+  `routes/*.php`), then every place that uses the name: `route('events.show', …)`, `to_route(…)`,
+  `redirect()->route(…)` in PHP, and `route('events.show')` in JS / TS / Vue (Ziggy). If nothing matches, it says
+  what was searched.
+- **A CSS custom property**: `locate --orange-500` searches for the variable (no `--` separator needed); the known
+  options (`--all`, `--project`) stay options.
+
+```bash
+bash ~/.claude/skills/callgraph/callgraph.sh locate route::events.show "Organizer's other events" --project myapp
+```
 
 ### Output formats (`--format`)
 
@@ -239,6 +279,8 @@ index); `--full` lifts the cap. Full reference: `callgraph.sh --help` and [`skil
 
 ### Project profile
 
+More on the website: [callgraph.eu/profile](https://callgraph.eu/profile/).
+
 In an unfamiliar project, start with `bash ~/.claude/skills/callgraph/callgraph.sh profile [--project alias]`. From
 folder and file names (and the framework found in `composer.json` / `package.json` / `Cargo.toml`) it tells you the
 architecture (Laravel / Yii layered MVC, DDD / hexagonal, Vue / React frontend, SwiftUI MVVM, Rust web), the layers
@@ -248,13 +290,27 @@ without a clear role, and how the layers call each other. The code graph confirm
 `--full` gives the per-folder details. Every file gets a role with a confidence (high / medium / low), or stays
 "unknown" — it never guesses. MCP: the `project_profile` tool, and a compact profile is sent on connect.
 
+The layers are listed by file count, so the main layer is always on top. A role found in both the backend and the
+frontend is shown apart, e.g. `controller (php)` and `controller (js)` for PHP controllers next to AngularJS ones, and
+the call direction keeps the two apart. Third-party code copied into the project (a subfolder with its own
+`composer.json`, `package.json` or `LICENSE`, or folders like `vendors/`, `third_party/`, `extensions/`, `libs/`) and
+build output (`dist/`, `build/`, `*.min/`, minified files) do not count: one line says how many files were skipped
+and where (`profile --with-vendor` counts them anyway); your queries still see these files. `event`, `listener` and
+`job` layers need proof in the code (an Event / Listener base class, Laravel's `Dispatchable` or `ShouldQueue`, a
+`handle(…)` method in a `Listeners` namespace) — a folder that is just named `Event` is not an event layer.
+
 Use the layers in queries (all opt-in, the default output does not change):
 
 ```bash
 bash ~/.claude/skills/callgraph/callgraph.sh app --layer service                     # only the service files (name,name...)
+bash ~/.claude/skills/callgraph/callgraph.sh . --layer controller:js                 # one ecosystem only: php, js, swift, rust
 bash ~/.claude/skills/callgraph/callgraph.sh app --format summary --layers           # summary grouped by layer
-bash ~/.claude/skills/callgraph/callgraph.sh app --grep 'Repo::find' --depth 2 --by-layer   # callers by layer
+bash ~/.claude/skills/callgraph/callgraph.sh app --grep 'Repo::find' --depth 2 --by-layer   # callers grouped by layer
 ```
+
+`--by-layer` puts the layer closest to the called method first (model → repository → service → controller) and
+starts each group with a header such as `[service]  3 calls`, in the short and the long `--grep` view alike (with
+`--depth`: in every level).
 
 Folder names that say nothing (or are not English)? A commit-able `.callgraph-layers` file in the project root maps
 them: `service = app/Szolgaltatasok, app/Logic`, `ignore-role = app/Legacy`.
@@ -270,6 +326,8 @@ CALLGRAPH_LANG=hu bash ~/.claude/skills/callgraph/callgraph.sh app/Models/Order.
 ```
 
 ### Use with other AI tools (MCP)
+
+Step-by-step setup per client (Claude Code, Claude Desktop, Cursor, VS Code): [callgraph.eu/mcp](https://callgraph.eu/mcp/).
 
 Besides the Claude Code skill (unchanged, fully supported), the same binary is also an
 [MCP](https://modelcontextprotocol.io) server on stdio, so any MCP client can use it: `callgraph mcp`.
@@ -312,6 +370,16 @@ Optional Claude Code hook: `bash install.sh --hooks` (or `callgraph.sh hook inst
 edits in the background; it adds one entry to `~/.claude/settings.json`, keeps everything else and writes a
 `settings.json.bak` backup first. Remove it with `bash ~/.claude/skills/callgraph/callgraph.sh hook uninstall`.
 Details (Hungarian): [`docs/PROJECT-GRAPH.md`](docs/PROJECT-GRAPH.md).
+
+### Local usage stats
+
+callgraph keeps a small usage summary on your computer: how often each command or MCP tool ran, whether it
+failed, and how long it took and how big its output was, in ranges. For `locate` over MCP it also notes whether the
+file the agent opened next was the first result. It never records paths, file or symbol names, search terms,
+project names or error texts, and **nothing is sent anywhere** (there is no network involved). See it with
+`bash ~/.claude/skills/callgraph/callgraph.sh stats [--days N]` (last 7 days by default). The data lives in
+`~/.claude/skills/callgraph/stats/` (one small file per month, kept for about 90 days); turn it off with
+`CALLGRAPH_STATS=0`. It is also off in CI and when callgraph does not run from a skill install.
 
 ### Feedback from agents
 

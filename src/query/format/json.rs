@@ -21,6 +21,7 @@ pub(super) struct OrderedGraph<'a> {
     comments: Comments<'a>,
     writes: &'a [crate::model::Write],
     sfc: &'a Option<serde_json::Value>,
+    parse_errors: &'a [crate::model::ParseError],
 }
 
 impl serde::Serialize for OrderedGraph<'_> {
@@ -51,6 +52,10 @@ impl serde::Serialize for OrderedGraph<'_> {
         m.serialize_entry("writes", self.writes)?;
         if let Some(v) = self.sfc {
             m.serialize_entry("sfc", v)?;
+        }
+        // csak szintaktikai hibánál (hiba nélkül a kimenet bájtra változatlan)
+        if !self.parse_errors.is_empty() {
+            m.serialize_entry("parseErrors", self.parse_errors)?;
         }
         m.end()
     }
@@ -143,6 +148,7 @@ pub(super) fn ordered_graph(graph: &FileGraph) -> OrderedGraph<'_> {
         },
         writes: &graph.writes,
         sfc: &graph.sfc,
+        parse_errors: &graph.parse_errors,
     }
 }
 

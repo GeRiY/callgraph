@@ -55,7 +55,8 @@ pub(crate) struct OutlineParams {
     /// Only this method/function (file paths only).
     #[serde(default)]
     pub method: Option<String>,
-    /// Only files of this layer (see `project_profile`), e.g. `service` or `service,repository`.
+    /// Only files of this layer (see `project_profile`), e.g. `service`, `service,repository`, or one ecosystem:
+    /// `controller:js`.
     #[serde(default)]
     pub layer: Option<String>,
     /// Disable the 400-line output cap (use only when needed).
@@ -129,7 +130,7 @@ pub(crate) struct FindCallersParams {
     /// Search only files of this layer (level 1), e.g. `controller`.
     #[serde(default)]
     pub layer: Option<String>,
-    /// Order callers by layer (closest to the callee first) and tag each line with its layer.
+    /// Group callers by layer (closest to the callee first), each group under a `[service]  3 callers` header.
     #[serde(default)]
     pub by_layer: bool,
     /// Disable the 400-line output cap.
@@ -192,7 +193,9 @@ pub(crate) struct NotesParams {
 pub(crate) struct LocateParams {
     /// Names and domain terms from the task, in code form: function / class / file names, columns, routes, and the
     /// English code name of a non-English domain word (`["RefundController", "processRefund", "refund",
-    /// "payment_status", "checkout.vue"]`); a single string works too.
+    /// "payment_status", "checkout.vue"]`); a single string works too. An element with spaces is one phrase,
+    /// matched as a whole against string literals (a UI label); `route::events.show` finds a route's definition
+    /// and its `route()` calls; `--orange-500` a CSS custom property.
     pub terms: OneOrMany,
     /// Registered project alias; default: the server's working directory.
     #[serde(default)]

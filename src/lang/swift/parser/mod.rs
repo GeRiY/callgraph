@@ -42,6 +42,36 @@ impl<'s> ParsedSwift<'s> {
         }
         first_error(root).map(line)
     }
+
+    /// A szintaktikai hibák (ERROR / hiányzó token) dokumentum-sorrendben, legfeljebb `max` darab: 1-alapú sor
+    /// (a fájlvégi hiba az utolsó tartalmas sorra) + rövid üzenet. A tree-sitter nem ad szöveges üzenetet, ezért
+    /// az üzenet csak a node fajtája (pl. ``missing `)` ``), forrásszöveget nem idéz.
+    pub(crate) fn errors(&self, max: usize) -> Vec<(u32, String)> {
+        let root = self.root();
+        let mut found = Vec::new();
+        if root.has_error() {
+            collect_errors(root, max, &mut found);
+        }
+        let last = self
+            .source
+            .lines()
+            .enumerate()
+            .filter(|(_, l)| !l.trim().is_empty())
+            .last()
+            .map(|(i, _)| i)
+            .map_or(1, |i| i as u32 + 1);
+        found
+            .into_iter()
+            .map(|node| {
+                let message = if node.is_missing() {
+                    format!("missing `{}`", node.kind())
+                } else {
+                    "unexpected syntax".to_owned()
+                };
+                (line(node).min(last), message)
+            })
+            .collect()
+    }
 }
 
 /// Egy node kezdősora (1-alapú).
@@ -82,6 +112,22 @@ fn first_error(node: Node<'_>) -> Option<Node<'_>> {
         .find_map(first_error)
 }
 
+/// Az ERROR / hiányzó node-ok gyűjtése (egy ERROR belsejébe nem megy tovább: az egy hiba).
+fn collect_errors<'t>(node: Node<'t>, max: usize, out: &mut Vec<Node<'t>>) {
+    if out.len() >= max {
+        return;
+    }
+    if node.is_error() || node.is_missing() {
+        out.push(node);
+        return;
+    }
+    for child in children(node) {
+        if child.has_error() || child.is_missing() {
+            collect_errors(child, max, out);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -103,6 +149,18 @@ mod tests {
     fn syntax_error_has_a_line() {
         let parsed = TreeSitterSwift.parse("struct A {\n  func (\n").unwrap();
         assert!(parsed.first_error_line().is_some());
+    }
+
+    #[test]
+    fn errors_are_listed_with_lines_and_capped() {
+        let parsed = TreeSitterSwift
+            .parse("func a() -> Int { 1 }\nfunc b() -> Int { 2 }\nfunc c( {\n")
+            .unwrap();
+        let errors = parsed.errors(5);
+        assert!(!errors.is_empty() && errors.len() <= 5);
+        assert_eq!(errors[0].0, 3, "{errors:?}");
+        let clean = TreeSitterSwift.parse("struct A {}\n").unwrap();
+        assert!(clean.errors(5).is_empty());
     }
 
     /// Fejlesztői segéd: `cargo test swift_dump -- --ignored --nocapture` a fa S-kifejezéséhez.

@@ -52,31 +52,45 @@ impl Locator {
         if terms.is_empty() {
             return Err(CallgraphError::Usage(usage().into()));
         }
-        let ranked = ProjectSource::new(&self.root, &self.analyzer).with_files(|files| {
-            let callers = CallerCounts::build(files.iter().map(|file| file.graph));
-            let matcher = Matcher::new(&terms, &callers);
-            let matched: Vec<FileMatch> = files
-                .iter()
-                .filter_map(|file| {
-                    let rel = self.relative(file.path);
-                    let hits = matcher.file_hits(&rel, file.graph, file.code);
-                    FileMatch::new(file.path.to_string_lossy().into_owned(), hits)
-                })
-                .collect();
-            // a teszt-felismerés a gyökérhez relatív úton (a gyökér útja maga ne számítson)
-            rank(matched, |path| {
-                rank::is_test_path(&self.relative(Path::new(path)))
-            })
-        })?;
-        let text = Report {
+        let (ranked, issues) =
+            ProjectSource::new(&self.root, &self.analyzer).with_files(|files| {
+                // a szintaktikai hibás fájlok a záró sorhoz (a rangsoruk hiányos térképből jön)
+                let issues: Vec<(String, u32)> = files
+                    .iter()
+                    .filter_map(|file| {
+                        crate::query::format::parse_issue(&self.root, file.path, file.graph)
+                    })
+                    .collect();
+                let callers = CallerCounts::build(files.iter().map(|file| file.graph));
+                let matcher = Matcher::new(&terms, &callers);
+                let matched: Vec<FileMatch> = files
+                    .iter()
+                    .filter_map(|file| {
+                        let rel = self.relative(file.path);
+                        let hits = matcher.file_hits(&rel, file.graph, file.code);
+                        FileMatch::new(rel, hits)
+                    })
+                    .collect();
+                // a teszt-felismerés a gyökérhez relatív úton (a gyökér útja maga ne számítson)
+                let ranked = rank(matched, rank::is_test_path);
+                (ranked, issues)
+            })?;
+        // mindig a `root:` sorral és a gyökérhez relatív utakkal (egyetlen találatnál is), a többi lekérdezéssel
+        // azonos alakban
+        let root = self.root.to_string_lossy();
+        let shown = crate::query::strip_verbatim(&root);
+        let mut text = crate::tf!("root: {shown}\n", "gyökér: {shown}\n");
+        let report = Report {
             terms: &terms,
             ranked: &ranked,
             all,
-        }
-        .render();
-        // az utak a projekt-gyökérhez relatívan, a többi lekérdezéssel azonos `root:` sorral
-        let engine = crate::query::QueryEngine::new(Some(self.root.as_path()), None);
-        Ok(engine.relativize(&text))
+        };
+        text.push_str(&report.render());
+        text.push_str(&crate::query::format::parse_trailer(
+            &issues,
+            crate::i18n::lang(),
+        ));
+        Ok(text)
     }
 
     /// Az út a gyökérhez képest (a fájlnév- és út-egyezéshez).
@@ -91,7 +105,7 @@ impl Locator {
 /// A parancs használata (a CLI és a hibaüzenet közös szövege).
 pub(crate) fn usage() -> &'static str {
     crate::t!(
-        "callgraph locate <term>... [--all] [--project <alias|dir>]  (names and domain terms from the task: functions, classes, files, columns, routes)",
-        "callgraph locate <kifejezés>... [--all] [--project <alias|mappa>]  (a feladat nevei és fogalmai: függvények, osztályok, fájlok, oszlopok, útvonalak)"
+        "callgraph locate <term>... [--all] [--project <alias|dir>]  (names and domain terms from the task: functions, classes, files, columns, routes; \"a quoted phrase\" = one term, matched as a whole against strings; route::<name> = a route name: its definition and route() calls; --name = a CSS custom property)",
+        "callgraph locate <kifejezés>... [--all] [--project <alias|mappa>]  (a feladat nevei és fogalmai: függvények, osztályok, fájlok, oszlopok, útvonalak; \"idézőjeles kifejezés\" = egyetlen kifejezés, egészében a stringekre illesztve; route::<név> = útvonalnév: a definíciója és a route() hívásai; --nev = CSS custom property)"
     )
 }

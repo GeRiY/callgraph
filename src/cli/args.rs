@@ -8,11 +8,12 @@ use crate::lang::LanguageRegistry;
 use crate::query::format::BodyMode;
 
 use super::profile_args::{LayerArgs, parse_profile};
+use super::stats_args::parse_stats;
 
 fn usage() -> &'static str {
     crate::t!(
-        "callgraph [--lang <id,...>] [--cache <file>] [--no-cache] <file|dir> [...] | callgraph prune [--cache <file>] [--dry-run] | callgraph set-lang [en|hu] | callgraph self-update [--check] | callgraph note add|list|rm … | callgraph refresh [--project <alias|dir>] [--background] [<path>…] | callgraph locate <term>... [--all] [--project <alias|dir>] | callgraph hook install|uninstall|status | callgraph mcp [--auto-update] | callgraph --version",
-        "callgraph [--lang <id,...>] [--cache <fájl>] [--no-cache] <fájl|mappa> [...] | callgraph prune [--cache <fájl>] [--dry-run] | callgraph set-lang [en|hu] | callgraph self-update [--check] | callgraph note add|list|rm … | callgraph refresh [--project <alias|mappa>] [--background] [<út>…] | callgraph locate <kifejezés>... [--all] [--project <alias|mappa>] | callgraph hook install|uninstall|status | callgraph mcp [--auto-update] | callgraph --version"
+        "callgraph [--lang <id,...>] [--cache <file>] [--no-cache] <file|dir> [...] | callgraph prune [--cache <file>] [--dry-run] | callgraph set-lang [en|hu] | callgraph self-update [--check] | callgraph note add|list|rm … | callgraph refresh [--project <alias|dir>] [--background] [<path>…] | callgraph locate <term>... [--all] [--project <alias|dir>] | callgraph hook install|uninstall|status | callgraph stats [--days N] | callgraph mcp [--auto-update] | callgraph --version  (any command: --no-gitignore = ignore the .gitignore files)",
+        "callgraph [--lang <id,...>] [--cache <fájl>] [--no-cache] <fájl|mappa> [...] | callgraph prune [--cache <fájl>] [--dry-run] | callgraph set-lang [en|hu] | callgraph self-update [--check] | callgraph note add|list|rm … | callgraph refresh [--project <alias|mappa>] [--background] [<út>…] | callgraph locate <kifejezés>... [--all] [--project <alias|mappa>] | callgraph hook install|uninstall|status | callgraph stats [--days N] | callgraph mcp [--auto-update] | callgraph --version  (bármely parancsnál: --no-gitignore = a .gitignore fájlok nélkül)"
     )
 }
 
@@ -56,6 +57,24 @@ fn hook_usage() -> &'static str {
         "callgraph hook install|uninstall|status [--settings <file>]  (Claude Code PostToolUse hook: background refresh after Edit / Write / MultiEdit; default settings: ~/.claude/settings.json) | callgraph hook post-edit  (run by the hook: reads the hook JSON from stdin)",
         "callgraph hook install|uninstall|status [--settings <fájl>]  (Claude Code PostToolUse hook: háttér-frissítés Edit / Write / MultiEdit után; alapértelmezett beállítások: ~/.claude/settings.json) | callgraph hook post-edit  (a hook futtatja: a hook JSON-ját a stdin-ről olvassa)"
     )
+}
+
+/// Globális kapcsoló minden projektet bejáró parancshoz (`show`, `locate`, `profile`, `refresh`, `callers`, elemzés):
+/// a `.gitignore` fájlok nem számítanak (a `.callgraphignore` és a beépített kihagyott mappák igen).
+pub const NO_GITIGNORE_FLAG: &str = "--no-gitignore";
+
+/// A globális `--no-gitignore` kapcsoló kivétele az argumentumok közül (bárhol, az első `--` előtt); `true`, ha
+/// szerepelt. A belépő ilyenkor `CALLGRAPH_GITIGNORE=0`-t állít be, így a bejáró (`io::FileWalker`) és a
+/// gyermek-folyamatok (háttér-`refresh`) is ezt látják.
+pub fn take_no_gitignore(args: &mut Vec<String>) -> bool {
+    let end = args.iter().position(|a| a == "--").unwrap_or(args.len());
+    let before = args.len();
+    let mut at = 0;
+    args.retain(|a| {
+        at += 1;
+        at > end || a != NO_GITIGNORE_FLAG
+    });
+    args.len() != before
 }
 
 /// A `hook` alparancs művelete (Claude Code-hook a fájl-írásokra, `crate::hook`).
@@ -130,8 +149,13 @@ pub enum CliArgs {
         /// A réteg-kapcsolók (`--layer`, `--layers`, `--by-layer`; `profile_args.rs`).
         layers: LayerArgs,
     },
-    /// `profile [--project <alias|mappa>] [--full]`: a projekt-profil (architektúra, rétegek, minták).
-    Profile { project: Option<String>, full: bool },
+    /// `profile [--project <alias|mappa>] [--full] [--with-vendor]`: a projekt-profil (architektúra, rétegek,
+    /// minták); `with_vendor`: a beágyazott külső kód is számít.
+    Profile {
+        project: Option<String>,
+        full: bool,
+        with_vendor: bool,
+    },
     /// `note add|list|rm` (PILOT); `project`: alias vagy gyökér-út.
     Note {
         action: NoteAction,
@@ -157,6 +181,8 @@ pub enum CliArgs {
         action: HookAction,
         settings: Option<PathBuf>,
     },
+    /// `stats [--days N]`: a helyi használati statisztika az elmúlt N napról (`crate::stats`).
+    Stats { days: u32 },
     /// `--version` / `-V`: a verzió és a platform.
     Version,
     /// `mcp [--auto-update]`: MCP-szerver stdio-n; `--auto-update`: indításkor naponta egyszer frissít.
@@ -169,7 +195,7 @@ impl CliArgs {
     /// A program neve nélküli argumentumlistából állít elő parancsot.
     pub fn parse<I: IntoIterator<Item = String>>(args: I) -> Result<Self> {
         let args: Vec<String> = args.into_iter().collect();
-        if args.len() == 1 && matches!(args[0].as_str(), "--version" | "-V") {
+        if args.len() == 1 && matches!(args[0].as_str(), "--version" | "-V" | "version") {
             return Ok(Self::Version);
         }
         if args.first().is_some_and(|a| a == "mcp") {
@@ -210,6 +236,9 @@ impl CliArgs {
         }
         if args.first().is_some_and(|a| a == "profile") {
             return parse_profile(&args[1..]);
+        }
+        if args.first().is_some_and(|a| a == "stats") {
+            return parse_stats(&args[1..]);
         }
         // a skill-parancsok maguk értelmezik az argumentumaikat (a hibáik error-id-t kapnak)
         if let Some(command) = args.first().filter(|a| {
@@ -480,7 +509,8 @@ impl CliArgs {
         })
     }
 
-    /// `locate <kifejezés>… [--all] [--project <alias|út>]`; `--` után minden kifejezés (a `-`-sel kezdődők is).
+    /// `locate <kifejezés>… [--all] [--project <alias|út>]`; `--` után minden kifejezés (a `-`-sel kezdődők is);
+    /// egy ismeretlen `--…` argumentum is kifejezés (CSS-változó), az egy kötőjeles ismeretlen kapcsoló hiba.
     fn parse_locate(args: &[String]) -> Result<Self> {
         let usage = || CallgraphError::Usage(crate::locate::usage().into());
         let mut terms = Vec::new();
@@ -498,7 +528,10 @@ impl CliArgs {
                     project = Some(args[i + 1].clone());
                     i += 1;
                 }
+                "--project" => return Err(usage()),
                 x if x.starts_with("--project=") => project = Some(x[10..].to_owned()),
+                // egy ismeretlen `--név` kifejezés (CSS custom property: `--orange-500`), nem kapcsoló
+                x if x.starts_with("--") && x.len() > 2 => terms.push(x.to_owned()),
                 x if x.starts_with('-') && x.len() > 1 => return Err(usage()),
                 x => terms.push(x.to_owned()),
             }
@@ -913,8 +946,37 @@ mod tests {
         );
         assert!(parse(&["locate"]).is_err());
         assert!(parse(&["locate", "--all"]).is_err());
-        assert!(parse(&["locate", "x", "--bogus"]).is_err());
+        // egy ismeretlen `--név` kifejezés (CSS custom property), az ismert kapcsolók kapcsolók maradnak
+        assert_eq!(
+            parse(&["locate", "--orange-500", "--all", "x"]).unwrap(),
+            CliArgs::Locate {
+                terms: vec!["--orange-500".into(), "x".into()],
+                all: true,
+                project: None,
+            }
+        );
+        assert!(parse(&["locate", "x", "-b"]).is_err());
+        assert!(parse(&["locate", "x", "--project"]).is_err());
         assert!(parse(&["locate", "x", "--project="]).is_err());
+    }
+
+    #[test]
+    fn no_gitignore_is_taken_anywhere_before_the_separator() {
+        let mut args: Vec<String> = ["show", "--no-gitignore", "src", "--no-gitignore"]
+            .map(String::from)
+            .to_vec();
+        assert!(take_no_gitignore(&mut args));
+        assert_eq!(args, ["show", "src"]);
+        let mut args: Vec<String> = ["locate", "--", "--no-gitignore"]
+            .map(String::from)
+            .to_vec();
+        assert!(!take_no_gitignore(&mut args));
+        assert_eq!(args.len(), 3);
+        let mut args: Vec<String> = ["--no-gitignore", "locate", "x", "--", "--no-gitignore"]
+            .map(String::from)
+            .to_vec();
+        assert!(take_no_gitignore(&mut args));
+        assert_eq!(args, ["locate", "x", "--", "--no-gitignore"]);
     }
 
     #[test]
@@ -949,6 +1011,12 @@ mod tests {
     fn parses_version_and_self_update() {
         assert_eq!(parse(&["--version"]).unwrap(), CliArgs::Version);
         assert_eq!(parse(&["-V"]).unwrap(), CliArgs::Version);
+        assert_eq!(parse(&["version"]).unwrap(), CliArgs::Version);
+        // több argumentummal a `version` egy elemzendő út (mint eddig)
+        assert!(matches!(
+            parse(&["version", "x"]).unwrap(),
+            CliArgs::Analyze { .. }
+        ));
         assert_eq!(
             parse(&["mcp"]).unwrap(),
             CliArgs::Mcp { auto_update: false }

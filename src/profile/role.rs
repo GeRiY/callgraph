@@ -76,6 +76,13 @@ pub(crate) static ROLES: &[RoleInfo] = &[
     role("test", Kind::Support, 11, None),
 ];
 
+/// Szerepek, amelyek neve gyakran domain-főnév is (egy naptár `Event`-je, egy állásportál `Jobs` mappája, egy
+/// `controllers/event` alrendszer): a profilban csak kód-jellel (őse / interfésze / traitje, Listeners-névtérben
+/// `handle(…)`) kapják meg a szerepet, a mappa- vagy fájlnév egyedül nem elég — különben a következő jel dönt
+/// (`app/Services/Event` → service). A `policy` nem ilyen: a Laravel 10+ policy-kban nincs megbízható kód-jel, a
+/// `Policies` mappa pedig erős konvenció.
+pub(crate) const CODE_SIGNAL_ROLES: &[&str] = &["event", "listener", "job"];
+
 /// Többes számú / rokon alakok a felhasználói bemenethez (`--layer`, `.callgraph-layers`).
 const ALIASES: &[(&str, &str)] = &[
     ("entity", "model"),
@@ -137,6 +144,11 @@ impl Role {
     /// Beszámít-e a rétegek közti hívásirányba (alkalmazás-réteg vagy kontextus).
     pub(crate) fn in_flow(self) -> bool {
         matches!(self.kind(), Kind::Layer | Kind::Context)
+    }
+
+    /// Kell-e a profilban kód-jel is (lásd [`CODE_SIGNAL_ROLES`]).
+    pub(crate) fn needs_code_signal(self) -> bool {
+        CODE_SIGNAL_ROLES.contains(&self.name())
     }
 
     /// Az összes szerep neve vesszővel (a hibaüzenethez).

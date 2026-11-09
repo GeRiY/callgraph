@@ -19,8 +19,8 @@ use serde::{Deserialize, Serialize};
 use super::record::{FileFacts, FileStamp};
 use crate::error::Result;
 use crate::model::{
-    Call, Comment, Constant, Container, ControlFlow, FileGraph, Imports, Method, Property,
-    StringLit, Write,
+    Call, Comment, Constant, Container, ControlFlow, FileGraph, Imports, Method, ParseError,
+    Property, StringLit, Write,
 };
 
 /// A tárolt szerkezet verziója; ha változik, a régi tároló csendben újraépül.
@@ -291,6 +291,9 @@ struct StoredGraph {
     /// Bináris tartalmú fájl (a régi rekordokban nincs: hamis).
     #[serde(default)]
     binary: bool,
+    /// A szintaktikai hibák (a régi rekordokban nincs: üres).
+    #[serde(default)]
+    parse_errors: Vec<ParseError>,
 }
 
 impl From<&FileGraph> for StoredGraph {
@@ -313,6 +316,7 @@ impl From<&FileGraph> for StoredGraph {
             writes,
             sfc,
             binary,
+            parse_errors,
         } = graph;
         let (entries, object) = imports.parts();
         Self {
@@ -333,6 +337,7 @@ impl From<&FileGraph> for StoredGraph {
             writes: writes.clone(),
             sfc: sfc.as_ref().map(serde_json::Value::to_string),
             binary: *binary,
+            parse_errors: parse_errors.clone(),
         }
     }
 }
@@ -356,6 +361,7 @@ impl From<StoredGraph> for FileGraph {
             writes: stored.writes,
             sfc: stored.sfc.and_then(|text| serde_json::from_str(&text).ok()),
             binary: stored.binary,
+            parse_errors: stored.parse_errors,
         }
     }
 }

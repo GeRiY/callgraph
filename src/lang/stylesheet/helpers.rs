@@ -6,27 +6,36 @@ pub(crate) fn clean_header(raw: &str) -> String {
         .join(" ")
 }
 
+/// A `/* … */` megjegyzések szóközökre cserélve (a bájthossz marad); a string-literálon belüli `/*`
+/// (`@source '../**/*.blade.php'`) nem megjegyzés, és a nem ASCII karakterek épen maradnak.
 pub(crate) fn strip_comments(raw: &str) -> String {
     let mut result = String::with_capacity(raw.len());
     let bytes = raw.as_bytes();
+    // az eddig még át nem másolt rész eleje
+    let mut copied = 0;
     let mut i = 0;
     while i < bytes.len() {
-        if bytes[i] == b'/' && bytes.get(i + 1) == Some(&b'*') {
-            i += 2;
-            while i + 1 < bytes.len() && !(bytes[i] == b'*' && bytes[i + 1] == b'/') {
-                result.push(' ');
+        match bytes[i] {
+            quote @ (b'"' | b'\'') => {
                 i += 1;
+                while i < bytes.len() && bytes[i] != quote {
+                    i += if bytes[i] == b'\\' { 2 } else { 1 };
+                }
+                i = (i + 1).min(bytes.len());
             }
-            if i + 1 < bytes.len() {
-                result.push(' ');
-                result.push(' ');
-                i += 2;
+            b'/' if bytes.get(i + 1) == Some(&b'*') => {
+                result.push_str(&raw[copied..i]);
+                let end = raw[i + 2..]
+                    .find("*/")
+                    .map_or(raw.len(), |end| i + 2 + end + 2);
+                result.extend(std::iter::repeat_n(' ', end - i));
+                i = end;
+                copied = end;
             }
-        } else {
-            result.push(bytes[i] as char);
-            i += 1;
+            _ => i += 1,
         }
     }
+    result.push_str(&raw[copied..]);
     result
 }
 

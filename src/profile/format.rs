@@ -67,7 +67,7 @@ fn compact(out: &mut String, profile: &ProjectProfile, lang: Lang) {
     if !profile.layers.is_empty() {
         out.push_str(lang.pick("layers (files):\n", "rétegek (fájlok):\n"));
         let shown: Vec<&LayerSummary> = profile.layers.iter().take(COMPACT_LAYERS).collect();
-        let role_width = shown.iter().map(|l| l.role.name().len()).max().unwrap_or(0);
+        let role_width = shown.iter().map(|l| l.label.len()).max().unwrap_or(0);
         let folder_width = shown
             .iter()
             .map(|l| main_folder(l, lang).chars().count())
@@ -78,9 +78,7 @@ fn compact(out: &mut String, profile: &ProjectProfile, lang: Lang) {
             let folder = main_folder(layer, lang);
             let mut line = format!(
                 "  {:<role_width$}  {:<folder_width$}  {:>4}",
-                layer.role.name(),
-                folder,
-                layer.files
+                layer.label, folder, layer.files
             );
             if let Some(label) = layer.confirm_label {
                 let _ = write!(line, "  ({label}: {})", layer.confirmed);
@@ -114,6 +112,31 @@ fn compact(out: &mut String, profile: &ProjectProfile, lang: Lang) {
         let _ = match lang {
             Lang::En => writeln!(out, "unknown: {}{more}", items.join(", ")),
             Lang::Hu => writeln!(out, "ismeretlen: {}{more}", items.join(", ")),
+        };
+    }
+    skipped_lines(out, profile, lang);
+}
+
+/// `vendor: 312 files skipped (extensions/Facebook, vendors/phpoffice, …)` és ugyanígy a generált kód.
+fn skipped_lines(out: &mut String, profile: &ProjectProfile, lang: Lang) {
+    let kinds = [
+        (&profile.vendor, "vendor", "vendor"),
+        (&profile.generated, "generated", "generált"),
+    ];
+    for (folders, en, hu) in kinds {
+        if folders.is_empty() {
+            continue;
+        }
+        let n: usize = folders.iter().map(|(_, n)| n).sum();
+        let mut list: Vec<&str> = folders.iter().take(3).map(|(f, _)| f.as_str()).collect();
+        if folders.len() > 3 {
+            list.push("…");
+        }
+        let list = list.join(", ");
+        let _ = match lang {
+            Lang::En if n == 1 => writeln!(out, "{en}: 1 file skipped ({list})"),
+            Lang::En => writeln!(out, "{en}: {n} files skipped ({list})"),
+            Lang::Hu => writeln!(out, "{hu}: {n} fájl kihagyva ({list})"),
         };
     }
 }
@@ -175,7 +198,7 @@ fn flow_line(out: &mut String, profile: &ProjectProfile, lang: Lang) {
         .map(|group| {
             group
                 .iter()
-                .map(|r| r.name())
+                .map(|layer| layer.label(&profile.mixed))
                 .collect::<Vec<_>>()
                 .join(" → ")
         })
@@ -230,8 +253,7 @@ fn details(out: &mut String, profile: &ProjectProfile, lang: Lang) {
         );
         let mut line = format!(
             "  {}  {}  ({h} {high}, {m} {medium}, {l} {low}",
-            layer.role.name(),
-            layer.files
+            layer.label, layer.files
         );
         if let Some(label) = layer.confirm_label {
             let _ = match lang {
@@ -261,11 +283,12 @@ fn details(out: &mut String, profile: &ProjectProfile, lang: Lang) {
     flow_line(out, profile, lang);
     if let Some(flow) = &profile.flow {
         for ((from, into), n) in &flow.pairs {
-            let mark = if from.rank() <= into.rank() {
+            let mark = if from.role.rank() <= into.role.rank() {
                 ""
             } else {
                 "  ↑"
             };
+            let (from, into) = (from.label(&profile.mixed), into.label(&profile.mixed));
             let _ = writeln!(out, "  {from} → {into}  {n}{mark}");
         }
     }
@@ -278,6 +301,7 @@ fn details(out: &mut String, profile: &ProjectProfile, lang: Lang) {
             let _ = writeln!(out, "  {folder}  {n}");
         }
     }
+    skipped_lines(out, profile, lang);
     if let Some(source) = &profile.overrides {
         let _ = writeln!(out, ".callgraph-layers: {}", source.display());
     }

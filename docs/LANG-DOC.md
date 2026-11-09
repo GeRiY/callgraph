@@ -28,13 +28,19 @@ Egy JSON-dokumentum egy konténer. Minden objektumkulcs egy `constant`:
 ```
 
 ```text
-scripts        -> name "scripts", value "object", line: 1
-scripts.build  -> name "scripts.build", value "string", line: 1
+scripts        -> name "scripts", value "object (1)", line: 1
+scripts.build  -> name "scripts.build", value "\"vite build\"", line: 1
 ```
 
 `constant.kind` mindig `"key"`, `name` a pontozott kulcsútvonal (a tömbindex
-nem része a névnek), `value` a JSON-típus (`object`, `array`, `string`,
-`number`, `boolean`, `null`), `visibility: "public"`, `doc: null`. A kulcs
+nem része a névnek), `value` a rövid érték: a string idézőjelben (60 karakter
+fölött `…`-ra vágva), a szám, a `true` / `false` és a `null` maga, az objektum
+és a tömb a fajtája az elemszámmal (`object (3)`, `array (2)`);
+`visibility: "public"`, `doc: null`. A `fájl.json::a.b.c` szelektor (tömb-elem
+indexszel: `files.0`) a lekérdezés idejére `key` fajtájú szakasz a kulcs
+sorától az értéke végéig — a `--body` így a kulcs JSON-részfáját adja. A
+`locate` a kulcsot pontos egyezéssel találja meg (a teljes út vagy az utolsó
+tagja). A kulcs
 sora a kulcs idézőjelének kezdősora; egysoros JSON-nál ezért minden kulcs
 sora 1. Nincs mélységi korlát: a teljes objektumfa bekerül. Tömbben lévő
 objektumok kulcsai ugyanígy a környező kulcsútvonal alatt jelennek meg.

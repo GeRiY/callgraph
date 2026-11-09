@@ -21,6 +21,7 @@ src/
   core/                         nyelvfüggetlen építőkövek
     chain.rs                    Chain<I> + Rule<I> — generikus Chain of Responsibility
     source.rs                   SourceFile { path, text, mtime } — a nyelvek bemenete
+    recovery.rs                 végzetes szintaktikai hibánál az ép előtag vágási pontjai (JS/TS/Vue, Rust)
   lang/                         a nyelv-réteg
     language.rs                 trait Language (id, role, extensions, analyze), LanguageRole, Analysis
     backend.rs                  trait LanguageBackend: Language   — szerveroldal (framework-felismerés)
@@ -35,18 +36,24 @@ src/
       framework/                stratégiák (laravel, yii, generic) + detektor
   model/                        közös kimeneti séma (FileGraph + FileGraphBuilder)
   analysis/                     Analyzer (Facade): fájl → registry.for_path → nyelv.analyze → Analysis
-  io/                           walker (a registry kiterjesztéseivel), cache (CacheStore + JsonlCacheStore), jsonl_writer
+  io/                           walker (a registry kiterjesztéseivel), ignore_rules (.gitignore / .callgraphignore
+                                git-szemantikával, `ignore::gitignore`; `--no-gitignore`), cache (CacheStore +
+                                JsonlCacheStore), jsonl_writer
   index/                        CallerIndex (fordított hívó-index, mindkét irány) + TypeHierarchy (via-illesztés)
   graph/                        ProjectGraph: perzisztens projekt-gráf (.callgraph/: index.bin manifest, graph.pack,
                                 facts.bin), fájlonként frissítve; folyamaton belül gyökerenként egy példány;
                                 előre-frissítés (refresh.rs: `callgraph refresh`, refresh.lock) és MCP-fájlfigyelő (watch.rs)
   hook/                         Claude Code PostToolUse hook: a hook JSON-ja → háttér-`refresh`; settings.json szerkesztése
   profile/                      projekt-profil: szerep-/réteg-, architektúra- és minta-felismerés a mappa- és fájlnevekből
-                                (szabály-táblák adatként), megerősítés a gráfból; a `--layer` / `--layers` / `--by-layer`
-                                kapcsolók osztályozója; `.callgraph-layers` (saját elnevezések)
+                                (szabály-táblák adatként), megerősítés a gráfból; réteg = szerep + ökoszisztéma
+                                (`controller (php)` / `controller (js)`); a vendor- és generált kód kimarad (vendor.rs);
+                                a `--layer` / `--layers` / `--by-layer` kapcsolók osztályozója; `.callgraph-layers`
   query/                        QueryEngine (Facade), formázók (Strategy + FormatterRegistry), kimeneti korlát
   locate/                       kiindulópont-kereső (Facade: Locator): kifejezések bontása (terms), egyezés a szűkített
                                 tényeken (matcher), név szerinti hívószám (callers), rangsor (rank), indoklás + kimenet
+  stats/                        helyi, passzív használati mérés (hálózat nincs): CLI-próba (main.rs) és MCP-próba
+                                (mcp::server) → napi összesítő `<skill>/stats/YYYY-MM.json` (csak zárt nevek és
+                                sávok, út / név soha), a `locate`-találat követése memóriában, `callgraph stats` riport
   cli/                          Command minta; args, parancsok (analyze, prune)
   mcp/                          MCP-szerver (`callgraph mcp`, rmcp, stdio): eszköz-paraméter → `show`-lekérdezés, útvonal-őr, frissítés (`--auto-update`, napi értesítés)
 tests/                          integrációs tesztek (pl. languages.rs: teszt-nyelvek a registryn)
@@ -91,7 +98,9 @@ kiterjesztést kéri, az előbb regisztrált nyer.
 - **`model/`** — a kimeneti séma (serde, a JSON 1:1). Minden nyelv ide képez le; a nem-kód nyelvek leképezése:
   CSS/SCSS — container: a stíluslap, „metódus”: mixin / function / szabály-blokk, imports: `@use`/`@import`;
   JSON — constants: kulcs-útvonalak; Markdown — „metódus”: címsor-szakaszok, „hívás”: linkek.
-- **`io/`** — `FileWalker::for_registry` a regisztrált kiterjesztéseket járja be (a `vendor`, `node_modules`, `.git`… mappákat kihagyja);
+- **`io/`** — `FileWalker::for_registry` a regisztrált kiterjesztéseket járja be (a `vendor`, `node_modules`, `.git`… mappákat
+  és a `.gitignore` / `.callgraphignore` mintáit kihagyja; a `collect`, az `includes` és az `includes_dir` ugyanazzal
+  a szabálykészlettel dönt);
   a cache kulcsa az abszolút út, értéke mtime + az eszköz verziója.
 - **`graph/`** — a perzisztens projekt-gráf (`docs/PROJECT-GRAPH.md`): egy hozzáfűzős pack (`graph.pack`: fájlonként
   a frontend `FileGraph`-ja veszteségmentes tükör-alakban + a hívás-sorok; MessagePack + LZ4), egy kis manifest

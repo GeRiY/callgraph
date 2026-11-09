@@ -1,6 +1,6 @@
 [package]
 name = "callgraph"
-version = "0.5.0"
+version = "0.5.1"
 edition = "2024"
 license = "MIT"
 description = "PHP projekt-gráf elemző (callgraph Rust-port), JSONL kimenettel"
@@ -47,6 +47,9 @@ tokio = { version = "1", default-features = false, features = ["rt"] }
 # MCP-fájlfigyelő (`graph::watch`): macOS FSEvents, Linux inotify, Windows ReadDirectoryChangesW; a mago-database
 # is ezt a verziót használja, így nem kerül be új crate
 notify = "=8.2.1"
+# a bejárás .gitignore- és .callgraphignore-mintái (git-szemantika: `ignore::gitignore`); már eddig is a függőségi
+# fában volt (a Cargo.lock-ban), így nem kerül be új crate
+ignore = "=0.4.34"
 # self-update: pure-Rust HTTPS (rustls, no OpenSSL) and zip (deflate only)
 ureq = { version = "=3.5.1", default-features = false, features = ["rustls"] }
 # self-update: SHA-256 of the downloaded package (SHA256SUMS), pure Rust
