@@ -168,7 +168,7 @@ impl QueryEngine {
                     .iter()
                     .any(|input| self.root.join(&input.file) == abs)
                 {
-                    return Err(CallgraphError::Binary(abs));
+                    return Err(crate::lang::filetype::skipped_content_error(&abs));
                 }
                 continue;
             }

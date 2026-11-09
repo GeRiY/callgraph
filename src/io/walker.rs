@@ -1,16 +1,21 @@
 //! Fájlbejárás: a megadott fájlok / mappák (rekurzívan) fájljai a regisztrált nyelvek kiterjesztéseivel
-//! (kis-/nagybetűtől függetlenül), a generált fájlok (`lang::filetype::is_generated`) és a projekt
-//! `.callgraphignore` fájljában kizárt kiterjesztések nélkül; minden fájl egyszer (a symlinkek célja is).
+//! (kis-/nagybetűtől függetlenül), a generált fájlok (`lang::filetype::is_generated`), a beépített kihagyott
+//! mappák, a `.gitignore` és a `.callgraphignore` szabályai (`ignore_rules`) nélkül; minden fájl egyszer (a
+//! symlinkek célja is). A `collect`, az `includes` és az `includes_dir` ugyanazokkal a szabályokkal dönt (a bejárás,
+//! az MCP-figyelő, a hook és a `refresh` így egyetért).
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
+use super::ignore_rules::{IgnoreTree, excluded_extensions, gitignore_enabled};
 use crate::lang::LanguageRegistry;
 
 /// A regisztrált kiterjesztésű fájlok gyűjtése; a kihagyott mappanevek konfigurálhatók.
 pub struct FileWalker {
     extensions: Vec<&'static str>,
     skip_dirs: Vec<String>,
+    /// A `.gitignore` fájlok is számítanak-e (alapból a `CALLGRAPH_GITIGNORE` szerint, `--no-gitignore`).
+    gitignore: bool,
 }
 
 impl FileWalker {
@@ -23,7 +28,14 @@ impl FileWalker {
         Self {
             extensions,
             skip_dirs: default_skip_dirs(),
+            gitignore: gitignore_enabled(),
         }
+    }
+
+    /// A `.gitignore` fájlok figyelembe vétele (alapból a `CALLGRAPH_GITIGNORE` környezeti változó szerint).
+    pub fn with_gitignore(mut self, gitignore: bool) -> Self {
+        self.gitignore = gitignore;
+        self
     }
 
     /// Feldolgozandó-e a fájl: regisztrált kiterjesztés (kis-/nagybetűtől függetlenül), nem generált fájl, és a
@@ -52,34 +64,6 @@ impl FileWalker {
     }
 }
 
-/// A projektenként kizárt kiterjesztések fájlja (a `.gitignore`-hoz hasonlóan a projektben, commitolható).
-pub const IGNORE_FILE: &str = ".callgraphignore";
-
-/// A `dir`-re érvényes (a mappától felfelé a legközelebbi) `.callgraphignore` kizárt kiterjesztései, kisbetűvel.
-/// Soronként egy: `md`, `.md` vagy `*.md`; `#`-tel kezdődő sor megjegyzés, az üres sor nem számít.
-pub fn excluded_extensions(dir: &Path) -> Vec<String> {
-    let mut at = Some(dir);
-    while let Some(candidate) = at {
-        if let Ok(contents) = std::fs::read_to_string(candidate.join(IGNORE_FILE)) {
-            return parse_ignore(&contents);
-        }
-        at = candidate.parent();
-    }
-    Vec::new()
-}
-
-/// A `.callgraphignore` tartalmának kiterjesztései (`md`, `.md`, `*.md` → `md`), kisbetűvel.
-pub fn parse_ignore(contents: &str) -> Vec<String> {
-    contents
-        .lines()
-        .map(str::trim)
-        .filter(|line| !line.is_empty() && !line.starts_with('#'))
-        .map(|line| line.trim_start_matches('*').trim_start_matches('.'))
-        .filter(|ext| !ext.is_empty() && !ext.contains(['/', '\\', '*', ' ']))
-        .map(str::to_ascii_lowercase)
-        .collect()
-}
-
 fn default_skip_dirs() -> Vec<String> {
     [
         "vendor",
@@ -103,7 +87,8 @@ impl FileWalker {
         self
     }
 
-    /// A bemenetek fájljai rendezve; a hozzáférhetetlen mappákról a `warn` kap üzenetet.
+    /// A bemenetek fájljai rendezve; a hozzáférhetetlen mappákról a `warn` kap üzenetet. A közvetlenül megadott
+    /// fájl a `.gitignore`-tól függetlenül bekerül (a felhasználó maga kérte).
     pub fn collect(&self, inputs: &[PathBuf], warn: &mut dyn FnMut(String)) -> Vec<PathBuf> {
         let mut files = self.collect_all(inputs, warn);
         // minden fájl egyszer: egy symlink (`out/link.php → src/A.php`) célja a kanonikus útjával kerül be,
@@ -116,6 +101,7 @@ impl FileWalker {
     fn collect_all(&self, inputs: &[PathBuf], warn: &mut dyn FnMut(String)) -> Vec<PathBuf> {
         let mut files = Vec::new();
         let mut visited = HashSet::new();
+        let mut rules = IgnoreTree::new(self.gitignore);
         for input in inputs {
             let Ok(real) = std::fs::canonicalize(input) else {
                 warn(crate::tf!(
@@ -126,7 +112,7 @@ impl FileWalker {
                 continue;
             };
             if real.is_dir() {
-                self.walk_dir(&real, &mut files, &mut visited, warn);
+                self.walk_dir(&real, &mut files, &mut visited, &mut rules, warn);
             } else if real.is_file() && self.matches(&real) {
                 files.push(real);
             }
@@ -139,6 +125,7 @@ impl FileWalker {
         dir: &Path,
         files: &mut Vec<PathBuf>,
         visited: &mut HashSet<PathBuf>,
+        rules: &mut IgnoreTree,
         warn: &mut dyn FnMut(String),
     ) {
         let Ok(real_dir) = std::fs::canonicalize(dir) else {
@@ -148,7 +135,7 @@ impl FileWalker {
             return;
         }
         let dir = real_dir.as_path();
-        let ignored = self.ignore_dirs_for(dir);
+        let skipped = self.skip_names_for(dir);
         let excluded = excluded_extensions(dir);
         let entries = match std::fs::read_dir(dir) {
             Ok(e) => e,
@@ -165,7 +152,7 @@ impl FileWalker {
             let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
                 continue;
             };
-            if ignored.iter().any(|ignored| ignored == name) {
+            if skipped.iter().any(|skipped| skipped == name) {
                 continue;
             }
             let Ok(metadata) = std::fs::symlink_metadata(&path) else {
@@ -176,32 +163,46 @@ impl FileWalker {
                 let Ok(target) = std::fs::canonicalize(&path) else {
                     continue;
                 };
+                // a minta a link saját útjára illeszkedik (mint a gitnél)
+                if rules.ignored(dir, &path, target.is_dir()) {
+                    continue;
+                }
                 if target.is_dir() {
-                    self.walk_dir(&target, files, visited, warn);
+                    self.walk_dir(&target, files, visited, rules, warn);
                 } else if target.is_file() && self.matches(&target) {
                     files.push(target);
                 }
             } else if metadata.is_dir() {
-                self.walk_dir(&path, files, visited, warn);
-            } else if self.matches_in(&path, &excluded) {
+                if !rules.ignored(dir, &path, true) {
+                    self.walk_dir(&path, files, visited, rules, warn);
+                }
+            } else if self.matches_in(&path, &excluded) && !rules.ignored(dir, &path, false) {
                 files.push(path);
             }
         }
     }
 
-    /// Bejárná-e a `collect(&[root])` ezt a fájlt: a kiterjesztése regisztrált, és a gyökér alatti egyik mappája sincs
-    /// kihagyva (`includes_dir`). A fájlnak nem kell léteznie; a `root` és a `file` ugyanabban az alakban (kanonikus
-    /// út). Symlinkeket nem követ (a `callgraph refresh` / az MCP-figyelő szűrője).
+    /// Bejárná-e a `collect(&[root])` ezt a fájlt: a kiterjesztése regisztrált, a gyökér alatti egyik mappája sincs
+    /// kihagyva (`includes_dir`), és a `.gitignore` / `.callgraphignore` mintái sem zárják ki. A fájlnak nem kell
+    /// léteznie; a `root` és a `file` ugyanabban az alakban (kanonikus út). Symlinkeket nem követ (a `callgraph
+    /// refresh` / az MCP-figyelő szűrője).
     pub fn includes(&self, root: &Path, file: &Path) -> bool {
+        let Some(dir) = file.parent() else {
+            return false;
+        };
+        let mut rules = IgnoreTree::new(self.gitignore);
         self.matches(file)
-            && file
-                .parent()
-                .is_some_and(|dir| self.includes_dir(root, dir))
+            && self.includes_dir_with(root, dir, &mut rules)
+            && !rules.ignored(dir, file, false)
     }
 
     /// Bejárná-e a `collect(&[root])` ezt a mappát: a gyökér alatt van, és egyik szintje sincs kihagyva (beépített
-    /// név, `.gitignore`-os mappa, Cargo `target/`). A gyökér maga benne van.
+    /// név, Cargo `target/`, `.gitignore`- vagy `.callgraphignore`-minta). A gyökér maga benne van.
     pub fn includes_dir(&self, root: &Path, dir: &Path) -> bool {
+        self.includes_dir_with(root, dir, &mut IgnoreTree::new(self.gitignore))
+    }
+
+    fn includes_dir_with(&self, root: &Path, dir: &Path, rules: &mut IgnoreTree) -> bool {
         let Ok(rel) = dir.strip_prefix(root) else {
             return false;
         };
@@ -213,50 +214,34 @@ impl FileWalker {
             let Some(name) = name.to_str() else {
                 return false;
             };
-            if self
-                .ignore_dirs_for(&at)
-                .iter()
-                .any(|ignored| ignored == name)
-            {
+            if self.skip_names_for(&at).iter().any(|skipped| skipped == name) {
                 return false;
             }
-            at.push(name);
+            let child = at.join(name);
+            if rules.ignored(&at, &child, true) {
+                return false;
+            }
+            at = child;
         }
         true
     }
 
-    fn ignore_dirs_for(&self, dir: &Path) -> Vec<String> {
-        let mut ignored = self.skip_dirs.clone();
+    /// A mappa név szerint kihagyott bejegyzései: a beépített nevek, és Cargo-csomagban a `target/`.
+    fn skip_names_for(&self, dir: &Path) -> Vec<String> {
+        let mut skipped = self.skip_dirs.clone();
         // Cargo-csomag: a `target/` build-kimenet (generált .rs fájlokkal). Csak Cargo.toml mellett,
         // hogy a PHP / JS projektek `target` nevű mappáit ne érintse.
         if dir.join("Cargo.toml").is_file() {
-            ignored.push("target".to_owned());
+            skipped.push("target".to_owned());
         }
-        // The reference starts at dirname($dir), then walks upward to the
-        // nearest .gitignore. Patterns are compared as whole entry names.
-        let mut project_root = dir.parent();
-        while let Some(candidate) = project_root {
-            let gitignore = candidate.join(".gitignore");
-            if let Ok(contents) = std::fs::read_to_string(gitignore) {
-                ignored.extend(contents.lines().filter_map(|line| {
-                    let line = line.trim();
-                    if line.is_empty() || line.starts_with('#') || !line.ends_with('/') {
-                        return None;
-                    }
-                    let name = line.trim_end_matches('/');
-                    (!name.starts_with('!')).then(|| name.to_owned())
-                }));
-                break;
-            }
-            project_root = candidate.parent();
-        }
-        ignored
+        skipped
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::FileWalker;
+    use crate::io::ignore_rules::{IGNORE_FILE, excluded_extensions, parse_ignore, path_patterns};
     use crate::lang::LanguageRegistry;
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -294,7 +279,7 @@ mod tests {
     fn skips_builtin_and_gitignored_dirs_in_filesystem_order() {
         let temp = TempDir::new();
         fs::write(temp.0.join(".gitignore"), "generated/\n# comment\n!keep/\n").unwrap();
-        // a/generated: a gyökér .gitignore-ja az ALMAPPÁK bejegyzéseire hat (a referencia a mappa szülőjétől keres)
+        // git-szemantika: a gyökér `generated/` mintája minden szinten hat (a gyökér saját `generated/`-jére is)
         for dir in ["z", "a", "vendor", "generated", "cache", "a/generated"] {
             fs::create_dir_all(temp.0.join(dir)).unwrap();
             fs::write(temp.0.join(dir).join("f.php"), "<?php").unwrap();
@@ -313,11 +298,10 @@ mod tests {
         names.sort();
         assert_eq!(
             names,
-            // paritás az ast_graph.php-val: a gyökér saját `generated/` bejegyzésére a gyökér .gitignore-ja még nem hat
-            // (a keresés a gyökér szülőjétől indul), az `a/generated` viszont kimarad
+            // valódi .gitignore-szemantika (a régi ast_graph.php-paritás helyett: ott a gyökér saját `generated/`-je
+            // bekerült, mert a keresés a gyökér szülőjétől indult)
             [
                 PathBuf::from("a/f.php"),
-                PathBuf::from("generated/f.php"),
                 PathBuf::from("root.php"),
                 PathBuf::from("z/f.php")
             ]
@@ -418,7 +402,7 @@ mod tests {
         ] {
             assert!(!walker.includes(&root, &root.join(name)), "{name}");
         }
-        fs::write(root.join(super::IGNORE_FILE), "md\n*.Vue\n").unwrap();
+        fs::write(root.join(IGNORE_FILE), "md\n*.Vue\n").unwrap();
         assert!(!walker.includes(&root, &root.join("README.md")));
         assert!(!walker.includes(&root, &root.join("src/App.vue")));
         assert!(walker.includes(&root, &root.join("src/A.php")));
@@ -429,8 +413,13 @@ mod tests {
     #[test]
     fn ignore_file_lines_accept_bare_dotted_and_glob_extensions() {
         assert_eq!(
-            super::parse_ignore("# comment\n\nmd\n.JSON\n*.vue\n  ts  \nsrc/\n*\n.\n"),
+            parse_ignore("# comment\n\nmd\n.JSON\n*.vue\n  ts  \nsrc/\n*\n.\n*.d.ts\n"),
             ["md", "json", "vue", "ts"]
+        );
+        // minden más sor útminta (a `.` és a `*.` önmagában semmi)
+        assert_eq!(
+            path_patterns("# comment\nmd\n.JSON\nsrc/\n*\n.\n*.d.ts\n/public/build\n!keep.js\n"),
+            ["src/", "*", "*.d.ts", "/public/build", "!keep.js"]
         );
     }
 
@@ -439,9 +428,9 @@ mod tests {
         let temp = TempDir::new();
         let root = temp.0.canonicalize().unwrap();
         fs::create_dir_all(root.join("a/b")).unwrap();
-        fs::write(root.join(super::IGNORE_FILE), "md\n").unwrap();
-        fs::write(root.join("a").join(super::IGNORE_FILE), "js\n").unwrap();
-        assert_eq!(super::excluded_extensions(&root), ["md"]);
-        assert_eq!(super::excluded_extensions(&root.join("a/b")), ["js"]);
+        fs::write(root.join(IGNORE_FILE), "md\n").unwrap();
+        fs::write(root.join("a").join(IGNORE_FILE), "js\n").unwrap();
+        assert_eq!(excluded_extensions(&root), ["md"]);
+        assert_eq!(excluded_extensions(&root.join("a/b")), ["js"]);
     }
 }

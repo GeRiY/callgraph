@@ -192,7 +192,9 @@ pub(crate) struct NotesParams {
 pub(crate) struct LocateParams {
     /// Names and domain terms from the task, in code form: function / class / file names, columns, routes, and the
     /// English code name of a non-English domain word (`["RefundController", "processRefund", "refund",
-    /// "payment_status", "checkout.vue"]`); a single string works too.
+    /// "payment_status", "checkout.vue"]`); a single string works too. An element with spaces is one phrase,
+    /// matched as a whole against string literals (a UI label); `route::events.show` finds a route's definition
+    /// and its `route()` calls; `--orange-500` a CSS custom property.
     pub terms: OneOrMany,
     /// Registered project alias; default: the server's working directory.
     #[serde(default)]

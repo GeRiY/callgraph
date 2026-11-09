@@ -63,7 +63,18 @@ Honnan induljak a feladattal (egy hívás a feladat neveivel és fogalmaival):
                                                 legfeljebb 3 indoklással: pontos definíció, fájlnév, név-részlet (camelCase /
                                                 snake_case / kebab-case, egyes / többes szám), string-literál, hívás; "hívók: N";
                                                 az első 5 fájl, --all: minden egyező fájl; a "nincs találat: …" a meg nem
-                                                talált, a "túl általános" a 30-nál több fájlban egyező kifejezéseket sorolja
+                                                talált, a "túl általános" a 30-nál több fájlban egyező kifejezéseket sorolja;
+                                                a pontos definíciók / fájlnevek kerülnek előre
+                                                "idézőjeles kifejezés" (szóközzel): egyetlen kifejezés, egészében a
+                                                string-literálokra illesztve (feliratok); route::events.show: az útvonal
+                                                definíciója (->name() a routes/*.php-ban) elöl, utána a route() /
+                                                to_route() / redirect()->route() hívások; --orange-500: CSS custom property
+
+Kizárt fájlok: a beépített mappák (vendor, node_modules, …), a minifikált / bundlolt JS / CSS, minden mappa
+  .gitignore-ja (git-szabályokkal), és a .callgraphignore: az "md" / ".md" / "*.md" egy kiterjesztést zár ki, minden
+  más sor a mappájához relatív .gitignore-minta ("public/build", "/storage/", "!keep.js"). --no-gitignore (bármely
+  parancsnál) vagy CALLGRAPH_GITIGNORE=0 (MCP-szerver, hook): a .gitignore fájlok nem számítanak (a .callgraphignore igen).
+  bash ~/.claude/skills/callgraph/callgraph.sh --version                       verzió, platform és a bináris helye
 
 Projekt-profil (architektúra, rétegek és minták a mappa- / fájlnevekből, a gráffal ellenőrizve):
   bash ~/.claude/skills/callgraph/callgraph.sh profile [--project alias] [--full]

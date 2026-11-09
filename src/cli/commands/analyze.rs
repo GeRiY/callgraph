@@ -187,7 +187,7 @@ impl Command for AnalyzeCommand {
             match outcome {
                 // bináris tartalmú fájl: nincs sora (a JSONL csak forráskódot ír ki), csak egy megjegyzés
                 Outcome::Graph(graph, _) if graph.binary => {
-                    note(crate::error::CallgraphError::Binary(file.clone()).to_string());
+                    note(crate::lang::filetype::skipped_content_error(file).to_string());
                 }
                 Outcome::Graph(graph, warnings) => {
                     warnings.into_iter().for_each(&mut note);

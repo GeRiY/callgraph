@@ -11,8 +11,36 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   the output was, and for `locate` how often the first result was the file the agent opened next. Everything stays on
   your computer: nothing is sent anywhere, and no paths, names or search terms are recorded — only counts in ranges.
   The data is in the skill folder (`stats/`, about 90 days); turn it off with `CALLGRAPH_STATS=0`.
+- **`--no-gitignore`:** add it to any command (show, folder views, `locate`, `profile`, `refresh`, `callers`) to also
+  map the files your `.gitignore` excludes; for the MCP server and the hook set `CALLGRAPH_GITIGNORE=0`.
+  `.callgraphignore` and the always-skipped folders (`vendor`, `node_modules`, …) still apply.
+- **`locate route::events.show`:** finds a route by its name: the definition (`->name('events.show')` in
+  `routes/*.php`) comes first, then every `route('events.show')`, `to_route(…)` and `redirect()->route(…)` in PHP and
+  JavaScript / TypeScript / Vue. If nothing is found, it says what it looked for.
+- **`callgraph.sh --version`** (also `-V` and `version`) prints the version, the platform and where the binary is.
+
+### Changed
+- **`.callgraphignore` accepts paths:** a line like `md`, `.md` or `*.md` still skips an extension, and every other
+  line is now a path pattern written like in `.gitignore` (`public/build/`, `/storage/`, `!keep.js`), relative to the
+  folder of the file. A bare word such as `build` is still an extension; write `build/` for a folder.
+- **`locate` ranks exact matches first:** a file whose class, component or function name (or file name) is one of the
+  terms now always comes before files that only contain the terms as text, such as translation files or build
+  output.
+- **A quoted phrase is one `locate` term:** `locate "Organizer's other events"` searches for the whole text in the
+  strings of the code (labels, translations) instead of splitting it into words that matched unrelated names.
+- **`locate` always shows a `root:` line** and paths relative to it, also when only one file matches.
 
 ### Fixed
+- **Files your `.gitignore` excludes no longer show up:** the build output of a Laravel + Vite project
+  (`public/build/assets/app-CBW7lKWe.js`, listed in `.gitignore` as `/public/build`) appeared in `locate` and folder
+  views. `.gitignore` now works the way git reads it: patterns with a leading `/`, nested paths, `**`, `!` exceptions
+  and a `.gitignore` in any subfolder. The same rules apply everywhere callgraph looks at files, including the MCP
+  server's file watcher and the editor hook.
+- **Minified and bundled JavaScript / CSS is skipped even without a `.min.` name or a `.gitignore`:** a file whose
+  first lines are extremely long is recognised as generated and left out.
+- **`locate --orange-500`** (a CSS variable) was rejected as an unknown option; it is now searched for. The known
+  options (`--all`, `--project`) still work as before.
+- **`callgraph.sh --version`** printed the usage of `show` and logged an error.
 - **Files with a syntax error are no longer shown as if they were complete:** a file you are in the middle of editing,
   or one with a merge conflict, could come back with no functions at all (JavaScript, TypeScript, Vue, Rust) or
   without any notice (PHP, Swift). A search then said "no such method" or found no callers, which could make an agent

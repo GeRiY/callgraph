@@ -11,8 +11,15 @@ use callgraph::stats::{CliProbe, Meter};
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 fn main() -> ExitCode {
+    let mut args: Vec<String> = std::env::args().skip(1).collect();
+    if cli::take_no_gitignore(&mut args) {
+        // SAFETY: a folyamat elején, minden más szál indulása előtt (egyszálú pont); a bejáró és a
+        // gyermek-folyamatok (háttér-`refresh`) ebből tudják, hogy a `.gitignore` ki van kapcsolva
+        unsafe {
+            std::env::set_var(callgraph::io::GITIGNORE_ENV, "0");
+        }
+    }
     callgraph::update::cleanup_stale_binary();
-    let args: Vec<String> = std::env::args().skip(1).collect();
     let probe = CliProbe::start(&args);
     let command = match CliArgs::parse(args).and_then(cli::build_command) {
         Ok(c) => c,

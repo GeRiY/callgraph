@@ -1,28 +1,68 @@
 //! A keresett kifejezések és az azonosítók szavakra bontása: kisbetűsítés, camelCase / PascalCase / snake_case /
 //! kebab-case / pont mentén bontás, egyes / többes szám tűrés (`refund` ~ `refunds`, `status` ~ `statuses`,
-//! `category` ~ `categories`).
+//! `category` ~ `categories`). Két különleges alak: a szóközt tartalmazó argumentum egyetlen kifejezés (`Phrase`:
+//! felirat / fordítási szöveg, egészében a string-literálokra illesztve), a `route::név` pedig egy útvonal neve
+//! (`Route`: a `route('név')` / `to_route` / `redirect()->route` hívások stringjei és a `->name('név')` definíció).
+
+/// A kifejezés fajtája: név / fogalom, több szavas kifejezés, vagy útvonalnév.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum TermKind {
+    /// Név vagy fogalom (függvény, osztály, fájl, oszlop): pontos, név-részlet, string és hívás egyezés.
+    Name,
+    /// Szóközt tartalmazó kifejezés (`"Szervező további eseményei"`): csak string-literál, egészében, kis- /
+    /// nagybetűtől és a szóközök számától függetlenül; nem bontva, név-részletként nem illeszt.
+    Phrase,
+    /// `route::név`: a név kisbetűvel (`events.show`).
+    Route(String),
+}
 
 /// Egy keresett kifejezés, ahogy az agent átadta, és az illesztéshez előkészített alakjai.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Term {
     /// Az átadott alak (a kimenetben így jelenik meg).
     pub raw: String,
-    /// Kisbetűs alak (pontos egyezéshez).
+    /// Kisbetűs alak (pontos egyezéshez); a több szavas kifejezésnél egy szóközzel.
     pub lower: String,
-    /// A kifejezés szavai kisbetűvel (név-részlet egyezéshez).
+    /// A kifejezés szavai kisbetűvel (név-részlet egyezéshez; a `Phrase` és a `Route` kifejezésnél üres).
     pub words: Vec<String>,
     /// `Típus::metódus` / `Típus.metódus` / `Típus->metódus` alak: (a típus rövid neve, a név), kisbetűvel.
     pub member: Option<(String, String)>,
+    /// A kifejezés fajtája.
+    pub kind: TermKind,
 }
+
+/// Az útvonalnév-kifejezés előtagja.
+const ROUTE_PREFIX: &str = "route::";
 
 impl Term {
     /// Egy kifejezés előkészítése; a körülötte álló idézőjelek / backtickek lekerülnek. Üres kifejezés: `None`.
+    /// Szóközzel: `Phrase`; `route::név`: `Route`; különben `Name`.
     pub(crate) fn new(raw: &str) -> Option<Self> {
         let raw = raw.trim().trim_matches(['"', '\'', '`']).trim();
         if raw.is_empty() {
             return None;
         }
+        if raw.contains(char::is_whitespace) {
+            let raw = raw.split_whitespace().collect::<Vec<_>>().join(" ");
+            return Some(Self {
+                lower: raw.to_lowercase(),
+                raw,
+                words: Vec::new(),
+                member: None,
+                kind: TermKind::Phrase,
+            });
+        }
         let lower = raw.to_lowercase();
+        if let Some(route) = lower.strip_prefix(ROUTE_PREFIX).filter(|r| !r.is_empty()) {
+            let route = route.to_owned();
+            return Some(Self {
+                raw: raw.to_owned(),
+                lower,
+                words: Vec::new(),
+                member: None,
+                kind: TermKind::Route(route),
+            });
+        }
         let member = match split_member(&lower) {
             (Some(owner), name) if !name.is_empty() => {
                 let owner = short_name(owner);
@@ -35,18 +75,23 @@ impl Term {
             words: words(raw),
             lower,
             member,
+            kind: TermKind::Name,
         })
     }
 
-    /// A parancssori / MCP-bemenet kifejezései: elemenként szóköz és vessző mentén is bontva (egy agent néha egy
-    /// stringben küld többet), kis-/nagybetűtől függetlenül egyszer.
+    /// A parancssori / MCP-bemenet kifejezései, kis-/nagybetűtől függetlenül egyszer. A szóközt tartalmazó elem
+    /// egyetlen kifejezés (`Phrase`); a szóköz nélküli vessző mentén bontva (egy agent néha egy stringben küld
+    /// többet: `refund,payment_status`).
     pub(crate) fn parse_all<S: AsRef<str>>(inputs: &[S]) -> Vec<Self> {
         let mut out: Vec<Self> = Vec::new();
         for input in inputs {
-            for part in input
-                .as_ref()
-                .split(|c: char| c.is_whitespace() || c == ',')
-            {
+            let input = input.as_ref().trim();
+            let parts: Vec<&str> = if input.contains(char::is_whitespace) {
+                vec![input]
+            } else {
+                input.split(',').collect()
+            };
+            for part in parts {
                 let Some(term) = Self::new(part) else {
                     continue;
                 };
@@ -56,6 +101,11 @@ impl Term {
             }
         }
         out
+    }
+
+    /// Név / fogalom kifejezés-e (a `Phrase` és a `Route` csak a saját egyezéseit adja).
+    pub(crate) fn is_plain(&self) -> bool {
+        self.kind == TermKind::Name
     }
 
     /// Pontosan ez a név-e (kis-/nagybetűtől függetlenül; névtérrel adott névnél a rövid név is számít).

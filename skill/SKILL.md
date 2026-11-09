@@ -32,10 +32,16 @@ visszatérítés → `refund`). It answers from the project map without reading 
 match), each with its reasons (exact definition, file name, name part, string, call, `callers: N`). Continue on
 those files with the outline / `--body` / `--grep`.
 <!-- /mcp -->
+Special terms: a quoted phrase with spaces (`"Szervező további eseményei"`) is ONE term, matched as a whole against
+string literals (UI labels, translations), never split into words; `route::events.show` finds the route definition
+(`->name('events.show')` in `routes/*.php`, ranked first) and its `route()` / `to_route()` / `redirect()->route()`
+calls in PHP and JS / TS / Vue; `--orange-500` is a CSS custom property, not a flag. Files with an exact definition or
+file name rank before files that only match strings (translations, build output).
 
 ```bash
 bash <skill>/callgraph.sh locate RefundController processRefund refund payment_status checkout.vue --project myapp   # where to start: ranked files + reasons
 bash <skill>/callgraph.sh locate refund --all --project myapp                                                       # every matching file, not just the top 5
+bash <skill>/callgraph.sh locate route::events.show "Szervező további eseményei" --project myapp                     # a route (definition first) and a UI phrase
 ```
 
 ## Quick commands
@@ -232,9 +238,12 @@ Local usage stats (counts and ranges only, no paths or names, never sent anywher
 when the user asks how callgraph is used; off: `CALLGRAPH_STATS=0`.
 
 Processed files: only the supported extensions (upper case too: `B.PHP`), without generated files
-(`package-lock.json`, `*.min.js`, `*.min.css`) and binary content. A `.callgraphignore` file in the project (the
-nearest one applies) lists further extensions to skip, one per line (`md`, `.json`, `*.vue`); a file named directly
-with such an extension is refused with the reason.
+(`package-lock.json`, `*.min.js`, `*.min.css`, minified / bundled JS / CSS by content), binary content, the built-in
+folders (`vendor`, `node_modules`, …) and what the `.gitignore` files exclude (git rules; every folder's own file). A
+`.callgraphignore` file in the project: a line `md` / `.md` / `*.md` skips an extension (the nearest file applies; a
+file named directly with such an extension is refused with the reason), any other line is a `.gitignore` pattern
+relative to its folder (`public/build`, `/storage/`, `!keep.js`). `--no-gitignore` (any command) or
+`CALLGRAPH_GITIGNORE=0` (MCP server, hook) turns the `.gitignore` files off; `.callgraphignore` still applies.
 
 ## Limits
 

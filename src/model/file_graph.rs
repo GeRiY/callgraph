@@ -31,7 +31,8 @@ pub struct FileGraph {
     /// `.vue`: `{template:{line,endLine}|null, scriptSetup, styles}`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sfc: Option<serde_json::Value>,
-    /// Bináris tartalmú fájl (`lang::filetype::looks_binary`): üres gráf, a lekérdezések kihagyják. A
+    /// Kihagyott tartalmú fájl — bináris (`lang::filetype::looks_binary`) vagy minifikált / bundlolt JS / CSS
+    /// (`lang::filetype::looks_minified`): üres gráf, a lekérdezések kihagyják. A
     /// projekt-gráf így megjegyzi, és a fájlt nem olvassa újra, amíg nem változik.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub binary: bool,

@@ -31,10 +31,16 @@ kódnév-megfelelőjét is (pl. visszatérítés → `refund`). A projekt-térk�
 fájl (`--all`: minden találat), mindegyik az indoklásával (pontos definíció, fájlnév, név-részlet, string, hívás,
 `hívók: N`). Ezekkel a fájlokkal folytasd: outline / `--body` / `--grep`.
 <!-- /mcp -->
+Különleges kifejezések: a szóközös, idézőjeles kifejezés (`"Szervező további eseményei"`) EGY kifejezés, egészében a
+string-literálokra illesztve (feliratok, fordítások), szavakra sosem bontva; a `route::events.show` az útvonal
+definícióját (`->name('events.show')` a `routes/*.php`-ban, elöl) és a `route()` / `to_route()` / `redirect()->route()`
+hívásait adja a PHP- és JS / TS / Vue-fájlokban; a `--orange-500` CSS custom property, nem kapcsoló. A pontos
+definíciójú vagy fájlnevű fájlok megelőzik a csak stringgel illőket (fordítások, build-kimenet).
 
 ```bash
 bash <skill>/callgraph.sh locate RefundController processRefund refund payment_status checkout.vue --project myapp   # honnan induljak: rangsorolt fájlok + indoklás
 bash <skill>/callgraph.sh locate refund --all --project myapp                                                       # minden egyező fájl, nem csak az első 5
+bash <skill>/callgraph.sh locate route::events.show "Szervező további eseményei" --project myapp                     # egy útvonal (a definíció elöl) és egy felirat
 ```
 
 ## Gyors parancsok
@@ -233,9 +239,13 @@ Helyi használati statisztika (csak darabszámok és sávok, út és név nélk�
 `bash <skill>/callgraph.sh stats`, ha a felhasználó kérdezi, hogyan használják a callgraph-ot; kikapcsolás: `CALLGRAPH_STATS=0`.
 
 Feldolgozott fájlok: csak a támogatott kiterjesztésűek (nagybetűvel is: `B.PHP`), a generált fájlok
-(`package-lock.json`, `*.min.js`, `*.min.css`) és a bináris tartalom nélkül. A projekt `.callgraphignore` fájlja
-(a legközelebbi érvényes) további kizárt kiterjesztéseket sorol fel, soronként egyet (`md`, `.json`, `*.vue`); az
-ilyen kiterjesztésű, közvetlenül megadott fájlt indoklással elutasítja.
+(`package-lock.json`, `*.min.js`, `*.min.css`, a tartalma szerint minifikált / bundlolt JS / CSS), a bináris tartalom,
+a beépített mappák (`vendor`, `node_modules`, …) és a `.gitignore` fájlok által kizártak nélkül (git-szabályok; minden
+mappa saját fájlja). A projekt `.callgraphignore` fájlja: az `md` / `.md` / `*.md` sor egy kiterjesztést zár ki (a
+legközelebbi fájl érvényes; az ilyen kiterjesztésű, közvetlenül megadott fájlt indoklással elutasítja), minden más sor
+a mappájához relatív `.gitignore`-minta (`public/build`, `/storage/`, `!keep.js`). A `--no-gitignore` (bármely
+parancsnál) vagy a `CALLGRAPH_GITIGNORE=0` (MCP-szerver, hook) kikapcsolja a `.gitignore` fájlokat; a
+`.callgraphignore` ekkor is érvényes.
 
 ## Korlát
 

@@ -36,7 +36,9 @@ src/
       framework/                stratégiák (laravel, yii, generic) + detektor
   model/                        közös kimeneti séma (FileGraph + FileGraphBuilder)
   analysis/                     Analyzer (Facade): fájl → registry.for_path → nyelv.analyze → Analysis
-  io/                           walker (a registry kiterjesztéseivel), cache (CacheStore + JsonlCacheStore), jsonl_writer
+  io/                           walker (a registry kiterjesztéseivel), ignore_rules (.gitignore / .callgraphignore
+                                git-szemantikával, `ignore::gitignore`; `--no-gitignore`), cache (CacheStore +
+                                JsonlCacheStore), jsonl_writer
   index/                        CallerIndex (fordított hívó-index, mindkét irány) + TypeHierarchy (via-illesztés)
   graph/                        ProjectGraph: perzisztens projekt-gráf (.callgraph/: index.bin manifest, graph.pack,
                                 facts.bin), fájlonként frissítve; folyamaton belül gyökerenként egy példány;
@@ -95,7 +97,9 @@ kiterjesztést kéri, az előbb regisztrált nyer.
 - **`model/`** — a kimeneti séma (serde, a JSON 1:1). Minden nyelv ide képez le; a nem-kód nyelvek leképezése:
   CSS/SCSS — container: a stíluslap, „metódus”: mixin / function / szabály-blokk, imports: `@use`/`@import`;
   JSON — constants: kulcs-útvonalak; Markdown — „metódus”: címsor-szakaszok, „hívás”: linkek.
-- **`io/`** — `FileWalker::for_registry` a regisztrált kiterjesztéseket járja be (a `vendor`, `node_modules`, `.git`… mappákat kihagyja);
+- **`io/`** — `FileWalker::for_registry` a regisztrált kiterjesztéseket járja be (a `vendor`, `node_modules`, `.git`… mappákat
+  és a `.gitignore` / `.callgraphignore` mintáit kihagyja; a `collect`, az `includes` és az `includes_dir` ugyanazzal
+  a szabálykészlettel dönt);
   a cache kulcsa az abszolút út, értéke mtime + az eszköz verziója.
 - **`graph/`** — a perzisztens projekt-gráf (`docs/PROJECT-GRAPH.md`): egy hozzáfűzős pack (`graph.pack`: fájlonként
   a frontend `FileGraph`-ja veszteségmentes tükör-alakban + a hívás-sorok; MessagePack + LZ4), egy kis manifest

@@ -68,28 +68,29 @@ impl Locator {
                     .filter_map(|file| {
                         let rel = self.relative(file.path);
                         let hits = matcher.file_hits(&rel, file.graph, file.code);
-                        FileMatch::new(file.path.to_string_lossy().into_owned(), hits)
+                        FileMatch::new(rel, hits)
                     })
                     .collect();
                 // a teszt-felismerés a gyökérhez relatív úton (a gyökér útja maga ne számítson)
-                let ranked = rank(matched, |path| {
-                    rank::is_test_path(&self.relative(Path::new(path)))
-                });
+                let ranked = rank(matched, rank::is_test_path);
                 (ranked, issues)
             })?;
-        let mut text = Report {
+        // mindig a `root:` sorral és a gyökérhez relatív utakkal (egyetlen találatnál is), a többi lekérdezéssel
+        // azonos alakban
+        let root = self.root.to_string_lossy();
+        let shown = crate::query::strip_verbatim(&root);
+        let mut text = crate::tf!("root: {shown}\n", "gyökér: {shown}\n");
+        let report = Report {
             terms: &terms,
             ranked: &ranked,
             all,
-        }
-        .render();
+        };
+        text.push_str(&report.render());
         text.push_str(&crate::query::format::parse_trailer(
             &issues,
             crate::i18n::lang(),
         ));
-        // az utak a projekt-gyökérhez relatívan, a többi lekérdezéssel azonos `root:` sorral
-        let engine = crate::query::QueryEngine::new(Some(self.root.as_path()), None);
-        Ok(engine.relativize(&text))
+        Ok(text)
     }
 
     /// Az út a gyökérhez képest (a fájlnév- és út-egyezéshez).
@@ -104,7 +105,7 @@ impl Locator {
 /// A parancs használata (a CLI és a hibaüzenet közös szövege).
 pub(crate) fn usage() -> &'static str {
     crate::t!(
-        "callgraph locate <term>... [--all] [--project <alias|dir>]  (names and domain terms from the task: functions, classes, files, columns, routes)",
-        "callgraph locate <kifejezés>... [--all] [--project <alias|mappa>]  (a feladat nevei és fogalmai: függvények, osztályok, fájlok, oszlopok, útvonalak)"
+        "callgraph locate <term>... [--all] [--project <alias|dir>]  (names and domain terms from the task: functions, classes, files, columns, routes; \"a quoted phrase\" = one term, matched as a whole against strings; route::<name> = a route name: its definition and route() calls; --name = a CSS custom property)",
+        "callgraph locate <kifejezés>... [--all] [--project <alias|mappa>]  (a feladat nevei és fogalmai: függvények, osztályok, fájlok, oszlopok, útvonalak; \"idézőjeles kifejezés\" = egyetlen kifejezés, egészében a stringekre illesztve; route::<név> = útvonalnév: a definíciója és a route() hívásai; --nev = CSS custom property)"
     )
 }

@@ -169,6 +169,10 @@ pub(crate) fn describe(reason: &Reason, terms: &[Term]) -> String {
 /// A fajta címkéje zárójelben (`exact class`, `name part`, `string` …).
 fn label(reason: &Reason) -> String {
     match reason.kind {
+        // a `route::név` definíciója (`->name('név')` a `routes/*.php`-ban)
+        Kind::Definition if matches!(reason.symbol, Symbol::Str { .. }) => {
+            crate::t!("route definition", "útvonal-definíció").to_owned()
+        }
         Kind::Definition => {
             let what = match &reason.symbol {
                 Symbol::Container { kind, .. } => kind.clone(),

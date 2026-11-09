@@ -26,8 +26,9 @@ impl Analyzer {
     }
 
     /// Fájl beolvasása és elemzése a kiterjesztése szerinti nyelvvel. Nem támogatott kiterjesztésre és generált
-    /// fájlra (`package-lock.json`, `*.min.js`, `*.min.css`) hiba; bináris tartalomra üres, `binary` jelölésű gráf
-    /// (a lekérdezések kihagyják, a közvetlenül megadott fájlnál hibát adnak).
+    /// fájlra (`package-lock.json`, `*.min.js`, `*.min.css`) hiba; bináris és minifikált / bundlolt tartalomra
+    /// (`filetype::looks_minified`) üres, `binary` jelölésű gráf (a lekérdezések kihagyják, a közvetlenül megadott
+    /// fájlnál hibát adnak: `filetype::skipped_content_error`).
     pub fn analyze_path(&self, path: &Path) -> Result<Analysis> {
         let language = self
             .registry
@@ -37,7 +38,9 @@ impl Analyzer {
             return Err(CallgraphError::Generated(path.to_path_buf()));
         }
         let source = SourceFile::read(path)?;
-        if crate::lang::filetype::looks_binary(&source.text) {
+        if crate::lang::filetype::looks_binary(&source.text)
+            || crate::lang::filetype::looks_minified(path, &source.text)
+        {
             let mut builder = crate::model::FileGraphBuilder::new(source.path_string());
             builder.binary(true);
             return Ok(Analysis {

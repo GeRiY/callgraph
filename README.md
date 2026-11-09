@@ -96,18 +96,31 @@ Per-language guides with examples: [PHP](https://callgraph.eu/php/) · [Rust](ht
 
 Only files with the extensions above, in upper or lower case (`B.PHP` counts as PHP); everything else is ignored.
 Also skipped, even with a supported extension: generated files (`package-lock.json`, `*.min.js`, `*.min.css`) and
-files with binary content. Each file is read once, even if a symlink points to it. Folders like `vendor/`,
-`node_modules/` and those listed in `.gitignore` are skipped too.
+files with binary content. Minified or bundled JavaScript / CSS is recognised by its content too (very long lines,
+e.g. a Vite `app-CBW7lKWe.js`) and skipped. Each file is read once, even if a symlink points to it. Folders like
+`vendor/` and `node_modules/` are skipped, and so is everything your `.gitignore` files exclude, with the same rules as
+git: `/public/build`, `public/build/`, `build/`, `**/assets`, `*.log`, `!keep.js`, and the `.gitignore` of every
+subfolder relative to that folder.
 
-To exclude more extensions in a project, put a `.callgraphignore` file in its root (or in any subfolder; the nearest
-one applies). Commit it, and the whole team gets the same results:
+To exclude more in a project, put a `.callgraphignore` file in its root (or in any subfolder). Commit it, and the whole
+team gets the same results. A line that is just an extension (`md`, `.md` or `*.md`) skips that extension (the
+nearest `.callgraphignore` applies, as before); any other line is a `.gitignore`-style path pattern, relative to the
+folder of the file:
 
 ```
 # callgraph: skip these extensions in this project
 md
 json
 *.vue
+# and these paths (same syntax as .gitignore)
+public/build/
+/storage/
+legacy/**/*.php
 ```
+
+To map files your `.gitignore` excludes, add `--no-gitignore` to any command (or set `CALLGRAPH_GITIGNORE=0` for the
+MCP server and the hook); `.callgraphignore` and the built-in skipped folders still apply. Note: a bare word such as
+`build` in `.callgraphignore` is an extension rule; write `build/` or `/build` for a folder.
 
 ### When *not* to use it
 
@@ -213,6 +226,7 @@ bash ~/.claude/skills/callgraph/callgraph.sh locate RefundController processRefu
 ```
 
 ```
+root: /home/me/myapp
 locate: 5 terms · 14 matches in 6 files · start here ↓
 1. app/Http/Controllers/RefundController.php  ★★★
    class RefundController  L6-16  ← "RefundController", "refund" (exact class)
@@ -224,9 +238,26 @@ locate: 5 terms · 14 matches in 6 files · start here ↓
 
 A match counts more the stronger it is: exact definition, then file name, then a part of a name (`refund` ~
 `RefundJob`, `refunds_table`, singular / plural), then a string literal, then a call. A file that matches several
-different terms ranks above one that matches a single term many times. By default 5 files are shown (`--all`: every
-match); terms without a match and terms that are too general are listed at the end. Plain text search (an exact
-message or config value) is still a job for grep; `locate` answers "where do I start?".
+different terms ranks above one that matches a single term many times, and files with an exact definition or file
+name always come before files that only match strings (translations, build output). By default 5 files are shown
+(`--all`: every match); terms without a match and terms that are too general are listed at the end. Paths are always
+relative to the `root:` line. Plain text search (an exact message or config value) is still a job for grep; `locate`
+answers "where do I start?".
+
+Special terms:
+
+- **A phrase**: a quoted argument with spaces (`"Organizer's other events"`) is one term. It is matched as a whole
+  (case-insensitive) against string literals, such as UI labels and translations, and is never split into words.
+- **A route name**: `route::events.show` lists the route definition first (`->name('events.show')` in
+  `routes/*.php`), then every place that uses the name: `route('events.show', …)`, `to_route(…)`,
+  `redirect()->route(…)` in PHP, and `route('events.show')` in JS / TS / Vue (Ziggy). If nothing matches, it says
+  what was searched.
+- **A CSS custom property**: `locate --orange-500` searches for the variable (no `--` separator needed); the known
+  options (`--all`, `--project`) stay options.
+
+```bash
+bash ~/.claude/skills/callgraph/callgraph.sh locate route::events.show "Organizer's other events" --project myapp
+```
 
 ### Output formats (`--format`)
 

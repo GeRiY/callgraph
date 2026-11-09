@@ -96,18 +96,32 @@ Nyelvenkénti útmutatók példákkal: [PHP](https://callgraph.eu/hu/php/) · [R
 
 Csak a fenti kiterjesztésű fájlokat, kis- és nagybetűvel is (a `B.PHP` is PHP); minden mást figyelmen kívül hagy.
 Támogatott kiterjesztéssel is kimarad: a generált fájl (`package-lock.json`, `*.min.js`, `*.min.css`) és a bináris
-tartalmú fájl. Minden fájlt egyszer olvas, akkor is, ha egy symlink is mutat rá. A `vendor/`, a `node_modules/` és a
-`.gitignore`-ban felsorolt mappák is kimaradnak.
+tartalmú fájl. A minifikált vagy bundlolt JavaScriptet / CSS-t a tartalma alapján is felismeri (nagyon hosszú sorok,
+pl. egy Vite-os `app-CBW7lKWe.js`), és kihagyja. Minden fájlt egyszer olvas, akkor is, ha egy symlink is mutat rá. A
+`vendor/` és a `node_modules/` mappa kimarad, és minden, amit a `.gitignore` fájljaid kizárnak, a git szabályaival:
+`/public/build`, `public/build/`, `build/`, `**/assets`, `*.log`, `!keep.js`, és minden almappa `.gitignore`-ja a
+saját mappájához képest.
 
-Ha egy projektben további kiterjesztéseket zárnál ki, tegyél egy `.callgraphignore` fájlt a gyökerébe (vagy
-bármelyik almappába; a legközelebbi érvényes). Commitold, és az egész csapatnál ugyanaz lesz az eredmény:
+Ha egy projektben még mást is kizárnál, tegyél egy `.callgraphignore` fájlt a gyökerébe (vagy bármelyik almappába).
+Commitold, és az egész csapatnál ugyanaz lesz az eredmény. Az a sor, amelyik csak egy kiterjesztés (`md`, `.md` vagy
+`*.md`), azt a kiterjesztést hagyja ki (a legközelebbi `.callgraphignore` érvényes, mint eddig); minden más sor
+`.gitignore`-szerű útminta, a fájl mappájához képest:
 
 ```
 # callgraph: ezeket a kiterjesztéseket hagyja ki ebben a projektben
 md
 json
 *.vue
+# és ezeket az utakat (a .gitignore szintaxisával)
+public/build/
+/storage/
+legacy/**/*.php
 ```
+
+Ha a `.gitignore` által kizárt fájlokat is fel akarod térképezni, add hozzá bármelyik parancshoz a `--no-gitignore`
+kapcsolót (az MCP-szervernél és a hooknál: `CALLGRAPH_GITIGNORE=0`); a `.callgraphignore` és a beépített kihagyott
+mappák ekkor is érvényesek. Figyelem: a `.callgraphignore`-ban egy puszta szó (pl. `build`) kiterjesztés-szabály;
+mappához írd így: `build/` vagy `/build`.
 
 ### Mikor *ne* használd
 
@@ -214,6 +228,7 @@ bash ~/.claude/skills/callgraph/callgraph.sh locate RefundController processRefu
 ```
 
 ```
+gyökér: /home/en/myapp
 locate: 5 kifejezés · 14 találat 6 fájlban · innen indulj ↓
 1. app/Http/Controllers/RefundController.php  ★★★
    class RefundController  L6-16  ← "RefundController", "refund" (pontos class)
@@ -225,9 +240,26 @@ locate: 5 kifejezés · 14 találat 6 fájlban · innen indulj ↓
 
 Az egyezés annál többet ér, minél erősebb: pontos definíció, aztán fájlnév, aztán egy név része (`refund` ~
 `RefundJob`, `refunds_table`, egyes / többes szám), aztán string-literál, végül hívás. Az a fájl, amelyik több
-különböző kifejezésre illik, előrébb kerül, mint amelyik egyre sokszor. Alapból 5 fájl látszik (`--all`: minden
-találat); a végén a találat nélküli és a túl általános kifejezések. A sima szövegkeresés (pontos üzenet,
-konfig-érték) továbbra is a grep dolga; a `locate` arra felel: honnan induljak?
+különböző kifejezésre illik, előrébb kerül, mint amelyik egyre sokszor, és a pontos definíciójú vagy fájlnevű
+fájlok mindig megelőzik a csak stringgel illőket (fordítások, build-kimenet). Alapból 5 fájl látszik (`--all`: minden
+találat); a végén a találat nélküli és a túl általános kifejezések. Az utak mindig a `gyökér:` sorhoz relatívak. A
+sima szövegkeresés (pontos üzenet, konfig-érték) továbbra is a grep dolga; a `locate` arra felel: honnan induljak?
+
+Különleges kifejezések:
+
+- **Több szavas kifejezés**: a szóközös, idézőjeles argumentum (`"Szervező további eseményei"`) egyetlen kifejezés.
+  Egészében illeszti (kis- / nagybetűtől függetlenül) a string-literálokra, pl. feliratokra és fordításokra; szavakra
+  sosem bontja.
+- **Útvonalnév**: a `route::events.show` elöl az útvonal definícióját adja (`->name('events.show')` a
+  `routes/*.php`-ban), utána minden helyet, ahol a nevet használják: `route('events.show', …)`, `to_route(…)`,
+  `redirect()->route(…)` a PHP-ban, és `route('events.show')` a JS / TS / Vue-ban (Ziggy). Ha nincs találat, kiírja,
+  mit keresett.
+- **CSS custom property**: a `locate --orange-500` a változót keresi (`--` elválasztó nélkül is); az ismert kapcsolók
+  (`--all`, `--project`) kapcsolók maradnak.
+
+```bash
+bash ~/.claude/skills/callgraph/callgraph.sh locate route::events.show "Szervező további eseményei" --project myapp
+```
 
 ### Kimeneti formátumok (`--format`)
 

@@ -347,7 +347,10 @@ fn locate_ranks_the_starting_files_like_the_cli() {
     assert!(body.contains("no match: nothingLikeThis"), "{body}");
     // egyetlen string is elég
     let single = s.call(3, "locate", json!({"terms": "Order"}));
-    assert!(text(&single).contains("Order.php"), "{single}");
+    // egyetlen találatnál is a `root:` sor és relatív út
+    let one = text(&single).replace('\\', "/");
+    assert!(one.starts_with("root: "), "{one}");
+    assert!(one.contains("1. src/Order.php"), "{one}");
     let empty = s.call(4, "locate", json!({"terms": []}));
     assert_eq!(empty["isError"], json!(true), "{empty}");
     // a CLI-vel azonos (egy későbbi hívás: az esetleges frissítés-értesítés csak az első eredmény végén áll)

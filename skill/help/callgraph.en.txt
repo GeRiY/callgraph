@@ -63,7 +63,18 @@ Where to start with a task (one call with the names and domain terms of the task
                                                 3 reasons: exact definition, file name, name part (camelCase / snake_case /
                                                 kebab-case, singular / plural), string literal, call; "callers: N";
                                                 top 5 files, --all: every matching file; "no match: …" lists the terms
-                                                not found, "too general" the ones matching more than 30 files
+                                                not found, "too general" the ones matching more than 30 files;
+                                                exact definitions / file names rank first
+                                                "a quoted phrase" (with spaces): one term, matched as a whole against
+                                                string literals (UI labels); route::events.show: the route definition
+                                                (->name() in routes/*.php) first, then the route() / to_route() /
+                                                redirect()->route() calls; --orange-500: a CSS custom property
+
+Excluded files: built-in folders (vendor, node_modules, …), minified / bundled JS / CSS, every folder's .gitignore
+  (git rules), and .callgraphignore: "md" / ".md" / "*.md" excludes an extension, any other line is a .gitignore
+  pattern relative to its folder ("public/build", "/storage/", "!keep.js"). --no-gitignore (any command) or
+  CALLGRAPH_GITIGNORE=0 (MCP server, hook): the .gitignore files are not applied (.callgraphignore still is).
+  bash ~/.claude/skills/callgraph/callgraph.sh --version                       version, platform and the binary's path
 
 Project profile (architecture, layers and patterns from folder / file names, checked against the graph):
   bash ~/.claude/skills/callgraph/callgraph.sh profile [--project alias] [--full]
