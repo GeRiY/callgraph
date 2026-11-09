@@ -198,6 +198,12 @@ A `callgraph.sh` naponta legfeljebb egyszer a háttérben (a lekérdezéseket ne
 igen, a kimenete egy `ℹ callgraph X elérhető` sorral végződik; kikapcsolás: `CALLGRAPH_UPDATE_CHECK=0` (a `CI`
 beállítása mellett sem fut).
 
+**Dev-buildek (develop ág):** az `update --dev` a `develop` ág legújabb buildjét telepíti (a folyamatosan frissülő
+`dev` előzetes kiadás, verziója `X.Y.Z-dev.<commit>`, a kiadásokhoz hasonlóan a `SHA256SUMS` szerint ellenőrizve); az
+`update --check --dev` csak megmondja, van-e újabb. A dev-buildek a még ki nem adott változások kipróbálására valók,
+lehetnek instabilak. A sima `update` visszavisz a legutóbbi stabil kiadásra; a háttér-ellenőrzés és az MCP
+`--auto-update` a stabil kiadásoknál marad (dev-buildnél csak egy újabb stabil verzióról szól).
+
 ## Használat
 
 Minden parancs a `callgraph.sh`-n át megy (vagy közvetlenül a binárissal: `callgraph show …`). A `--project <alias>`

@@ -5,6 +5,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+### Added
+- **`update --dev`:** installs the newest build of the `develop` branch (version `X.Y.Z-dev.<commit>`, checked
+  against its `SHA256SUMS` like a release); `update --check --dev` only tells you whether there is a newer one. A plain
+  `update` takes you back to the latest stable release. The daily background check and the MCP `--auto-update` stay
+  on stable releases. On a dev build `callgraph --version` shows the dev version.
+
+### Fixed
+- **`update --check` right after a release:** for a few minutes after a new release it could still say "up to date",
+  because GitHub briefly served the old answer. It now asks without the cache and also looks at the list of recent
+  releases, so a new version is found immediately.
+
 ## [0.5.1] — 2026-11-09
 
 ### Added

@@ -1,4 +1,7 @@
 # Build + teszt a main- és develop-pushoknál és PR-en; `v*` tagnél a négy platform binárisaiból skill-csomag és GitHub Release.
+# develop-pushnál ugyanezek a csomagok a gördülő `dev` előzetes kiadásba kerülnek (a `dev` tag az épített commitra
+# mozdul; `callgraph.sh update --dev`), a binárisok verziója `X.Y.Z-dev.<sha7>` (CALLGRAPH_BUILD_VERSION).
+# A `dev` tag pusholása nem indít új futást: a tag-szűrő `v*`, és a GITHUB_TOKEN-nel küldött push amúgy sem indít workflow-t.
 name: build
 
 on:
@@ -69,6 +72,13 @@ jobs:
           else
             export CFLAGS="-ffile-prefix-map=$home=~ -ffile-prefix-map=$GITHUB_WORKSPACE=callgraph"
           fi
+          # develop-push (dev-csatorna): a bináris verziója X.Y.Z-dev.<sha7> (`callgraph --version`, a frissítő
+          # ehhez hasonlít); tag-, main- és PR-buildnél nincs beállítva → a Cargo.toml verziója
+          if [[ "${{ github.event_name }}" == push && "${{ github.ref }}" == refs/heads/develop ]]; then
+            base="$(sed -n 's/^version *= *"\(.*\)"/\1/p' Cargo.toml | head -1)"
+            export CALLGRAPH_BUILD_VERSION="$base-dev.${GITHUB_SHA::7}"
+            echo "CALLGRAPH_BUILD_VERSION=$CALLGRAPH_BUILD_VERSION"
+          fi
           cargo build --release --locked --target ${{ matrix.target }}
       - name: bináris összegyűjtése
         shell: bash
@@ -102,6 +112,9 @@ jobs:
   package:
     needs: build
     runs-on: ubuntu-24.04
+    env:
+      # 'true': v* tag (GitHub Release) vagy develop-push (dev előzetes kiadás) → platform-zipek + SHA256SUMS
+      PUBLISH: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'push' && github.ref == 'refs/heads/develop') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -119,12 +132,12 @@ jobs:
       # a platformonkénti telepíthető csomagok (callgraph-<os>-<arch>) → fix nevű zipek a Release-hez,
       # hogy a README releases/latest/download/callgraph-<os>-<arch>.zip linkjei mindig a legfrissebbre mutassanak
       - uses: actions/download-artifact@v4
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: env.PUBLISH == 'true'
         with:
           pattern: callgraph-*-*
           path: dist/pkg
       - name: platform-zipek
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: env.PUBLISH == 'true'
         run: |
           for d in dist/pkg/callgraph-*; do
             n="$(basename "$d")"
@@ -133,7 +146,7 @@ jobs:
           ls -l dist/*.zip
       # a frissítő (self-update) ezzel ellenőrzi a letöltött zipet; `sha256sum -c SHA256SUMS` kézzel is
       - name: SHA256SUMS
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: env.PUBLISH == 'true'
         run: |
           cd dist
           sha256sum callgraph-*.tar.gz callgraph-*.zip > SHA256SUMS
@@ -144,3 +157,38 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release create "${GITHUB_REF_NAME}" dist/callgraph-*.tar.gz dist/callgraph-*.zip dist/SHA256SUMS --title "${GITHUB_REF_NAME}" --generate-notes
+      # Dev-csatorna: develop-pushnál ugyanezek a fájlok (azonos nevek, azonos SHA256SUMS) a gördülő `dev` előzetes
+      # kiadásba. Sorrend: tag mozgatása → kiadás létrehozása, ha nincs → feltöltés (--clobber) → elavult assetek
+      # törlése → végül a leírás (benne a `version:` sor) frissítése: a kliens a leírásból olvassa a verziót, így az
+      # új verziót csak akkor látja, amikor már minden új fájl fent van. Soha nem „latest”: a releases/latest marad
+      # a legutóbbi stabil. A `dev` tag pusholása nem indít új futást (tag-szűrő: `v*`; GITHUB_TOKEN-es push).
+      - name: dev előzetes kiadás (csak develop-pushnál)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          base="$(sed -n 's/^version *= *"\(.*\)"/\1/p' Cargo.toml | head -1)"
+          version="$base-dev.${GITHUB_SHA::7}"
+          echo "$version" > dist/VERSION
+          notes="$(printf '%s\n' \
+            "Rolling development build of the \`develop\` branch — not a stable release, may be unstable." \
+            "Install: \`bash ~/.claude/skills/callgraph/callgraph.sh update --dev\`" \
+            "" \
+            "version: $version" \
+            "commit: $GITHUB_SHA" \
+            "date: $(date -u +%Y-%m-%d)")"
+          title="callgraph dev (develop)"
+          git tag -f dev "$GITHUB_SHA"
+          git push -f origin refs/tags/dev
+          if ! gh release view dev >/dev/null 2>&1; then
+            gh release create dev --verify-tag --prerelease --latest=false --title "$title" --notes "$notes"
+          fi
+          files=(dist/callgraph-*.tar.gz dist/callgraph-*.zip dist/SHA256SUMS dist/VERSION)
+          gh release upload dev "${files[@]}" --clobber
+          # elavult assetek (pl. egy régebbi verziószámú callgraph-X.Y.Z.tar.gz) törlése
+          keep="$(printf '%s\n' "${files[@]##*/}")"
+          gh release view dev --json assets --jq '.assets[].name' | while read -r name; do
+            grep -qxF "$name" <<<"$keep" || gh release delete-asset dev "$name" --yes
+          done
+          gh release edit dev --prerelease --latest=false --title "$title" --notes "$notes"
+          gh release view dev

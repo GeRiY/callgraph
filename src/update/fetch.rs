@@ -28,8 +28,28 @@ pub(crate) enum FetchError {
 pub(crate) trait Fetcher {
     fn get(&self, url: &str, limit: u64) -> Result<Vec<u8>, FetchError>;
 
+    /// Mint a `get`, de gyorsítótár nélkül (a kiadás-lekérdezésekhez: a GitHub egy kiadás után percekig a régi
+    /// `releases/latest`-et adhatja). Alapból a `get`; a valódi fetcher a címhez egy egyedi query-paramétert fűz.
+    fn get_fresh(&self, url: &str, limit: u64) -> Result<Vec<u8>, FetchError> {
+        self.get(url, limit)
+    }
+
     /// Egy átirányító cím célja (`Location`), az átirányítás követése nélkül; ha nem irányít át, hiba.
+    /// A valódi fetcher gyorsítótár nélkül kérdez (mint a `get_fresh`).
     fn redirect(&self, url: &str) -> Result<String, FetchError>;
+}
+
+/// Gyorsítótár-kerülő cím: `?cb=<unix-idő>` (vagy `&cb=…`); a GitHub az ismeretlen paramétert figyelmen kívül
+/// hagyja, a köztes gyorsítótár viszont új címnek látja.
+pub(crate) fn cache_busted(url: &str, now: u64) -> String {
+    let sep = if url.contains('?') { '&' } else { '?' };
+    format!("{url}{sep}cb={now}")
+}
+
+fn now_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs())
 }
 
 /// Az előtér (`self-update`) időkorlátja: a zip letöltése is belefér.
@@ -80,6 +100,7 @@ impl HttpFetcher {
                 "Accept",
                 "application/vnd.github+json, application/octet-stream",
             )
+            .header("Cache-Control", "no-cache")
             .call()
             .map_err(http_error)?;
         response
@@ -111,11 +132,23 @@ impl Fetcher for HttpFetcher {
         read_local(url.strip_prefix("file://").unwrap_or(url), limit)
     }
 
+    fn get_fresh(&self, url: &str, limit: u64) -> Result<Vec<u8>, FetchError> {
+        if is_http(url) {
+            return self.get_http(&cache_busted(url, now_secs()), limit);
+        }
+        self.get(url, limit)
+    }
+
     fn redirect(&self, url: &str) -> Result<String, FetchError> {
         if !is_http(url) {
             return Err(FetchError::Other(format!("{url}: not an http(s) URL")));
         }
-        let response = self.no_follow.get(url).call().map_err(http_error)?;
+        let response = self
+            .no_follow
+            .get(&cache_busted(url, now_secs()))
+            .header("Cache-Control", "no-cache")
+            .call()
+            .map_err(http_error)?;
         let status = response.status();
         if !status.is_redirection() {
             return Err(FetchError::Other(format!(
@@ -161,6 +194,19 @@ mod tests {
         let missing = dir.join("missing.json").display().to_string();
         assert_eq!(f.get(&missing, 10), Err(FetchError::NotFound));
         assert!(matches!(f.redirect(&url), Err(FetchError::Other(_))));
+        assert_eq!(f.get_fresh(&url, 10).unwrap(), b"{}");
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn cache_buster_appends_a_query_parameter() {
+        assert_eq!(
+            cache_busted("https://x.invalid/latest", 7),
+            "https://x.invalid/latest?cb=7"
+        );
+        assert_eq!(
+            cache_busted("https://x.invalid/releases?per_page=5", 7),
+            "https://x.invalid/releases?per_page=5&cb=7"
+        );
     }
 }

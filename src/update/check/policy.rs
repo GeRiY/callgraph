@@ -57,7 +57,7 @@ pub(crate) fn decide(state: &CheckState, now: u64, current: &Version, succeeded:
         .latest
         .as_deref()
         .and_then(Version::parse)
-        .filter(|latest| succeeded && latest > current && !latest.is_prerelease())
+        .filter(|latest| succeeded && latest.supersedes(current))
         .filter(|latest| {
             let same =
                 state.notified_version.as_deref().and_then(Version::parse) == Some(latest.clone());
@@ -86,7 +86,7 @@ pub(crate) fn decide_auto(state: &CheckState, now: u64, current: &Version) -> Op
         .latest
         .as_deref()
         .and_then(Version::parse)
-        .is_some_and(|latest| &latest > current && !latest.is_prerelease());
+        .is_some_and(|latest| latest.supersedes(current));
     if !newer && !expired(state.checked_at, now) {
         return None;
     }
@@ -245,5 +245,19 @@ mod tests {
         assert_eq!(next.latest.as_deref(), Some("0.2.0"));
         // régi gyorsítótár: újra megnézzük
         assert!(decide_auto(&state(NOW - DAY, None), NOW, &current).is_some());
+    }
+
+    #[test]
+    fn dev_builds_are_not_pulled_back_to_the_same_stable_base() {
+        let dev = v("0.5.1-dev.23ed277");
+        // ugyanaz az alapverzió (vagy régebbi): nincs értesítés, és az auto-update sem tér vissza a stabilra
+        for latest in ["0.5.1", "0.5.0"] {
+            assert!(decide(&state(NOW, Some(latest)), NOW, &dev, true).notice.is_none());
+            assert_eq!(decide_auto(&state(NOW - 60, Some(latest)), NOW, &dev), None);
+        }
+        // újabb alapverzió: szól, és az auto-update (stabil csatorna) frissít
+        let d = decide(&state(NOW, Some("0.5.2")), NOW, &dev, true);
+        assert_eq!(d.notice, Some(v("0.5.2")));
+        assert!(decide_auto(&state(NOW - 60, Some("0.5.2")), NOW, &dev).is_some());
     }
 }

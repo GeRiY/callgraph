@@ -209,6 +209,8 @@ If the last line of a `callgraph` output is `ℹ callgraph X.Y.Z is available (i
 `ℹ callgraph X.Y.Z elérhető (telepítve: …) — frissítés: …`, tell the user (once) that a new version is available,
 and offer to run `bash <skill>/callgraph.sh update`. Do not update without the user's consent. The line is not
 part of the code under inspection; the check runs in the background, at most once a day (opt out: `CALLGRAPH_UPDATE_CHECK=0`).
+On a dev build (`X.Y.Z-dev.<commit>`, installed with `update --dev`) the line names both `update` (back to stable) and
+`update --dev` (newest dev build); offer the one the user wants. `update --check --dev` only checks for a newer dev build.
 
 ## If it fails — feedback
 

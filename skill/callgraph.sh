@@ -2,7 +2,7 @@
 # callgraph.sh — thin wrapper over the callgraph binary (`callgraph wrap`): compact PHP / JS / TS / Vue file context
 # (outline, call graph, method bodies, "where is it called") without reading the file.
 # `callgraph.sh set-lang [en|hu]` shows / sets the output language (forwarded to `callgraph set-lang`).
-# `callgraph.sh update [--check|--force]` updates the skill from GitHub Releases (forwarded to `callgraph self-update`).
+# `callgraph.sh update [--check] [--dev|--force]` updates the skill from GitHub Releases (`--dev`: newest develop build) (forwarded to `callgraph self-update`).
 # `callgraph.sh note add|list|rm …` (pilot) manages notes on files / methods (forwarded to `callgraph note`).
 # `callgraph.sh refresh [--project alias] [--background] [<path>…]` brings the project graph up to date
 # (forwarded to `callgraph refresh`); `callgraph.sh hook install|uninstall|status` manages the Claude Code hook.

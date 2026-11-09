@@ -122,6 +122,10 @@ Update (from GitHub Releases; projects.json, lang, errors.jsonl, feedback.jsonl,
   bash ~/.claude/skills/callgraph/callgraph.sh update                 download and install the newer release
   bash ~/.claude/skills/callgraph/callgraph.sh update --force         reinstall even if up to date
   bash ~/.claude/skills/callgraph/callgraph.sh update --from <zip>    install from a local zip / URL (callgraph-<os>-<arch>.zip)
+  bash ~/.claude/skills/callgraph/callgraph.sh update --dev           install the newest dev build of the develop branch
+  bash ~/.claude/skills/callgraph/callgraph.sh update --check --dev   is there a newer dev build? (X.Y.Z-dev.<commit>)
+  Dev builds may be unstable; a plain update goes back to the latest stable release. The automatic check and
+  --auto-update stay on stable releases (on a dev build only a newer stable version counts).
   The download is verified against the release's SHA256SUMS (nothing is installed on a mismatch or if it is missing);
   --insecure-skip-checksum skips this. --from: verified by --sha256 <hex> or a SHA256SUMS next to the zip, else a warning.
   Automatic check: at most once a day, in the background; a newer release adds one "ℹ callgraph X is available" line

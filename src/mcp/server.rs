@@ -179,7 +179,7 @@ impl CallgraphServer {
 impl ServerHandler for CallgraphServer {
     fn get_info(&self) -> ServerConfig {
         ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
-            .with_server_info(Implementation::new("callgraph", env!("CARGO_PKG_VERSION")))
+            .with_server_info(Implementation::new("callgraph", crate::update::build_version()))
             .with_instructions(
                 super::guide::instructions(crate::i18n::lang()) + &self.runner.startup_note(),
             )
