@@ -8,6 +8,32 @@ Minden kiadás dátummal, a legújabb elöl: mi új, mi változott és mi javult
 
 [A legújabb verzió telepítése](https://callgraph.eu/hu/#install)[Legfrissebb kiadás a GitHubon](https://github.com/GeRiY/callgraph/releases/latest)
 
+## v0.5.3 — 2026-11-09
+
+[Kiadási jegyzet és letöltések a GitHubon](https://github.com/GeRiY/callgraph/releases/tag/v0.5.3)
+
+### Új
+
+- **`--strict` CI-hez:** a szintaktikai hibás fájl alapból továbbra is 0-s kilépési kódot ad (a részleges térkép is hasznos). A `--strict` kapcsolóval (vagy `CALLGRAPH_STRICT=1`-gyel) a `show` (fájl, mappa, `--grep`), a `locate` és a `profile` 3-as kóddal lép ki, ha egy beolvasott fájl szintaktikai hibás; a kimenet ugyanaz.
+
+- **`mail` és `notification` réteg:** a Laravel levél-osztályai (`extends Mailable`, jellemzően az `app/Mail`-ben) és értesítései (`extends Notification`) saját réteget kapnak az „ismeretlen” helyett. Az `event`-hez hasonlóan ehhez bizonyíték kell a kódban: egy csak `Mail` nevű mappa nem elég.
+
+### Változás
+
+- **Az `irány:` sor csak valódi hívás-párokat mutat:** a láncban minden `A → B` azt jelenti, hogy A ténylegesen hívja B-t. Az a réteg, amely csak a lánc közepébe hív, mellékágként látszik, pl. `irány: controller → service → model; command → service` (korábban: `controller → command → service → model`, pedig a controllerek nem hívnak commandot).
+
+- **Az enum nem kap szerepet a nevéből:** az `app/Enums/PaymentProvider.php` csak a neve miatt volt „provider”. Egy enum (PHP, TS, Rust, Swift) mostantól nem kap szerepet a nevéből; az `Enums` mappa `enum`-ként látszik.
+
+- **A bemásolt framework-mag a vendor-kódhoz hasonlóan kimarad:** egy régi projektbe bemásolt framework (CodeIgniter `system/`, Yii `framework/`, Kohana `system/`) már nem ad `command` / `handler` / `request` réteget a profilhoz. Csak a framework-mag marad ki, a mellette lévő alkalmazás-kód továbbra is számít. Egy teljesen kihagyandó nagy almappa útvonalként a `.callgraphignore`-ba írható (`sn_monitoring/`).
+
+### Javítás
+
+- **A szintaktikai hiba már nem rejti el az utána jövő kódot (JS / TS / Vue, Rust):** korábban csak a hiba előtti függvények kerültek a térképre; egy Vue `<script setup>`-ban az első függvény hibája után semmi sem maradt. Most a következő felső szintű függvénytől, osztálytól, elemtől folytatódik, helyes sorszámokkal; csak a hibás rész hiányzik.
+
+- **A `--layer` / `--layers` / `--by-layer` egyezik a profillal:** csak a mappanevekből soroltak be, ezért az `app/Actions/Event/*Action.php` `[event]`-ként látszott, holott a profil nem mutatott event-réteget. Most ugyanazokkal a szabályokkal és kódbeli bizonyítékkal dolgoznak, mint a `profile` (a projekt-térképből; nélküle egy `Event`-szerű mappa a következő szerepet adja, pl. `service`). A vendor- vagy build-kimenetként kihagyott fájlok itt sem kapnak réteget.
+
+- **`callgraph.sh --project <mappa>`:** egy mappa-út (abszolút vagy relatív) regisztráció nélkül is működik minden paranccsal; korábban a fájl-lekérdezés azt írta: „Nincs projects.json — regisztrálj előbb”. Ismeretlen aliasnál továbbra is hibaüzenet jön.
+
 ## v0.5.2 — 2026-11-09
 
 [Kiadási jegyzet és letöltések a GitHubon](https://github.com/GeRiY/callgraph/releases/tag/v0.5.2)
