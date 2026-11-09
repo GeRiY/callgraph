@@ -31,8 +31,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 - **A quoted phrase is one `locate` term:** `locate "Organizer's other events"` searches for the whole text in the
   strings of the code (labels, translations) instead of splitting it into words that matched unrelated names.
 - **`locate` always shows a `root:` line** and paths relative to it, also when only one file matches.
-- **The profile lists the layers by file count:** the biggest layer comes first, so a main layer such as `model` no
-  longer hides behind `… +6 more layers` while layers with one or two files are shown.
+- **The profile lists the main layers first:** the architecture layers (controller, service, model …) come first, by
+  file count, and tests, migrations and configuration come last, so a main layer such as `model` no longer hides
+  behind `… +6 more layers` while layers with one or two files are shown.
 - **`--by-layer` shows a header for each layer:** every group of callers starts with a line such as
   `[service]  3 calls`, in the normal and in the short ("one line per call") `--grep` view, and in every level of
   `--depth`. The group closest to the called method comes first (model → repository → service → controller), as
