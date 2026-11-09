@@ -181,10 +181,22 @@ fn the_main_layer_is_not_hidden_behind_small_ones() {
         ]
         .map(str::to_owned),
     );
+    // a sok teszt- és migrációs fájl sem tolja a fő réteget a „+N további” alá
+    paths.extend((0..8).map(|i| format!("tests/Unit/T{i}Test.php")));
+    paths.extend((0..8).map(|i| format!("database/migrations/m{i}.php")));
     let refs: Vec<&str> = paths.iter().map(String::as_str).collect();
     let profile = ProjectProfile::aggregate(&entries(&refs), Vec::new(), None, false);
     assert!(profile.layers.len() > 9);
     assert_eq!(profile.layers[0].label, "model");
+    let last = &profile.layers[profile.layers.len() - 1];
+    assert!(
+        matches!(
+            last.label.as_str(),
+            "test" | "migration" | "config" | "provider"
+        ),
+        "{}",
+        last.label
+    );
     let out = render(&profile, Lang::En, false, Tip::Hide);
     assert!(out.contains("\n  model "), "{out}");
     assert!(out.contains("more layers (profile --full)"), "{out}");
@@ -289,7 +301,10 @@ fn by_layer_runs_and_headers() {
     let controller = scope.order_key("app/Http/Controllers/C.php");
     assert_ne!(handler, controller);
     let err = LayerScope::new(root, Some("nope"), false).unwrap_err();
-    assert!(err.contains("nope") && err.contains("controller:js"), "{err}");
+    assert!(
+        err.contains("nope") && err.contains("controller:js"),
+        "{err}"
+    );
     let only_js = LayerScope::new(root, Some("controller:js"), false).unwrap();
     assert!(only_js.keeps(Path::new("web/js/controllers/d.js")));
     assert!(!only_js.keeps(Path::new("app/Http/Controllers/C.php")));

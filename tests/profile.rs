@@ -275,7 +275,10 @@ fn by_layer_orders_callers_from_the_closest_layer() {
     // szintenként rétegcsoportok, mindegyik előtt fejléc (a sorok végén nincs címke)
     assert!(layered.contains("\n  [service]  1 call\n"), "{layered}");
     assert!(layered.contains("\n  [controller]  1 call\n"), "{layered}");
-    assert!(layered.contains("\n  [controller]  1 caller\n"), "{layered}");
+    assert!(
+        layered.contains("\n  [controller]  1 caller\n"),
+        "{layered}"
+    );
     let mut a: Vec<String> = plain.lines().map(str::to_owned).collect();
     let mut b: Vec<String> = layered
         .lines()
@@ -403,10 +406,7 @@ fn legacy() -> Project {
             ORDER_CONTROLLER,
         ),
         ("modules/shop/models/Cart.php", CART_MODEL),
-        (
-            "web/assets/frontend/js/controllers/cart.js",
-            NG_CONTROLLER,
-        ),
+        ("web/assets/frontend/js/controllers/cart.js", NG_CONTROLLER),
         (
             "web/assets.min/frontend/js/controllers/cart.js",
             NG_CONTROLLER,

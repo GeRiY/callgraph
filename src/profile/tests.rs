@@ -291,7 +291,7 @@ fn aggregates_a_laravel_project() {
         .unwrap();
     assert_eq!(controller.files, 2);
     assert_eq!(controller.folders, [("app/Http/Controllers".to_owned(), 2)]);
-    // a rétegek fájlszám szerint csökkenő sorrendben, azonos számnál név szerint
+    // előbb az architektúra rétegei, utánuk a minták; csoporton belül fájlszám szerint, azonos számnál név szerint
     let order: Vec<&str> = profile.layers.iter().map(|l| l.label.as_str()).collect();
     assert_eq!(
         order,
@@ -300,8 +300,8 @@ fn aggregates_a_laravel_project() {
             "model",
             "repository",
             "service",
-            "factory",
-            "request"
+            "request",
+            "factory"
         ]
     );
     let patterns: Vec<(&str, usize)> = profile.patterns.iter().map(|p| (p.name, p.files)).collect();

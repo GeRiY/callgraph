@@ -74,10 +74,7 @@ pub(crate) fn compute(files: &[FlowFile<'_>]) -> Option<FlowStats> {
             let Some(to) = found.filter(|to| *to != at) else {
                 continue;
             };
-            let Some(into) = files[to]
-                .layer
-                .filter(|l| l.role.in_flow() && *l != from)
-            else {
+            let Some(into) = files[to].layer.filter(|l| l.role.in_flow() && *l != from) else {
                 continue;
             };
             *counts.entry((from, into)).or_default() += 1;

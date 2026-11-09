@@ -10,7 +10,7 @@ use super::architecture::{self, Architecture, RoleCounts};
 use super::classify::Classification;
 use super::flow::FlowStats;
 use super::layer::{Layer, Mixed};
-use super::role::Confidence;
+use super::role::{Confidence, Kind};
 
 /// Egy fájl a profilhoz: a relatív útja, a besorolása, és a gráfból jött megerősítés címkéje (C jel).
 #[derive(Debug, Clone)]
@@ -150,7 +150,15 @@ impl ProjectProfile {
                 layer
             })
             .collect();
-        layers.sort_by(|a, b| b.files.cmp(&a.files).then_with(|| a.label.cmp(&b.label)));
+        // elöl az architektúra rétegei, utánuk a kontextus- és minta-mappák, a végén a kiszolgáló fájlok (teszt,
+        // migráció, konfiguráció); csoporton belül fájlszám szerint — így a fő réteg (model) nem csúszik a sok
+        // teszt- vagy migrációs fájl mögé
+        layers.sort_by(|a, b| {
+            group(a.layer.role.kind())
+                .cmp(&group(b.layer.role.kind()))
+                .then_with(|| b.files.cmp(&a.files))
+                .then_with(|| a.label.cmp(&b.label))
+        });
         let mut patterns: Vec<PatternSummary> = patterns
             .into_iter()
             .map(|(name, (files, examples))| PatternSummary {
@@ -207,4 +215,14 @@ fn ranked<K: Ord + Copy>(counts: HashMap<K, usize>) -> Vec<(K, usize)> {
     let mut out: Vec<(K, usize)> = counts.into_iter().collect();
     out.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
     out
+}
+
+/// A rétegsor csoportja a rendezéshez: architektúra-réteg, kontextus, minta, kiszolgáló.
+fn group(kind: Kind) -> u8 {
+    match kind {
+        Kind::Layer => 0,
+        Kind::Context => 1,
+        Kind::Pattern => 2,
+        Kind::Support => 3,
+    }
 }

@@ -78,9 +78,7 @@ fn compact(out: &mut String, profile: &ProjectProfile, lang: Lang) {
             let folder = main_folder(layer, lang);
             let mut line = format!(
                 "  {:<role_width$}  {:<folder_width$}  {:>4}",
-                layer.label,
-                folder,
-                layer.files
+                layer.label, folder, layer.files
             );
             if let Some(label) = layer.confirm_label {
                 let _ = write!(line, "  ({label}: {})", layer.confirmed);
@@ -255,8 +253,7 @@ fn details(out: &mut String, profile: &ProjectProfile, lang: Lang) {
         );
         let mut line = format!(
             "  {}  {}  ({h} {high}, {m} {medium}, {l} {low}",
-            layer.label,
-            layer.files
+            layer.label, layer.files
         );
         if let Some(label) = layer.confirm_label {
             let _ = match lang {

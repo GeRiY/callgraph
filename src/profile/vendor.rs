@@ -267,7 +267,10 @@ mod tests {
         );
         write("src/Illuminate/Support/LICENSE.md", "MIT");
         write("app/Models/License.php", "<?php\nclass License {}\n");
-        write("package.json", r#"{"name": "shop", "workspaces": ["packages/*"]}"#);
+        write(
+            "package.json",
+            r#"{"name": "shop", "workspaces": ["packages/*"]}"#,
+        );
         write(
             "sn_monitoring/composer.json",
             r#"{"name": "yiisoft/yii", "type": "library"}"#,
@@ -331,7 +334,10 @@ mod tests {
             assert_eq!(skipper.skip(own), None, "{own}");
         }
         let mut with_vendor = Skipper::new(&root, false);
-        assert_eq!(with_vendor.skip("extensions/Facebook/src/GraphNode.php"), None);
+        assert_eq!(
+            with_vendor.skip("extensions/Facebook/src/GraphNode.php"),
+            None
+        );
         assert_eq!(
             with_vendor.skip("web/assets.min/js/app.js"),
             Some(Skip::Generated("web/assets.min".into()))
