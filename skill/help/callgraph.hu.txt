@@ -77,12 +77,16 @@ Kizárt fájlok: a beépített mappák (vendor, node_modules, …), a minifikál
   bash ~/.claude/skills/callgraph/callgraph.sh --version                       verzió, platform és a bináris helye
 
 Projekt-profil (architektúra, rétegek és minták a mappa- / fájlnevekből, a gráffal ellenőrizve):
-  bash ~/.claude/skills/callgraph/callgraph.sh profile [--project alias] [--full]
+  bash ~/.claude/skills/callgraph/callgraph.sh profile [--project alias] [--full] [--with-vendor]
                                                 ~15 sor: architektúra, rétegek mappával és fájlszámmal, minták,
-                                                a rétegek közti hívásirány, ismeretlen mappák; --full: mappánként
-  bash ~/.claude/skills/callgraph/callgraph.sh <mappa> --layer service         csak az adott réteg fájljai (név,név...)
+                                                a rétegek közti hívásirány, ismeretlen mappák; --full: mappánként;
+                                                a bemásolt külső kód és a build-kimenet kimarad (--with-vendor: az is
+                                                számít); PHP-ben és JS-ben is meglévő szerep: controller (php) / (js)
+  bash ~/.claude/skills/callgraph/callgraph.sh <mappa> --layer service         csak az adott réteg fájljai (név,név...;
+                                                egy ökoszisztéma: controller:php, controller:js, …:swift, …:rust)
   bash ~/.claude/skills/callgraph/callgraph.sh <mappa> --layers                summary rétegenként, [szerep] a FILE sorokon
-  bash ~/.claude/skills/callgraph/callgraph.sh <mappa> --grep <minta> --depth 2 --by-layer   hívók rétegek szerint
+  bash ~/.claude/skills/callgraph/callgraph.sh <mappa> --grep <minta> --depth 2 --by-layer   hívók rétegenként
+                                                (a hívotthoz legközelebbi elöl), csoportonként "[service]  3 hívás" fejléc
   Saját mappanevek: .callgraph-layers fájl a projekt gyökerében ("service = app/Logic", "ignore-role = app/Legacy").
 
 Helyi használati statisztika (a gépen marad, semmi nem megy el; út, név és keresési kifejezés nélkül):

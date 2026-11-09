@@ -8,6 +8,7 @@ use crate::graph::ProjectGraph;
 use crate::i18n::Lang;
 use crate::index::{CallerIndex, CallerRow};
 use crate::model::FileGraph;
+use crate::profile::{Count, LayerRun, LayerScope, group_header};
 use crate::query::format::{call_lines, grep_outline, method_calls};
 use crate::query::snippet::{self, SourceLines};
 use crate::{t, tf};
@@ -40,7 +41,8 @@ impl QueryEngine {
             }
         }
         if depth <= 1 {
-            return Ok(grep_flat(rows, &source, lang, full, limit));
+            let layers = self.layers.as_ref().filter(|scope| scope.by_layer());
+            return Ok(grep_flat(rows, &source, lang, full, limit, layers));
         }
         let direct = direct_rows(rows);
         let whole_project = scope == self.depth_scope().as_slice();
@@ -138,9 +140,50 @@ struct DepthView<'a> {
     ranges: &'a dyn MethodRanges,
     source: &'a SourceLines,
     lang: Lang,
-    /// `--by-layer`: a hívók rétegek szerint (a hívotthoz legközelebbi elöl), a sor végén a szerep; `None` = a régi
-    /// sorrend és sor.
-    layers: Option<&'a crate::profile::LayerScope>,
+    /// `--by-layer`: a hívók rétegek szerint (a hívotthoz legközelebbi elöl), szintenként rétegcsoportokban, a
+    /// csoport előtt `[service]  2 callers` fejléccel; `None` = a régi sorrend és sor.
+    layers: Option<&'a LayerScope>,
+}
+
+/// A `--by-layer` csoport-fejléce egy sorban (`behúzás` + `[service]  3 calls` + újsor).
+fn header_line(indent: &str, label: &str, n: usize, count: Count, lang: Lang) -> String {
+    format!("{indent}{}\n", group_header(label, n, count, lang))
+}
+
+/// A rendezett sorok csoportjai (`--by-layer` nélkül üres).
+fn row_runs(rows: &[QueryResult], layers: Option<&LayerScope>) -> Vec<LayerRun> {
+    layers.map_or_else(Vec::new, |scope| {
+        scope.runs(rows.iter().map(|row| row.graph.file.as_str()))
+    })
+}
+
+/// A csoport találat-hívásainak száma.
+fn calls_in(rows: &[QueryResult], run: &LayerRun) -> usize {
+    rows[run.range.clone()]
+        .iter()
+        .map(|row| row.graph.calls.len())
+        .sum()
+}
+
+/// A grep-outline-ba a csoportok első `FILE` sora elé a fejléc.
+fn with_headers(text: &str, rows: &[QueryResult], runs: &[LayerRun], lang: Lang) -> String {
+    let mut out = String::with_capacity(text.len() + runs.len() * 32);
+    let mut next = runs.iter().peekable();
+    for line in text.split_inclusive('\n') {
+        if let Some(run) = next.peek()
+            && let Some(rest) = line
+                .trim_end_matches('\n')
+                .strip_prefix("FILE  ")
+                .and_then(|rest| rest.strip_prefix(rows[run.range.start].graph.file.as_str()))
+            && (rest.is_empty() || rest.starts_with("  NS:"))
+        {
+            let n = calls_in(rows, run);
+            out.push_str(&header_line("", &run.label, n, Count::Calls, lang));
+            next.next();
+        }
+        out.push_str(line);
+    }
+    out
 }
 
 /// Az 1. szint hívásai a hívó-index lekérdezéséhez (`level: 1`).
@@ -161,19 +204,27 @@ fn direct_rows(rows: &[QueryResult]) -> Vec<CallerRow> {
         .collect()
 }
 
-/// `--grep` mélység nélkül: a grep-outline; ha túl hosszú, hívásonként egy sor (`flat_lines`).
+/// `--grep` mélység nélkül: a grep-outline; ha túl hosszú, hívásonként egy sor (`flat_lines`). `--by-layer`-rel
+/// (a sorok már rétegek szerint rendezve) mindkét alakban rétegenként egy `[service]  25 calls` fejléc.
 fn grep_flat(
     rows: &[QueryResult],
     source: &SourceLines,
     lang: Lang,
     full: bool,
     limit: Option<usize>,
+    layers: Option<&LayerScope>,
 ) -> String {
     let text = grep_outline(rows, lang, source);
     if rows.is_empty() {
         // Nincs találat: csak a záró tipp marad (nincs fejléc-elválasztó).
         return text.trim_start_matches("\n---\n").to_owned();
     }
+    let runs = row_runs(rows, layers);
+    let text = if runs.is_empty() {
+        text
+    } else {
+        with_headers(&text, rows, &runs, lang)
+    };
     let max = limit.unwrap_or_else(|| crate::query::OutputLimit::from_env(full).limit);
     if full || text.lines().count() <= max {
         return text;
@@ -184,7 +235,7 @@ fn grep_flat(
         text.lines().count(),
         snippet::MAX_PER_METHOD
     );
-    flat_lines(header, rows, source, lang, max)
+    flat_lines(header, rows, source, lang, max, &runs)
 }
 
 /// A szintenkénti nézet: 1. szint = a találatok metódusai a hívás-soraikkal, 2+. szint = hívónként egy sor
@@ -231,18 +282,25 @@ fn render_depth(view: DepthView<'_>) -> String {
             direct.sort_by_key(|(row, _)| scope.order_key(&row.graph.file));
         }
         if level == 1 {
-            for (row, method) in &direct {
+            let runs = layers.map_or_else(Vec::new, |scope| {
+                scope.runs(direct.iter().map(|(row, _)| row.graph.file.as_str()))
+            });
+            for (at, (row, method)) in direct.iter().enumerate() {
+                if let Some(run) = runs.iter().find(|run| run.range.start == at) {
+                    let n: usize = direct[run.range.clone()]
+                        .iter()
+                        .map(|(row, method)| method_calls(&row.graph, method).len())
+                        .sum();
+                    output.push_str(&header_line("  ", &run.label, n, Count::Calls, lang));
+                }
                 writeln!(
                     output,
-                    "  {}  {}::{}()  L{}-{}{}",
+                    "  {}  {}::{}()  L{}-{}",
                     row.graph.file,
                     method.container.as_deref().unwrap_or("__top__"),
                     method.name,
                     method.line,
-                    method.end_line.unwrap_or(method.line),
-                    layers
-                        .map(|scope| scope.tag(&row.graph.file))
-                        .unwrap_or_default()
+                    method.end_line.unwrap_or(method.line)
                 )
                 .unwrap();
                 let calls = method_calls(&row.graph, method);
@@ -268,13 +326,20 @@ fn render_depth(view: DepthView<'_>) -> String {
         if let Some(scope) = layers {
             level_callers.sort_by_key(|row| scope.order_key(&row.file));
         }
-        for caller in level_callers {
+        let runs = layers.map_or_else(Vec::new, |scope| {
+            scope.runs(level_callers.iter().map(|row| row.file.as_str()))
+        });
+        for (at, caller) in level_callers.iter().enumerate() {
+            if let Some(run) = runs.iter().find(|run| run.range.start == at) {
+                let n = run.range.len();
+                output.push_str(&header_line("  ", &run.label, n, Count::Callers, lang));
+            }
             let range = ranges
                 .range(&caller.file, caller.container.as_deref(), &caller.caller)
                 .unwrap_or((caller.line, caller.line));
             writeln!(
                 output,
-                "  {}  {}::{}()  L{}-{}{}{}",
+                "  {}  {}::{}()  L{}-{}{}",
                 caller.file,
                 caller.container.as_deref().unwrap_or("__top__"),
                 caller.caller,
@@ -288,10 +353,7 @@ fn render_depth(view: DepthView<'_>) -> String {
                     )
                 } else {
                     String::new()
-                },
-                layers
-                    .map(|scope| scope.tag(&caller.file))
-                    .unwrap_or_default()
+                }
             )
             .unwrap();
             let code = source.get(&caller.file, caller.line);
@@ -333,15 +395,24 @@ type CallerCalls<'a> = (
 
 /// A túl hosszú `--grep` outline helyett: hívó metódusonként a hívások egy-egy sorban
 /// (`fájl  Osztály::metódus  L12, L40  ← cél │ kód`), az azonos (cél, `via`, kód) hívások összevonva, legfeljebb
-/// `snippet::MAX_PER_METHOD` sor, a többi `… +N more: L55, L61`; `max` sor után levágva.
+/// `snippet::MAX_PER_METHOD` sor, a többi `… +N more: L55, L61`; `max` sor után levágva. `runs` (`--by-layer`):
+/// a rétegcsoportok első sora előtt a `[service]  25 calls` fejléc.
 fn flat_lines(
     mut out: String,
     rows: &[QueryResult],
     source: &SourceLines,
     lang: crate::i18n::Lang,
     max: usize,
+    runs: &[LayerRun],
 ) -> String {
-    for row in rows {
+    for (at, row) in rows.iter().enumerate() {
+        if let Some(run) = runs.iter().find(|run| run.range.start == at) {
+            let n = calls_in(rows, run);
+            let line = header_line("", &run.label, n, Count::Calls, lang);
+            if push_limited(&mut out, &line, max) {
+                return out;
+            }
+        }
         // hívó metódusonként, az első előfordulás sorrendjében
         let mut groups: Vec<CallerCalls<'_>> = Vec::new();
         for call in &row.graph.calls {

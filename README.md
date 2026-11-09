@@ -290,13 +290,27 @@ without a clear role, and how the layers call each other. The code graph confirm
 `--full` gives the per-folder details. Every file gets a role with a confidence (high / medium / low), or stays
 "unknown" — it never guesses. MCP: the `project_profile` tool, and a compact profile is sent on connect.
 
+The layers are listed by file count, so the main layer is always on top. A role found in both the backend and the
+frontend is shown apart, e.g. `controller (php)` and `controller (js)` for PHP controllers next to AngularJS ones, and
+the call direction keeps the two apart. Third-party code copied into the project (a subfolder with its own
+`composer.json`, `package.json` or `LICENSE`, or folders like `vendors/`, `third_party/`, `extensions/`, `libs/`) and
+build output (`dist/`, `build/`, `*.min/`, minified files) do not count: one line says how many files were skipped
+and where (`profile --with-vendor` counts them anyway); your queries still see these files. `event`, `listener` and
+`job` layers need proof in the code (an Event / Listener base class, Laravel's `Dispatchable` or `ShouldQueue`, a
+`handle(…)` method in a `Listeners` namespace) — a folder that is just named `Event` is not an event layer.
+
 Use the layers in queries (all opt-in, the default output does not change):
 
 ```bash
 bash ~/.claude/skills/callgraph/callgraph.sh app --layer service                     # only the service files (name,name...)
+bash ~/.claude/skills/callgraph/callgraph.sh . --layer controller:js                 # one ecosystem only: php, js, swift, rust
 bash ~/.claude/skills/callgraph/callgraph.sh app --format summary --layers           # summary grouped by layer
-bash ~/.claude/skills/callgraph/callgraph.sh app --grep 'Repo::find' --depth 2 --by-layer   # callers by layer
+bash ~/.claude/skills/callgraph/callgraph.sh app --grep 'Repo::find' --depth 2 --by-layer   # callers grouped by layer
 ```
+
+`--by-layer` puts the layer closest to the called method first (model → repository → service → controller) and
+starts each group with a header such as `[service]  3 calls`, in the short and the long `--grep` view alike (with
+`--depth`: in every level).
 
 Folder names that say nothing (or are not English)? A commit-able `.callgraph-layers` file in the project root maps
 them: `service = app/Szolgaltatasok, app/Logic`, `ignore-role = app/Legacy`.

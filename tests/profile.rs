@@ -272,9 +272,16 @@ fn by_layer_orders_callers_from_the_closest_layer() {
         "{layered}"
     );
     assert!(!plain.contains("  [service]"), "{plain}");
-    assert!(layered.contains("  [service]"), "{layered}");
+    // szintenként rétegcsoportok, mindegyik előtt fejléc (a sorok végén nincs címke)
+    assert!(layered.contains("\n  [service]  1 call\n"), "{layered}");
+    assert!(layered.contains("\n  [controller]  1 call\n"), "{layered}");
+    assert!(layered.contains("\n  [controller]  1 caller\n"), "{layered}");
     let mut a: Vec<String> = plain.lines().map(str::to_owned).collect();
-    let mut b: Vec<String> = untagged(&layered).lines().map(str::to_owned).collect();
+    let mut b: Vec<String> = layered
+        .lines()
+        .filter(|line| !line.starts_with("  ["))
+        .map(str::to_owned)
+        .collect();
     a.sort_unstable();
     b.sort_unstable();
     assert_eq!(a, b, "same lines, other order");
@@ -371,4 +378,206 @@ fn profile_without_code_files_says_so() {
     let project = Project::new(&[("docs/readme.md", "# x\n")]);
     let out = project.run(&["profile"]);
     assert!(out.starts_with("profile: no code files"), "{out}");
+}
+
+const CART_CONTROLLER: &str = "<?php\nnamespace app\\modules\\shop\\controllers;\n\nclass CartController extends Controller\n{\n    public function actionIndex()\n    {\n        return [];\n    }\n}\n";
+
+const ORDER_CONTROLLER: &str = "<?php\nnamespace app\\modules\\shop\\controllers;\n\nclass OrderController extends Controller\n{\n    public function actionIndex()\n    {\n        return [];\n    }\n}\n";
+
+const CART_MODEL: &str =
+    "<?php\nnamespace app\\modules\\shop\\models;\n\nclass Cart extends ActiveRecord\n{\n}\n";
+
+const NG_CONTROLLER: &str = "angular.module('shop').controller('CartCtrl', function () {});\n";
+
+/// Egy Yii-szerű PHP-projekt AngularJS-frontenddel, egy minifikált másolattal, két bemásolt külső csomaggal és
+/// egy `Services/Event` domain-mappával.
+fn legacy() -> Project {
+    Project::new(&[
+        ("composer.json", "{\"name\": \"acme/shop\"}\n"),
+        (
+            "modules/shop/controllers/CartController.php",
+            CART_CONTROLLER,
+        ),
+        (
+            "modules/shop/controllers/OrderController.php",
+            ORDER_CONTROLLER,
+        ),
+        ("modules/shop/models/Cart.php", CART_MODEL),
+        (
+            "web/assets/frontend/js/controllers/cart.js",
+            NG_CONTROLLER,
+        ),
+        (
+            "web/assets.min/frontend/js/controllers/cart.js",
+            NG_CONTROLLER,
+        ),
+        (
+            "extensions/Facebook/composer.json",
+            "{\"name\": \"facebook/graph-sdk\"}\n",
+        ),
+        (
+            "extensions/Facebook/src/Builders/RequestBuilder.php",
+            "<?php\nnamespace Facebook;\n\nclass RequestBuilder\n{\n}\n",
+        ),
+        (
+            "extensions/Facebook/src/Factories/ClientFactory.php",
+            "<?php\nnamespace Facebook;\n\nclass ClientFactory\n{\n}\n",
+        ),
+        (
+            "sdk/composer.json",
+            "{\"name\": \"vendorco/sdk\", \"type\": \"library\"}\n",
+        ),
+        (
+            "sdk/Handlers/FooHandler.php",
+            "<?php\nnamespace Vendorco;\n\nclass FooHandler\n{\n}\n",
+        ),
+        (
+            "app/Services/Event/EventPlanner.php",
+            "<?php\nnamespace App\\Services\\Event;\n\nclass EventPlanner\n{\n}\n",
+        ),
+    ])
+}
+
+#[test]
+fn profile_separates_ecosystems_and_skips_vendor_code() {
+    let project = legacy();
+    let out = project.run(&["profile"]);
+    let php = line_with(&out, "  controller (php) ");
+    assert!(php.contains("modules/shop/controllers"), "{out}");
+    assert!(php.contains("   2"), "{out}");
+    let js = line_with(&out, "  controller (js) ");
+    assert!(js.contains("web/assets/frontend/js/controllers"), "{out}");
+    // a rétegek fájlszám szerint, azonos számnál név szerint
+    let order: Vec<usize> = [
+        "  controller (php) ",
+        "  controller (js) ",
+        "  model ",
+        "  service ",
+    ]
+    .iter()
+    .map(|l| out.find(l).unwrap_or_else(|| panic!("{l}: {out}")))
+    .collect();
+    assert!(order.windows(2).all(|w| w[0] < w[1]), "{out}");
+    // a domain-szó (Services/Event) nem réteg; a vendor-kódból nincs réteg és minta
+    for missing in [
+        "  event",
+        "  builder",
+        "  factory",
+        "  handler",
+        "Builder",
+        "Factory",
+    ] {
+        assert!(!out.contains(missing), "{missing}: {out}");
+    }
+    assert!(
+        out.contains("vendor: 3 files skipped (extensions/Facebook, sdk)\n"),
+        "{out}"
+    );
+    assert!(
+        out.contains("generated: 1 file skipped (web/assets.min)\n"),
+        "{out}"
+    );
+    let hu = project.run_in(&["profile"], "hu");
+    assert!(
+        hu.contains("vendor: 3 fájl kihagyva (extensions/Facebook, sdk)\n"),
+        "{hu}"
+    );
+
+    let with_vendor = project.run(&["profile", "--with-vendor"]);
+    assert!(with_vendor.contains("Builder"), "{with_vendor}");
+    assert!(!with_vendor.contains("vendor: "), "{with_vendor}");
+
+    // a vendor-fájlok a lekérdezésekben megmaradnak
+    let facebook = project.run(&["show", "extensions", "--full"]);
+    assert!(facebook.contains("RequestBuilder.php"), "{facebook}");
+
+    // --layer: minősítővel egy ökoszisztéma, nélküle mindkettő
+    let only_js = project.run(&[
+        "show",
+        "modules",
+        "web",
+        "--layer",
+        "controller:js",
+        "--full",
+    ]);
+    assert!(
+        only_js.contains("frontend/js/controllers/cart.js"),
+        "{only_js}"
+    );
+    assert!(!only_js.contains("CartController"), "{only_js}");
+    let only_php = project.run(&[
+        "show",
+        "modules",
+        "web",
+        "--layer",
+        "controller (php)",
+        "--full",
+    ]);
+    assert!(only_php.contains("CartController"), "{only_php}");
+    assert!(!only_php.contains("cart.js"), "{only_php}");
+    let both = project.run(&["show", "modules", "web", "--layer", "controller", "--full"]);
+    assert!(
+        both.contains("CartController") && both.contains("cart.js"),
+        "{both}"
+    );
+}
+
+#[test]
+fn by_layer_prints_a_header_per_layer_in_both_grep_views() {
+    let project = laravel();
+    let args = ["show", "app", "--grep", "UserRepositoryInterface::find"];
+    let mut normal = args.to_vec();
+    normal.push("--by-layer");
+    let out = project.run(&normal);
+    let service = out
+        .find("[service]  1 call\nFILE  ")
+        .unwrap_or_else(|| panic!("{out}"));
+    let controller = out
+        .find("[controller]  1 call\nFILE  ")
+        .unwrap_or_else(|| panic!("{out}"));
+    assert!(service < controller, "closest to the callee first: {out}");
+    let plain = project.run(&args);
+    assert!(!plain.contains("[service]"), "{plain}");
+
+    let mut compact = normal.clone();
+    compact.push("CALLGRAPH_OUT_LIMIT=6");
+    let out = project.run(&compact);
+    assert!(out.contains("1 line per call instead"), "{out}");
+    let service = out
+        .find("\n[service]  1 call\n")
+        .unwrap_or_else(|| panic!("{out}"));
+    let controller = out
+        .find("\n[controller]  1 call\n")
+        .unwrap_or_else(|| panic!("{out}"));
+    assert!(service < controller, "{out}");
+}
+
+#[test]
+fn unknown_layer_is_a_user_error_without_error_id() {
+    let project = laravel();
+    let skill = std::env::temp_dir().join(format!(
+        "callgraph-profile-skill-{}-{}",
+        std::process::id(),
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    fs::create_dir_all(&skill).unwrap();
+    let out = Command::new(env!("CARGO_BIN_EXE_callgraph"))
+        .args(["wrap", "app", "--layer", "nope"])
+        .current_dir(&project.0)
+        .env("CALLGRAPH_LANG", "en")
+        .env("CALLGRAPH_UPDATE_CHECK", "0")
+        .env("CALLGRAPH_STATS", "0")
+        .env("CALLGRAPH_SKILL_DIR", &skill)
+        .env("CALLGRAPH_REGISTRY", "/nonexistent/projects.json")
+        .output()
+        .expect("callgraph runs");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(!out.status.success());
+    assert!(stderr.contains("Unknown layer: nope"), "{stderr}");
+    assert!(!stderr.contains("error-id"), "{stderr}");
+    assert!(!skill.join("errors.jsonl").exists());
+    let _ = fs::remove_dir_all(&skill);
 }

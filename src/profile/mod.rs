@@ -4,6 +4,8 @@
 //!
 //! - `rules.rs`, `role.rs`, `confirm.rs`, `architecture.rs`: a szabályok adat-táblái (bővíthetők, nyelvenként);
 //! - `classify.rs`: fájl → szerep, csak az útból (a lekérdezéskor is olcsó; a `.callgraph-layers` felülírhatja);
+//! - `layer.rs`: réteg = szerep + ökoszisztéma (`controller (php)` / `controller (js)`), a `--layer` szűrő alakjai;
+//! - `vendor.rs`: a profilból kimaradó vendor- és generált kód;
 //! - `project.rs`, `flow.rs`: a projekt összesítése; `build.rs`: bejárás + gráf; `format.rs`: a szöveges kimenet;
 //! - `scope.rs`, `view.rs`: a lekérdezések réteg-kapcsolói (`--layer`, `--layers`, `--by-layer`).
 //!
@@ -17,16 +19,20 @@ mod confirm;
 mod ecosystem;
 mod flow;
 mod format;
+mod layer;
 mod layers_file;
 mod names;
 mod project;
 mod role;
 mod rules;
 mod scope;
+mod vendor;
 mod view;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_layers;
 
 use std::path::Path;
 
@@ -34,8 +40,8 @@ use crate::i18n::Lang;
 
 pub(crate) use build::{quick, with_graph};
 pub(crate) use format::{Tip, render};
-pub(crate) use scope::LayerScope;
-pub(crate) use view::{layered_summary, tag_file_lines};
+pub(crate) use scope::{LayerRun, LayerScope};
+pub(crate) use view::{Count, group_header, layered_summary, tag_file_lines};
 
 /// A tömör, csak a nevekből számolt profil (az MCP-kapcsolódáskor az útmutató végére): gyors, és soha nem bukik
 /// el — ha a gyökér nem projekt-mappa (nincs manifest / `.git`), vagy nincs kódfájl, `None`.

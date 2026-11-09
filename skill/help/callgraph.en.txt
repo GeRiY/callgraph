@@ -77,12 +77,16 @@ Excluded files: built-in folders (vendor, node_modules, …), minified / bundled
   bash ~/.claude/skills/callgraph/callgraph.sh --version                       version, platform and the binary's path
 
 Project profile (architecture, layers and patterns from folder / file names, checked against the graph):
-  bash ~/.claude/skills/callgraph/callgraph.sh profile [--project alias] [--full]
+  bash ~/.claude/skills/callgraph/callgraph.sh profile [--project alias] [--full] [--with-vendor]
                                                 ~15 lines: architecture, layers with folders and file counts, patterns,
-                                                call direction between layers, unknown folders; --full: per folder
-  bash ~/.claude/skills/callgraph/callgraph.sh <dir> --layer service           only the files of that layer (name,name...)
+                                                call direction between layers, unknown folders; --full: per folder;
+                                                embedded third-party code and build output are skipped (--with-vendor:
+                                                counted too); a role in both PHP and JS: controller (php) / controller (js)
+  bash ~/.claude/skills/callgraph/callgraph.sh <dir> --layer service           only the files of that layer (name,name...;
+                                                one ecosystem: controller:php, controller:js, …:swift, …:rust)
   bash ~/.claude/skills/callgraph/callgraph.sh <dir> --layers                  summary grouped by layer, [role] on FILE lines
-  bash ~/.claude/skills/callgraph/callgraph.sh <dir> --grep <pattern> --depth 2 --by-layer   callers ordered by layer
+  bash ~/.claude/skills/callgraph/callgraph.sh <dir> --grep <pattern> --depth 2 --by-layer   callers grouped by layer
+                                                (closest to the callee first), a "[service]  3 calls" header per group
   Own folder names: a .callgraph-layers file in the project root ("service = app/Logic", "ignore-role = app/Legacy").
 
 Local usage stats (stays on this computer, nothing is sent anywhere; no paths, names or search terms):

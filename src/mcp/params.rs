@@ -55,7 +55,8 @@ pub(crate) struct OutlineParams {
     /// Only this method/function (file paths only).
     #[serde(default)]
     pub method: Option<String>,
-    /// Only files of this layer (see `project_profile`), e.g. `service` or `service,repository`.
+    /// Only files of this layer (see `project_profile`), e.g. `service`, `service,repository`, or one ecosystem:
+    /// `controller:js`.
     #[serde(default)]
     pub layer: Option<String>,
     /// Disable the 400-line output cap (use only when needed).
@@ -129,7 +130,7 @@ pub(crate) struct FindCallersParams {
     /// Search only files of this layer (level 1), e.g. `controller`.
     #[serde(default)]
     pub layer: Option<String>,
-    /// Order callers by layer (closest to the callee first) and tag each line with its layer.
+    /// Group callers by layer (closest to the callee first), each group under a `[service]  3 callers` header.
     #[serde(default)]
     pub by_layer: bool,
     /// Disable the 400-line output cap.

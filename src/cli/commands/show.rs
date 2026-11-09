@@ -250,12 +250,19 @@ impl ShowCommand {
             && (self.strings.is_some() || self.const_filter.is_some())
     }
 
+    /// A hiba a hibakimenetre; a kilépési kód 2 a felhasználói hibáknál (hibás kapcsoló / rétegnév, nem létező vagy
+    /// nem támogatott fájl — a burok ezeket nem naplózza hibaként), 1 a belső hibáknál (olvasás, írás, JSON).
     fn report(err: &mut dyn Write, error: crate::error::CallgraphError) -> Result<i32> {
+        use crate::error::CallgraphError as E;
+        let code = match &error {
+            E::Usage(_) | E::Unsupported(_) | E::Generated(_) | E::Binary(_) | E::Excluded(_) => 2,
+            E::Read { .. } | E::Write(_) | E::Json(_) => 1,
+        };
         match error {
-            crate::error::CallgraphError::Usage(message) => writeln!(err, "{message}")?,
+            E::Usage(message) => writeln!(err, "{message}")?,
             other => writeln!(err, "{other}")?,
         }
-        Ok(1)
+        Ok(code)
     }
 }
 

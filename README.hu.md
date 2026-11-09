@@ -292,13 +292,27 @@ nélküli mappákat, és hogy a rétegek hogyan hívják egymást. A kód-gráf 
 részletez. Minden fájl kap egy szerepet bizonyossággal (magas / közepes / alacsony), vagy „ismeretlen” marad — nem
 találgat. MCP: a `project_profile` eszköz, és kapcsolódáskor egy tömör profil is megy.
 
+A rétegek fájlszám szerint sorakoznak, így a fő réteg mindig felül van. A backendben és a frontendben is meglévő
+szerep külön látszik, pl. `controller (php)` és `controller (js)`, ha PHP-controllerek mellett AngularJS-controllerek
+is vannak, és a hívásirány sem köti össze a kettőt. A projektbe bemásolt külső kód (saját `composer.json`,
+`package.json` vagy `LICENSE` fájlos almappa, vagy `vendors/`, `third_party/`, `extensions/`, `libs/` jellegű mappa) és
+a build-kimenet (`dist/`, `build/`, `*.min/`, minifikált fájlok) nem számít: egy sor mondja meg, hány fájl maradt ki és
+honnan (a `profile --with-vendor` mégis beszámolja őket); a lekérdezések ezeket a fájlokat is látják. Az `event`, a
+`listener` és a `job` réteghez bizonyíték kell a kódban (Event / Listener ősosztály, a Laravel `Dispatchable` vagy
+`ShouldQueue`, `handle(…)` metódus a `Listeners` névtérben) — egy csak `Event` nevű mappa nem event-réteg.
+
 A rétegek a lekérdezésekben (mind kapcsolóra, az alapkimenet nem változik):
 
 ```bash
 bash ~/.claude/skills/callgraph/callgraph.sh app --layer service                     # csak a service-fájlok (név,név...)
+bash ~/.claude/skills/callgraph/callgraph.sh . --layer controller:js                 # csak egy ökoszisztéma: php, js, swift, rust
 bash ~/.claude/skills/callgraph/callgraph.sh app --format summary --layers           # summary rétegenként
-bash ~/.claude/skills/callgraph/callgraph.sh app --grep 'Repo::find' --depth 2 --by-layer   # hívók rétegek szerint
+bash ~/.claude/skills/callgraph/callgraph.sh app --grep 'Repo::find' --depth 2 --by-layer   # hívók rétegenként
 ```
+
+A `--by-layer` a hívott metódushoz legközelebbi réteget teszi előre (model → repository → service → controller), és
+minden csoport egy `[service]  3 hívás` jellegű fejléccel kezdődik, a rövid és a hosszú `--grep` nézetben egyaránt
+(`--depth`-tel minden szinten).
 
 Semmitmondó (vagy nem angol) mappanevek? Egy commitolható `.callgraph-layers` fájl a projekt gyökerében
 hozzárendeli őket: `service = app/Szolgaltatasok, app/Logic`, `ignore-role = app/Legacy`.

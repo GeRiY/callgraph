@@ -29,8 +29,37 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 - **A quoted phrase is one `locate` term:** `locate "Organizer's other events"` searches for the whole text in the
   strings of the code (labels, translations) instead of splitting it into words that matched unrelated names.
 - **`locate` always shows a `root:` line** and paths relative to it, also when only one file matches.
+- **The profile lists the layers by file count:** the biggest layer comes first, so a main layer such as `model` no
+  longer hides behind `… +6 more layers` while layers with one or two files are shown.
+- **`--by-layer` shows a header for each layer:** every group of callers starts with a line such as
+  `[service]  3 calls`, in the normal and in the short ("one line per call") `--grep` view, and in every level of
+  `--depth`. The group closest to the called method comes first (model → repository → service → controller), as
+  the help says; before, only a `[service]` tag at the end of some lines showed the layer.
+- **User mistakes are no longer logged as tool errors:** a mistyped layer name, an unknown option or a file that does
+  not exist now prints just the message — no `[error-id: …]` line, no bug-report link, and nothing is written to
+  `errors.jsonl`. Real internal errors are still logged and get an error-id.
 
 ### Fixed
+- **PHP and JavaScript layers are no longer mixed up in the profile:** in a project with PHP controllers and
+  AngularJS (or other JavaScript) controllers, the profile showed one `controller` layer with all of them. A role
+  that exists in more than one language is now shown apart, e.g. `controller (php)` and `controller (js)`, and the
+  call direction (`flow:`) no longer joins the backend and the frontend through a shared name such as `service`.
+  Projects with one language look exactly as before. `--layer controller` still finds both; `--layer controller:js`
+  (or `--layer "controller (js)"`) only the JavaScript ones.
+- **Third-party code no longer makes up the project's architecture:** an SDK or library copied into the project (a
+  subfolder with its own `composer.json`, `package.json` or `LICENSE`, or folders such as `vendors/`, `third_party/`,
+  `extensions/`, `external/`, `libs/`) gave the profile layers and patterns (Builder, Factory, Handler…) that the
+  project itself does not have. These files are now left out of the profile, and one line says so, e.g.
+  `vendor: 312 files skipped (extensions/Facebook, vendors/phpoffice, …)`. Searches and folder views still see them.
+  `profile --with-vendor` counts them again.
+- **Copies of build output are left out of the profile:** folders named `dist`, `build` or `*.min` (such as
+  `web/assets.min`) and minified files no longer count twice as layers; a `generated: N files skipped (…)` line shows
+  them.
+- **A folder named after a business topic is not an event layer:** `app/Services/Event` or a JavaScript
+  `controllers/event` folder became an `event` layer. `event`, `listener` and `job` now need proof in the code — an
+  Event / Listener / Subscriber base class or interface, Laravel's `Dispatchable` or `ShouldQueue`, or a `handle(…)`
+  method in a `Listeners` namespace; otherwise the file keeps its other role (`service`, `controller`, `model` for
+  `app/Models/Job.php`).
 - **Files your `.gitignore` excludes no longer show up:** the build output of a Laravel + Vite project
   (`public/build/assets/app-CBW7lKWe.js`, listed in `.gitignore` as `/public/build`) appeared in `locate` and folder
   views. `.gitignore` now works the way git reads it: patterns with a leading `/`, nested paths, `**`, `!` exceptions

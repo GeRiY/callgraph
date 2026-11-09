@@ -85,15 +85,26 @@ calls through its interface / parent / trait), so it can miss callers; use it to
 bash $CG profile --project myapp                                     # architecture, layers (folders, file counts), patterns, call direction, unknown folders
 bash $CG profile --project myapp --full                              # per folder, confidence counts, the call pairs between layers
 bash $CG --project myapp app --layer service                         # only the files of one layer (several: service,repository)
+bash $CG --project myapp . --layer controller:js                     # one ecosystem only (php, js, swift, rust) when a role is in both
 bash $CG --project myapp app --format summary --layers               # summary grouped by layer
-bash $CG --project myapp app --grep 'Repo::find' --depth 2 --by-layer # callers ordered by layer, closest to the callee first
+bash $CG --project myapp app --grep 'Repo::find' --depth 2 --by-layer # callers grouped by layer, a "[service]  3 callers" header per group
 ```
 
 In an unfamiliar project run `profile` once at the start (~15 lines) instead of listing folders: it says which folder
 holds which layer, so you can narrow a query with `--layer <name>` without knowing the folder names. A layer is a name
 from the profile (`controller`, `service`, `repository`, `model`, `component`, `store`…), not a path. Roles come from
-folder and file names, confirmed by the graph (confidence high / medium / low; "unknown" when unclear). A layer never
-hides results by itself: only `--layer` filters, `--layers` / `--by-layer` only group and order. Own folder names:
+folder and file names, confirmed by the graph (confidence high / medium / low; "unknown" when unclear). Layers are
+listed by file count. When a role is in both the backend and the frontend, the profile shows them apart
+(`controller (php)` / `controller (js)`) and the call direction never chains them; `--layer controller` matches both,
+`--layer controller:js` (or `"controller (js)"`) one. Third-party code copied into the project (a subfolder with its
+own `composer.json` / `package.json` / `LICENSE`, or `vendors/`, `third_party/`, `extensions/`, `external/`, `libs/`)
+and build output (`dist/`, `build/`, `*.min/`, minified files) are left out of the profile — one `vendor: N files
+skipped (…)` line says so; queries still see these files (`profile --with-vendor` counts them). `event`, `listener` and
+`job` need code proof (an Event / Listener base class or interface, `Dispatchable`, `ShouldQueue`, `handle(…)` in a
+`Listeners` namespace); a folder named `Event` alone is not an event layer. A layer never hides results by itself:
+only `--layer` filters, `--layers` / `--by-layer` only group and order. `--by-layer` groups the calls (with `--depth`:
+per level) by layer, the layer closest to the callee first (the deepest layer in the call direction: model →
+repository → service → controller), each group under a `[service]  3 calls` header. Own folder names:
 `.callgraph-layers` in the project root (`service = app/Logic`, `ignore-role = app/Legacy`). MCP: the
 `project_profile` tool and the `layer` / `by_layer` parameters.
 

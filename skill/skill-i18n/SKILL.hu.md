@@ -85,16 +85,27 @@ az interfészén / szülőjén / trait-jén át menőket), ezért hívók maradh
 bash $CG profile --project myapp                                     # architektúra, rétegek (mappák, fájlszám), minták, hívásirány, ismeretlen mappák
 bash $CG profile --project myapp --full                              # mappánként, bizonyosság szerint, a rétegek közti hívás-párok
 bash $CG --project myapp app --layer service                         # csak egy réteg fájljai (több: service,repository)
+bash $CG --project myapp . --layer controller:js                     # csak egy ökoszisztéma (php, js, swift, rust), ha a szerep mindkettőben van
 bash $CG --project myapp app --format summary --layers               # summary rétegenként csoportosítva
-bash $CG --project myapp app --grep 'Repo::find' --depth 2 --by-layer # hívók rétegek szerint, a hívotthoz legközelebbi elöl
+bash $CG --project myapp app --grep 'Repo::find' --depth 2 --by-layer # hívók rétegenként csoportosítva, csoportonként "[service]  3 hívó" fejléccel
 ```
 
 Ismeretlen projektben a mappák listázása helyett futtasd egyszer az elején a `profile`-t (~15 sor): megmondja, melyik
 mappában melyik réteg van, így a mappaneveket nem ismerve is szűkíthetsz a `--layer <név>`-vel. A réteg egy név a
 profilból (`controller`, `service`, `repository`, `model`, `component`, `store`…), nem út. A szerepek a mappa- és
 fájlnevekből jönnek, a gráffal megerősítve (bizonyosság magas / közepes / alacsony; „ismeretlen”, ha nem egyértelmű).
+A rétegek fájlszám szerint sorakoznak. Ha egy szerep a backendben és a frontendben is megvan, a profil külön mutatja
+(`controller (php)` / `controller (js)`), és a hívásirány-lánc sem köti össze őket; a `--layer controller` mindkettőt
+adja, a `--layer controller:js` (vagy `"controller (js)"`) csak az egyiket. A projektbe bemásolt külső kód (saját
+`composer.json` / `package.json` / `LICENSE` fájlos almappa, vagy `vendors/`, `third_party/`, `extensions/`,
+`external/`, `libs/`) és a build-kimenet (`dist/`, `build/`, `*.min/`, minifikált fájlok) kimarad a profilból — erről
+egy `vendor: N fájl kihagyva (…)` sor szól; a lekérdezések ezeket is látják (`profile --with-vendor`: a profil is
+számol velük). Az `event`, `listener` és `job` réteghez kód-jel kell (Event / Listener ősosztály vagy interfész,
+`Dispatchable`, `ShouldQueue`, `handle(…)` a `Listeners` névtérben); egy `Event` nevű mappa magában nem event-réteg.
 A réteg magától soha nem rejt el találatot: csak a `--layer` szűr, a `--layers` / `--by-layer` csak csoportosít és
-sorrendez. Saját mappanevek: `.callgraph-layers` a projekt gyökerében (`service = app/Logic`,
+sorrendez. A `--by-layer` a hívásokat (`--depth`-tel szintenként) rétegenként csoportosítja, a hívotthoz legközelebbi
+réteg elöl (a hívásirányban a legmélyebb: model → repository → service → controller), minden csoport előtt egy
+`[service]  3 hívás` fejléccel. Saját mappanevek: `.callgraph-layers` a projekt gyökerében (`service = app/Logic`,
 `ignore-role = app/Legacy`). MCP: a `project_profile` eszköz és a `layer` / `by_layer` paraméter.
 
 ## Melyik `--format` mire való

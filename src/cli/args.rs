@@ -149,8 +149,13 @@ pub enum CliArgs {
         /// A réteg-kapcsolók (`--layer`, `--layers`, `--by-layer`; `profile_args.rs`).
         layers: LayerArgs,
     },
-    /// `profile [--project <alias|mappa>] [--full]`: a projekt-profil (architektúra, rétegek, minták).
-    Profile { project: Option<String>, full: bool },
+    /// `profile [--project <alias|mappa>] [--full] [--with-vendor]`: a projekt-profil (architektúra, rétegek,
+    /// minták); `with_vendor`: a beágyazott külső kód is számít.
+    Profile {
+        project: Option<String>,
+        full: bool,
+        with_vendor: bool,
+    },
     /// `note add|list|rm` (PILOT); `project`: alias vagy gyökér-út.
     Note {
         action: NoteAction,
