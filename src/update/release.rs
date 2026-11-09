@@ -11,7 +11,8 @@ pub(crate) const DEFAULT_API: &str = "https://api.github.com/repos/GeRiY/callgra
 
 /// A legutóbbi néhány kiadás listája: a `releases/latest` egy friss kiadás után percekig a régit adhatja — ha az
 /// „naprakész”-t mond, a lista első stabil kiadása is számít (`newest_stable`).
-pub(crate) const DEFAULT_LIST: &str = "https://api.github.com/repos/GeRiY/callgraph/releases?per_page=5";
+pub(crate) const DEFAULT_LIST: &str =
+    "https://api.github.com/repos/GeRiY/callgraph/releases?per_page=5";
 
 /// A dev-csatorna: a develop-ág gördülő előzetes kiadása (`dev` tag; a CI minden develop-pushnál frissíti).
 /// A `CALLGRAPH_UPDATE_DEV_API` (tükör, teszt; `file://` is) felülírja.

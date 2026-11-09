@@ -11,6 +11,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   `update` takes you back to the latest stable release. The daily background check and the MCP `--auto-update` stay
   on stable releases. On a dev build `callgraph --version` shows the dev version.
 
+### Changed
+- **The changelog in Hungarian too:** `CHANGELOG.hu.md` has every release in Hungarian, and the Hungarian website
+  shows it.
+
 ### Fixed
 - **`update --check` right after a release:** for a few minutes after a new release it could still say "up to date",
   because GitHub briefly served the old answer. It now asks without the cache and also looks at the list of recent

@@ -605,7 +605,10 @@ fn dev_check_compares_by_commit_and_base_version() {
     let (code, out, _) = run_as(&["--check", "--dev"], &skill, dev(), "0.5.1", None);
     assert_eq!(code, 0);
     assert!(out.contains("0.5.1-dev.abc1234 (2026-11-09)"), "{out}");
-    assert!(out.contains("0.5.1)") && out.contains("update --dev"), "{out}");
+    assert!(
+        out.contains("0.5.1)") && out.contains("update --dev"),
+        "{out}"
+    );
 
     // más commit: újabb; ugyanaz a commit vagy újabb stabil: nem
     let other = "0.5.1-dev.0000000";
@@ -614,7 +617,10 @@ fn dev_check_compares_by_commit_and_base_version() {
     for current in ["0.5.1-dev.abc1234", "0.5.2"] {
         let (code, out, _) = run_as(&["--check", "--dev"], &skill, dev(), current, None);
         assert_eq!(code, 0);
-        assert!(!out.contains("update --dev") && out.contains(current), "{out}");
+        assert!(
+            !out.contains("update --dev") && out.contains(current),
+            "{out}"
+        );
     }
     assert_eq!(read(skill.join("bin/linux-x86_64/callgraph")), "OLD");
 
@@ -650,7 +656,10 @@ fn dev_update_installs_a_verified_dev_build_and_keeps_the_stable_state() {
     ];
     let (code, out, _) = run_as(&["--dev"], &skill, good, "0.5.1-dev.0000000", None);
     assert_eq!(code, 0);
-    assert!(out.contains("0.5.1-dev.0000000 → 0.5.1-dev.abc1234"), "{out}");
+    assert!(
+        out.contains("0.5.1-dev.0000000 → 0.5.1-dev.abc1234"),
+        "{out}"
+    );
     assert_eq!(read(binary), "DEV");
     assert_eq!(read(skill.join("lang")), "hu\n");
     // a háttér-ellenőrzés (stabil csatorna) állapota nem változik
@@ -715,10 +724,7 @@ fn check_falls_back_to_the_release_list_when_latest_is_stale() {
         {"tag_name": "v0.1.0", "assets": []}
     ]"#;
     // a releases/latest még a régit adja, a lista már az újat
-    let stale = vec![
-        (API, Ok(release_json("v0.1.0"))),
-        (LIST, Ok(list.to_vec())),
-    ];
+    let stale = vec![(API, Ok(release_json("v0.1.0"))), (LIST, Ok(list.to_vec()))];
     let (code, out, _) = run_as(&["--check"], &skill, stale, "0.1.0", Some(LIST));
     assert_eq!(code, 0);
     assert!(out.contains("0.1.0 → 0.2.0"), "{out}");

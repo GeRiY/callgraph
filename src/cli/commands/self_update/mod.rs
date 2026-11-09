@@ -396,7 +396,10 @@ impl SelfUpdateCommand {
         let latest = source
             .latest(self.env.fetcher.as_ref())
             .map_err(|e| source_failure(source.url(), e))?;
-        if latest.as_ref().is_some_and(|r| r.version > self.env.current) {
+        if latest
+            .as_ref()
+            .is_some_and(|r| r.version > self.env.current)
+        {
             return Ok(latest);
         }
         let Some(url) = &self.env.recent else {

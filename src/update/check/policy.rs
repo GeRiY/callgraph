@@ -252,7 +252,11 @@ mod tests {
         let dev = v("0.5.1-dev.23ed277");
         // ugyanaz az alapverzió (vagy régebbi): nincs értesítés, és az auto-update sem tér vissza a stabilra
         for latest in ["0.5.1", "0.5.0"] {
-            assert!(decide(&state(NOW, Some(latest)), NOW, &dev, true).notice.is_none());
+            assert!(
+                decide(&state(NOW, Some(latest)), NOW, &dev, true)
+                    .notice
+                    .is_none()
+            );
             assert_eq!(decide_auto(&state(NOW - 60, Some(latest)), NOW, &dev), None);
         }
         // újabb alapverzió: szól, és az auto-update (stabil csatorna) frissít
