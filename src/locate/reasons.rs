@@ -25,6 +25,7 @@ fn key(symbol: &Symbol) -> String {
             ..
         } => format!("m\0{}\0{name}\0{line}", container.as_deref().unwrap_or("")),
         Symbol::Constant { name, line } => format!("k\0{name}\0{line}"),
+        Symbol::Key { name, line } => format!("j\0{name}\0{line}"),
         Symbol::Str { value, .. } => format!("s\0{value}"),
         Symbol::Call { target, .. } => format!("x\0{target}"),
     }
@@ -36,6 +37,7 @@ fn line_of(symbol: &Symbol) -> u32 {
         Symbol::Container { line, .. }
         | Symbol::Method { line, .. }
         | Symbol::Constant { line, .. }
+        | Symbol::Key { line, .. }
         | Symbol::Str { line, .. }
         | Symbol::Call { line, .. } => *line,
     }
@@ -140,6 +142,7 @@ pub(crate) fn describe(reason: &Reason, terms: &[Term]) -> String {
             text
         }
         Symbol::Constant { name, line } => format!("const {name}  L{line}"),
+        Symbol::Key { name, line } => format!("{name}  L{line}"),
         Symbol::Str { value, .. } => format!("'{}'  {}", clip(value, 60), lines(&reason.lines)),
         Symbol::Call { caller, target, .. } => {
             let at = lines(&reason.lines);
@@ -180,6 +183,7 @@ fn label(reason: &Reason) -> String {
                     container: None, ..
                 } => crate::t!("function", "függvény").to_owned(),
                 Symbol::Method { .. } => crate::t!("method", "metódus").to_owned(),
+                Symbol::Key { .. } => crate::t!("JSON key", "JSON-kulcs").to_owned(),
                 _ => crate::t!("constant", "konstans").to_owned(),
             };
             crate::tf!("exact {what}", "pontos {what}")

@@ -44,6 +44,11 @@ pub(crate) enum Symbol {
         name: String,
         line: u32,
     },
+    /// JSON-kulcs (a teljes kulcs-út: `devDependencies.laravel-vite-plugin`).
+    Key {
+        name: String,
+        line: u32,
+    },
     Str {
         value: String,
         line: u32,
@@ -74,8 +79,9 @@ impl<'a> Matcher<'a> {
         Self { terms, callers }
     }
 
-    /// A fájl összes egyezése. `rel`: a gyökérhez relatív út; `code`: kódfájl-e (dokumentum / adat — md, json — csak
-    /// a fájlnevével illeszthető, a címsorai és kulcsai zajt adnának).
+    /// A fájl összes egyezése. `rel`: a gyökérhez relatív út; `code`: kódfájl-e. A dokumentum / adat (md, json) a
+    /// fájlnevével, a JSON még a kulcsával is illeszthető — de csak pontosan (a teljes kulcs-út vagy az utolsó
+    /// tagja, `laravel-vite-plugin`, `scripts.build`): a címsorok és a név-részletek zajt adnának.
     pub(crate) fn file_hits(&self, rel: &str, graph: &FileGraph, code: bool) -> Vec<Hit> {
         let mut hits = Vec::new();
         self.file_name(rel, code, &mut hits);
@@ -83,8 +89,27 @@ impl<'a> Matcher<'a> {
             self.definitions(graph, &mut hits);
             self.strings(rel, graph, &mut hits);
             self.calls(graph, &mut hits);
+        } else {
+            self.document_keys(graph, &mut hits);
         }
         hits
+    }
+
+    /// A JSON-kulcsok (`kind: key`) pontos egyezése: a teljes kulcs-út vagy az utolsó tagja.
+    fn document_keys(&self, graph: &FileGraph, hits: &mut Vec<Hit>) {
+        for key in graph.constants.iter().filter(|k| k.kind == "key") {
+            let path = key.name.to_lowercase();
+            let last = path.rsplit('.').next().unwrap_or(&path);
+            for (i, term) in self.terms.iter().enumerate() {
+                if term.is_plain() && (term.lower == path || term.lower == last) {
+                    let symbol = Symbol::Key {
+                        name: key.name.clone(),
+                        line: key.line,
+                    };
+                    Self::push(hits, i, Kind::Definition, symbol);
+                }
+            }
+        }
     }
 
     fn push(hits: &mut Vec<Hit>, term: usize, kind: Kind, symbol: Symbol) {

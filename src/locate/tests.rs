@@ -228,6 +228,41 @@ fn matcher_finds_every_kind_of_match() {
     assert!(hits.is_empty(), "{hits:?}");
 }
 
+fn json_key(name: &str, line: u32) -> (Kind, Symbol) {
+    let symbol = Symbol::Key {
+        name: name.into(),
+        line,
+    };
+    (Kind::Definition, symbol)
+}
+
+const PACKAGE_JSON: &[u8] = br#"{"scripts": {"build": "vite build"},
+"devDependencies": {"laravel-vite-plugin": "^1.0"}}
+"#;
+
+#[test]
+fn json_keys_match_exactly_by_full_path_or_last_segment() {
+    use crate::lang::Language;
+    use crate::lang::json::JsonDocument;
+    let file = crate::core::SourceFile::new("package.json", PACKAGE_JSON.to_vec(), None);
+    let json = JsonDocument.analyze(&file).unwrap().graph;
+    let terms = Term::parse_all(&["laravel-vite-plugin", "scripts.build", "vite", "laravel"]);
+    let callers = CallerCounts::build([&json]);
+    let matcher = Matcher::new(&terms, &callers);
+    let hits = matcher.file_hits("package.json", &json, false);
+    let found = |term: usize| -> Vec<(Kind, Symbol)> {
+        hits.iter()
+            .filter(|h| h.term == term)
+            .map(|h| (h.kind, h.symbol.clone()))
+            .collect()
+    };
+    assert_eq!(found(0), [json_key("devDependencies.laravel-vite-plugin", 2)]);
+    assert_eq!(found(1), [json_key("scripts.build", 1)]);
+    // csak pontos egyezés: a név-részlet és az érték nem illeszkedik
+    assert!(found(2).is_empty(), "{hits:?}");
+    assert!(found(3).is_empty(), "{hits:?}");
+}
+
 fn hit(term: usize, kind: Kind) -> Hit {
     Hit {
         term,

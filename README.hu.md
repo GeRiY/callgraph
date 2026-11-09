@@ -89,8 +89,8 @@ Nyelvenkénti útmutatók példákkal: [PHP](https://callgraph.eu/hu/php/) · [R
 | JavaScript / TypeScript | `.js` `.mjs` `.cjs` `.jsx` `.ts` `.tsx` | modulok, függvények, osztályok, importok alias-feloldással (`jsconfig` / `tsconfig`) |
 | Vue | `.vue` | props, emits, `setup`, template-komponensek és eseménykezelők, `computed`, `watch`, életciklus-hookok, Options API |
 | Swift / SwiftUI | `.swift` | osztályok, structok, enumok, protokollok, actorok, extensionök; a `View` típusok komponensként; `func` / `init` / computed property-k (`body`); property wrapperek (`@State`, `@Binding`, `@Published`, …); a SwiftUI view-k és modifierek saját hívás-kategóriával |
-| CSS / SCSS | `.css` `.scss` | szabály-blokkok, mixinek, függvények, változók, `@use` / `@import` |
-| JSON / Markdown | `.json` `.md` | kulcs-útvonalak; címsor-szakaszok és linkek |
+| CSS / SCSS | `.css` `.scss` | szabály-blokkok és at-szabályok (`@media`, `@layer`, Tailwind v4 `@theme` / `@utility` / `@source` …), mixinek, függvények, változók, `@use` / `@import` |
+| JSON / Markdown | `.json` `.md` | kulcs-útvonalak a rövid értékükkel (`package.json::scripts --body` egy kulcsot ír ki); címsor-szakaszok szintenként, és linkek |
 
 ### Mely fájlokat dolgozza fel
 

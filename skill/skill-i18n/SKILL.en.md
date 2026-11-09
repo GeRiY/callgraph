@@ -51,6 +51,7 @@ bash $CG --project myapp app/Http/Controllers/X.php                  # outline: 
 bash $CG --project myapp app/Http/Controllers/X.php::store           # only one method (several ::selectors, several files too)
 bash $CG --project myapp app/Http/Controllers/X.php::store --body    # the method's source, compact (comments kept, docblock omitted: --doc; --raw = exact)
 bash $CG --project myapp app/Http/Controllers/X.php --lines 30-60    # any range, line-numbered (view, procedural file)
+bash $CG --project myapp package.json::scripts --body                # one JSON key with its exact lines (dot path: scripts.build, files.0)
 bash $CG --project myapp app --strings 'Order not found'             # where a string literal (error message, key) is
 bash $CG --project myapp app --const STATUS_ACTIVE                   # constant: definition, references, re-exports
 bash $CG --project myapp app --grep '(^|::|\.|->)cancel$'           # who calls it: EVERY call of the name, with the call line

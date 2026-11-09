@@ -31,6 +31,15 @@ szövege. Ez a döntés azért hasznos, mert a CSS-ben nincs deklarált függvé
 viszont a szabályblokk a legfontosabb végrehajtási egység, és a deklarációk,
 beágyazott media/supports blokkok hozzá köthetők.
 
+Az at-szabály is metódus, `kind: "at-rule"`, a neve a teljes fejléc: a blokkos
+(`@media …`, `@supports …`, `@layer …`, `@keyframes …`, `@font-face`, és a
+Tailwind v4 `@theme`, `@utility …`, `@custom-variant …`, `@variant …`) a záró
+`}`-ig, a `;`-re végződő (`@import`, `@tailwind`, `@plugin`, `@source`,
+`@config`, `@custom-variant`, `@layer`, `@charset`, `@namespace`, `@reference`)
+a saját sorain; a szabályon belüli `@apply` nem metódus. A `line` a fejléc
+első karakterének sora (az előtte álló komment és üres sorok nem számítanak).
+Az outline a `rule` és `at-rule` neve után nem ír `()`-t.
+
 SCSS-ben a szabályblokk ugyanígy `rule`, továbbá:
 
 - `@mixin rounded($r: 4px)` → `mixin` metódus, `params: ["$r: 4px"]`;

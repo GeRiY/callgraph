@@ -24,6 +24,8 @@ mod strings;
 mod summary;
 
 #[cfg(test)]
+mod document_tests;
+#[cfg(test)]
 mod tests;
 
 pub use body::BodyMode;

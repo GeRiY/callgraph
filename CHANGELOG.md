@@ -38,8 +38,27 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 - **User mistakes are no longer logged as tool errors:** a mistyped layer name, an unknown option or a file that does
   not exist now prints just the message — no `[error-id: …]` line, no bug-report link, and nothing is written to
   `errors.jsonl`. Real internal errors are still logged and get an error-id.
+- **JSON outlines show the values:** `scripts.build = "vite build"` and `devDependencies.vite = "^6.0"` instead of
+  just `string`; numbers, `true` / `false` and `null` as they are, strings over 60 characters cut with `…`, and
+  objects and lists with their size (`object (3)`, `array (2)`).
+- **Read one JSON key:** `callgraph.sh package.json::scripts --body` prints that key with its exact lines; use dots
+  for deeper keys (`scripts.build`) and numbers for list items (`files.0`). Before, it said "No such method".
+- **`locate` finds JSON keys:** `locate laravel-vite-plugin` now lists `package.json` with the line of the key. Only
+  the exact key name (or the whole dotted path) counts, so searches for other words do not fill up with JSON files.
+- **Markdown headings show their level:** the outline indents sub-headings and marks them with `#`, `##`, `###`, and
+  no longer writes `()` after a heading (`## Docker / build  L51-61`).
+- **CSS and SCSS rules are no longer written like functions:** `.p-toast  L29-31` instead of `.p-toast()`; mixins and
+  functions keep their `()`.
 
 ### Fixed
+- **CSS outlines list every rule:** some rules were missing (a rule with the selector `.p-toast` was always left out,
+  and so was the first rule after `@charset`), and at-rules were not shown at all. Now every rule and at-rule is listed with its
+  lines: `@import`, `@tailwind`, `@media`, `@supports`, `@layer`, `@keyframes`, `@font-face`, and the Tailwind v4
+  `@theme`, `@utility`, `@custom-variant`, `@variant`, `@plugin`, `@source` and `@config`.
+- **CSS rules start on the right line:** a rule after a comment or another rule showed the line where the previous
+  rule ended (`.p-datepicker-panel  L31-41` instead of `L39-41`).
+- **CSS paths with `/*` inside quotes stay whole:** `@source '../**/*.blade.php'` was cut, because the `/*` in the
+  path was taken for the start of a comment.
 - **PHP and JavaScript layers are no longer mixed up in the profile:** in a project with PHP controllers and
   AngularJS (or other JavaScript) controllers, the profile showed one `controller` layer with all of them. A role
   that exists in more than one language is now shown apart, e.g. `controller (php)` and `controller (js)`, and the

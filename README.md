@@ -89,8 +89,8 @@ Per-language guides with examples: [PHP](https://callgraph.eu/php/) · [Rust](ht
 | JavaScript / TypeScript | `.js` `.mjs` `.cjs` `.jsx` `.ts` `.tsx` | modules, functions, classes, imports with alias resolution (`jsconfig` / `tsconfig`) |
 | Vue | `.vue` | props, emits, `setup`, template components and event handlers, `computed`, `watch`, lifecycle hooks, Options API |
 | Swift / SwiftUI | `.swift` | classes, structs, enums, protocols, actors, extensions; `View` types as components; `func` / `init` / computed properties (`body`); property wrappers (`@State`, `@Binding`, `@Published`, …); SwiftUI views and modifiers as their own call categories |
-| CSS / SCSS | `.css` `.scss` | rule blocks, mixins, functions, variables, `@use` / `@import` |
-| JSON / Markdown | `.json` `.md` | key paths; heading sections and links |
+| CSS / SCSS | `.css` `.scss` | rule blocks and at-rules (`@media`, `@layer`, Tailwind v4 `@theme` / `@utility` / `@source` …), mixins, functions, variables, `@use` / `@import` |
+| JSON / Markdown | `.json` `.md` | key paths with their short values (`package.json::scripts --body` prints one key); heading sections by level, and links |
 
 ### Which files are processed
 

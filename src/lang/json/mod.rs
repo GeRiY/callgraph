@@ -1,5 +1,9 @@
 //! JSON/JSONC dokumentum-indexelő.
 
+mod value;
+
+pub(crate) use value::key_lines;
+
 use std::path::{Path, PathBuf};
 
 use jsonc_parser::{
@@ -32,17 +36,6 @@ impl JsonDocument {
             .collect()
     }
 
-    fn value_type(value: &Value<'_>) -> &'static str {
-        match value {
-            Value::StringLit(_) => "string",
-            Value::NumberLit(_) => "number",
-            Value::BooleanLit(_) => "boolean",
-            Value::Object(_) => "object",
-            Value::Array(_) => "array",
-            Value::NullKeyword(_) => "null",
-        }
-    }
-
     fn scalar(value: &Value<'_>) -> Option<String> {
         match value {
             Value::StringLit(value) => Some(value.value.to_string()),
@@ -71,7 +64,7 @@ impl JsonDocument {
                     kind: "key".into(),
                     name: child_path.clone(),
                     line: Self::line(property.name.range().start, starts),
-                    value: Some(Self::value_type(&property.value).into()),
+                    value: Some(value::display(&property.value)),
                     visibility: Some("public".into()),
                     caller: None,
                     doc: None,

@@ -51,6 +51,7 @@ bash $CG --project myapp app/Http/Controllers/X.php                  # outline: 
 bash $CG --project myapp app/Http/Controllers/X.php::store           # csak egy metódus (több ::szelektor, több fájl is)
 bash $CG --project myapp app/Http/Controllers/X.php::store --body    # a metódus forrása, tömören (kommentekkel, docblock nélkül: --doc; --raw = pontos)
 bash $CG --project myapp app/Http/Controllers/X.php --lines 30-60    # tetszőleges sáv sorszámozva (view, procedurális fájl)
+bash $CG --project myapp package.json::scripts --body                # egy JSON-kulcs a pontos soraival (pontokkal tagolt út: scripts.build, files.0)
 bash $CG --project myapp app --strings 'Order not found'             # string-literál (hibaüzenet, kulcs) helye
 bash $CG --project myapp app --const STATUS_ACTIVE                   # konstans: definíció, hivatkozások, továbbexportálás
 bash $CG --project myapp app --grep '(^|::|\.|->)cancel$'           # ki hívja: a név MINDEN hívása, a hívás sorával

@@ -2,6 +2,7 @@
 
 mod grep_text;
 mod issues;
+mod json_keys;
 mod layer;
 mod loader;
 
@@ -157,10 +158,14 @@ impl QueryEngine {
                     }
                 })
                 .cloned();
-            let graph = match stored {
+            let mut graph = match stored {
                 Some(graph) => graph,
                 None => self.analyze(&abs)?,
             };
+            // JSON: a kért kulcs-út (`package.json::scripts`) szakasz lesz, a forrás-soraival
+            if let Some(names) = &methods {
+                json_keys::add_key_sections(&abs, &mut graph, names);
+            }
             self.note_parse_issue(&abs, &graph);
             if graph.binary {
                 if selectors

@@ -1,6 +1,7 @@
 //! A CSS token-szkenner. A Raffia az érvényes inputot validálja, ez a kis visitor
 //! pedig a stabil, forráshelyes outline-ot gyűjti a közös modellbe.
 
+use super::rules::{header_offset, is_statement_at_rule, rule_kind};
 use crate::lang::Analysis;
 use crate::lang::stylesheet::{clean_header, is_ident, is_ident_start, line, strip_comments};
 use crate::model::{
@@ -91,16 +92,13 @@ impl<'a> CssScanner<'a> {
                 continue;
             }
             if bytes[i] == b'{' {
-                let header = clean_header(&self.source[segment..i]);
-                let method = (!header.is_empty()
-                    && !header.starts_with('@')
-                    && !header.eq_ignore_ascii_case("@charset \"UTF-8\"")
-                    && !(self.source[..segment]
-                        .to_ascii_lowercase()
-                        .contains("@charset")
-                        && !self.source[..segment].contains('{'))
-                    && header != ".p-toast")
-                    .then(|| self.method(&header, segment, line(self.source, i)));
+                let raw = &self.source[segment..i];
+                let header = clean_header(raw);
+                // a szabály és a blokkos at-szabály (`@media`, `@theme`, `@utility` …) is az outline része; a sora a
+                // fejléc első karaktere (az előző szabály vége és a megjegyzések nem számítanak)
+                let start = segment + header_offset(raw);
+                let method = (!header.is_empty())
+                    .then(|| self.method(&header, rule_kind(&header), start, start));
                 if header.starts_with("@media") {
                     let raw_header = &self.source[segment..i];
                     let cond = raw_header.find("@media").map(|pos| {
@@ -130,6 +128,7 @@ impl<'a> CssScanner<'a> {
                 }
                 segment = i + 1;
             } else if bytes[i] == b';' {
+                self.statement_at_rule(segment, i);
                 self.declaration(&self.source[segment..i], segment);
                 self.import_statement(&self.source[segment..i]);
                 segment = i + 1;
@@ -142,13 +141,15 @@ impl<'a> CssScanner<'a> {
         }
     }
 
-    fn method(&mut self, name: &str, start: usize, _open_line: u32) -> usize {
+    /// Egy szabály / at-szabály az outline-ban; `start`: a fejléc eleje, `end`: az utasítás `;`-je (a blokkos szabály
+    /// végét a záró `}` állítja be).
+    fn method(&mut self, name: &str, kind: &str, start: usize, end: usize) -> usize {
         let index = self.builder.method_count();
         self.builder.method(Method {
             container: Some(self.container.clone()),
             name: name.to_string(),
             line: line(self.source, start),
-            end_line: Some(line(self.source, start)),
+            end_line: Some(line(self.source, end)),
             visibility: None,
             is_static: false,
             is_abstract: false,
@@ -156,9 +157,20 @@ impl<'a> CssScanner<'a> {
             return_type: None,
             doc: None,
             body: None,
-            kind: None,
+            kind: Some(kind.into()),
         });
         index
+    }
+
+    /// A `;`-re végződő at-szabály (`@import`, `@tailwind`, `@plugin`, `@source` …) az outline-ba, a soraival; a
+    /// szabályon belüli (`@apply`) kimarad.
+    fn statement_at_rule(&mut self, segment: usize, end: usize) {
+        let raw = &self.source[segment..end];
+        let header = clean_header(raw);
+        if is_statement_at_rule(&header) {
+            let start = segment + header_offset(raw);
+            self.method(&header, "at-rule", start, end);
+        }
     }
 
     fn set_method_end(&mut self, index: usize, end: u32) {
