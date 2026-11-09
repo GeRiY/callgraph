@@ -5,6 +5,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+## [0.5.3] — 2026-11-09
+
 ### Added
 - **`--strict` for CI:** a file with a syntax error still gives exit code 0 by default (the partial map is useful).
   With `--strict` (or `CALLGRAPH_STRICT=1`), `show` (file, folder, `--grep`), `locate` and `profile` exit with code 3
@@ -388,7 +390,8 @@ First release.
 - Built-in update: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Prebuilt packages for macOS (arm64, x86_64), Linux (x86_64, ARM64, static musl) and Windows.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.5.2...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.5.3...develop
+[0.5.3]: https://github.com/GeRiY/callgraph/releases/tag/v0.5.3
 [0.5.2]: https://github.com/GeRiY/callgraph/releases/tag/v0.5.2
 [0.5.1]: https://github.com/GeRiY/callgraph/releases/tag/v0.5.1
 [0.5.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.5.0

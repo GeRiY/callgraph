@@ -6,6 +6,8 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ## [Unreleased]
 
+## [0.5.3] — 2026-11-09
+
 ### Új
 - **`--strict` CI-hez:** a szintaktikai hibás fájl alapból továbbra is 0-s kilépési kódot ad (a részleges térkép is
   hasznos). A `--strict` kapcsolóval (vagy `CALLGRAPH_STRICT=1`-gyel) a `show` (fájl, mappa, `--grep`), a `locate` és a
@@ -418,7 +420,8 @@ Első kiadás.
 - Beépített frissítés: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Előre fordított csomagok macOS-re (arm64, x86_64), Linuxra (x86_64, ARM64, statikus musl) és Windowsra.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.5.2...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.5.3...develop
+[0.5.3]: https://github.com/GeRiY/callgraph/releases/tag/v0.5.3
 [0.5.2]: https://github.com/GeRiY/callgraph/releases/tag/v0.5.2
 [0.5.1]: https://github.com/GeRiY/callgraph/releases/tag/v0.5.1
 [0.5.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.5.0
