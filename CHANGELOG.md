@@ -5,6 +5,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+## [0.5.2] — 2026-11-09
+
 ### Added
 - **`update --dev`:** installs the newest build of the `develop` branch (version `X.Y.Z-dev.<commit>`, checked
   against its `SHA256SUMS` like a release); `update --check --dev` only tells you whether there is a newer one. A plain
@@ -354,7 +356,8 @@ First release.
 - Built-in update: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Prebuilt packages for macOS (arm64, x86_64), Linux (x86_64, ARM64, static musl) and Windows.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.5.1...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.5.2...develop
+[0.5.2]: https://github.com/GeRiY/callgraph/releases/tag/v0.5.2
 [0.5.1]: https://github.com/GeRiY/callgraph/releases/tag/v0.5.1
 [0.5.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.5.0
 [0.4.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.4.0

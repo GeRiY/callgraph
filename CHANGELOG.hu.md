@@ -6,6 +6,8 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ## [Unreleased]
 
+## [0.5.2] — 2026-11-09
+
 ### Új
 - **`update --dev`:** a `develop` ág legfrissebb buildjét telepíti (verzió: `X.Y.Z-dev.<commit>`, a release-ekhez
   hasonlóan a `SHA256SUMS` alapján ellenőrizve); az `update --check --dev` csak megmondja, van-e újabb. Egy sima
@@ -383,7 +385,8 @@ Első kiadás.
 - Beépített frissítés: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Előre fordított csomagok macOS-re (arm64, x86_64), Linuxra (x86_64, ARM64, statikus musl) és Windowsra.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.5.1...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.5.2...develop
+[0.5.2]: https://github.com/GeRiY/callgraph/releases/tag/v0.5.2
 [0.5.1]: https://github.com/GeRiY/callgraph/releases/tag/v0.5.1
 [0.5.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.5.0
 [0.4.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.4.0
