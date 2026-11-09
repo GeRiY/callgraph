@@ -4,6 +4,7 @@
 //! A réteg szerep + ökoszisztéma: a PHP `service` és a JS `services` mappa két külön csomópont, így a backend és a
 //! frontend lánca nem fut össze egy közös szerepnév miatt.
 
+use std::cmp::Reverse;
 use std::collections::HashMap;
 
 use crate::index::normalize_type;
@@ -21,7 +22,8 @@ pub(crate) struct FlowFile<'a> {
 /// A rétegek közti hívások összesítése.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct FlowStats {
-    /// A hívásokban részt vevő fő rétegek, a várt irány sorrendjében.
+    /// A kiírt láncok: a fő rétegek a várt irány sorrendjében, minden szomszédos pár egy megfigyelt hívás-pár
+    /// (fő út, utána a mellékágak; lásd `chains`).
     pub chain: Vec<Vec<Layer>>,
     /// A várt irányba menő (rétegek közti) hívások száma.
     pub expected: usize,
@@ -96,13 +98,14 @@ pub(crate) fn compute(files: &[FlowFile<'_>]) -> Option<FlowStats> {
     }
     // a lánc csak a fő rétegeket mutatja: legalább a hívások 5%-ában részt vesz
     let floor = (total / 20).max(1);
-    let mut chain: Vec<Layer> = involvement
+    let mut main: Vec<Layer> = involvement
         .into_iter()
         .filter(|(_, n)| *n >= floor)
         .map(|(layer, _)| layer)
         .collect();
-    chain.sort_by_key(|layer| (layer.role.rank(), *layer));
-    let chain = connected_groups(&chain, &counts);
+    main.sort_by_key(|layer| (layer.role.rank(), *layer));
+    // egy nyíl csak megfigyelt párra: legalább a hívások 2%-a (min. 1) megy a két réteg között ebben az irányban
+    let chain = chains(&main, &counts, (total / 50).max(1));
     let mut pairs: Vec<((Layer, Layer), usize)> = counts.into_iter().collect();
     pairs.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
     Some(FlowStats {
@@ -113,36 +116,88 @@ pub(crate) fn compute(files: &[FlowFile<'_>]) -> Option<FlowStats> {
     })
 }
 
-/// A fő rétegek csoportjai: azok a rétegek egy csoportban, amelyek között ténylegesen van hívás (pl. a backend és a
-/// frontend rétegei külön lánc, ha nem hívják egymást); csoporton belül és a csoportok között a rétegek sorrendjében.
-fn connected_groups(chain: &[Layer], counts: &HashMap<(Layer, Layer), usize>) -> Vec<Vec<Layer>> {
-    let mut group: Vec<usize> = (0..chain.len()).collect();
-    fn root(group: &mut [usize], mut at: usize) -> usize {
-        while group[at] != at {
-            group[at] = group[group[at]];
-            at = group[at];
+/// Egy út pontszáma: (még nem szereplő rétegek, hossz, hívások száma).
+type Score = (usize, usize, usize);
+
+/// A kiírt láncok: minden `A → B` nyíl egy megfigyelt pár (`counts` ≥ `edge_floor`, a rétegek sorrendjében előre).
+/// Először a leghosszabb út (a legtöbb, még nem szereplő réteggel; egyenlőségnél a több hívással), utána a még
+/// hiányzó rétegek mellékágai (pl. `command → service`) a még nem használt párokból, amíg van új réteg; pár nélküli
+/// réteg nem kerül a láncba. Sorrend: összefüggő csoportonként (a csoport első rétegének helye szerint), azon belül a
+/// fő út, utána a mellékágak — így a backend és a frontend lánca külön marad.
+fn chains(
+    main: &[Layer],
+    counts: &HashMap<(Layer, Layer), usize>,
+    edge_floor: usize,
+) -> Vec<Vec<Layer>> {
+    let weight = |i: usize, j: usize| {
+        counts
+            .get(&(main[i], main[j]))
+            .copied()
+            .filter(|n| *n >= edge_floor)
+    };
+    let mut used: Vec<(usize, usize)> = Vec::new();
+    let mut covered = vec![false; main.len()];
+    let mut paths: Vec<Vec<usize>> = Vec::new();
+    loop {
+        // best[j]: a j-ben végződő legjobb út pontszáma (új rétegek, hossz, hívások) és az előző réteg
+        let mut best: Vec<(Score, Option<usize>)> = Vec::with_capacity(main.len());
+        for (j, new) in covered.iter().map(|c| usize::from(!c)).enumerate() {
+            let mut top = ((new, 1, 0), None);
+            for (i, (score, _)) in best.iter().enumerate() {
+                let Some(n) = weight(i, j).filter(|_| !used.contains(&(i, j))) else {
+                    continue;
+                };
+                let candidate = (score.0 + new, score.1 + 1, score.2 + n);
+                if candidate > top.0 {
+                    top = (candidate, Some(i));
+                }
+            }
+            best.push(top);
         }
-        at
-    }
-    for (from, into) in counts.keys() {
-        let (Some(a), Some(b)) = (
-            chain.iter().position(|r| r == from),
-            chain.iter().position(|r| r == into),
-        ) else {
-            continue;
+        let Some(end) = best
+            .iter()
+            .enumerate()
+            .filter(|(_, (score, previous))| score.0 > 0 && previous.is_some())
+            .max_by_key(|(j, (score, _))| (*score, Reverse(*j)))
+            .map(|(j, _)| j)
+        else {
+            break;
         };
-        let (ra, rb) = (root(&mut group, a), root(&mut group, b));
-        if ra != rb {
-            group[ra.max(rb)] = ra.min(rb);
+        let mut path = vec![end];
+        while let Some(previous) = best[*path.last().unwrap_or(&end)].1 {
+            path.push(previous);
         }
-    }
-    let mut out: Vec<(usize, Vec<Layer>)> = Vec::new();
-    for (at, layer) in chain.iter().enumerate() {
-        let r = root(&mut group, at);
-        match out.iter_mut().find(|(id, _)| *id == r) {
-            Some((_, layers)) => layers.push(*layer),
-            None => out.push((r, vec![*layer])),
+        path.reverse();
+        for pair in path.windows(2) {
+            used.push((pair[0], pair[1]));
         }
+        for at in &path {
+            covered[*at] = true;
+        }
+        paths.push(path);
     }
-    out.into_iter().map(|(_, layers)| layers).collect()
+    // összefüggő csoportok a használt párokból: csoportonként, a csoport első rétegének helye szerint
+    let group = |path: &[usize]| {
+        let mut members: Vec<usize> = path.to_vec();
+        let mut grew = true;
+        while grew {
+            grew = false;
+            for (a, b) in &used {
+                let touches = members.contains(a) || members.contains(b);
+                for x in [a, b] {
+                    if touches && !members.contains(x) {
+                        members.push(*x);
+                        grew = true;
+                    }
+                }
+            }
+        }
+        members.into_iter().min().unwrap_or(0)
+    };
+    let mut keyed: Vec<(usize, Vec<usize>)> = paths.into_iter().map(|p| (group(&p), p)).collect();
+    keyed.sort_by_key(|(group, _)| *group);
+    keyed
+        .into_iter()
+        .map(|(_, path)| path.into_iter().map(|at| main[at]).collect())
+        .collect()
 }

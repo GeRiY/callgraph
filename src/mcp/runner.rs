@@ -53,7 +53,8 @@ impl ShowRunner {
             .map_err(|e| e.to_string())?;
         let (mut out, mut err) = (Vec::new(), Vec::new());
         let code = command.run(&mut out, &mut err).map_err(|e| e.to_string())?;
-        if code != 0 {
+        // a `CALLGRAPH_STRICT` csak a CLI-é: itt a 3-as kód (szintaktikai hibás fájl) is siker, a `⚠` sor a kimenetben
+        if code != 0 && code != crate::cli::strict::STRICT_EXIT_CODE {
             return Err(String::from_utf8_lossy(&err).trim_end().to_owned());
         }
         Ok(String::from_utf8_lossy(&out).into_owned())

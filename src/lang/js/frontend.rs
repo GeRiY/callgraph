@@ -78,7 +78,7 @@ impl JsFrontend {
             out.builder
                 .parse_error(ParseError::new(line, &error.message));
         }
-        // végzetes hibánál a passzok az ép előtagot látják (`parse_recovering`)
+        // végzetes hibánál a passzok az ép részeket látják, a hibás szakaszok szóközzel (`parse_recovering`)
         let ctx = PassContext {
             path,
             source: parsed.source,

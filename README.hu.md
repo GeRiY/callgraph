@@ -130,7 +130,10 @@ mappához írd így: `build/` vagy `/build`.
 - Makró- vagy reflexió-nehéz kód: a statikusan nem feloldható, dinamikus hívások csak név szerinti egyezésként (`?`,
   `--guess`-szel) jelennek meg, vagy sehogy.
 - Szintaktikai hibás fájl (szerkesztés közben, merge-konfliktus): `⚠ szintaktikai hiba itt: L<n>` és egy záró `⚠` sor
-  jelzi; a hiba előtti rész a térképen van, a többi hiányozhat — az ilyen fájlt olvasd közvetlenül.
+  jelzi; a hibás rész előtti és utáni kód a térképen van (JS / TS / Vue, Rust: a következő felső szintű függvénytől,
+  osztálytól, elemtől), csak a hibás rész hiányzik — az ilyen fájlt olvasd közvetlenül. A kilépési kód 0 marad; CI-hez
+  add hozzá a `--strict` kapcsolót (vagy `CALLGRAPH_STRICT=1`): a `show`, a `locate` és a `profile` ilyenkor 3-as
+  kóddal lép ki, ha egy beolvasott fájl szintaktikai hibás, a kimenet ugyanaz.
 
 ## Gyors kezdés
 
@@ -207,7 +210,8 @@ lehetnek instabilak. A sima `update` visszavisz a legutóbbi stabil kiadásra; a
 ## Használat
 
 Minden parancs a `callgraph.sh`-n át megy (vagy közvetlenül a binárissal: `callgraph show …`). A `--project <alias>`
-mellett az utak a regisztrált projekt gyökeréhez képest értendők; nélküle az aktuális mappa a gyökér.
+mellett az utak a regisztrált projekt gyökeréhez képest értendők; a `--project <mappa>` (létező mappa, abszolút vagy
+relatív) regisztráció nélkül is működik; nélküle az aktuális mappa a gyökér.
 
 | Feladat | Parancs |
 |---|---|
@@ -301,11 +305,19 @@ találgat. MCP: a `project_profile` eszköz, és kapcsolódáskor egy tömör pr
 A rétegek fájlszám szerint sorakoznak, így a fő réteg mindig felül van. A backendben és a frontendben is meglévő
 szerep külön látszik, pl. `controller (php)` és `controller (js)`, ha PHP-controllerek mellett AngularJS-controllerek
 is vannak, és a hívásirány sem köti össze a kettőt. A projektbe bemásolt külső kód (saját `composer.json`,
-`package.json` vagy `LICENSE` fájlos almappa, vagy `vendors/`, `third_party/`, `extensions/`, `libs/` jellegű mappa) és
-a build-kimenet (`dist/`, `build/`, `*.min/`, minifikált fájlok) nem számít: egy sor mondja meg, hány fájl maradt ki és
-honnan (a `profile --with-vendor` mégis beszámolja őket); a lekérdezések ezeket a fájlokat is látják. Az `event`, a
-`listener` és a `job` réteghez bizonyíték kell a kódban (Event / Listener ősosztály, a Laravel `Dispatchable` vagy
-`ShouldQueue`, `handle(…)` metódus a `Listeners` névtérben) — egy csak `Event` nevű mappa nem event-réteg.
+`package.json` vagy `LICENSE` fájlos almappa, `vendors/`, `third_party/`, `extensions/`, `libs/` jellegű mappa, vagy egy
+bemásolt framework-mag: CodeIgniter `system/`, Yii `framework/`, Kohana `system/`) és a build-kimenet (`dist/`, `build/`,
+`*.min/`, minifikált fájlok) nem számít: egy sor mondja meg, hány fájl maradt ki és honnan (a `profile --with-vendor`
+mégis beszámolja őket); a lekérdezések ezeket a fájlokat is látják. Az `event`, a `listener`, a `job`, a `mail` és a
+`notification` réteghez bizonyíték kell a kódban (Event / Listener ősosztály, a Laravel `Dispatchable` vagy
+`ShouldQueue`, `handle(…)` metódus a `Listeners` névtérben, `extends Mailable` / `extends Notification`) — egy csak
+`Event` nevű mappa nem event-réteg. Egy enum soha nem kap szerepet a nevéből (a `PaymentProvider` nem provider); az
+`Enums` mappa `enum`-ként látszik. Az `irány:` sor csak a ténylegesen egymást hívó rétegeket köti össze; a mellékág
+`;` után jön, pl. `irány: controller → service → model; command → service`.
+
+Egy nagy almappa, amelyet a profil egyáltalán ne nézzen (az egész alkalmazás egy régi másolata, egy bemásolt régi
+eszköz, pl. `sn_monitoring/`), egy útvonal-sorral kihagyható a `.callgraphignore`-ban (`sn_monitoring/`); ilyenkor
+minden lekérdezésből is eltűnik.
 
 A rétegek a lekérdezésekben (mind kapcsolóra, az alapkimenet nem változik):
 
@@ -318,7 +330,9 @@ bash ~/.claude/skills/callgraph/callgraph.sh app --grep 'Repo::find' --depth 2 -
 
 A `--by-layer` a hívott metódushoz legközelebbi réteget teszi előre (model → repository → service → controller), és
 minden csoport egy `[service]  3 hívás` jellegű fejléccel kezdődik, a rövid és a hosszú `--grep` nézetben egyaránt
-(`--depth`-tel minden szinten).
+(`--depth`-tel minden szinten). A réteg-kapcsolók pontosan úgy sorolják be a fájlokat, mint a `profile` (ugyanazzal a
+kódbeli bizonyítékkal, a projekt-térképből); térkép nélkül (`CALLGRAPH_NO_GRAPH=1`) a bizonyítékot kívánó mappa (pl.
+`Event`) a következő szerepet adja (`app/Services/Event/X.php` → `service`).
 
 Semmitmondó (vagy nem angol) mappanevek? Egy commitolható `.callgraph-layers` fájl a projekt gyökerében
 hozzárendeli őket: `service = app/Szolgaltatasok, app/Logic`, `ignore-role = app/Legacy`.

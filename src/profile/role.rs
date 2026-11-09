@@ -57,6 +57,8 @@ pub(crate) static ROLES: &[RoleInfo] = &[
     role("event", Kind::Layer, 5, None),
     role("service", Kind::Layer, 6, None),
     role("api", Kind::Layer, 7, None),
+    role("mail", Kind::Layer, 7, None),
+    role("notification", Kind::Layer, 7, None),
     role("repository", Kind::Layer, 8, Some("Repository")),
     role("dto", Kind::Layer, 8, Some("DTO")),
     role("model", Kind::Layer, 9, None),
@@ -73,6 +75,7 @@ pub(crate) static ROLES: &[RoleInfo] = &[
     role("provider", Kind::Support, 1, None),
     role("migration", Kind::Support, 10, None),
     role("config", Kind::Support, 10, None),
+    role("enum", Kind::Support, 10, None),
     role("test", Kind::Support, 11, None),
 ];
 
@@ -80,8 +83,9 @@ pub(crate) static ROLES: &[RoleInfo] = &[
 /// `controllers/event` alrendszer): a profilban csak kód-jellel (őse / interfésze / traitje, Listeners-névtérben
 /// `handle(…)`) kapják meg a szerepet, a mappa- vagy fájlnév egyedül nem elég — különben a következő jel dönt
 /// (`app/Services/Event` → service). A `policy` nem ilyen: a Laravel 10+ policy-kban nincs megbízható kód-jel, a
-/// `Policies` mappa pedig erős konvenció.
-pub(crate) const CODE_SIGNAL_ROLES: &[&str] = &["event", "listener", "job"];
+/// `Policies` mappa pedig erős konvenció. A `mail` / `notification` (Laravel `Mailable` / `Notification`) ugyanígy: egy
+/// levelező alkalmazás `Mail` mappája domain-kód is lehet.
+pub(crate) const CODE_SIGNAL_ROLES: &[&str] = &["event", "listener", "job", "mail", "notification"];
 
 /// Többes számú / rokon alakok a felhasználói bemenethez (`--layer`, `.callgraph-layers`).
 const ALIASES: &[(&str, &str)] = &[

@@ -19,7 +19,7 @@ use crate::i18n::Lang;
 use crate::index::TypeHierarchy;
 use crate::model::FileGraph;
 
-fn entries(paths: &[&str]) -> Vec<FileEntry> {
+pub(super) fn entries(paths: &[&str]) -> Vec<FileEntry> {
     let c = Classifier::default();
     paths
         .iter()
@@ -33,7 +33,7 @@ fn entries(paths: &[&str]) -> Vec<FileEntry> {
         .collect()
 }
 
-fn graph(value: serde_json::Value) -> FileGraph {
+pub(super) fn graph(value: serde_json::Value) -> FileGraph {
     let mut base = json!({
         "file": "x", "framework": null, "namespace": null, "imports": {}, "containers": [],
         "properties": [], "constants": [], "methods": [], "calls": [], "comments": [],
@@ -45,12 +45,12 @@ fn graph(value: serde_json::Value) -> FileGraph {
     serde_json::from_value(base).unwrap()
 }
 
-fn call(container: &str, resolved: &str) -> serde_json::Value {
+pub(super) fn call(container: &str, resolved: &str) -> serde_json::Value {
     json!({"container": container, "caller": "run", "line": 3, "type": "method",
         "target": "x", "resolved": resolved, "category": "internal"})
 }
 
-fn class(name: &str) -> serde_json::Value {
+pub(super) fn class(name: &str) -> serde_json::Value {
     json!({"type": "class", "name": name, "line": 1, "endLine": 9, "doc": null})
 }
 
@@ -212,7 +212,7 @@ fn event_listener_and_job_need_a_code_signal() {
             .fallback
             .map(|f| f.role.map(Role::name))
     };
-    // az út egyedül (a `--layer` szűrő) a mappanevet adja; a profil tartaléka a következő jel
+    // az út egyedül a mappanevet adja; a profil (és gráf nélkül a réteg-kapcsolók) tartaléka a következő jel
     assert_eq!(role("app/Services/Event/Planner.php"), Some("event"));
     assert_eq!(
         fallback("app/Services/Event/Planner.php"),
@@ -245,7 +245,12 @@ fn event_listener_and_job_need_a_code_signal() {
     let hierarchy = TypeHierarchy::from_graphs([&shipped, &listener, &plain]);
     let settled = |rel: &str, file_graph: &FileGraph| {
         let mut entry = entries(&[rel]).remove(0);
-        settle(&mut entry, Some(file_graph), &hierarchy);
+        settle(
+            &mut entry,
+            Some(file_graph),
+            &hierarchy,
+            &Classifier::default(),
+        );
         (entry.class.role.map(Role::name), entry.confirmed)
     };
     let (event, label) = settled("app/Events/OrderShipped.php", &shipped);

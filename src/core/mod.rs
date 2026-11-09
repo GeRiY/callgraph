@@ -5,5 +5,5 @@ mod recovery;
 mod source;
 
 pub use chain::{Chain, Rule};
-pub use recovery::{clamp_to_content, prefix_cuts};
+pub use recovery::{clamp_to_content, prefix_cuts, recover_segments};
 pub use source::SourceFile;

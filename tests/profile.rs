@@ -34,6 +34,11 @@ impl Project {
     }
 
     fn command(&self, args: &[&str], lang: &str) -> Output {
+        self.command_env(args, lang, &[])
+    }
+
+    /// Mint a `command`, további környezeti változókkal (pl. `CALLGRAPH_NO_GRAPH=1`).
+    fn command_env(&self, args: &[&str], lang: &str, env: &[(&str, &str)]) -> Output {
         Command::new(env!("CARGO_BIN_EXE_callgraph"))
             .args(args)
             .arg("--project")
@@ -43,6 +48,7 @@ impl Project {
             .env("CALLGRAPH_UPDATE_CHECK", "0")
             .env("CALLGRAPH_REGISTRY", "/nonexistent/projects.json")
             .env_remove("CALLGRAPH_NO_GRAPH")
+            .envs(env.iter().copied())
             .output()
             .expect("callgraph runs")
     }
@@ -583,4 +589,87 @@ fn unknown_layer_is_a_user_error_without_error_id() {
     assert!(!stderr.contains("error-id"), "{stderr}");
     assert!(!skill.join("errors.jsonl").exists());
     let _ = fs::remove_dir_all(&skill);
+}
+
+const LANGUAGE_MODEL: &str = "<?php\nnamespace App\\Models;\n\nuse Illuminate\\Database\\Eloquent\\Model;\n\nclass Language extends Model\n{\n    public static function default(): string\n    {\n        return 'en';\n    }\n}\n";
+
+/// Egy `Event` domain-mappa (Actions / Services alatt), egy valódi Laravel-esemény, egy Mailable és egy PHP-enum.
+fn events_domain() -> Project {
+    Project::new(&[
+        (
+            "composer.json",
+            "{\"require\": {\"laravel/framework\": \"^11\"}}\n",
+        ),
+        ("app/Models/Language.php", LANGUAGE_MODEL),
+        (
+            "app/Actions/Event/CreateEventAction.php",
+            "<?php\nnamespace App\\Actions\\Event;\n\nuse App\\Models\\Language;\n\nclass CreateEventAction\n{\n    public function run(): string\n    {\n        return Language::default();\n    }\n}\n",
+        ),
+        (
+            "app/Services/Event/EventPresenter.php",
+            "<?php\nnamespace App\\Services\\Event;\n\nuse App\\Models\\Language;\n\nclass EventPresenter\n{\n    public function show(): string\n    {\n        return Language::default();\n    }\n}\n",
+        ),
+        (
+            "app/Events/OrderShipped.php",
+            "<?php\nnamespace App\\Events;\n\nuse App\\Models\\Language;\nuse Illuminate\\Foundation\\Events\\Dispatchable;\n\nclass OrderShipped\n{\n    use Dispatchable;\n\n    public function lang(): string\n    {\n        return Language::default();\n    }\n}\n",
+        ),
+        (
+            "app/Mail/OrderMail.php",
+            "<?php\nnamespace App\\Mail;\n\nuse Illuminate\\Mail\\Mailable;\n\nclass OrderMail extends Mailable\n{\n}\n",
+        ),
+        (
+            "app/Enums/PaymentProvider.php",
+            "<?php\nnamespace App\\Enums;\n\nenum PaymentProvider: string\n{\n    case Stripe = 'stripe';\n}\n",
+        ),
+        (
+            "app/Support/ShippingProvider.php",
+            "<?php\nnamespace App\\Support;\n\nenum ShippingProvider: string\n{\n    case Dhl = 'dhl';\n}\n",
+        ),
+    ])
+}
+
+#[test]
+fn layer_switches_classify_like_the_profile() {
+    let project = events_domain();
+    let profile = project.run(&["profile", "--full"]);
+    assert!(profile.contains("  event "), "{profile}");
+    assert!(profile.contains("  mail "), "{profile}");
+    assert!(
+        profile.contains("confirmed 1: extends Mailable"),
+        "{profile}"
+    );
+    // enum: a név (`*Provider`) nem szerep; az `Enums` mappa a saját (kiszolgáló) szerepe
+    assert!(profile.contains("  enum "), "{profile}");
+    assert!(!profile.contains("  provider "), "{profile}");
+    let args = ["show", "app", "--grep", "Language::default", "--by-layer"];
+    let out = project.run(&args);
+    assert!(out.contains("[service]  2 calls\n"), "{out}");
+    assert!(out.contains("[event]  1 call\n"), "{out}");
+    // gráf nélkül a profil tartalék-szabálya: kód-jel nélkül nincs event
+    let no_graph = project.command_env(&args, "en", &[("CALLGRAPH_NO_GRAPH", "1")]);
+    let no_graph = String::from_utf8(no_graph.stdout).unwrap();
+    assert!(no_graph.contains("[service]  2 calls\n"), "{no_graph}");
+    assert!(!no_graph.contains("[event]"), "{no_graph}");
+    // --layer event: csak a valódi esemény
+    let events = project.run(&["show", "app", "--layer", "event", "--full"]);
+    assert!(events.contains("OrderShipped"), "{events}");
+    assert!(!events.contains("CreateEventAction"), "{events}");
+    assert!(!events.contains("EventPresenter"), "{events}");
+    // callers --by-layer: a JSON `layer` mezője is
+    let callers = project.run(&["callers", "Language::default", "--by-layer"]);
+    let layers: Vec<String> = callers
+        .lines()
+        .filter_map(|l| serde_json::from_str::<serde_json::Value>(l).ok())
+        .filter_map(|v| v["layer"].as_str().map(str::to_owned))
+        .collect();
+    assert_eq!(
+        layers.iter().filter(|l| *l == "event").count(),
+        1,
+        "{callers}"
+    );
+    assert_eq!(
+        layers.iter().filter(|l| *l == "service").count(),
+        2,
+        "{callers}"
+    );
 }

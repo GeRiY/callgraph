@@ -13,6 +13,13 @@ use crate::project::{Project, ProjectLocator, ProjectStore};
 /// Szintaktikai hibás fájl: gyökérhez relatív út és az első hiba sora.
 type BrokenFile = (String, u32);
 
+/// A hívók, a hibás fájlok és (`--by-layer`) a rétegek osztályozója.
+type Callers = (
+    Vec<crate::index::CallerRow>,
+    Vec<BrokenFile>,
+    Option<crate::profile::LayerScope>,
+);
+
 /// A projekten belüli, minta szerinti hívókat JSONL-ként írja ki.
 pub struct CallersCommand {
     pattern: String,
@@ -56,11 +63,9 @@ impl CallersCommand {
 
     /// A projekt-gráfból (`.callgraph/`, a folyamatban közös példány) a minta hívói; előtte a gráf
     /// naprakészre hozva: csak a változott fájlok elemződnek újra, a törölt / átnevezett fájlok kikerülnek.
-    /// Mellé a szintaktikai hibás fájlok (gyökérhez relatív út, az első hiba sora) a figyelmeztetéshez.
-    fn callers(
-        &self,
-        project: &Project,
-    ) -> Result<(Vec<crate::index::CallerRow>, Vec<BrokenFile>)> {
+    /// Mellé a szintaktikai hibás fájlok (gyökérhez relatív út, az első hiba sora) a figyelmeztetéshez, és
+    /// `--by-layer`-nél a rétegek a profillal azonos besorolással (a frissített gráfból).
+    fn callers(&self, project: &Project) -> Result<Callers> {
         let store = ProjectStore::new(project);
         store.ensure()?;
         let analyzer = Analyzer::with_defaults();
@@ -86,9 +91,18 @@ impl CallersCommand {
                 crate::query::format::parse_issue(project.root(), file, stored)
             })
             .collect();
+        let scope = if self.by_layer {
+            let mut scope = crate::profile::LayerScope::new(project.root(), None, true)
+                .map_err(crate::error::CallgraphError::Usage)?;
+            scope.settle_with(&files, graph);
+            Some(scope)
+        } else {
+            None
+        };
         Ok((
             graph.caller_index().callers(&self.pattern, self.depth)?,
             issues,
+            scope,
         ))
     }
 }
@@ -96,19 +110,17 @@ impl CallersCommand {
 impl Command for CallersCommand {
     fn run(&self, out: &mut dyn Write, _err: &mut dyn Write) -> Result<i32> {
         let project = self.root();
-        let (mut rows, issues) = self.callers(&project)?;
+        let (mut rows, issues, scope) = self.callers(&project)?;
         // a JSONL-kimenet gépi: a szintaktikai hibás fájlok figyelmeztetése a hibakimenetre megy (kilépési kód: 0)
         let warning = crate::query::format::parse_trailer(&issues, crate::i18n::lang());
         _err.write_all(warning.as_bytes())?;
-        if !self.by_layer {
+        let Some(scope) = scope else {
             for row in rows {
                 serde_json::to_writer(&mut *out, &row)?;
                 writeln!(out)?;
             }
             return Ok(0);
-        }
-        let scope = crate::profile::LayerScope::new(project.root(), None, true)
-            .map_err(crate::error::CallgraphError::Usage)?;
+        };
         // stabil rendezés: szinten belül a réteg, azon belül az eredeti sorrend
         rows.sort_by_key(|row| (row.level, scope.order_key(&row.file)));
         for row in &rows {

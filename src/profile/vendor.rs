@@ -6,12 +6,15 @@
 //!   alatta lévő első mappa: `extensions/Facebook`), vagy egy almappa (nem a gyökér) saját könyvtár-`composer.json`-nal
 //!   (nem `"type": "project"`, nincs a gyökér `replace` listájában, és más a vendor-előtagja, mint a gyökéré), saját,
 //!   nem privát, verziózott `package.json`-nal (más a scope-ja, mint a gyökéré), vagy — manifest nélkül — saját
-//!   licencfájllal (`LICENSE`, `LICENCE`, `COPYING`). A gyökér `package.json` `workspaces` és a `composer.json`
+//!   licencfájllal (`LICENSE`, `LICENCE`, `COPYING`), vagy egy bemásolt framework-mag (CodeIgniter `system/`, Yii
+//!   `framework/`, Kohana `system/`; `framework_copy.rs`). A gyökér `package.json` `workspaces` és a `composer.json`
 //!   `path`-repository mappái a projekt saját kódja.
 //! - generált: `dist`, `build`, `*.min` nevű mappa (`assets.min`); a gráfban `binary` jelölésű (minifikált) fájl.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+
+use super::framework_copy::{FRAMEWORK_VENDORS, is_framework_core};
 
 /// Mappanevek (kisbetűvel), amelyek alatt külső kód van; az egység a név alatti első mappa.
 const VENDOR_NAMES: &[&str] = &[
@@ -134,8 +137,15 @@ impl Skipper {
             return *known;
         }
         let dir = self.root.join(prefix);
+        // bemásolt framework-mag (`framework_copy`): a manifest előtt, de nem a framework saját repójában
+        let framework_repo = self
+            .root_vendor
+            .as_deref()
+            .is_some_and(|v| FRAMEWORK_VENDORS.contains(&v));
         // a manifest dönt (egy saját, felosztott csomag mellett is lehet licenc); manifest nélkül a licenc
-        let found = if let Some(json) = read_json(&dir.join("composer.json")) {
+        let found = if !framework_repo && is_framework_core(&dir) {
+            true
+        } else if let Some(json) = read_json(&dir.join("composer.json")) {
             self.foreign_composer(&json)
         } else if let Some(json) = read_json(&dir.join("package.json")) {
             self.foreign_package(&json)
@@ -291,6 +301,9 @@ mod tests {
         );
         write("packages/ui/LICENSE", "MIT");
         write("modules/billing/LICENSE", "MIT");
+        // bemásolt framework-mag: csak a mag marad ki, az alkalmazás-kód mellette nem
+        write("legacy/legacy/system/CodeIgniter.php", "<?php\n");
+        write("legacy/legacy/index.php", "<?php\n");
         let mut skipper = Skipper::new(&root, true);
         let vendor = |s: &str| Some(Skip::Vendor(s.to_owned()));
         assert_eq!(
@@ -317,6 +330,14 @@ mod tests {
         assert_eq!(
             skipper.skip("frontend/dist/app.js"),
             Some(Skip::Generated("frontend/dist".into()))
+        );
+        assert_eq!(
+            skipper.skip("legacy/legacy/system/Commands/Make.php"),
+            vendor("legacy/legacy/system")
+        );
+        assert_eq!(
+            skipper.skip("legacy/legacy/application/controllers/Home.php"),
+            None
         );
         // a projekt saját kódja: azonos vendor-előtag, "project" típus, privát csomag, workspace, path-repository
         for own in [

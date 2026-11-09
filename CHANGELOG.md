@@ -5,6 +5,40 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+## [0.5.3] — 2026-11-09
+
+### Added
+- **`--strict` for CI:** a file with a syntax error still gives exit code 0 by default (the partial map is useful).
+  With `--strict` (or `CALLGRAPH_STRICT=1`), `show` (file, folder, `--grep`), `locate` and `profile` exit with code 3
+  when a file they read has a syntax error; the output is the same.
+- **`mail` and `notification` layers:** Laravel mail classes (`extends Mailable`, usually in `app/Mail`) and
+  notifications (`extends Notification`) get their own layer instead of "unknown". Like `event`, they need this proof
+  in the code: a folder that is just named `Mail` is not enough.
+
+### Changed
+- **The `flow:` line only shows real call pairs:** every `A → B` in the chain now means A really calls B. A layer
+  that only calls into the middle of the chain is shown as a side branch, e.g.
+  `flow: controller → service → model; command → service` (before: `controller → command → service → model`, although
+  controllers never call commands).
+- **Enums get no role from their name:** `app/Enums/PaymentProvider.php` was a "provider" just because of its name.
+  An enum (PHP, TS, Rust, Swift) never gets a role from its name now; an `Enums` folder is shown as `enum`.
+- **Copied framework cores are skipped like vendor code:** a framework copied into a legacy project (CodeIgniter
+  `system/`, Yii `framework/`, Kohana `system/`) no longer adds `command` / `handler` / `request` layers to the
+  profile. Only the framework core is skipped, the application code next to it still counts. A big subtree you want
+  left out completely can go into `.callgraphignore` as a path (`sn_monitoring/`).
+
+### Fixed
+- **Syntax errors no longer hide the code after them (JS / TS / Vue, Rust):** before, only the functions before the
+  error were mapped; in a Vue `<script setup>` an error in the first function could leave nothing. Now mapping goes
+  on from the next top-level function, class or item, with the right line numbers; only the broken part is missing.
+- **`--layer` / `--layers` / `--by-layer` now agree with the profile:** they classified files from folder names only,
+  so `app/Actions/Event/*Action.php` showed up as `[event]` although the profile did not list an event layer. They now
+  use the same rules and code proof as `profile` (from the project map; without it, a folder like `Event` gives the
+  next role, e.g. `service`). Files skipped as vendor or build output get no layer here either.
+- **`callgraph.sh --project <dir>`:** a folder path (absolute or relative) now works with every command, without
+  registering it; before, file queries said "No projects.json — register a project first". An unknown alias still
+  gives an error.
+
 ## [0.5.2] — 2026-11-09
 
 ### Added
@@ -356,7 +390,8 @@ First release.
 - Built-in update: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Prebuilt packages for macOS (arm64, x86_64), Linux (x86_64, ARM64, static musl) and Windows.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.5.2...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.5.3...develop
+[0.5.3]: https://github.com/GeRiY/callgraph/releases/tag/v0.5.3
 [0.5.2]: https://github.com/GeRiY/callgraph/releases/tag/v0.5.2
 [0.5.1]: https://github.com/GeRiY/callgraph/releases/tag/v0.5.1
 [0.5.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.5.0

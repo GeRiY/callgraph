@@ -116,7 +116,7 @@ impl Command for ShowCommand {
             let trailer = parse_trailer(&engine, &rows, &text, true);
             text.push_str(&trailer);
             write!(out, "{}", engine.relativize(&text))?;
-            return Ok(0);
+            return Ok(strict_code(&engine));
         }
         if self.layers.by_layer {
             engine.sort_by_layer(&mut rows);
@@ -133,7 +133,7 @@ impl Command for ShowCommand {
             let trailer = parse_trailer(&engine, &rows, &text, true);
             text.push_str(&trailer);
             write!(out, "{}", engine.relativize(&text))?;
-            return Ok(0);
+            return Ok(strict_code(&engine));
         }
         if self.body
             || (self.format == "outline"
@@ -192,7 +192,7 @@ impl Command for ShowCommand {
             text.push_str(&trailer);
             write!(out, "{}", engine.relativize(&text))?;
         }
-        Ok(0)
+        Ok(strict_code(&engine))
     }
 }
 
@@ -293,6 +293,12 @@ fn parse_trailer(
     }
     trailer.push_str(&crate::query::format::parse_trailer(&issues, lang));
     trailer
+}
+
+/// A sikeres futás kilépési kódja: `--strict` / `CALLGRAPH_STRICT=1` mellett 3, ha egy beolvasott fájl szintaktikai
+/// hibás (a kimenet ugyanaz).
+fn strict_code(engine: &QueryEngine) -> i32 {
+    crate::cli::strict::exit_code(!engine.parse_issues().is_empty())
 }
 
 fn lines_error(value: &str) -> String {

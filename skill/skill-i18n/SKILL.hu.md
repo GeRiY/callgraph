@@ -16,8 +16,8 @@ bash <skill>/projects.sh add myapp /abszolút/út/a/projekt/gyökeréhez
 bash <skill>/projects.sh list
 ```
 
-Utána `--project myapp` mellett a gyökérhez képesti rövid út adható meg. `--project` nélkül az aktuális
-mappa a gyökér.
+Utána `--project myapp` mellett a gyökérhez képesti rövid út adható meg; a `--project <mappa>` (létező mappa,
+abszolút vagy relatív) regisztráció nélkül is működik. `--project` nélkül az aktuális mappa a gyökér.
 
 ## 1. lépés — honnan induljak: `locate` (a feladat első hívása)
 
@@ -101,9 +101,15 @@ adja, a `--layer controller:js` (vagy `"controller (js)"`) csak az egyiket. A pr
 `composer.json` / `package.json` / `LICENSE` fájlos almappa, vagy `vendors/`, `third_party/`, `extensions/`,
 `external/`, `libs/`) és a build-kimenet (`dist/`, `build/`, `*.min/`, minifikált fájlok) kimarad a profilból — erről
 egy `vendor: N fájl kihagyva (…)` sor szól; a lekérdezések ezeket is látják (`profile --with-vendor`: a profil is
-számol velük). Az `event`, `listener` és `job` réteghez kód-jel kell (Event / Listener ősosztály vagy interfész,
-`Dispatchable`, `ShouldQueue`, `handle(…)` a `Listeners` névtérben); egy `Event` nevű mappa magában nem event-réteg.
-A réteg magától soha nem rejt el találatot: csak a `--layer` szűr, a `--layers` / `--by-layer` csak csoportosít és
+számol velük); egy bemásolt framework-mag (CodeIgniter `system/`, Yii `framework/`, Kohana `system/`) is vendor-kódnak
+számít. Az `event`, `listener`, `job`, `mail` és `notification` réteghez kód-jel kell (Event / Listener ősosztály vagy
+interfész, `Dispatchable`, `ShouldQueue`, `handle(…)` a `Listeners` névtérben, `extends Mailable` / `Notification`); egy
+`Event` nevű mappa magában nem event-réteg. Egy enum a nevéből nem kap szerepet (a `PaymentProvider` nem provider); az
+`Enums` mappa `enum`. A `--layer`, a `--layers` és a `--by-layer` pontosan úgy sorol be, mint a profil. Az `irány:` sor
+csak a ténylegesen egymást hívó rétegeket köti össze, a mellékág `;` után jön (`controller → service → model; command
+→ service`). Egy nagy almappa, amelyet a profil ne nézzen (az alkalmazás régi másolata, pl. `sn_monitoring/`): egy
+útvonal-sor a `.callgraphignore`-ban (`sn_monitoring/`) — ilyenkor minden lekérdezésből is eltűnik. A réteg magától
+soha nem rejt el találatot: csak a `--layer` szűr, a `--layers` / `--by-layer` csak csoportosít és
 sorrendez. A `--by-layer` a hívásokat (`--depth`-tel szintenként) rétegenként csoportosítja, a hívotthoz legközelebbi
 réteg elöl (a hívásirányban a legmélyebb: model → repository → service → controller), minden csoport előtt egy
 `[service]  3 hívás` fejléccel. Saját mappanevek: `.callgraph-layers` a projekt gyökerében (`service = app/Logic`,
@@ -270,3 +276,7 @@ osztálynév / regisztrált komponens nem oldható fel. A `--depth` alapból csa
 a név szerinti egyezést a `--guess` mutatja „?” jellel. A pontos vezérlési logikához a `--body` kell (tömör, kommentekkel; a `--raw` a pontos szöveget adja).
 A `⚠ szintaktikai hiba` sor: egy fájl nem elemezhető teljesen, az eredmény hiányos lehet — azt a fájlt olvasd közvetlenül.
 <!-- /mcp -->
+A hibás rész előtti és utáni kód a térképen van (JS / TS / Vue, Rust: a következő felső szintű függvénytől,
+osztálytól, elemtől); csak a hibás rész hiányzik. A kilépési kód 0 marad; CI-ben add hozzá a `--strict` kapcsolót
+(vagy `CALLGRAPH_STRICT=1`): a `show`, a `locate` és a `profile` ilyenkor 3-as kóddal lép ki, ha egy beolvasott fájl
+szintaktikai hibás, a kimenet ugyanaz.

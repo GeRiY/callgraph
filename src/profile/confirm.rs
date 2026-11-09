@@ -1,9 +1,9 @@
 //! C jel: megerősítés a már kész gráfból — az öröklés / interfész / trait (közvetlen és a hatókör
 //! típus-hierarchiáján át tranzitív ősök), néhány árulkodó hívás (Vue / Pinia `defineStore`), és egy névtérben lévő
 //! metódus (Laravel listener: `handle(OrderShipped $e)` a `Listeners` névtérben). Általában csak megerősít (a
-//! bizonyosság magasra nő); a kód-jelet kívánó szerepeknél (`event`, `listener`, `job`) a profil megerősítés nélkül
-//! a tartalék besorolást használja (`Classification::fallback`). A `--layer` szűrő (csak az út) ezeket a mappanévből
-//! adja.
+//! bizonyosság magasra nő); a kód-jelet kívánó szerepeknél (`event`, `listener`, `job`, `mail`, `notification`) a
+//! profil megerősítés nélkül a tartalék besorolást használja (`Classification::fallback`) — a réteg-kapcsolók
+//! (`--layer`, `--by-layer`) ugyanígy. A csak enumot tartalmazó fájl (`enum_only`) neve nem ad szerepet.
 
 use std::collections::HashSet;
 
@@ -114,6 +114,13 @@ pub(crate) static CONFIRM_RULES: &[ConfirmRule] = &[
         "listeners",
         "handle(…) in Listeners",
     ),
+    rule("mail", &["mailable"], &[], "extends Mailable"),
+    rule(
+        "notification",
+        &["notification"],
+        &[],
+        "extends Notification",
+    ),
     rule("command", &["command"], &[], "extends Command"),
     rule(
         "provider",
@@ -177,6 +184,23 @@ pub(crate) fn confirm(
                 || method_signal(rule, graph)
         })
         .map(|rule| rule.label)
+}
+
+/// Csak enum(ok) van-e a fájlban: PHP / Rust / Swift-nél minden típus `enum` (az `impl` / `extension` blokkok és a
+/// fájl-szintű modul nem számít), TS-nél nincs osztály és függvény, csak `enum` tagjai (`enum_case` konstansok).
+pub(crate) fn enum_only(graph: &FileGraph) -> bool {
+    let types: Vec<&str> = graph
+        .containers
+        .iter()
+        .map(|c| c.kind.as_str())
+        .filter(|kind| !matches!(*kind, "module" | "component" | "impl" | "extension"))
+        .collect();
+    if !types.is_empty() {
+        return types.iter().all(|kind| *kind == "enum");
+    }
+    graph.methods.is_empty()
+        && !graph.constants.is_empty()
+        && graph.constants.iter().all(|c| c.kind == "enum_case")
 }
 
 /// A szabály metódus-jele: a névtér egyik szegmense (kisbetűvel) a megadott, és van ilyen nevű, paraméteres metódus.

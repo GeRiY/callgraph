@@ -1,5 +1,6 @@
 //! Szintaktikai hibás fájlok: a hiba mindig látszik (`⚠` sor a `FILE` alatt, záró sor a több fájlos / `--grep`
-//! kimenetben, `parseErrors` a JSON-ban), a hiba előtti ép rész megmarad (JS / TS / Vue / Rust), a kilépési kód 0.
+//! kimenetben, `parseErrors` a JSON-ban), a hiba előtti és utáni ép rész megmarad (JS / TS / Vue / Rust), a kilépési
+//! kód 0 (`--strict` / `CALLGRAPH_STRICT=1`: 3).
 //! A projekt-gráffal, gráf nélkül (`CALLGRAPH_NO_GRAPH=1`) és meleg gráffal (második futás) ugyanígy.
 
 use std::fs;
@@ -19,6 +20,18 @@ struct Project(PathBuf);
 
 impl Project {
     fn new() -> Self {
+        let project = Self::empty();
+        project.write("src/tail.js", TAIL);
+        project.write("src/tail.ts", TAIL);
+        project.write("src/k.php", PHP);
+        project.write("src/r.rs", RUST);
+        project.write("src/s.swift", SWIFT);
+        project.write("src/v.vue", VUE);
+        project.write("src/ok.js", "export function ok() { return 1 }\n");
+        project
+    }
+
+    fn empty() -> Self {
         let id = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
@@ -32,15 +45,7 @@ impl Project {
             }
         ));
         fs::create_dir_all(root.join("src")).unwrap();
-        let project = Self(root.canonicalize().unwrap());
-        project.write("src/tail.js", TAIL);
-        project.write("src/tail.ts", TAIL);
-        project.write("src/k.php", PHP);
-        project.write("src/r.rs", RUST);
-        project.write("src/s.swift", SWIFT);
-        project.write("src/v.vue", VUE);
-        project.write("src/ok.js", "export function ok() { return 1 }\n");
-        project
+        Self(root.canonicalize().unwrap())
     }
 
     fn write(&self, rel: &str, text: &str) {
@@ -48,6 +53,11 @@ impl Project {
     }
 
     fn command(&self, args: &[&str], graph: bool) -> Output {
+        self.command_env(args, graph, &[])
+    }
+
+    /// Mint a `command`, további környezeti változókkal.
+    fn command_env(&self, args: &[&str], graph: bool, env: &[(&str, &str)]) -> Output {
         let mut command = Command::new(env!("CARGO_BIN_EXE_callgraph"));
         command
             .args(args)
@@ -57,10 +67,12 @@ impl Project {
             .env("CALLGRAPH_LANG", "en")
             .env("CALLGRAPH_UPDATE_CHECK", "0")
             .env("CALLGRAPH_STATS", "0")
+            .env_remove("CALLGRAPH_STRICT")
             .env_remove("CALLGRAPH_NO_GRAPH");
         if !graph {
             command.env("CALLGRAPH_NO_GRAPH", "1");
         }
+        command.envs(env.iter().copied());
         command.output().expect("callgraph runs")
     }
 
@@ -243,5 +255,103 @@ fn valid_files_have_no_warning() {
         assert!(!out.contains('⚠'), "{mode}: {out}");
         let grep = project.run(&["show", "src/ok.js", "--grep", "ok"], graph);
         assert!(!grep.contains("syntax error"), "{mode}: {grep}");
+    }
+}
+
+const BAD: &str = "export function ok() { return 1 }\nexport function broken( { return x + ; }\nexport function after() { return 2 }\n";
+const TWO: &str = "export function a() { return 1 }\nexport function b( { return 2 }\nexport function c() { return 3 }\nexport function d( { return 4 }\nexport function e() { return 5 }\n";
+const VUE_FIRST: &str = "<template><div/></template>\n<script setup>\nfunction a( { return 1 }\nfunction b() { return 2 }\nfunction c() { return 3 }\n</script>\n";
+const MULTI: &str = "export function a() {\n  return 1\n}\n\nexport function b(x) {\n  return x + ;\n}\n\nexport function c() {\n  return 3\n}\n";
+
+fn recovery_project() -> Project {
+    let project = Project::empty();
+    project.write("src/bad.js", BAD);
+    project.write("src/bad.ts", BAD);
+    project.write("src/two.js", TWO);
+    project.write("src/first.vue", VUE_FIRST);
+    project.write("src/multi.js", MULTI);
+    project
+}
+
+#[test]
+fn functions_after_the_error_are_kept_with_their_lines() {
+    let project = recovery_project();
+    for (graph, mode) in MODES {
+        for file in ["src/bad.js", "src/bad.ts"] {
+            let out = project.run(&["show", file], graph);
+            assert!(out.contains("  ok()  L1-1"), "{mode} {file}: {out}");
+            assert!(out.contains("  after()  L3-3"), "{mode} {file}: {out}");
+            assert!(!out.contains("broken()"), "{mode} {file}: {out}");
+            assert!(
+                out.contains("⚠ syntax error at L2: "),
+                "{mode} {file}: {out}"
+            );
+        }
+        let two = project.run(&["show", "src/two.js"], graph);
+        for (name, line) in [("a", 1), ("c", 3), ("e", 5)] {
+            assert!(
+                two.contains(&format!("  {name}()  L{line}-{line}")),
+                "{mode}: {two}"
+            );
+        }
+        assert!(
+            !two.contains("  b()") && !two.contains("  d()"),
+            "{mode}: {two}"
+        );
+        let multi = project.run(&["show", "src/multi.js"], graph);
+        assert!(
+            multi.contains("  a()  L1-3") && multi.contains("  c()  L9-11"),
+            "{mode}: {multi}"
+        );
+        // a hiba utáni függvény törzse is az eredeti sorokból jön
+        let body = project.run(&["show", "src/bad.js::after", "--body"], graph);
+        assert!(body.contains("return 2"), "{mode}: {body}");
+    }
+}
+
+#[test]
+fn vue_error_in_the_first_function_keeps_the_later_ones() {
+    let project = recovery_project();
+    for (graph, mode) in MODES {
+        let out = project.run(&["show", "src/first.vue"], graph);
+        assert!(out.contains("  b()  L4-4"), "{mode}: {out}");
+        assert!(out.contains("  c()  L5-5"), "{mode}: {out}");
+        assert!(out.contains("⚠ syntax error at L3: "), "{mode}: {out}");
+    }
+}
+
+#[test]
+fn strict_mode_exits_with_3_on_syntax_errors_and_keeps_the_output() {
+    let project = recovery_project();
+    project.write("src/ok.js", "export function ok() { return 1 }\n");
+    for (graph, mode) in MODES {
+        let plain = project.run(&["show", "src/bad.js"], graph);
+        let strict = project.command(&["show", "src/bad.js", "--strict"], graph);
+        assert_eq!(strict.status.code(), Some(3), "{mode}");
+        assert_eq!(
+            String::from_utf8_lossy(&strict.stdout).replace('\\', "/"),
+            plain
+        );
+        // env-ből is (CI)
+        let strict_env = [("CALLGRAPH_STRICT", "1")];
+        let env = project.command_env(&["show", ".", "--grep", "ok"], graph, &strict_env);
+        assert_eq!(env.status.code(), Some(3), "{mode}");
+        // ép fájl: 0 marad
+        let ok = project.command(&["show", "src/ok.js", "--strict"], graph);
+        assert_eq!(ok.status.code(), Some(0), "{mode}");
+        for args in [
+            &["show", "src", "--strict"][..],
+            &["show", ".", "--grep", "ok", "--strict"],
+            &["locate", "after", "--strict"],
+        ] {
+            let out = project.command(args, graph);
+            assert_eq!(out.status.code(), Some(3), "{mode} {args:?}");
+        }
+        // a profil a projekt-gráfból tudja a hibás fájlokat (gráf nélkül csak a nevekből dolgozik)
+        if graph {
+            let out = project.command(&["profile", "--strict"], graph);
+            assert_eq!(out.status.code(), Some(3), "{mode}");
+            assert_eq!(project.command(&["profile"], graph).status.code(), Some(0));
+        }
     }
 }

@@ -51,7 +51,8 @@ impl CliProbe {
     /// kategóriához: „nincs meg” / használat / egyéb; a szöveg nem tárolódik).
     pub fn finish<W: Write, E: Write>(self, result: &Result<i32>, out: &Meter<W>, err: &Meter<E>) {
         let outcome = match result {
-            Ok(0) => Outcome::Ok,
+            // `--strict`: a 3-as kód (szintaktikai hibás fájl) sikeres lekérdezés
+            Ok(0 | crate::cli::strict::STRICT_EXIT_CODE) => Outcome::Ok,
             Ok(_) => Outcome::Error(ErrorKind::of_message(&String::from_utf8_lossy(err.head()))),
             Err(error) => Outcome::Error(ErrorKind::of(error)),
         };

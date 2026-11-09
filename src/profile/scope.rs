@@ -1,8 +1,11 @@
-//! A lekérdezések réteg-kapcsolói (`--layer`, `--layers`, `--by-layer`): a fájl rétege (szerep + ökoszisztéma) az
-//! útjából, a lekérdezéskor számolva (nincs tárolt adat, nincs formátumváltás). A kód-jelet kívánó szerepeket
-//! (`event`, `listener`, `job`) itt a mappanév adja — gráf nélkül nincs mivel megerősíteni.
+//! A lekérdezések réteg-kapcsolói (`--layer`, `--layers`, `--by-layer`): a fájl rétege (szerep + ökoszisztéma) a
+//! profillal azonos besorolással, a lekérdezéskor számolva (nincs tárolt adat, nincs formátumváltás). A projekt-
+//! gráffal (`settle_with`) a kód-jelet kívánó szerepek (`event`, `listener`, `job`, `mail`, `notification`) és az
+//! enum-fájlok a gráfból döntenek, a vendor- és generált kód réteg nélküli; gráf nélkül (`CALLGRAPH_NO_GRAPH=1`) a
+//! profil tartalék-szabálya: kód-jel nélkül a következő jel (`Services/Event/X` → service).
 
 use std::cmp::Reverse;
+use std::collections::HashMap;
 use std::ops::Range;
 use std::path::{Path, PathBuf};
 
@@ -18,6 +21,8 @@ pub(crate) struct LayerScope {
     classifier: Classifier,
     filter: Vec<LayerFilter>,
     by_layer: bool,
+    /// A gráffal megerősített rétegek (`settle_with`), a gyökérhez relatív úttal; ami nincs benne, az útból jön.
+    settled: HashMap<String, Option<Layer>>,
 }
 
 /// A `--by-layer` rendezési kulcsa: előbb a hívásirányba számító rétegek (a hívotthoz legközelebbi, azaz a
@@ -58,7 +63,13 @@ impl LayerScope {
             classifier: Classifier::for_root(root),
             filter: layers,
             by_layer,
+            settled: HashMap::new(),
         })
+    }
+
+    /// A profil besorolása a projekt-gráfból (a hívó frissítette): `files` a gyökér kódfájljai (abszolút út).
+    pub(crate) fn settle_with(&mut self, files: &[PathBuf], graph: &crate::graph::ProjectGraph) {
+        self.settled = super::build::settled_layers(&self.root, files, graph);
     }
 
     /// Kért-e rétegek szerinti sorrendet (`--by-layer`).
@@ -72,12 +83,21 @@ impl LayerScope {
 
     /// Egy (abszolút vagy a gyökérhez relatív) út szerepe.
     pub(crate) fn role_of(&self, path: &Path) -> Option<Role> {
-        self.classifier.role_of(&self.rel(path))
+        self.layer_of(path).map(|layer| layer.role)
     }
 
-    /// Egy út rétege (szerep + ökoszisztéma).
+    /// Egy út rétege (szerep + ökoszisztéma): a gráffal megerősített, különben az útból — kód-jelet kívánó
+    /// szerepnél a tartalék besorolás (mint a gráf nélküli profilban).
     pub(crate) fn layer_of(&self, path: &Path) -> Option<Layer> {
-        self.classifier.layer_of(&self.rel(path))
+        let rel = self.rel(path);
+        if let Some(layer) = self.settled.get(&rel) {
+            return *layer;
+        }
+        let class = self.classifier.classify(&rel)?;
+        match &class.fallback {
+            Some(fallback) => fallback.layer(),
+            None => class.layer(),
+        }
     }
 
     /// Mint a `role_of`, a gráf-kulcs (az út szövegként) alapján.

@@ -89,12 +89,14 @@ impl Classifier {
         &self.overrides
     }
 
-    /// Csak a szerep (a szűrőhöz, a sorrendezéshez, a címkéhez).
+    /// Csak a szerep (tesztekhez; a lekérdezések a `LayerScope`-on át, a tartalék-szabállyal).
+    #[cfg(test)]
     pub(crate) fn role_of(&self, rel: &str) -> Option<Role> {
         self.classify(rel).and_then(|c| c.role)
     }
 
-    /// Csak a réteg (szerep + ökoszisztéma).
+    /// Csak a réteg (szerep + ökoszisztéma; tesztekhez).
+    #[cfg(test)]
     pub(crate) fn layer_of(&self, rel: &str) -> Option<Layer> {
         self.classify(rel).and_then(|c| c.layer())
     }
@@ -102,15 +104,27 @@ impl Classifier {
     /// A projekt-gyökérhez relatív, `/`-rel elválasztott út besorolása; `None`, ha nem kódfájl (CSS, JSON, MD…).
     /// Kód-jelet kívánó szerepnél a `fallback` is kitöltve (a `.callgraph-layers` hozzárendelésénél nem).
     pub(crate) fn classify(&self, rel: &str) -> Option<Classification> {
-        let mut class = self.classify_by(rel, false)?;
+        self.classify_with(rel, true)
+    }
+
+    /// Mint a `classify`, de a fájlnév (végződés, előtag, Rust-modulnév) nem dönt: egy csak enumot tartalmazó fájl
+    /// (`PaymentProvider` enum) neve nem szerep (a profil a gráf alapján hívja).
+    pub(crate) fn classify_without_name(&self, rel: &str) -> Option<Classification> {
+        self.classify_with(rel, false)
+    }
+
+    /// A tartalék-besorolás kitöltése kód-jelet kívánó szerepnél; `names`: számít-e a fájlnév.
+    fn classify_with(&self, rel: &str, names: bool) -> Option<Classification> {
+        let mut class = self.classify_by(rel, false, names)?;
         if class.reason != Reason::Override && class.role.is_some_and(Role::needs_code_signal) {
-            class.fallback = self.classify_by(rel, true).map(Box::new);
+            class.fallback = self.classify_by(rel, true, names).map(Box::new);
         }
         Some(class)
     }
 
-    /// A besorolás; `strict`: a kód-jelet kívánó szerepek mappa- és névszabályai nélkül.
-    fn classify_by(&self, rel: &str, strict: bool) -> Option<Classification> {
+    /// A besorolás; `strict`: a kód-jelet kívánó szerepek mappa- és névszabályai nélkül; `names`: a fájlnév-szabályok
+    /// is számítanak.
+    fn classify_by(&self, rel: &str, strict: bool, names: bool) -> Option<Classification> {
         let (dir, file) = rel.rsplit_once('/').unwrap_or(("", rel));
         let (stem, ext) = file.rsplit_once('.')?;
         let eco = Eco::of_extension(ext)?;
@@ -130,7 +144,8 @@ impl Classifier {
                 fallback: None,
             });
         }
-        let name = name_hit(stem, eco).filter(|hit| !(strict && hit.role.needs_code_signal()));
+        let name =
+            name_hit(stem, eco).filter(|hit| names && !(strict && hit.role.needs_code_signal()));
         // a DDD-kontextus mappa (`Domain/…`) csak akkor dönt, ha a fájlnév semmit sem mond
         let folder = folder_hit(dir, eco, strict)
             .filter(|folder| name.is_none() || folder.role.kind() != Kind::Context);
@@ -182,10 +197,11 @@ impl Classifier {
                 anchor: folder.anchor,
                 ..base
             },
-            // minta-végződés egy réteg-mappában (`Services/StripeStrategy`), vagy teszt-mappa: a mappa dönt
+            // minta-végződés egy réteg-mappában (`Services/StripeStrategy`), vagy teszt- / enum-mappa
+            // (`Enums/PaymentProvider`): a mappa dönt
             (Some(folder), Some(name))
                 if (name.role.kind() == Kind::Pattern && folder.role.kind() != Kind::Pattern)
-                    || folder.role.name() == "test" =>
+                    || matches!(folder.role.name(), "test" | "enum") =>
             {
                 let pattern = name.role.info().pattern.or(folder.role.info().pattern);
                 Classification {

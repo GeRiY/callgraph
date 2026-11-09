@@ -17,8 +17,8 @@ bash <skill>/projects.sh add myapp /absolute/path/to/the/project/root
 bash <skill>/projects.sh list
 ```
 
-After that, with `--project myapp` you can give short paths relative to the root. Without `--project` the current
-directory is the root.
+After that, with `--project myapp` you can give short paths relative to the root; `--project <dir>` (an existing
+folder, absolute or relative) works without registering. Without `--project` the current directory is the root.
 
 ## Step 1 — where to start: `locate` (the first call of a task)
 
@@ -101,9 +101,15 @@ listed by file count. When a role is in both the backend and the frontend, the p
 `--layer controller:js` (or `"controller (js)"`) one. Third-party code copied into the project (a subfolder with its
 own `composer.json` / `package.json` / `LICENSE`, or `vendors/`, `third_party/`, `extensions/`, `external/`, `libs/`)
 and build output (`dist/`, `build/`, `*.min/`, minified files) are left out of the profile — one `vendor: N files
-skipped (…)` line says so; queries still see these files (`profile --with-vendor` counts them). `event`, `listener` and
-`job` need code proof (an Event / Listener base class or interface, `Dispatchable`, `ShouldQueue`, `handle(…)` in a
-`Listeners` namespace); a folder named `Event` alone is not an event layer. A layer never hides results by itself:
+skipped (…)` line says so; queries still see these files (`profile --with-vendor` counts them); a copied framework
+core (CodeIgniter `system/`, Yii `framework/`, Kohana `system/`) counts as vendor code too. `event`, `listener`, `job`,
+`mail` and `notification` need code proof (an Event / Listener base class or interface, `Dispatchable`, `ShouldQueue`,
+`handle(…)` in a `Listeners` namespace, `extends Mailable` / `Notification`); a folder named `Event` alone is not an
+event layer. An enum gets no role from its name (`PaymentProvider` is not a provider); an `Enums` folder is `enum`.
+`--layer`, `--layers` and `--by-layer` classify exactly like the profile. The `flow:` line only links layers that
+really call each other, side branches after `;` (`controller → service → model; command → service`). A big subtree
+the profile should ignore (an old copy of the app, e.g. `sn_monitoring/`): a path line in `.callgraphignore`
+(`sn_monitoring/`) — it then disappears from every query too. A layer never hides results by itself:
 only `--layer` filters, `--layers` / `--by-layer` only group and order. `--by-layer` groups the calls (with `--depth`:
 per level) by layer, the layer closest to the callee first (the deepest layer in the call direction: model →
 repository → service → controller), each group under a `[service]  3 calls` header. Own folder names:
@@ -267,3 +273,7 @@ assembled at runtime cannot be resolved. By default `--depth` follows only the c
 name-only matches are shown by `--guess` with a "?" mark. For the exact control logic you need `--body` (compact, comments kept; `--raw` gives the exact text).
 A `⚠ syntax error` line means a file did not parse fully: the result may be incomplete — read that file directly.
 <!-- /mcp -->
+The code before and after the broken part is still mapped (JS / TS / Vue, Rust: from the next top-level function,
+class or item on); only the broken part is missing. The exit code stays 0; in CI add `--strict` (or set
+`CALLGRAPH_STRICT=1`): `show`, `locate` and `profile` then exit with code 3 when a file they read has a syntax error,
+with the same output.
