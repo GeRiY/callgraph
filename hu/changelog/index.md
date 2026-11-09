@@ -6,9 +6,87 @@ Source: https://callgraph.eu/hu/changelog/
 
 Minden kiadás dátummal, a legújabb elöl: mi új, mi változott és mi javult. A verziók letöltései és ellenőrzőösszegei a [GitHub kiadási oldalán](https://github.com/GeRiY/callgraph/releases) vannak.
 
-A bejegyzések angolul vannak, ahogy a projekt `CHANGELOG.md` fájljában.
-
 [A legújabb verzió telepítése](https://callgraph.eu/hu/#install)[Legfrissebb kiadás a GitHubon](https://github.com/GeRiY/callgraph/releases/latest)
+
+## v0.5.2 — 2026-11-09
+
+[Kiadási jegyzet és letöltések a GitHubon](https://github.com/GeRiY/callgraph/releases/tag/v0.5.2)
+
+### Új
+
+- **`update --dev`:** a `develop` ág legfrissebb buildjét telepíti (verzió: `X.Y.Z-dev.<commit>`, a release-ekhez hasonlóan a `SHA256SUMS` alapján ellenőrizve); az `update --check --dev` csak megmondja, van-e újabb. Egy sima `update` visszavisz a legfrissebb stabil release-re. A napi háttér-ellenőrzés és az MCP `--auto-update` maradnak a stabil release-eknél. Dev buildön a `callgraph --version` a dev verziót mutatja.
+
+### Változás
+
+- **A változásnapló magyarul is:** a `CHANGELOG.hu.md` minden release-t magyarul tartalmaz, és a magyar weboldal ezt mutatja.
+
+### Javítás
+
+- **`update --check` közvetlenül egy release után:** egy új release után még néhány percig azt mondhatta, hogy „naprakész”, mert a GitHub rövid ideig a régi választ adta. Most cache nélkül kérdez, és a legutóbbi release-ek listáját is megnézi, így az új verziót azonnal megtalálja.
+
+## v0.5.1 — 2026-11-09
+
+[Kiadási jegyzet és letöltések a GitHubon](https://github.com/GeRiY/callgraph/releases/tag/v0.5.1)
+
+### Új
+
+- **Helyi használati statisztika:** a `callgraph.sh stats` megmutatja, hogyan használtad (te és az agentjeid) a callgraph-ot az elmúlt 7 napban (`--days N`, legfeljebb 90): parancsonként és MCP tool-onként hány hívás volt, hány hibázott, mennyi ideig tartottak és mekkora volt a kimenet, a `locate`-nél pedig azt, hogy az első találat milyen gyakran volt az a fájl, amit az agent utána megnyitott. Minden a gépeden marad: semmit nem küld el, és nem rögzít útvonalat, nevet vagy keresett szöveget — csak sávos számokat. Az adat a skill mappájában van (`stats/`, kb. 90 nap); kikapcsolás: `CALLGRAPH_STATS=0`.
+
+- **`--no-gitignore`:** bármelyik parancshoz (show, mappanézetek, `locate`, `profile`, `refresh`, `callers`) adva a `.gitignore` által kizárt fájlokat is feltérképezi; az MCP serverhez és a hookhoz: `CALLGRAPH_GITIGNORE=0`. A `.callgraphignore` és a mindig kihagyott mappák (`vendor`, `node_modules`, …) ilyenkor is érvényesek.
+
+- **`locate route::events.show`:** route-ot keres a neve alapján: elöl a definíció (`->name('events.show')` a `routes/*.php`-ban), utána minden `route('events.show')`, `to_route(…)` és `redirect()->route(…)` a PHP- és a JavaScript / TypeScript / Vue kódban. Ha nincs találat, kiírja, mit keresett.
+
+- **`callgraph.sh --version`** (és `-V`, `version`): kiírja a verziót, a platformot és a binary helyét.
+
+### Változás
+
+- **A `.callgraphignore` útvonalat is elfogad:** az `md`, `.md` vagy `*.md` sor továbbra is egy kiterjesztést hagy ki, minden más sor viszont útvonal-minta, ugyanúgy írva, mint a `.gitignore`-ban (`public/build/`, `/storage/`, `!keep.js`), a fájl mappájához képest. Egy puszta szó, például `build`, továbbra is kiterjesztés; mappához `build/` kell.
+
+- **A `locate` elöl a pontos egyezéseket rangsorolja:** az a fájl, amelynek osztály-, komponens- vagy függvényneve (vagy fájlneve) az egyik keresett kifejezés, mindig megelőzi azokat, amelyek csak szövegként tartalmazzák a kifejezéseket, például a fordítási fájlokat vagy a build-kimenetet.
+
+- **Az idézőjeles kifejezés egyetlen `locate`-kifejezés:** a `locate "Szervező további eseményei"` a teljes szöveget keresi a kód stringjeiben (feliratok, fordítások), ahelyett hogy szavakra bontaná, amelyek oda nem tartozó nevekre illettek.
+
+- **A `locate` mindig ír `root:` sort**, és ahhoz relatív útvonalakat, akkor is, ha csak egy fájl illik.
+
+- **A profile elöl a fő layereket mutatja:** az architektúra layerei (controller, service, model …) jönnek elöl, fájlszám szerint, a tesztek, a migrációk és a konfiguráció a végén; így egy fő layer, például a `model`, már nem bújik a `… +6 more layers` mögé, miközben az egy-két fájlos layerek látszanak.
+
+- **A `--by-layer` minden layerhez fejlécet ír:** a hívók minden csoportja egy ilyen sorral kezdődik: `[service] 3 calls`, a normál és a rövid („hívásonként egy sor”) `--grep` nézetben, és a `--depth` minden szintjén. A hívott metódushoz legközelebbi csoport van elöl (model → repository → service → controller), ahogy a súgó írja; korábban csak egyes sorok végén egy `[service]` címke jelezte a layert.
+
+- **A felhasználói hibák már nem tool-hibaként kerülnek a naplóba:** egy elírt layernév, egy ismeretlen kapcsoló vagy egy nem létező fájl most csak az üzenetet írja ki — nincs `[error-id: …]` sor, nincs hibajelentő link, és az `errors.jsonl`-be sem kerül semmi. A valódi belső hibák továbbra is naplózódnak, és error-id-t kapnak.
+
+- **A JSON outline az értékeket is mutatja:** `scripts.build = "vite build"` és `devDependencies.vite = "^6.0"` a puszta `string` helyett; a számok, a `true` / `false` és a `null` ahogy vannak, a 60 karakternél hosszabb stringek `…`-lel levágva, az objektumok és listák a méretükkel (`object (3)`, `array (2)`).
+
+- **Egy JSON-kulcs kiolvasása:** a `callgraph.sh package.json::scripts --body` a kulcsot a pontos soraival írja ki; mélyebb kulcshoz pont (`scripts.build`), listaelemhez szám (`files.0`). Korábban „No such method” volt a válasz.
+
+- **A `locate` megtalálja a JSON-kulcsokat:** a `locate laravel-vite-plugin` most kilistázza a `package.json`-t a kulcs sorával. Csak a pontos kulcsnév (vagy a teljes, pontokkal tagolt útvonal) számít, így a más szavakra keresést nem árasztják el a JSON-fájlok.
+
+- **A CSS- és SCSS-szabályok már nem függvényként jelennek meg:** `.p-toast L29-31` a `.p-toast()` helyett; a mixinek és a függvények megtartják a `()`-t.
+
+### Javítás
+
+- **A CSS outline minden szabályt listáz:** egyes szabályok hiányoztak (a `.p-toast` selectorú szabály mindig kimaradt, és a `@charset` utáni első szabály is), az at-rule-ok pedig egyáltalán nem jelentek meg. Most minden szabály és at-rule a soraival szerepel: `@import`, `@tailwind`, `@media`, `@supports`, `@layer`, `@keyframes`, `@font-face`, valamint a Tailwind v4 `@theme`, `@utility`, `@custom-variant`, `@variant`, `@plugin`, `@source` és `@config`.
+
+- **A CSS-szabályok a helyes sorban kezdődnek:** egy komment vagy egy másik szabály utáni szabály azt a sort mutatta, ahol az előző szabály véget ért (`.p-datepicker-panel L31-41` az `L39-41` helyett).
+
+- **Az idézőjelek közötti `/*` nem vágja el a CSS-útvonalat:** a `@source '../**/*.blade.php'` elvágódott, mert az útvonalban lévő `/*`-ot komment kezdetének vette.
+
+- **A profile már nem keveri a PHP- és a JavaScript-layereket:** egy PHP-controllereket és AngularJS (vagy más JavaScript) controllereket is tartalmazó projektben a profile egyetlen `controller` layert mutatott mindegyikkel. Egy több nyelvben is előforduló szerep most külön jelenik meg, pl. `controller (php)` és `controller (js)`, és a hívásirány (`flow:`) már nem köti össze a backendet és a frontendet egy közös néven, például a `service`-en át. Az egynyelvű projektek pontosan úgy néznek ki, mint korábban. A `--layer controller` továbbra is mindkettőt megtalálja; a `--layer controller:js` (vagy `--layer "controller (js)"`) csak a JavaScripteseket.
+
+- **A külső kód már nem adja a projekt architektúráját:** egy projektbe másolt SDK vagy library (saját `composer.json`, `package.json` vagy `LICENSE` fájllal rendelkező almappa, vagy olyan mappák, mint `vendors/`, `third_party/`, `extensions/`, `external/`, `libs/`) olyan layereket és mintákat (Builder, Factory, Handler…) adott a profile-nak, amelyek a projektben valójában nincsenek. Ezek a fájlok most kimaradnak a profile-ból, és egy sor jelzi ezt, pl. `vendor: 312 files skipped (extensions/Facebook, vendors/phpoffice, …)`. A keresések és a mappanézetek továbbra is látják őket. A `profile --with-vendor` újra beszámítja őket.
+
+- **A build-kimenet másolatai kimaradnak a profile-ból:** a `dist`, `build` vagy `*.min` nevű mappák (például `web/assets.min`) és a minifikált fájlok már nem számítanak kétszer layerként; egy `generated: N files skipped (…)` sor mutatja őket.
+
+- **Egy üzleti témáról elnevezett mappa nem event layer:** az `app/Services/Event` vagy egy JavaScript `controllers/event` mappa `event` layerré vált. Az `event`, `listener` és `job` szerephez most bizonyíték kell a kódban — egy Event / Listener / Subscriber ősosztály vagy interface, a Laravel `Dispatchable` vagy `ShouldQueue`, vagy egy `handle(…)` metódus egy `Listeners` namespace-ben; különben a fájl megtartja a másik szerepét (`service`, `controller`, illetve `model` az `app/Models/Job.php`-nél).
+
+- **A `.gitignore` által kizárt fájlok már nem jelennek meg:** egy Laravel + Vite projekt build-kimenete (`public/build/assets/app-CBW7lKWe.js`, a `.gitignore`-ban `/public/build`-ként) megjelent a `locate`-ben és a mappanézetekben. A `.gitignore` most úgy működik, ahogy a git olvassa: `/`-rel kezdődő minták, beágyazott útvonalak, `**`, `!` kivételek és bármelyik almappa `.gitignore`-ja. Ugyanezek a szabályok érvényesek mindenhol, ahol a callgraph fájlokat néz, az MCP server file watcherét és az editor hookot is beleértve.
+
+- **A minifikált és bundle-ölt JavaScript / CSS akkor is kimarad, ha nincs `.min.` a nevében és nincs `.gitignore`:** a rendkívül hosszú első sorokkal kezdődő fájlt generáltnak ismeri fel, és kihagyja.
+
+- **A `locate --orange-500`** (egy CSS-változó) ismeretlen kapcsolóként elutasításra került; most keresi. Az ismert kapcsolók (`--all`, `--project`) ugyanúgy működnek, mint eddig.
+
+- **A `callgraph.sh --version`** a `show` használati súgóját írta ki, és hibát naplózott.
+
+- **A szintaktikai hibás fájlok már nem látszanak teljesnek:** egy éppen szerkesztett vagy merge conflictos fájl függvények nélkül jöhetett vissza (JavaScript, TypeScript, Vue, Rust), vagy jelzés nélkül (PHP, Swift). Egy keresés ilyenkor „no such method”-ot mondott, vagy nem talált hívót, amiből egy agent azt hihette, hogy a kódot nem használják. Most a hiba előtti részek megmaradnak (az `a` és `b` függvény látszik, ha a `c` hibás), és minden eredmény jelzi ezt: `⚠ syntax error at L3: … — this file's outline may be incomplete` a fájl alatt, egy záró sor, pl. `⚠ 2 files had syntax errors (results may be incomplete): src/tail.js L3, src/v.vue L4`, ha egy mappa, egy keresés (`--grep`, `--depth`), a `locate` vagy a `profile` hibás fájlt olvasott, `parseErrors` a `--format json` kimenetben, és figyelmeztetés a `callers` hibakimenetén. A kilépési kód 0 marad, mert az eredmény többi része továbbra is helyes és hasznos. Érvényes a JavaScriptre, TypeScriptre, Vue-ra, PHP-ra, Rustra, Swiftre és JSON-ra (a CSS, SCSS és Markdown engedékenyen olvasott, ezeket nem jelzi).
 
 ## v0.5.0 — 2026-11-06
 
@@ -16,25 +94,25 @@ A bejegyzések angolul vannak, ahogy a projekt `CHANGELOG.md` fájljában.
 
 ### Új
 
-- **Where to start with a task — `locate`:** give it the names and terms from a task in one go (`callgraph.sh locate RefundController processRefund refund payment_status checkout.vue`, or the new `locate` tool over MCP) and it lists the few files worth opening first, best first, each with the reason: the class or method of that name, the file of that name, a name that contains the word (`refund` → `RefundJob`, `refunds_table`), a text such as a column name or route, or a call to it. It answers from the project map without reading the code again, so it is quick. A file that matches several of your terms comes before one that matches a single term many times. It shows 5 files (`--all` for every match) and says which terms found nothing and which are too general. The skill and MCP instructions now also tell agents when to use it, and when plain text search (grep) is the better tool.
+- **Honnan induljak egy feladattal — `locate`:** add meg egyszerre egy feladat neveit és kifejezéseit (`callgraph.sh locate RefundController processRefund refund payment_status checkout.vue`, vagy MCP-n az új `locate` tool), és kilistázza azt a néhány fájlt, amit érdemes először megnyitni, a legjobbal kezdve, mindegyiket indoklással: az ilyen nevű osztály vagy metódus, az ilyen nevű fájl, egy nevet tartalmazó név (`refund` → `RefundJob`, `refunds_table`), egy szöveg, például oszlopnév vagy route, vagy egy hívás rá. A projekt-térképből válaszol, a kód újraolvasása nélkül, ezért gyors. Az a fájl, amely több kifejezésre is illik, megelőzi azt, amelyik egyetlen kifejezésre illik sokszor. 5 fájlt mutat (`--all`: minden találatot), és megmondja, mely kifejezések nem találtak semmit, és melyek túl általánosak. A skill és az MCP-útmutató most azt is elmondja az agenteknek, mikor használják, és mikor jobb eszköz a sima szöveges keresés (grep).
 
-- **Project profile:** `callgraph.sh profile` tells you in about 15 lines how an unfamiliar project is built: the architecture (Laravel / Yii layered MVC, DDD / hexagonal, Vue / React frontend, SwiftUI MVVM, Rust web), which folder holds which layer (controllers, services, repositories, models, components, stores…) with file counts, the design patterns it uses (Repository, Factory, Strategy, Observer…), the folders with no clear role, and whether the layers call each other in the expected direction. It reads folder and file names and checks them against the code graph (`extends Controller`, `implements *RepositoryInterface`, `defineStore`); what it cannot tell stays "unknown". `--full` shows every folder. For AI clients: the `project_profile` MCP tool, and a short profile is sent when a client connects.
+- **Projekt-profile:** a `callgraph.sh profile` kb. 15 sorban elmondja, hogyan épül fel egy ismeretlen projekt: az architektúra (Laravel / Yii layered MVC, DDD / hexagonális, Vue / React frontend, SwiftUI MVVM, Rust web), melyik mappa melyik layert tartalmazza (controllerek, service-ek, repositoryk, modellek, komponensek, store-ok…) fájlszámmal, az alkalmazott tervezési minták (Repository, Factory, Strategy, Observer…), a szerep nélküli mappák, és hogy a layerek a várt irányban hívják-e egymást. A mappa- és fájlneveket olvassa, és a code graph alapján ellenőrzi (`extends Controller`, `implements *RepositoryInterface`, `defineStore`); amit nem tud eldönteni, az „unknown” marad. A `--full` minden mappát mutat. AI-klienseknek: a `project_profile` MCP tool, és csatlakozáskor egy rövid profile.
 
-- **Layers in queries (opt-in, nothing changes by default):** `--layer service` searches only the files of that layer (no need to know the folder names), `--layers` groups the summary by layer and marks each file with its role, `--by-layer` orders "who calls it?" results by layer, closest to the called code first (also for `callers`, and as `layer` / `by_layer` on the MCP tools). Folder names that say nothing, or are not English, can be mapped in a commit-able `.callgraph-layers` file (`service = app/Logic`, `ignore-role = app/Legacy`).
+- **Layerek a lekérdezésekben (opt-in, alapból semmi nem változik):** a `--layer service` csak az adott layer fájljaiban keres (nem kell ismerni a mappaneveket), a `--layers` layer szerint csoportosítja a summaryt, és minden fájlt megjelöl a szerepével, a `--by-layer` layer szerint rendezi a „ki hívja?” eredményeket, a hívott kódhoz legközelebbivel kezdve (a `callers`-nél is, és az MCP toolokon `layer` / `by_layer`-ként). A semmitmondó vagy nem angol mappanevek egy commitolható `.callgraph-layers` fájlban rendelhetők hozzá (`service = app/Logic`, `ignore-role = app/Legacy`).
 
-- **Exclude extensions per project:** a `.callgraphignore` file in the project root (or in any subfolder; the nearest one applies) lists extensions callgraph should skip there, one per line (`md`, `.json` or `*.vue`; `#` starts a comment). Commit it, and everyone on the team gets the same results. A file you name directly with an excluded extension is refused with a clear message.
+- **Kiterjesztések kizárása projektenként:** a projekt gyökerében (vagy bármelyik almappában; a legközelebbi érvényes) egy `.callgraphignore` fájl felsorolja, mely kiterjesztéseket hagyja ki ott a callgraph, soronként egyet (`md`, `.json` vagy `*.vue`; a `#` kommentet kezd). Commitold, és a csapatban mindenki ugyanazt az eredményt kapja. Egy kizárt kiterjesztésű, közvetlenül megnevezett fájlt érthető üzenettel utasít el.
 
 ### Változás
 
-- **Only supported files are processed, more strictly:** callgraph already ignored files with other extensions; now it also skips generated files (`package-lock.json`, `*.min.js`, `*.min.css`) and files with binary content, even when their extension is supported. Naming one of them directly gives a clear reason instead of a result.
+- **Csak a támogatott fájlokat dolgozza fel, szigorúbban:** a callgraph eddig is figyelmen kívül hagyta a más kiterjesztésű fájlokat; most a generált fájlokat (`package-lock.json`, `*.min.js`, `*.min.css`) és a bináris tartalmú fájlokat is kihagyja, akkor is, ha a kiterjesztésük támogatott. Ha egyiket közvetlenül megnevezed, eredmény helyett érthető indoklást ad.
 
-- **Upper-case extensions count:** `B.PHP`, `App.TS` or `Main.Vue` are now processed like their lower-case versions (before, they were silently skipped).
+- **A nagybetűs kiterjesztés is számít:** a `B.PHP`, `App.TS` vagy `Main.Vue` most ugyanúgy feldolgozódik, mint a kisbetűs változata (korábban csendben kimaradt).
 
 ### Javítás
 
-- **A file reached through a symlink is no longer listed twice:** if a symlink pointed to a file inside the project, that file appeared (and was analysed) twice in folder results.
+- **A symlinken át elért fájl már nem szerepel kétszer:** ha egy symlink a projekten belüli fájlra mutatott, az a fájl kétszer jelent meg (és kétszer elemződött) a mappa-eredményekben.
 
-- **Windows: the short summary shows file names again:** when a folder's output was too long and callgraph showed the one-line-per-file summary instead, Windows listed each file with its full path instead of just its name.
+- **Windows: a rövid összefoglaló újra fájlneveket mutat:** amikor egy mappa kimenete túl hosszú volt, és a callgraph helyette a fájlonként egysoros összefoglalót mutatta, Windowson minden fájl a teljes útvonalával jelent meg a neve helyett.
 
 ## v0.4.0 — 2026-11-06
 
@@ -42,29 +120,29 @@ A bejegyzések angolul vannak, ahogy a projekt `CHANGELOG.md` fájljában.
 
 ### Új
 
-- **Refresh the project map ahead of time:** `callgraph.sh refresh` brings the project map in `.callgraph/` up to date right away — every changed, new or deleted file, or only the files / folders you name — and prints a one-line summary. Handy after a `git pull` or after an agent wrote many files: the next query no longer has to re-analyse them. `--background` returns at once and does the work in a separate process. Two refreshes never work on the same project at the same time; if one is already running, the other simply skips.
+- **A projekt-térkép előre frissítése:** a `callgraph.sh refresh` azonnal naprakészre hozza a `.callgraph/` projekt-térképet — minden változott, új vagy törölt fájlt, vagy csak a megnevezett fájlokat / mappákat —, és egy soros összefoglalót ír. Hasznos egy `git pull` után, vagy ha egy agent sok fájlt írt: a következő lekérdezésnek már nem kell újraelemeznie őket. A `--background` azonnal visszatér, és külön folyamatban végzi a munkát. Két refresh soha nem dolgozik egyszerre ugyanazon a projekten; ha már fut egy, a másik egyszerűen kihagyja.
 
-- **Optional Claude Code hook:** after Claude edits or writes a file, callgraph refreshes that file in the background, so the next question about it is answered instantly. The installer asks whether to add it (`install.sh --hooks` adds it without asking); it only adds one entry to `~/.claude/settings.json`, keeps all other settings and hooks, and saves a `settings.json.bak` backup first. Check or remove it any time: `callgraph.sh hook status` / `callgraph.sh hook uninstall`. It does nothing outside registered projects (or ones that already have a `.callgraph/` folder).
+- **Opcionális Claude Code hook:** miután Claude szerkeszt vagy ír egy fájlt, a callgraph a háttérben frissíti azt, így a következő kérdésre azonnal jön a válasz. A telepítő megkérdezi, hozzáadja-e (az `install.sh --hooks` kérdés nélkül hozzáadja); csak egy bejegyzést tesz a `~/.claude/settings.json`-ba, minden más beállítást és hookot megtart, és előtte `settings.json.bak` mentést készít. Bármikor ellenőrizhető vagy eltávolítható: `callgraph.sh hook status` / `callgraph.sh hook uninstall`. Regisztrált projekteken kívül (vagy amelyekben még nincs `.callgraph/` mappa) nem csinál semmit.
 
-- **The MCP server keeps itself up to date:** while `callgraph mcp` runs, it watches the projects it has opened and refreshes changed files a moment after they are saved, so queries stay fast. The answers are exactly the same as before. If watching is not possible on a system, it says so once and works as before. To switch it off, set `CALLGRAPH_WATCH=0`.
+- **Az MCP server naprakészen tartja magát:** amíg a `callgraph mcp` fut, figyeli a megnyitott projekteket, és a változott fájlokat a mentés után egy pillanattal frissíti, így a lekérdezések gyorsak maradnak. A válaszok pontosan ugyanazok, mint korábban. Ha egy rendszeren a figyelés nem lehetséges, ezt egyszer jelzi, és úgy működik, mint korábban. Kikapcsolás: `CALLGRAPH_WATCH=0`.
 
-- **The MCP server explains itself:** AI tools that use callgraph through MCP (Claude Code, Claude Desktop, Cursor, VS Code) now get a short usage guide when they connect, in your language: which tool to use when, how to find every caller of a function, and how to read the answers. A new `guide` tool gives them the full manual on request. The tool descriptions now each carry an example and the most common mistake to avoid. The guide is made from the same text as the skill's `SKILL.md`, so the two always say the same thing.
+- **Az MCP server elmagyarázza magát:** a callgraph-ot MCP-n át használó AI-eszközök (Claude Code, Claude Desktop, Cursor, VS Code) csatlakozáskor rövid használati útmutatót kapnak a nyelveden: melyik toolt mikor használják, hogyan találják meg egy függvény összes hívóját, és hogyan olvassák a válaszokat. Egy új `guide` tool kérésre a teljes kézikönyvet adja. A tool-leírások mindegyike tartalmaz egy példát és a leggyakoribb elkerülendő hibát. Az útmutató ugyanabból a szövegből készül, mint a skill `SKILL.md`-je, így a kettő mindig ugyanazt mondja.
 
-- **The installer can set up the MCP server for Claude Code:** if the `claude` command is available, `install.sh` asks whether to register callgraph as an MCP server (`install.sh --mcp` does it without asking, `--no-mcp` skips it). Running it again does not create duplicates. It prints how to remove it (`claude mcp remove -s user callgraph`) and where to find the setup for Claude Desktop, Cursor and VS Code. If this step fails, the rest of the install still completes. The installer now ends with a reminder to restart Claude Code.
+- **A telepítő be tudja állítani az MCP servert a Claude Code-hoz:** ha a `claude` parancs elérhető, az `install.sh` megkérdezi, regisztrálja-e a callgraph-ot MCP serverként (az `install.sh --mcp` kérdés nélkül megteszi, a `--no-mcp` kihagyja). Újrafuttatva nem hoz létre duplikátumot. Kiírja, hogyan távolítható el (`claude mcp remove -s user callgraph`), és hol található a Claude Desktop, a Cursor és a VS Code beállítása. Ha ez a lépés nem sikerül, a telepítés többi része akkor is lefut. A telepítő a végén emlékeztet a Claude Code újraindítására.
 
-- **The MCP server can update itself:** add `--auto-update` to the server's arguments in your AI tool's MCP settings (`"args": ["mcp", "--auto-update"]`, recommended). When the tool starts the server — at most once a day — it checks for a newer callgraph release, downloads it, checks that the file is exactly the published one (it never installs a file whose checksum does not match), installs it just like `callgraph.sh update` (your projects and settings are kept) and restarts itself, so the tool works with the new version right away. If anything goes wrong (no internet, GitHub limit, a bad download, no write permission) it simply starts the version you have and writes one line to the tool's log. It only writes into callgraph's own folder, never into your projects.
+- **Az MCP server frissíteni tudja magát:** add hozzá a `--auto-update`-et a server argumentumaihoz az AI-eszközöd MCP-beállításaiban (`"args": ["mcp", "--auto-update"]`, ajánlott). Amikor az eszköz elindítja a servert — naponta legfeljebb egyszer —, megnézi, van-e újabb callgraph release, letölti, ellenőrzi, hogy a fájl pontosan a közzétett (soha nem telepít olyan fájlt, amelynek checksumja nem egyezik), ugyanúgy telepíti, mint a `callgraph.sh update` (a projektjeid és beállításaid megmaradnak), és újraindítja magát, így az eszköz azonnal az új verzióval dolgozik. Ha bármi elromlik (nincs internet, GitHub-korlát, hibás letöltés, nincs írási jog), egyszerűen a meglévő verziót indítja, és egy sort ír az eszköz logjába. Csak a callgraph saját mappájába ír, a projektjeidbe soha.
 
-- **The MCP server tells you about updates:** without `--auto-update`, the server checks for a newer release at most once a day in the background (it never makes a request wait) and adds one line to the first answer of the session: `ℹ callgraph X is available (installed: Y) — update: …/callgraph.sh update, or add --auto-update to the MCP config`. `CALLGRAPH_UPDATE_CHECK=0` turns off all update checks (no network at all); they are also off in CI.
+- **Az MCP server szól a frissítésekről:** `--auto-update` nélkül a server naponta legfeljebb egyszer a háttérben megnézi, van-e újabb release (egy kérést sem várakoztat meg), és a session első válaszához egy sort fűz: `ℹ callgraph X is available (installed: Y) — update: …/callgraph.sh update, or add --auto-update to the MCP config`. A `CALLGRAPH_UPDATE_CHECK=0` minden frissítés-ellenőrzést kikapcsol (semmilyen hálózati forgalom); CI-ben is ki vannak kapcsolva.
 
 ### Változás
 
-- **Comments inside a method stay in `--body`:** the short method view used to hide comment lines inside the method too, so an agent could think a line was missing and read the file again. Now only the docblock above the method and blank lines are left out; comments inside the method (they often explain the intent) are shown. When a docblock was left out, the header line says so, e.g. `(docblock L112-119 omitted: --doc)`. `--doc` still adds the docblock, `--raw` still prints the exact source. The MCP `method_body` tool works the same way.
+- **A metóduson belüli kommentek a `--body`-ban maradnak:** a rövid metódusnézet a metóduson belüli kommentsorokat is elrejtette, így egy agent azt hihette, hogy hiányzik egy sor, és újra beolvasta a fájlt. Most csak a metódus feletti docblock és az üres sorok maradnak ki; a metóduson belüli kommentek (gyakran a szándékot magyarázzák) látszanak. Ha egy docblock kimaradt, a fejléc sor jelzi, pl. `(docblock L112-119 omitted: --doc)`. A `--doc` továbbra is hozzáadja a docblockot, a `--raw` továbbra is a pontos forrást írja ki. Az MCP `method_body` tool ugyanígy működik.
 
-- The project website has its own domain: [https://callgraph.eu](https://callgraph.eu) (the old `geriy.github.io/callgraph` address redirects).
+- A projekt weboldala saját domaint kapott: [https://callgraph.eu](https://callgraph.eu) (a régi `geriy.github.io/callgraph` cím átirányít).
 
 ### Javítás
 
-- **"Who calls it" now finds calls from child classes:** searching for a method with its class name (`--grep FrontendController::redirectToNewDashboard`, or the MCP `find_callers` tool) missed the places where a child class calls the inherited method as `$this->redirectToNewDashboard()` — only the bare method name found them. Now these calls are found too, marked with the child class (`L139 via EventeditController │ …`). A child class that has its own version of the method is not counted, because its call runs its own version.
+- **A „ki hívja” most megtalálja a leszármazott osztályok hívásait:** egy metódusra az osztálynevével keresve (`--grep FrontendController::redirectToNewDashboard`, vagy az MCP `find_callers` tool) kimaradtak azok a helyek, ahol egy leszármazott osztály `$this->redirectToNewDashboard()`-ként hívja az örökölt metódust — csak a puszta metódusnév találta meg őket. Most ezek a hívások is megjelennek, a leszármazott osztállyal megjelölve (`L139 via EventeditController │ …`). Az a leszármazott osztály, amelynek saját változata van a metódusból, nem számít, mert az ő hívása a saját változatát futtatja.
 
 ## v0.3.0 — 2026-11-06
 
@@ -72,31 +150,31 @@ A bejegyzések angolul vannak, ahogy a projekt `CHANGELOG.md` fájljában.
 
 ### Változás
 
-- **Faster queries on big projects:** callgraph now keeps a compact project map in `.callgraph/` in just three files, however big the project is: a short list of all files, one file with every file's full analysis, and one with the summary that searches need. It is updated file by file, only for files that changed since the last query (deleted or renamed files drop out). "Where is it called" (`--grep`, every `--depth` level), `callers`, `--strings` and `--const` are answered from the summary file in one read; a single-file view (outline, `--body` …) reads just that file's part of the full-analysis file. The output is exactly the same as before. An edited file shows up in the very next query; anything damaged or written by another callgraph version is rebuilt quietly. The map replaces the old analysis cache (`cache.jsonl`), which is removed automatically, so the folder takes less space than before. The MCP server (`callgraph mcp`) keeps the map in memory between requests. To switch it off (e.g. to compare), set `CALLGRAPH_NO_GRAPH=1`. Details: `docs/PROJECT-GRAPH.md`.
+- **Gyorsabb lekérdezések nagy projekteken:** a callgraph most egy tömör projekt-térképet tart a `.callgraph/` mappában, mindössze három fájlban, akármekkora is a projekt: az összes fájl rövid listája, egy fájl minden fájl teljes elemzésével, és egy az összefoglalóval, amire a kereséseknek szükségük van. Fájlonként frissül, csak az utolsó lekérdezés óta változott fájloknál (a törölt vagy átnevezett fájlok kikerülnek). A „hol hívják” (`--grep`, minden `--depth` szint), a `callers`, a `--strings` és a `--const` egyetlen olvasással az összefoglaló fájlból válaszol; egy egyfájlos nézet (outline, `--body` …) csak az adott fájl részét olvassa a teljes elemzésből. A kimenet pontosan ugyanaz, mint korábban. Egy szerkesztett fájl már a következő lekérdezésben megjelenik; bármi sérült vagy más callgraph-verzió által írt csendben újraépül. A térkép a régi elemzési cache-t (`cache.jsonl`) váltja, amely automatikusan törlődik, így a mappa kevesebb helyet foglal, mint korábban. Az MCP server (`callgraph mcp`) a kérések között memóriában tartja a térképet. Kikapcsolás (pl. összehasonlításhoz): `CALLGRAPH_NO_GRAPH=1`. Részletek: `docs/PROJECT-GRAPH.md`.
 
-- **Shorter call lists in "where is it called" results:** when one caller method makes the same call on several lines with the very same source text, it is now shown once with all its line numbers, e.g. `L12, L40 │ $this->repo->find($id)`. Each caller shows at most 3 such rows; the rest are listed by line number only: `… +2 more: L55, L61`. This applies to `--grep`, the first `--depth` level and the one-line-per-call view used when the result would be too long. Calls through an interface stay on their own row (`via …`).
+- **Rövidebb hívólisták a „hol hívják” eredményekben:** ha egy hívó metódus több soron is ugyanazt a hívást teszi, pontosan ugyanazzal a forrásszöveggel, most egyszer jelenik meg az összes sorszámmal, pl. `L12, L40 │ $this->repo->find($id)`. Hívónként legfeljebb 3 ilyen sor látszik; a többi csak sorszámmal: `… +2 more: L55, L61`. Érvényes a `--grep`-re, az első `--depth` szintre és a hívásonként egysoros nézetre, amit túl hosszú eredménynél használ. Az interface-en át történő hívások külön sorban maradnak (`via …`).
 
-- **Shorter method bodies:** `--body` now leaves out what an agent rarely needs: the docblock / doc comments above the method, blank lines and lines that are only a comment. Code lines are printed exactly as written (a comment at the end of a code line stays), and nothing inside a string, heredoc or template literal is ever removed. The line numbers are still the real ones, so a gap shows where lines were skipped and you can still read an exact range. Attributes such as `#[test]` / `#[Route(...)]` are kept. Works for PHP, JS / TS / Vue, Rust and Swift, for several methods at once and for `--grep … --body`.
+- **Rövidebb metódus-törzsek:** a `--body` most kihagyja, amire egy agentnek ritkán van szüksége: a metódus feletti docblockot / doc kommenteket, az üres sorokat és a csak kommentből álló sorokat. A kódsorok pontosan úgy jelennek meg, ahogy írva vannak (a kódsor végén álló komment megmarad), és egy string, heredoc vagy template literal belsejéből soha nem töröl semmit. A sorszámok továbbra is a valódiak, így egy hézag mutatja, hol maradtak ki sorok, és továbbra is kiolvasható egy pontos tartomány. Az olyan attribútumok, mint `#[test]` / `#[Route(...)]`, megmaradnak. Működik PHP-ra, JS / TS / Vue-ra, Rustra és Swiftre, egyszerre több metódusra, és a `--grep … --body`-ra is.
 
-- New `--doc` adds the docblock back; new `--raw` prints the exact, unfiltered source (as before, plus Rust / Swift doc comments and attributes). The MCP `method_body` tool follows the same default and has `doc` / `raw` options.
+- Az új `--doc` visszaadja a docblockot; az új `--raw` a pontos, szűretlen forrást írja ki (mint korábban, plusz a Rust / Swift doc kommenteket és attribútumokat). Az MCP `method_body` tool ugyanezt az alapértelmezést követi, és `doc` / `raw` opciói vannak.
 
 ### Új
 
-- **Notes on files and methods (pilot):** `callgraph note add <file>[::<method>] "<text>"` (also `callgraph.sh note …`) attaches a short note, stored outside the source in `<project>/.callgraph/notes.jsonl` (git-ignored) with the date and time (UTC). The outline shows it under the file header or the method (`📝 2026-11-05 20:27 · text`, newest first, at most 3), `--body` above the method source. `note list [<path>]` lists them (with `[orphaned]` when the method is gone), `note rm <id>` deletes one, and `show <dir> --notes <pattern>` searches them. The anchor is the method name, not a line number. MCP: a new read-only `notes` tool (there is no write tool). Without notes the output is unchanged. Details: `docs/NOTES.md`.
+- **Jegyzetek fájlokhoz és metódusokhoz (kísérleti):** a `callgraph note add <file>[::<method>] "<szöveg>"` (vagy `callgraph.sh note …`) rövid jegyzetet csatol, a forráson kívül tárolva a `<project>/.callgraph/notes.jsonl`-ben (git-ignored), dátummal és idővel (UTC). Az outline a fájl fejléce vagy a metódus alatt mutatja (`📝 2026-11-05 20:27 · szöveg`, a legújabb elöl, legfeljebb 3), a `--body` a metódus forrása felett. A `note list [<path>]` listázza őket (`[orphaned]` jelöléssel, ha a metódus már nincs meg), a `note rm <id>` töröl egyet, a `show <dir> --notes <minta>` keres bennük. A horgony a metódus neve, nem egy sorszám. MCP: egy új, csak olvasható `notes` tool (írás tool nincs). Jegyzetek nélkül a kimenet változatlan. Részletek: `docs/NOTES.md`.
 
-- **TypeScript: calls through typed objects and interfaces.** callgraph now works out which class a TS method call goes to when the type is written down: a typed parameter (`repo: Repo`), a typed class property (`private repo: Repo`, also `constructor(private repo: Repo)`), `this.repo = new Repo()` or `const x = new Repo()`. So `this.repo.find()` shows up as `Repo::find`, and `--grep 'Repo::find'` finds it. Classes record their `implements`, and TS interfaces (`interface X extends Y`) appear in the map, so searching `PlaylistResolver::getPlayables` also finds calls made through its `Resolver` interface, marked `via Resolver` (in `--depth` and `callers` too). When the type is unclear (no type, `any`, a union like `Repo | null`, a generic `T`, or different values in the same function) the call stays as before.
+- **TypeScript: hívások típusos objektumokon és interface-eken át.** A callgraph most kikövetkezteti, melyik osztályhoz megy egy TS metódushívás, ha a típus le van írva: típusos paraméter (`repo: Repo`), típusos osztályproperty (`private repo: Repo`, a `constructor(private repo: Repo)` is), `this.repo = new Repo()` vagy `const x = new Repo()`. Így a `this.repo.find()` `Repo::find`-ként jelenik meg, és a `--grep 'Repo::find'` megtalálja. Az osztályok rögzítik az `implements`-üket, és a TS interface-ek (`interface X extends Y`) megjelennek a térképen, így a `PlaylistResolver::getPlayables` keresése a `Resolver` interface-en át történő hívásokat is megtalálja, `via Resolver` jelöléssel (a `--depth`-ben és a `callers`-ben is). Ha a típus nem egyértelmű (nincs típus, `any`, egy union, mint `Repo | null`, egy generic `T`, vagy különböző értékek ugyanabban a függvényben), a hívás marad a régiben.
 
-- **`--const` lists re-exports:** besides references and definitions, `--const NAME` now shows where a name is passed on, marked `[re-export]`: Rust `pub use state::{CheckState, STATE_FILE};` / `pub(crate) use …`, JS / TS `export { NAME } from './x'` / `export { NAME }`, PHP `use const App\NAME;`.
-
-### Javítás
-
-- `--grep <pattern> --body` prints the source of the caller methods again (the option was ignored).
-
-- MCP `method_body`: `method` may be a single name as a plain string as well as a list (some clients send `"method": "parse"`, which used to fail with an "expected a sequence" error).
+- **A `--const` a re-exportokat is listázza:** a hivatkozások és a definíciók mellett a `--const NAME` most azt is mutatja, hol adják tovább a nevet, `[re-export]` jelöléssel: Rust `pub use state::{CheckState, STATE_FILE};` / `pub(crate) use …`, JS / TS `export { NAME } from './x'` / `export { NAME }`, PHP `use const App\NAME;`.
 
 ### Javítás
 
-- **JS/TS: no more doubled methods when a class is named like its file** (`PlaylistResolver.ts` with `class PlaylistResolver`): the class's methods were listed twice, once under the file's `module` entry and once under the class. Now class members appear only under the class and top-level functions only under the module.
+- A `--grep <minta> --body` újra kiírja a hívó metódusok forrását (az opciót figyelmen kívül hagyta).
+
+- MCP `method_body`: a `method` egyetlen név is lehet sima stringként, nem csak lista (egyes kliensek `"method": "parse"`-t küldenek, ami korábban „expected a sequence” hibával elbukott).
+
+### Javítás
+
+- **JS/TS: nincs több duplán listázott metódus, ha egy osztály neve megegyezik a fájléval** (`PlaylistResolver.ts` `class PlaylistResolver`-rel): az osztály metódusai kétszer szerepeltek, egyszer a fájl `module` bejegyzése alatt, egyszer az osztály alatt. Most az osztálytagok csak az osztály alatt, a legfelső szintű függvények csak a modul alatt jelennek meg.
 
 ## v0.2.0 — 2026-11-05
 
@@ -104,60 +182,60 @@ A bejegyzések angolul vannak, ahogy a projekt `CHANGELOG.md` fájljában.
 
 ### Új
 
-- **Background update check:** at most once a day `callgraph.sh` checks GitHub in a detached background process (never slows a query down). If a newer release exists, the output ends with one line, once a day: `ℹ callgraph X is available (installed: Y) — update: bash …/callgraph.sh update`. Claude Code tells the user and offers the update; it never updates on its own. Opt out with `CALLGRAPH_UPDATE_CHECK=0`; off in CI.
+- **Háttérben futó frissítés-ellenőrzés:** a `callgraph.sh` naponta legfeljebb egyszer, egy leválasztott háttér- folyamatban megnézi a GitHubot (soha nem lassít le egy lekérdezést). Ha van újabb release, a kimenet egy sorral zárul, naponta egyszer: `ℹ callgraph X is available (installed: Y) — update: bash …/callgraph.sh update`. A Claude Code szól a felhasználónak, és felajánlja a frissítést; magától soha nem frissít. Kikapcsolás: `CALLGRAPH_UPDATE_CHECK=0`; CI-ben ki van kapcsolva.
 
-- **Bug reporting via GitHub:** bilingual issue forms (bug report, idea / feedback), a private security report link and `SECURITY.md`. Error messages now point to the bug form; `feedback.sh show <error-id>` prints the details to paste.
+- **Hibajelentés GitHubon át:** kétnyelvű issue-űrlapok (hibajelentés, ötlet / visszajelzés), egy privát security report link és `SECURITY.md`. A hibaüzenetek most a hibajelentő űrlapra mutatnak; a `feedback.sh show <error-id>` kiírja a bemásolandó részleteket.
 
-- **Release checksums:** every release has a `SHA256SUMS` asset (`sha256sum` format, all assets). `update` verifies the downloaded zip's SHA-256 before installing and installs nothing on a mismatch; a release without `SHA256SUMS` (v0.1.0) is refused unless `--insecure-skip-checksum` is given. `update --from <zip>` checks `--sha256 <hex>` or a `SHA256SUMS` next to the zip, otherwise it warns in one line and installs.
+- **Release checksumok:** minden release-nek van `SHA256SUMS` assetje (`sha256sum` formátum, minden asset). Az `update` telepítés előtt ellenőrzi a letöltött zip SHA-256-ját, és eltérés esetén semmit nem telepít; a `SHA256SUMS` nélküli release-t (v0.1.0) elutasítja, hacsak nincs megadva az `--insecure-skip-checksum`. Az `update --from <zip>` a `--sha256 <hex>`-et vagy a zip melletti `SHA256SUMS`-ot ellenőrzi, különben egy sorban figyelmeztet, és telepít.
 
-- **MCP server mode:** `callgraph mcp` runs a Model Context Protocol server on stdio (official Rust SDK `rmcp`), so Claude Desktop, Cursor, VS Code or any MCP client can use callgraph. Tools: `outline`, `method_body`, `find_callers`, `search`, `framework_view`, `projects` — the same compact text and output cap as the CLI. Read-only, no network, paths confined to the project root. The skill / CLI usage is unchanged. Setup recipes: `docs/MCP.md`.
+- **MCP server mód:** a `callgraph mcp` egy Model Context Protocol servert futtat stdio-n (a hivatalos Rust SDK, `rmcp`), így a Claude Desktop, a Cursor, a VS Code vagy bármely MCP-kliens használhatja a callgraph-ot. Toolok: `outline`, `method_body`, `find_callers`, `search`, `framework_view`, `projects` — ugyanaz a tömör szöveg és kimeneti korlát, mint a CLI-nél. Csak olvas, nincs hálózat, az útvonalak a projekt gyökerére korlátozva. A skill / CLI használata változatlan. Beállítási receptek: `docs/MCP.md`.
 
-- **See how something is called:** "where is it called" results (`--grep`, and every level of `--depth`) now show the call's own source line next to its line number, e.g. `L25 │ $this->repo->find($id)` — no extra `--body` call needed just to see the arguments.
+- **Látszik, hogyan hívják:** a „hol hívják” eredmények (`--grep` és a `--depth` minden szintje) most a sorszám mellett a hívás saját forrássorát is mutatják, pl. `L25 │ $this->repo->find($id)` — nem kell külön `--body` hívás csak azért, hogy lásd az argumentumokat.
 
-- **Calls through interfaces and traits:** searching a class method (`--grep 'PlaylistResolver::getPlayables'`) also finds the calls made through its interface, abstract parent or trait (and, the other way round, through subclasses that don't override it). These are marked, e.g. `L14 via Resolver │ …`; `--depth` follows them to the next level, and `callers` adds a `"via"` field. Works where the call's receiver type is known (PHP: typed properties and other resolved receivers; Rust: `Type::method` calls); JS/TS interfaces and Swift protocols are not tracked yet.
+- **Hívások interface-eken és traiteken át:** egy osztálymetódus keresése (`--grep 'PlaylistResolver::getPlayables'`) az interface-én, absztrakt szülőjén vagy traitjén át történő hívásokat is megtalálja (és fordítva, a felül nem írt leszármazottakon át történőket is). Ezek meg vannak jelölve, pl. `L14 via Resolver │ …`; a `--depth` követi őket a következő szintre, a `callers` pedig egy `"via"` mezőt ad hozzá. Ott működik, ahol a hívás receiverének típusa ismert (PHP: típusos propertyk és más feloldott receiverek; Rust: `Type::method` hívások); a JS/TS interface-eket és a Swift protocolokat még nem követi.
 
-- **Rust: smarter method calls.** For `x.load()` callgraph now works out the type of `x` in the simple cases (parameter type, `let x = Repo::new()`, `Repo { … }`, `self`, a field of your own struct like `self.repo`), so the call shows up as `Repo::load` and "who calls `Repo::load`?" finds it. When the type can't be worked out, the call is kept as `?::load` and a `Repo::load` search still lists it, marked as uncertain — instead of silently missing it.
+- **Rust: okosabb metódushívások.** Az `x.load()`-nál a callgraph most az egyszerű esetekben kikövetkezteti az `x` típusát (paramétertípus, `let x = Repo::new()`, `Repo { … }`, `self`, a saját struct egy mezője, mint a `self.repo`), így a hívás `Repo::load`-ként jelenik meg, és a „ki hívja a `Repo::load`-ot?” megtalálja. Ha a típus nem következtethető ki, a hívás `?::load`-ként marad meg, és egy `Repo::load` keresés bizonytalanként megjelölve akkor is listázza — ahelyett, hogy csendben kihagyná.
 
-- **Rust constants:** `--const` now finds Rust `const` / `static` items — where they are defined and where they are used (also `Type::CONST`).
+- **Rust konstansok:** a `--const` most megtalálja a Rust `const` / `static` elemeket — hol vannak definiálva és hol használják őket (a `Type::CONST`-ot is).
 
-- **JS / TS object methods:** functions inside an object literal (`const api = { fetch() {}, save: () => {} }`, or a plain `export default { … }`) are listed as separate methods (`api.fetch`) with their line ranges, and calls to them are found.
+- **JS / TS objektum-metódusok:** az object literalon belüli függvények (`const api = { fetch() {}, save: () => {} }`, vagy egy sima `export default { … }`) külön metódusként szerepelnek (`api.fetch`) a sortartományukkal, és a rájuk irányuló hívások is megtalálhatók.
 
 ### Változás
 
-- **Shorter result lists:** when the project root would repeat on many lines (`--grep`, `--depth`, `--strings`, `--const`, folder outlines, framework views…), the first line is now `root: /abs/path/to/project` and every path after it is relative to that root. Outputs with a single path, and the machine formats (`json`, `mermaid`, `dot`, `callers`), are unchanged.
+- **Rövidebb találati listák:** ha a projekt gyökere sok sorban ismétlődne (`--grep`, `--depth`, `--strings`, `--const`, mappa-outline-ok, framework nézetek…), az első sor most `root: /abs/path/to/project`, és utána minden útvonal ehhez a gyökérhez relatív. Az egyetlen útvonalat tartalmazó kimenetek és a gépi formátumok (`json`, `mermaid`, `dot`, `callers`) változatlanok.
 
-- `SKILL.md` now recommends finding callers by name (`--grep '(^|::|\.|->)name$'`), which also catches inherited, trait and unknown-receiver calls; `Type::method` is for narrowing a common name. It also explains the new search output (`root:` line, `L<n> │ code`, `via`, `?::`) and the new Rust / JS options.
+- A `SKILL.md` most a név szerinti hívókeresést ajánlja (`--grep '(^|::|\.|->)name$'`), ami az örökölt, traites és ismeretlen receiverű hívásokat is elkapja; a `Type::method` egy gyakori név szűkítésére való. Elmagyarázza az új keresési kimenetet is (`root:` sor, `L<n> │ code`, `via`, `?::`) és az új Rust / JS opciókat.
 
-- `--const` also lists the matching constant definitions (marked `[definition]`), not only the references.
+- A `--const` a megfelelő konstansdefiníciókat is listázza (`[definition]` jelöléssel), nem csak a hivatkozásokat.
 
 ### Javítás
 
-- Windows: the project root is printed as `C:\…` instead of `\\?\C:\…` in search output.
+- Windows: a projekt gyökere `C:\…`-ként jelenik meg a keresési kimenetben a `\\?\C:\…` helyett.
 
-- A bare method selector also finds an object-literal method: `store.ts::updateSongs` selects `playableStore.updateSongs`.
+- Egy puszta metódus-selector egy object literal metódusát is megtalálja: a `store.ts::updateSongs` a `playableStore.updateSongs`-ot választja ki.
 
-- `--grep … --depth`: from level 2 on, callers are searched in the whole project (from the project root), not only in the folders of the level-1 matches — callers in other folders were missed.
+- `--grep … --depth`: a 2. szinttől a hívókat az egész projektben keresi (a projekt gyökerétől), nem csak az 1. szint találatainak mappáiban — a más mappákban lévő hívók kimaradtak.
 
-- Rust `--format api` now lists the `pub fn` methods of `impl` blocks (and trait implementations), the `pub` constants and fields — before, it showed no public methods for Rust types.
+- A Rust `--format api` most listázza az `impl` blokkok (és trait-implementációk) `pub fn` metódusait, a `pub` konstansokat és mezőket — korábban a Rust típusoknál nem mutatott publikus metódust.
 
-- `--strings` now finds texts inside Vue template expressions (`{{ … }}`, `:title="…"`, `@click="…"`) and in Rust `const` / `static` values, including byte strings (`b"…"`).
+- A `--strings` most megtalálja a Vue template-kifejezésekben lévő szövegeket (`{{ … }}`, `:title="…"`, `@click="…"`) és a Rust `const` / `static` értékekben lévőket, a byte stringeket (`b"…"`) is beleértve.
 
-- SCSS: `@mixin` / `@function` parameters (`$color: t.$brand, …`) and `@include` keyword arguments were listed as constants; now only `$var: value;` declarations are (the parameters stay the mixin's params).
+- SCSS: a `@mixin` / `@function` paraméterek (`$color: t.$brand, …`) és az `@include` kulcsszavas argumentumok konstansként jelentek meg; most csak a `$var: value;` deklarációk (a paraméterek a mixin paraméterei maradnak).
 
-- `update --check` now also records its result in `update-check.json`, so the daily background check does not repeat it and a newer version found manually shows up in the notice.
+- Az `update --check` most az eredményét az `update-check.json`-ba is beírja, így a napi háttér-ellenőrzés nem ismétli meg, és a kézzel talált újabb verzió megjelenik az értesítésben.
 
 ## v0.1.0 — 2026-11-05
 
 [Kiadási jegyzet és letöltések a GitHubon](https://github.com/GeRiY/callgraph/releases/tag/v0.1.0)
 
-First release.
+Első kiadás.
 
-- Languages: PHP, JavaScript / TypeScript, Vue, **Rust**, **Swift / SwiftUI**, CSS / SCSS, JSON, Markdown.
+- Nyelvek: PHP, JavaScript / TypeScript, Vue, **Rust**, **Swift / SwiftUI**, CSS / SCSS, JSON, Markdown.
 
-- Structure, categorized call graph, method bodies, "who calls this?" and impact analysis (`--grep --depth`), framework views (Laravel / Yii), many output formats.
+- Szerkezet, kategorizált call graph, metódus-törzsek, „ki hívja?” és hatáselemzés (`--grep --depth`), framework nézetek (Laravel / Yii), sokféle kimeneti formátum.
 
-- English or Hungarian output (`callgraph.sh set-lang en|hu`).
+- Angol vagy magyar kimenet (`callgraph.sh set-lang en|hu`).
 
-- Built-in update: `callgraph --version`, `callgraph.sh update [--check|--force]`.
+- Beépített frissítés: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 
-- Prebuilt packages for macOS (arm64, x86_64), Linux (x86_64, ARM64, static musl) and Windows.
+- Előre fordított csomagok macOS-re (arm64, x86_64), Linuxra (x86_64, ARM64, statikus musl) és Windowsra.
