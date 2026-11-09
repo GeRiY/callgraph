@@ -5,7 +5,7 @@
 //! - `rules.rs`, `role.rs`, `confirm.rs`, `architecture.rs`: a szabályok adat-táblái (bővíthetők, nyelvenként);
 //! - `classify.rs`: fájl → szerep, csak az útból (a lekérdezéskor is olcsó; a `.callgraph-layers` felülírhatja);
 //! - `layer.rs`: réteg = szerep + ökoszisztéma (`controller (php)` / `controller (js)`), a `--layer` szűrő alakjai;
-//! - `vendor.rs`: a profilból kimaradó vendor- és generált kód;
+//! - `vendor.rs`, `framework_copy.rs`: a profilból kimaradó vendor- és generált kód (bemásolt framework-mag is);
 //! - `project.rs`, `flow.rs`: a projekt összesítése; `build.rs`: bejárás + gráf; `format.rs`: a szöveges kimenet;
 //! - `scope.rs`, `view.rs`: a lekérdezések réteg-kapcsolói (`--layer`, `--layers`, `--by-layer`).
 //!
@@ -19,6 +19,7 @@ mod confirm;
 mod ecosystem;
 mod flow;
 mod format;
+mod framework_copy;
 mod layer;
 mod layers_file;
 mod names;
@@ -33,6 +34,8 @@ mod view;
 mod tests;
 #[cfg(test)]
 mod tests_layers;
+#[cfg(test)]
+mod tests_roles;
 
 use std::path::Path;
 

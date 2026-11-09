@@ -50,7 +50,7 @@ impl Command for ProfileCommand {
             "{}",
             crate::query::format::parse_trailer(&issues, lang)
         )?;
-        Ok(0)
+        Ok(crate::cli::strict::exit_code(!issues.is_empty()))
     }
 }
 

@@ -52,6 +52,37 @@ fn syntax_error_keeps_the_intact_prefix() {
 }
 
 #[test]
+fn syntax_error_keeps_the_items_after_the_error() {
+    // két hibás függvény (b, d): a hiba utáni elemek is megmaradnak, az eredeti sorszámokkal
+    let src = "fn a() -> u32 { 1 }\nfn b() -> u32 { let = 2; }\nfn c() -> u32 { 3 }\n\nfn d() { let = 4; }\n\nimpl X {\n    fn e(&self) {}\n}\n";
+    let a = RustBackend::with_defaults().analyze_source("src/r.rs", src.as_bytes());
+    let found: Vec<(&str, u32)> = a
+        .graph
+        .methods
+        .iter()
+        .map(|m| (m.name.as_str(), m.line))
+        .collect();
+    assert_eq!(
+        found,
+        [("a", 1), ("c", 3), ("e", 8)],
+        "{:?}",
+        a.graph.parse_errors
+    );
+    assert_eq!(a.graph.parse_errors.len(), 1);
+    assert_eq!(a.graph.parse_errors[0].line, 2);
+    let module = &a.graph.containers[0];
+    assert_eq!((module.line, module.end_line), (1, 9));
+}
+
+#[test]
+fn unclosed_delimiter_in_the_middle_keeps_the_items_after_it() {
+    let src = "fn a() -> u32 { 1 }\nfn b( -> u32 { 2 }\nfn c() -> u32 { 3 }\n";
+    let a = RustBackend::with_defaults().analyze_source("src/r.rs", src.as_bytes());
+    let names: Vec<&str> = a.graph.methods.iter().map(|m| m.name.as_str()).collect();
+    assert_eq!(names, ["a", "c"], "{:?}", a.graph.parse_errors);
+}
+
+#[test]
 fn valid_file_has_no_parse_errors() {
     let a = RustBackend::with_defaults().analyze_source("src/ok.rs", b"fn a() {}\n");
     assert!(a.graph.parse_errors.is_empty());

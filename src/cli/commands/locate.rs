@@ -30,8 +30,8 @@ impl LocateCommand {
 impl Command for LocateCommand {
     fn run(&self, out: &mut dyn Write, _err: &mut dyn Write) -> Result<i32> {
         let root = super::project_root(&self.home, self.project.as_deref())?;
-        let text = Locator::new(&root).run(&self.terms, self.all)?;
+        let (text, broken) = Locator::new(&root).run(&self.terms, self.all)?;
         out.write_all(text.as_bytes())?;
-        Ok(0)
+        Ok(crate::cli::strict::exit_code(broken > 0))
     }
 }

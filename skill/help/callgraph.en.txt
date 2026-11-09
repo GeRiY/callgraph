@@ -36,6 +36,10 @@ Usage:
                                                 unresolved, name-only matches ("?")
   Paths: when several would repeat the project root, the first line is "root: /abs/project" and every path after it is
   relative to that root (usable as-is in the next call with the same --project).
+  --project <alias|dir>: a registered alias, or an existing folder (absolute or relative) used as the root as-is.
+  Syntax errors: "⚠ syntax error at L<n>" under FILE (and a closing ⚠ line); the code before and after the broken
+  part is still mapped; exit code 0 — with --strict (or CALLGRAPH_STRICT=1, for CI) show / locate / profile exit
+  with 3 instead (same output).
   bash ~/.claude/skills/callgraph/callgraph.sh <file>::<method> [...] --body   source of the method(s), line-numbered, compact: no
                                                 docblock or blank lines, comments inside the body are kept (the line
                                                 numbers stay exact; the "==" header says "docblock L…-… omitted")
@@ -87,7 +91,10 @@ Project profile (architecture, layers and patterns from folder / file names, che
   bash ~/.claude/skills/callgraph/callgraph.sh <dir> --layers                  summary grouped by layer, [role] on FILE lines
   bash ~/.claude/skills/callgraph/callgraph.sh <dir> --grep <pattern> --depth 2 --by-layer   callers grouped by layer
                                                 (closest to the callee first), a "[service]  3 calls" header per group
+  event / listener / job / mail / notification need proof in the code (Dispatchable, extends Mailable…); an enum gets
+  no role from its name; --layer / --layers / --by-layer classify exactly like the profile.
   Own folder names: a .callgraph-layers file in the project root ("service = app/Logic", "ignore-role = app/Legacy").
+  A big legacy subtree to leave out entirely (e.g. an old app copy): a path line in .callgraphignore ("sn_monitoring/").
 
 Local usage stats (stays on this computer, nothing is sent anywhere; no paths, names or search terms):
   bash ~/.claude/skills/callgraph/callgraph.sh stats [--days N]

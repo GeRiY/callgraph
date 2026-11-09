@@ -13,7 +13,7 @@ use syn::spanned::Spanned;
 pub struct ParsedFile<'a> {
     pub(crate) file: &'a syn::File,
     source: &'a str,
-    /// A teljes fájl sorainak száma (előtag-elemzésnél több, mint a `source` sorai).
+    /// A forrás sorainak száma (helyreállításnál is a teljes fájlé: a hibás szakasz csak szóközökre cserélődik).
     lines: u32,
 }
 
@@ -24,11 +24,6 @@ impl<'a> ParsedFile<'a> {
             source,
             lines: line_count_of(source),
         }
-    }
-
-    /// A fájl-szintű container záró sora a teljes fájlé marad, ha csak egy előtagot elemeztünk.
-    pub(crate) fn with_line_count(self, lines: u32) -> Self {
-        Self { lines, ..self }
     }
 
     /// A teljes forrásszöveg (a kommentek szkenneléséhez).
@@ -107,21 +102,6 @@ pub trait RustParser {
         source: &str,
         consume: impl FnOnce(std::result::Result<&ParsedFile<'_>, ParseError>) -> R,
     ) -> R;
-
-    /// A forrás első `len` bájtjának elemzése (végzetes szintaktikai hibánál az ép előtag); a sorszámok
-    /// változatlanok, a fájl-container a teljes fájl sorait kapja.
-    fn parse_prefix<R>(
-        &self,
-        source: &str,
-        len: usize,
-        consume: impl FnOnce(std::result::Result<&ParsedFile<'_>, ParseError>) -> R,
-    ) -> R {
-        let lines = line_count_of(source);
-        self.parse(&source[..len], |parsed| match parsed {
-            Ok(parsed) => consume(Ok(&parsed.with_line_count(lines))),
-            Err(error) => consume(Err(error)),
-        })
-    }
 }
 
 #[cfg(test)]

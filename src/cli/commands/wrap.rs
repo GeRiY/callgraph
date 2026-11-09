@@ -96,7 +96,8 @@ impl WrapCommand {
         }
     }
 
-    fn exec(&self, out: &mut dyn Write) -> std::result::Result<(), SkillFailure> {
+    /// A `show` futtatása; siker: a kilépési kód (0, vagy `--strict` mellett szintaktikai hibás fájlnál 3).
+    fn exec(&self, out: &mut dyn Write) -> std::result::Result<i32, SkillFailure> {
         let p = parse(&self.args);
         let depth_ok = p.depth.starts_with(|c: char| ('1'..='9').contains(&c))
             && p.depth.chars().all(|c| c.is_ascii_digit());
@@ -114,7 +115,12 @@ impl WrapCommand {
             None => std::env::current_dir()?.display().to_string(),
             Some(alias) => self.resolve(alias)?,
         };
-        let label = p.project.clone().unwrap_or_else(|| root.clone());
+        // mappa-útként megadott projektnél a címke a (kanonikus) gyökér, aliasnál maga az alias
+        let label = p
+            .project
+            .clone()
+            .filter(|value| !std::path::Path::new(value).is_dir())
+            .unwrap_or_else(|| root.clone());
         let mut show = vec![
             "show".into(),
             "--project".into(),
@@ -141,8 +147,8 @@ impl WrapCommand {
                 2
             }
         };
-        if code == 0 {
-            return Ok(());
+        if code == 0 || code == crate::cli::strict::STRICT_EXIT_CODE {
+            return Ok(code);
         }
         let message = String::from_utf8_lossy(&captured)
             .trim_end_matches('\n')
@@ -156,8 +162,23 @@ impl WrapCommand {
         }
     }
 
+    /// A `--project` értéke: előbb regisztrált alias, különben létező mappa (abszolút vagy relatív — regisztráció
+    /// nélkül, mint a `locate` / `profile`); egyik sem → a régi hibaüzenet.
     fn resolve(&self, alias: &str) -> std::result::Result<String, SkillFailure> {
         let file = self.home.registry_file();
+        let registered = if file.is_file() {
+            ProjectRegistry::load(file)?.root(alias)
+        } else {
+            None
+        };
+        if let Some(root) = registered {
+            return Ok(root);
+        }
+        let dir = std::path::Path::new(alias);
+        if dir.is_dir() {
+            let dir = dir.canonicalize().unwrap_or_else(|_| dir.to_path_buf());
+            return Ok(dir.display().to_string());
+        }
         if !file.is_file() {
             return Err(SkillFailure::usage(crate::tf!(
                 "No projects.json — register a project first: bash ~/.claude/skills/callgraph/projects.sh add {alias} <absolute_path>",
@@ -178,7 +199,9 @@ impl Command for WrapCommand {
         let result = self.exec(out);
         self.update_check
             .after_command(now_secs(), result.is_ok(), out);
-        finish(&self.home, SOURCE, result, err)
+        let code = result.as_ref().map_or(0, |code| *code);
+        let finished = finish(&self.home, SOURCE, result.map(|_| ()), err)?;
+        Ok(if finished == 0 { code } else { finished })
     }
 }
 
@@ -228,6 +251,22 @@ mod tests {
             s(&["--layer", "service", "--layers", "--by-layer"])
         );
         assert_eq!(p.targets, s(&["app"]));
+    }
+
+    #[test]
+    fn project_may_be_an_existing_directory_without_a_registry() {
+        let dir = std::env::temp_dir();
+        let registry = dir.join("callgraph-wrap-no-such-projects.json");
+        let home = SkillHome::new(dir.clone(), String::new(), registry);
+        let wrap = WrapCommand::new(Vec::new(), home);
+        let root = wrap.resolve(&dir.display().to_string()).unwrap();
+        assert_eq!(
+            std::path::PathBuf::from(root),
+            dir.canonicalize().unwrap()
+        );
+        // nem mappa és nincs registry: a régi hibaüzenet
+        let error = wrap.resolve("no-such-alias-xyz").unwrap_err();
+        assert!(error.message.contains("projects.json"), "{}", error.message);
     }
 
     #[test]

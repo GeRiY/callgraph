@@ -13,10 +13,11 @@ use crate::index::TypeHierarchy;
 use crate::io::FileWalker;
 use crate::model::FileGraph;
 
-use super::classify::Classifier;
-use super::confirm::confirm;
+use super::classify::{Classifier, Reason};
+use super::confirm::{confirm, enum_only};
 use super::ecosystem::manifest_frameworks;
 use super::flow::{self, FlowFile};
+use super::layer::Layer;
 use super::layers_file::slashed;
 use super::project::{FileEntry, ProjectProfile};
 use super::vendor::{Skip, Skipper};
@@ -90,7 +91,7 @@ pub(crate) fn with_graph(root: &Path, with_vendor: bool) -> ProjectProfile {
     }
     let hierarchy = TypeHierarchy::from_graphs(every.iter().copied());
     for (entry, file_graph) in entries.iter_mut().zip(&graphs) {
-        settle(entry, *file_graph, &hierarchy);
+        settle(entry, *file_graph, &hierarchy, &classifier);
     }
     let mut frameworks = manifest_frameworks(root);
     let present: Vec<&FileGraph> = graphs.iter().flatten().copied().collect();
@@ -116,7 +117,21 @@ pub(crate) fn with_graph(root: &Path, with_vendor: bool) -> ProjectProfile {
 }
 
 /// A megerősítés (C jel); kód-jelet kívánó szerepnél megerősítés nélkül a tartalék besorolás (és annak megerősítése).
-pub(super) fn settle(entry: &mut FileEntry, graph: Option<&FileGraph>, hierarchy: &TypeHierarchy) {
+/// Csak enumot tartalmazó fájlnál (`confirm::enum_only`) a fájlnév nem ad szerepet: a besorolás a név nélküli.
+pub(super) fn settle(
+    entry: &mut FileEntry,
+    graph: Option<&FileGraph>,
+    hierarchy: &TypeHierarchy,
+    classifier: &Classifier,
+) {
+    let named = matches!(entry.class.reason, Reason::Name(_) | Reason::Conflict(..))
+        && !entry.class.role.is_some_and(|role| role.name() == "enum");
+    if named
+        && graph.is_some_and(enum_only)
+        && let Some(class) = classifier.classify_without_name(&entry.rel)
+    {
+        entry.class = class;
+    }
     let check = |role: Option<super::role::Role>| match (role, graph) {
         (Some(role), Some(graph)) => confirm(role, graph, hierarchy),
         _ => None,
@@ -128,6 +143,39 @@ pub(super) fn settle(entry: &mut FileEntry, graph: Option<&FileGraph>, hierarchy
         entry.class = *fallback;
         entry.confirmed = check(entry.class.role);
     }
+}
+
+/// A réteg-kapcsolók (`--layer`, `--layers`, `--by-layer`, `callers --by-layer`) rétegei a profillal azonos
+/// besorolással: a projekt-gráf (már frissítve) szűkített tényeiből megerősítve (`settle`), a vendor- és generált
+/// kód réteg nélkül. Kulcs: a gyökérhez relatív, `/`-es út.
+pub(crate) fn settled_layers(
+    root: &Path,
+    files: &[PathBuf],
+    graph: &crate::graph::ProjectGraph,
+) -> HashMap<String, Option<Layer>> {
+    let classifier = Classifier::for_root(root);
+    let mut skipper = Skipper::new(root, true);
+    let mut found: Vec<(FileEntry, Option<&FileGraph>)> = Vec::new();
+    for file in files {
+        let Some(entry) = entry(root, file, &classifier) else {
+            continue;
+        };
+        found.push((entry, graph.slim_graph(&file.to_string_lossy())));
+    }
+    let hierarchy = TypeHierarchy::from_graphs(found.iter().filter_map(|(_, g)| *g));
+    found
+        .into_iter()
+        .map(|(mut entry, file_graph)| {
+            let skipped = skipper.skip(&entry.rel).is_some() || file_graph.is_some_and(|g| g.binary);
+            let layer = if skipped {
+                None
+            } else {
+                settle(&mut entry, file_graph, &hierarchy, &classifier);
+                entry.class.layer()
+            };
+            (entry.rel, layer)
+        })
+        .collect()
 }
 
 /// A név-alapú profil a már bejárt fájllistából (kód-jel nincs: a kód-jelet kívánó szerepek a tartalékot kapják).

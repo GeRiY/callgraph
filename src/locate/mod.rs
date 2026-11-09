@@ -45,9 +45,9 @@ impl Locator {
         }
     }
 
-    /// A kifejezésekre adott válasz szövege; `all`: minden egyező fájl (alapból az első 5). Kifejezés nélkül
-    /// használati hiba.
-    pub fn run<S: AsRef<str>>(&self, inputs: &[S], all: bool) -> Result<String> {
+    /// A kifejezésekre adott válasz szövege és a szintaktikai hibás fájlok száma (`--strict`); `all`: minden egyező
+    /// fájl (alapból az első 5). Kifejezés nélkül használati hiba.
+    pub fn run<S: AsRef<str>>(&self, inputs: &[S], all: bool) -> Result<(String, usize)> {
         let terms = Term::parse_all(inputs);
         if terms.is_empty() {
             return Err(CallgraphError::Usage(usage().into()));
@@ -90,7 +90,7 @@ impl Locator {
             &issues,
             crate::i18n::lang(),
         ));
-        Ok(text)
+        Ok((text, issues.len()))
     }
 
     /// Az út a gyökérhez képest (a fájlnév- és út-egyezéshez).

@@ -8,7 +8,7 @@ use super::framework::FrameworkDetector;
 use super::module_path::ModulePath;
 use super::parser::{RustParser, SynAdapter};
 use super::visitor::{self, FileVisitor};
-use crate::core::SourceFile;
+use crate::core::{SourceFile, recover_segments};
 use crate::error::Result;
 use crate::lang::{Analysis, Language, LanguageBackend, LanguageRole};
 use crate::model::{Container, FileGraphBuilder};
@@ -30,7 +30,7 @@ impl<P: RustParser> RustBackend<P> {
     }
 
     /// Már beolvasott forrás elemzése. Szintaktikai hibánál (a `syn` nem hibatűrő) a hiba a `warnings`-ba és a
-    /// gráf `parse_errors`-ába kerül, a gráf pedig a hiba előtti ép előtagból készül (`recover`); ha az sem
+    /// gráf `parse_errors`-ába kerül, a gráf pedig a hiba előtti és utáni ép részekből készül (`recover`); ha az sem
     /// elemezhető, csak a fájl-container marad.
     pub fn analyze_source(&self, path: &str, source: &[u8]) -> Analysis {
         let text = String::from_utf8_lossy(source);
@@ -66,8 +66,9 @@ impl<P: RustParser> RustBackend<P> {
         }
     }
 
-    /// Az ép előtag elemzése: a hibás sor elejéig, utána korábbi felső szintű határokig (`core::prefix_cuts`).
-    /// Igaz, ha valamelyik előtag elemezhető volt (a visitorok lefutottak).
+    /// Az ép részek elemzése: az előtag a hibás sor elejéig (vagy korábbi felső szintű határig), utána a hibát követő
+    /// első felső szintű elemtől újra (`core::recover_segments`: a hibás szakasz szóközökre cserélve, így a sorszámok
+    /// az eredetiek). Igaz, ha valamelyik változat elemezhető volt (a visitorok lefutottak).
     fn recover(
         &self,
         text: &str,
@@ -75,21 +76,47 @@ impl<P: RustParser> RustBackend<P> {
         ctx: &mut RsContext,
         builder: &mut FileGraphBuilder,
     ) -> bool {
-        for cut in crate::core::prefix_cuts(text, line_offset(text, line)) {
-            let done = self.parser.parse_prefix(text, cut, |parsed| match parsed {
-                Ok(parsed) => {
-                    visitor::run(&self.visitors, parsed, ctx, builder);
-                    true
-                }
-                Err(_) => false,
-            });
-            if done {
-                return true;
+        let fatal_at = |candidate: &str| {
+            self.parser.parse(candidate, |parsed| {
+                parsed
+                    .err()
+                    .map(|e| line_offset(candidate, error_line(candidate, e.line)))
+            })
+        };
+        let first = line_offset(text, line);
+        let Some(recovered) = recover_segments(text, first, &ITEM_STARTS, fatal_at) else {
+            return false;
+        };
+        self.parser.parse(&recovered, |parsed| match parsed {
+            Ok(parsed) => {
+                visitor::run(&self.visitors, parsed, ctx, builder);
+                true
             }
-        }
-        false
+            Err(_) => false,
+        })
     }
 }
+
+/// Felső szintű elem-kezdetek, ahonnan végzetes hiba után az elemzés folytatható (`core::recover_segments`).
+const ITEM_STARTS: [&str; 17] = [
+    "fn",
+    "pub",
+    "impl",
+    "struct",
+    "enum",
+    "mod",
+    "use",
+    "trait",
+    "type",
+    "const",
+    "static",
+    "extern",
+    "unsafe",
+    "async",
+    "macro_rules!",
+    "#[",
+    "///",
+];
 
 /// A hiba sora: a `syn` a fájlvégi hibát a hívási helyre (0. sor) vagy a záró üres sorra teheti — ilyenkor az
 /// utolsó tartalmas sor.

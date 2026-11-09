@@ -5,6 +5,7 @@ mod command;
 pub mod commands;
 mod profile_args;
 mod stats_args;
+pub mod strict;
 
 pub use args::{CliArgs, HookAction, NO_GITIGNORE_FLAG, NoteAction, take_no_gitignore};
 pub use command::Command;

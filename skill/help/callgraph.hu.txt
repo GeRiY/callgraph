@@ -36,6 +36,10 @@ Használat:
                                                 csak név szerinti egyezéseket is ("?")
   Utak: ha a projekt-gyökér többször ismétlődne, az első sor "gyökér: /abs/projekt", utána minden út ehhez relatív
   (a következő hívásban ugyanazzal a --project-tel változatlanul használható).
+  --project <alias|mappa>: regisztrált alias, vagy egy létező mappa (abszolút vagy relatív), változatlanul gyökérként.
+  Szintaktikai hiba: "⚠ szintaktikai hiba itt: L<n>" a FILE alatt (és egy záró ⚠ sor); a hibás rész előtti és utáni
+  kód a térképen van; a kilépési kód 0 — --strict mellett (vagy CALLGRAPH_STRICT=1, CI-hez) a show / locate / profile
+  3-mal lép ki (ugyanazzal a kimenettel).
   bash ~/.claude/skills/callgraph/callgraph.sh <fájl>::<metódus> [...] --body   a metódus(ok) forrása sorszámozva, tömören: docblock
                                                 és üres sorok nélkül, a törzsön belüli megjegyzések maradnak (a sorszámok
                                                 pontosak; az "==" fejléc jelzi: "docblock L…-… kihagyva")
@@ -87,7 +91,11 @@ Projekt-profil (architektúra, rétegek és minták a mappa- / fájlnevekből, a
   bash ~/.claude/skills/callgraph/callgraph.sh <mappa> --layers                summary rétegenként, [szerep] a FILE sorokon
   bash ~/.claude/skills/callgraph/callgraph.sh <mappa> --grep <minta> --depth 2 --by-layer   hívók rétegenként
                                                 (a hívotthoz legközelebbi elöl), csoportonként "[service]  3 hívás" fejléc
+  event / listener / job / mail / notification réteghez kódbeli bizonyíték kell (Dispatchable, extends Mailable…); egy
+  enum a nevéből nem kap szerepet; a --layer / --layers / --by-layer pontosan úgy sorol be, mint a profil.
   Saját mappanevek: .callgraph-layers fájl a projekt gyökerében ("service = app/Logic", "ignore-role = app/Legacy").
+  Egy nagy, teljesen kihagyandó régi almappa (pl. egy régi alkalmazás-másolat): útvonal-sor a .callgraphignore-ban
+  ("sn_monitoring/").
 
 Helyi használati statisztika (a gépen marad, semmi nem megy el; út, név és keresési kifejezés nélkül):
   bash ~/.claude/skills/callgraph/callgraph.sh stats [--days N]

@@ -129,7 +129,10 @@ MCP server and the hook); `.callgraphignore` and the built-in skipped folders st
 - Macro- or reflection-heavy code: dynamic calls that can't be resolved statically are shown as name-only matches
   (`?`) with `--guess`, or not at all.
 - Files with a syntax error (mid-edit, merge conflict) are flagged with `⚠ syntax error at L<n>` and a closing `⚠`
-  line: the part before the error is still mapped, the rest may be missing — read such a file directly.
+  line: the code before and after the broken part is still mapped (JS / TS / Vue, Rust: from the next top-level
+  function, class or item on), the broken part itself is missing — read such a file directly. The exit code stays 0;
+  for CI, add `--strict` (or set `CALLGRAPH_STRICT=1`): `show`, `locate` and `profile` then exit with code 3 when a
+  file they read has a syntax error, with the same output.
 
 ## Quick start
 
@@ -205,7 +208,8 @@ stable releases (on a dev build they only speak up for a newer stable version).
 ## Usage
 
 All commands go through `callgraph.sh` (or the binary directly: `callgraph show …`). `--project <alias>` makes paths
-relative to a registered project root; without it, the current directory is the root.
+relative to a registered project root; `--project <dir>` (an existing folder, absolute or relative) works without
+registering; without it, the current directory is the root.
 
 | Task | Command |
 |---|---|
@@ -299,11 +303,19 @@ without a clear role, and how the layers call each other. The code graph confirm
 The layers are listed by file count, so the main layer is always on top. A role found in both the backend and the
 frontend is shown apart, e.g. `controller (php)` and `controller (js)` for PHP controllers next to AngularJS ones, and
 the call direction keeps the two apart. Third-party code copied into the project (a subfolder with its own
-`composer.json`, `package.json` or `LICENSE`, or folders like `vendors/`, `third_party/`, `extensions/`, `libs/`) and
-build output (`dist/`, `build/`, `*.min/`, minified files) do not count: one line says how many files were skipped
-and where (`profile --with-vendor` counts them anyway); your queries still see these files. `event`, `listener` and
-`job` layers need proof in the code (an Event / Listener base class, Laravel's `Dispatchable` or `ShouldQueue`, a
-`handle(…)` method in a `Listeners` namespace) — a folder that is just named `Event` is not an event layer.
+`composer.json`, `package.json` or `LICENSE`, folders like `vendors/`, `third_party/`, `extensions/`, `libs/`, or a
+copied framework core: CodeIgniter `system/`, Yii `framework/`, Kohana `system/`) and build output (`dist/`, `build/`,
+`*.min/`, minified files) do not count: one line says how many files were skipped and where (`profile --with-vendor`
+counts them anyway); your queries still see these files. `event`, `listener`, `job`, `mail` and `notification`
+layers need proof in the code (an Event / Listener base class, Laravel's `Dispatchable` or `ShouldQueue`, a
+`handle(…)` method in a `Listeners` namespace, `extends Mailable` / `extends Notification`) — a folder that is just
+named `Event` is not an event layer. An enum never gets a role from its name (`PaymentProvider` is not a provider);
+an `Enums` folder is shown as `enum`. The `flow:` line only links layers that really call each other; a side branch
+follows after `;`, e.g. `flow: controller → service → model; command → service`.
+
+A large subtree the profile should not look at at all (an old copy of the whole app, a bundled legacy tool such as
+`sn_monitoring/`) can be left out with a path line in `.callgraphignore` (`sn_monitoring/`); note that it then
+disappears from every query too.
 
 Use the layers in queries (all opt-in, the default output does not change):
 
@@ -316,7 +328,9 @@ bash ~/.claude/skills/callgraph/callgraph.sh app --grep 'Repo::find' --depth 2 -
 
 `--by-layer` puts the layer closest to the called method first (model → repository → service → controller) and
 starts each group with a header such as `[service]  3 calls`, in the short and the long `--grep` view alike (with
-`--depth`: in every level).
+`--depth`: in every level). The layer switches classify the files exactly like `profile` (with the same code proof,
+read from the project map); without the map (`CALLGRAPH_NO_GRAPH=1`) a folder that needs proof, such as `Event`,
+gives the next role (`app/Services/Event/X.php` → `service`).
 
 Folder names that say nothing (or are not English)? A commit-able `.callgraph-layers` file in the project root maps
 them: `service = app/Szolgaltatasok, app/Logic`, `ignore-role = app/Legacy`.

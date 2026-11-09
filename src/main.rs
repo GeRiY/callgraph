@@ -19,6 +19,13 @@ fn main() -> ExitCode {
             std::env::set_var(callgraph::io::GITIGNORE_ENV, "0");
         }
     }
+    if cli::strict::take_strict(&mut args) {
+        // SAFETY: mint fent — egyszálú pont; a `show` / `locate` / `profile` (és a `wrap`) ebből tudja, hogy a
+        // szintaktikai hibás fájl 3-as kilépési kódot ad
+        unsafe {
+            std::env::set_var(cli::strict::STRICT_ENV, "1");
+        }
+    }
     callgraph::update::cleanup_stale_binary();
     let probe = CliProbe::start(&args);
     let command = match CliArgs::parse(args).and_then(cli::build_command) {

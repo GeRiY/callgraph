@@ -12,6 +12,8 @@
 # `callgraph.sh stats [--days N]` shows the local usage stats (forwarded to `callgraph stats`; nothing is sent anywhere).
 # `callgraph.sh --version` (or `-V`, `version`) prints the binary's version and platform, and the binary's path.
 # `--no-gitignore` with any command: the .gitignore files are not applied (.callgraphignore still is).
+# `--strict` (or CALLGRAPH_STRICT=1): show / locate / profile exit with code 3 if a file read had a syntax error.
+# `--project <dir>`: an existing folder (absolute or relative) works without registering it as an alias.
 # Help: skill/help/callgraph.en.txt and skill/help/callgraph.hu.txt (`callgraph.sh --help`).
 
 set -uo pipefail
