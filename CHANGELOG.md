@@ -5,6 +5,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+## [0.5.1] — 2026-11-09
+
 ### Added
 - **Local usage stats:** `callgraph.sh stats` shows how you (and your agents) used callgraph in the last 7 days
   (`--days N` for up to 90): how many calls per command and MCP tool, how many failed, how long they took and how big
@@ -336,7 +338,8 @@ First release.
 - Built-in update: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Prebuilt packages for macOS (arm64, x86_64), Linux (x86_64, ARM64, static musl) and Windows.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.5.0...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.5.1...develop
+[0.5.1]: https://github.com/GeRiY/callgraph/releases/tag/v0.5.1
 [0.5.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.5.0
 [0.4.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.4.0
 [0.3.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.3.0
