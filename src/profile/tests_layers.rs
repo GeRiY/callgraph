@@ -245,7 +245,12 @@ fn event_listener_and_job_need_a_code_signal() {
     let hierarchy = TypeHierarchy::from_graphs([&shipped, &listener, &plain]);
     let settled = |rel: &str, file_graph: &FileGraph| {
         let mut entry = entries(&[rel]).remove(0);
-        settle(&mut entry, Some(file_graph), &hierarchy, &Classifier::default());
+        settle(
+            &mut entry,
+            Some(file_graph),
+            &hierarchy,
+            &Classifier::default(),
+        );
         (entry.class.role.map(Role::name), entry.confirmed)
     };
     let (event, label) = settled("app/Events/OrderShipped.php", &shipped);

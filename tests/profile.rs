@@ -634,7 +634,10 @@ fn layer_switches_classify_like_the_profile() {
     let profile = project.run(&["profile", "--full"]);
     assert!(profile.contains("  event "), "{profile}");
     assert!(profile.contains("  mail "), "{profile}");
-    assert!(profile.contains("confirmed 1: extends Mailable"), "{profile}");
+    assert!(
+        profile.contains("confirmed 1: extends Mailable"),
+        "{profile}"
+    );
     // enum: a név (`*Provider`) nem szerep; az `Enums` mappa a saját (kiszolgáló) szerepe
     assert!(profile.contains("  enum "), "{profile}");
     assert!(!profile.contains("  provider "), "{profile}");
@@ -659,6 +662,14 @@ fn layer_switches_classify_like_the_profile() {
         .filter_map(|l| serde_json::from_str::<serde_json::Value>(l).ok())
         .filter_map(|v| v["layer"].as_str().map(str::to_owned))
         .collect();
-    assert_eq!(layers.iter().filter(|l| *l == "event").count(), 1, "{callers}");
-    assert_eq!(layers.iter().filter(|l| *l == "service").count(), 2, "{callers}");
+    assert_eq!(
+        layers.iter().filter(|l| *l == "event").count(),
+        1,
+        "{callers}"
+    );
+    assert_eq!(
+        layers.iter().filter(|l| *l == "service").count(),
+        2,
+        "{callers}"
+    );
 }

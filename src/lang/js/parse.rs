@@ -183,7 +183,8 @@ mod tests {
     #[test]
     fn error_in_the_first_statement_keeps_the_rest() {
         let alloc = Allocator::default();
-        let src = "\nfunction a( { return 1 }\nfunction b() { return 2 }\nfunction c() { return 3 }\n";
+        let src =
+            "\nfunction a( { return 1 }\nfunction b() { return 2 }\nfunction c() { return 3 }\n";
         let p = parse_recovering(&alloc, src, SourceType::jsx());
         assert!(p.fatal);
         assert_eq!(p.program.body.len(), 2, "{:?}", p.errors);

@@ -144,8 +144,8 @@ impl Classifier {
                 fallback: None,
             });
         }
-        let name = name_hit(stem, eco)
-            .filter(|hit| names && !(strict && hit.role.needs_code_signal()));
+        let name =
+            name_hit(stem, eco).filter(|hit| names && !(strict && hit.role.needs_code_signal()));
         // a DDD-kontextus mappa (`Domain/…`) csak akkor dönt, ha a fájlnév semmit sem mond
         let folder = folder_hit(dir, eco, strict)
             .filter(|folder| name.is_none() || folder.role.kind() != Kind::Context);

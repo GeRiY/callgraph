@@ -282,13 +282,22 @@ fn functions_after_the_error_are_kept_with_their_lines() {
             assert!(out.contains("  ok()  L1-1"), "{mode} {file}: {out}");
             assert!(out.contains("  after()  L3-3"), "{mode} {file}: {out}");
             assert!(!out.contains("broken()"), "{mode} {file}: {out}");
-            assert!(out.contains("⚠ syntax error at L2: "), "{mode} {file}: {out}");
+            assert!(
+                out.contains("⚠ syntax error at L2: "),
+                "{mode} {file}: {out}"
+            );
         }
         let two = project.run(&["show", "src/two.js"], graph);
         for (name, line) in [("a", 1), ("c", 3), ("e", 5)] {
-            assert!(two.contains(&format!("  {name}()  L{line}-{line}")), "{mode}: {two}");
+            assert!(
+                two.contains(&format!("  {name}()  L{line}-{line}")),
+                "{mode}: {two}"
+            );
         }
-        assert!(!two.contains("  b()") && !two.contains("  d()"), "{mode}: {two}");
+        assert!(
+            !two.contains("  b()") && !two.contains("  d()"),
+            "{mode}: {two}"
+        );
         let multi = project.run(&["show", "src/multi.js"], graph);
         assert!(
             multi.contains("  a()  L1-3") && multi.contains("  c()  L9-11"),
@@ -319,7 +328,10 @@ fn strict_mode_exits_with_3_on_syntax_errors_and_keeps_the_output() {
         let plain = project.run(&["show", "src/bad.js"], graph);
         let strict = project.command(&["show", "src/bad.js", "--strict"], graph);
         assert_eq!(strict.status.code(), Some(3), "{mode}");
-        assert_eq!(String::from_utf8_lossy(&strict.stdout).replace('\\', "/"), plain);
+        assert_eq!(
+            String::from_utf8_lossy(&strict.stdout).replace('\\', "/"),
+            plain
+        );
         // env-ből is (CI)
         let strict_env = [("CALLGRAPH_STRICT", "1")];
         let env = project.command_env(&["show", ".", "--grep", "ok"], graph, &strict_env);

@@ -166,7 +166,8 @@ pub(crate) fn settled_layers(
     found
         .into_iter()
         .map(|(mut entry, file_graph)| {
-            let skipped = skipper.skip(&entry.rel).is_some() || file_graph.is_some_and(|g| g.binary);
+            let skipped =
+                skipper.skip(&entry.rel).is_some() || file_graph.is_some_and(|g| g.binary);
             let layer = if skipped {
                 None
             } else {

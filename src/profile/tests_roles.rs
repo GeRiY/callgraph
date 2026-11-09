@@ -100,7 +100,10 @@ fn enum_files_get_no_role_from_their_name() {
             .map(Role::name),
         Some("enum")
     );
-    assert_eq!(settled("app/Support/PaymentProvider.php", &enum_graph), None);
+    assert_eq!(
+        settled("app/Support/PaymentProvider.php", &enum_graph),
+        None
+    );
     assert_eq!(
         settled("app/Support/PaymentProvider.php", &class_graph),
         Some("provider")

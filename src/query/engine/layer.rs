@@ -19,7 +19,11 @@ impl QueryEngine {
         if let Some(shared) = self.project_graph() {
             let mut graph = crate::graph::lock(&shared);
             let files = self.walk(std::slice::from_ref(&self.root));
-            if graph.refresh(&files, true, &self.analyzer).is_ok() {
+            // mint a profilnál: a szűkített gráf (kód-jelek) is betöltve, különben a besorolás jel nélküli
+            let ready = graph
+                .refresh(&files, true, &self.analyzer)
+                .and_then(|()| graph.ensure_callers(&self.analyzer));
+            if ready.is_ok() {
                 let _ = graph.save();
                 scope.settle_with(&files, &graph);
             }

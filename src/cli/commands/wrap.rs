@@ -260,10 +260,7 @@ mod tests {
         let home = SkillHome::new(dir.clone(), String::new(), registry);
         let wrap = WrapCommand::new(Vec::new(), home);
         let root = wrap.resolve(&dir.display().to_string()).unwrap();
-        assert_eq!(
-            std::path::PathBuf::from(root),
-            dir.canonicalize().unwrap()
-        );
+        assert_eq!(std::path::PathBuf::from(root), dir.canonicalize().unwrap());
         // nem mappa és nincs registry: a régi hibaüzenet
         let error = wrap.resolve("no-such-alias-xyz").unwrap_err();
         assert!(error.message.contains("projects.json"), "{}", error.message);
