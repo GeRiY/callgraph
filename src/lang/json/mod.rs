@@ -151,7 +151,14 @@ impl Language for JsonDocument {
                 }
                 Vec::new()
             }
-            Err(error) => vec![format!("JSONC parse warning: {error}")],
+            Err(error) => {
+                let line = u32::try_from(error.line_display()).unwrap_or(u32::MAX);
+                b.parse_error(crate::model::ParseError::new(
+                    line,
+                    &error.kind().to_string(),
+                ));
+                vec![format!("JSONC parse warning: {error}")]
+            }
         };
         Ok(Analysis {
             graph: b.build(),
@@ -196,6 +203,16 @@ mod tests {
                 .collect::<Vec<_>>(),
             ["scripts", "scripts.build", "items", "items.name"]
         );
+    }
+
+    #[test]
+    fn syntax_error_is_recorded_with_its_line() {
+        let file = SourceFile::new("b.json", b"{\n  \"a\": 1,\n  \"b\": ]\n}\n".to_vec(), None);
+        let graph = JsonDocument.analyze(&file).unwrap().graph;
+        assert_eq!(graph.parse_errors.len(), 1);
+        assert_eq!(graph.parse_errors[0].line, 3, "{:?}", graph.parse_errors);
+        let ok = SourceFile::new("c.json", b"{\"a\": 1}\n".to_vec(), None);
+        assert!(JsonDocument.analyze(&ok).unwrap().graph.parse_errors.is_empty());
     }
 
     #[test]

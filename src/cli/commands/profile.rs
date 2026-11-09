@@ -3,6 +3,7 @@
 //! alapból; `--full`: mappánként, bizonyosság szerint, a hívásirány párjaival.
 
 use std::io::Write;
+use std::path::Path;
 
 use crate::cli::Command;
 use crate::error::Result;
@@ -31,11 +32,29 @@ impl Command for ProfileCommand {
     fn run(&self, out: &mut dyn Write, _err: &mut dyn Write) -> Result<i32> {
         let root = super::project_root(&self.home, self.project.as_deref())?;
         let profile = with_graph(&root);
-        write!(
-            out,
-            "{}",
-            render(&profile, crate::i18n::lang(), self.full, Tip::Show)
-        )?;
+        let lang = crate::i18n::lang();
+        write!(out, "{}", render(&profile, lang, self.full, Tip::Show))?;
+        // a gráf-alapú megerősítés hibás fájlnál hiányos: a záró `⚠` sor (hiba nélkül üres)
+        let issues = parse_issues(&root);
+        write!(out, "{}", crate::query::format::parse_trailer(&issues, lang))?;
         Ok(0)
     }
+}
+
+/// A projekt-gráfban (a `with_graph` frissítette) a szintaktikai hibás fájlok: gyökérhez relatív út, az első hiba
+/// sora, út szerint rendezve; gráf nélkül üres.
+fn parse_issues(root: &Path) -> Vec<(String, u32)> {
+    let root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
+    let Some(shared) = crate::graph::shared(&root) else {
+        return Vec::new();
+    };
+    let graph = crate::graph::lock(&shared);
+    graph
+        .tracked_under(&root)
+        .iter()
+        .filter_map(|key| {
+            let stored = graph.slim_graph(key)?;
+            crate::query::format::parse_issue(&root, Path::new(key), stored)
+        })
+        .collect()
 }

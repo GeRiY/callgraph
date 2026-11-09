@@ -115,6 +115,8 @@ json
 - Non-code files (plain text, data dumps): the outline adds little.
 - Macro- or reflection-heavy code: dynamic calls that can't be resolved statically are shown as name-only matches
   (`?`) with `--guess`, or not at all.
+- Files with a syntax error (mid-edit, merge conflict) are flagged with `⚠ syntax error at L<n>` and a closing `⚠`
+  line: the part before the error is still mapped, the rest may be missing — read such a file directly.
 
 ## Quick start
 

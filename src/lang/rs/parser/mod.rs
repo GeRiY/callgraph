@@ -9,14 +9,26 @@ use proc_macro2::Span;
 use syn::spanned::Spanned;
 
 /// Egy parse-olt Rust-fájl nézete: a szintaxisfa, a forrás és a sor-segédek.
+#[derive(Clone, Copy)]
 pub struct ParsedFile<'a> {
     pub(crate) file: &'a syn::File,
     source: &'a str,
+    /// A teljes fájl sorainak száma (előtag-elemzésnél több, mint a `source` sorai).
+    lines: u32,
 }
 
 impl<'a> ParsedFile<'a> {
     pub(crate) fn new(file: &'a syn::File, source: &'a str) -> Self {
-        Self { file, source }
+        Self {
+            file,
+            source,
+            lines: line_count_of(source),
+        }
+    }
+
+    /// A fájl-szintű container záró sora a teljes fájlé marad, ha csak egy előtagot elemeztünk.
+    pub(crate) fn with_line_count(self, lines: u32) -> Self {
+        Self { lines, ..self }
     }
 
     /// A teljes forrásszöveg (a kommentek szkenneléséhez).
@@ -26,7 +38,7 @@ impl<'a> ParsedFile<'a> {
 
     /// A forrás sorainak száma (a fájl-szintű container záró sora).
     pub(crate) fn line_count(&self) -> u32 {
-        self.source.lines().count().max(1) as u32
+        self.lines
     }
 
     /// A span kezdő sora (1-alapú).
@@ -57,6 +69,11 @@ impl<'a> ParsedFile<'a> {
     pub(crate) fn short(&self, node: &impl Spanned, max: usize) -> String {
         shorten(&squash(&self.text(node)), max)
     }
+}
+
+/// A szöveg sorainak száma (legalább 1).
+pub(crate) fn line_count_of(text: &str) -> u32 {
+    text.lines().count().max(1) as u32
 }
 
 /// Whitespace-sorozatok egy szóközre cserélése.
@@ -90,6 +107,21 @@ pub trait RustParser {
         source: &str,
         consume: impl FnOnce(std::result::Result<&ParsedFile<'_>, ParseError>) -> R,
     ) -> R;
+
+    /// A forrás első `len` bájtjának elemzése (végzetes szintaktikai hibánál az ép előtag); a sorszámok
+    /// változatlanok, a fájl-container a teljes fájl sorait kapja.
+    fn parse_prefix<R>(
+        &self,
+        source: &str,
+        len: usize,
+        consume: impl FnOnce(std::result::Result<&ParsedFile<'_>, ParseError>) -> R,
+    ) -> R {
+        let lines = line_count_of(source);
+        self.parse(&source[..len], |parsed| match parsed {
+            Ok(parsed) => consume(Ok(&parsed.with_line_count(lines))),
+            Err(error) => consume(Err(error)),
+        })
+    }
 }
 
 #[cfg(test)]

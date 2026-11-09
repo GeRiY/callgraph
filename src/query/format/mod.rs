@@ -15,6 +15,7 @@ mod lines;
 mod method_index;
 mod outline;
 mod outline_procedural;
+mod parse_errors;
 mod reexports;
 mod selection;
 mod source;
@@ -27,6 +28,8 @@ mod tests;
 
 pub use body::BodyMode;
 pub(crate) use outline::{call_lines, grep_outline, method_calls};
+pub(crate) use parse_errors::{file_lines as parse_error_lines, issue as parse_issue};
+pub use parse_errors::trailer as parse_trailer;
 
 use crate::error::{CallgraphError, Result};
 use crate::i18n::Lang;

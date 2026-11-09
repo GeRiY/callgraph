@@ -53,7 +53,11 @@ impl CallersCommand {
 
     /// A projekt-gráfból (`.callgraph/`, a folyamatban közös példány) a minta hívói; előtte a gráf
     /// naprakészre hozva: csak a változott fájlok elemződnek újra, a törölt / átnevezett fájlok kikerülnek.
-    fn callers(&self, project: &Project) -> Result<Vec<crate::index::CallerRow>> {
+    /// Mellé a szintaktikai hibás fájlok (gyökérhez relatív út, az első hiba sora) a figyelmeztetéshez.
+    fn callers(
+        &self,
+        project: &Project,
+    ) -> Result<(Vec<crate::index::CallerRow>, Vec<(String, u32)>)> {
         let store = ProjectStore::new(project);
         store.ensure()?;
         let analyzer = Analyzer::with_defaults();
@@ -72,14 +76,24 @@ impl CallersCommand {
         graph.refresh(&files, true, &analyzer)?;
         graph.ensure_callers(&analyzer)?;
         graph.save()?;
-        graph.caller_index().callers(&self.pattern, self.depth)
+        let issues = files
+            .iter()
+            .filter_map(|file| {
+                let stored = graph.slim_graph(&file.to_string_lossy())?;
+                crate::query::format::parse_issue(project.root(), file, stored)
+            })
+            .collect();
+        Ok((graph.caller_index().callers(&self.pattern, self.depth)?, issues))
     }
 }
 
 impl Command for CallersCommand {
     fn run(&self, out: &mut dyn Write, _err: &mut dyn Write) -> Result<i32> {
         let project = self.root();
-        let mut rows = self.callers(&project)?;
+        let (mut rows, issues) = self.callers(&project)?;
+        // a JSONL-kimenet gépi: a szintaktikai hibás fájlok figyelmeztetése a hibakimenetre megy (kilépési kód: 0)
+        let warning = crate::query::format::parse_trailer(&issues, crate::i18n::lang());
+        _err.write_all(warning.as_bytes())?;
         if !self.by_layer {
             for row in rows {
                 serde_json::to_writer(&mut *out, &row)?;

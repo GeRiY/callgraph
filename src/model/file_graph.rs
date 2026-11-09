@@ -4,7 +4,9 @@ use serde::de::{MapAccess, SeqAccess, Visitor};
 use serde::ser::{SerializeMap, SerializeSeq};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use super::{Call, Comment, Constant, Container, ControlFlow, Method, Property, StringLit, Write};
+use super::{
+    Call, Comment, Constant, Container, ControlFlow, Method, ParseError, Property, StringLit, Write,
+};
 
 /// Egy PHP-fájl elemzésének eredménye (immutábilis; `FileGraphBuilder` állítja össze).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -33,6 +35,13 @@ pub struct FileGraph {
     /// projekt-gráf így megjegyzi, és a fájlt nem olvassa újra, amíg nem változik.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub binary: bool,
+    /// A parser szintaktikai hibái (1-alapú sor + rövid üzenet); ha van, a vázlat hiányos lehet.
+    #[serde(
+        default,
+        rename = "parseErrors",
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub parse_errors: Vec<ParseError>,
 }
 
 impl FileGraph {

@@ -9,13 +9,13 @@ use super::analysis::{JsAnalysis, JsPass, PassContext};
 use super::imports::ImportsPass;
 use super::lines::LineIndex;
 use super::meta::{ClassContainerPass, apply_file_meta};
-use super::parse::{parse_program, source_type_for};
+use super::parse::{parse_recovering, source_type_for};
 use super::resolve::Resolver;
 use super::sfc::{Sfc, SfcBlockKind};
 use crate::core::SourceFile;
 use crate::error::Result;
 use crate::lang::{Analysis, Language, LanguageFrontend, LanguageRole};
-use crate::model::Container;
+use crate::model::{Container, ParseError};
 
 /// JavaScript, TypeScript és Vue SFC forrásokat a közös fájlgráfba fordító frontend.
 #[derive(Default)]
@@ -63,17 +63,24 @@ impl JsFrontend {
         out: &mut JsAnalysis,
     ) {
         let allocator = Allocator::default();
-        let parsed = parse_program(&allocator, src, source_type_for(path, vue_lang));
+        let parsed = parse_recovering(&allocator, src, source_type_for(path, vue_lang));
         if let Some(first) = parsed.errors.first() {
             out.warnings.push(crate::tf!(
-                "{}: JS syntax error: {first}",
-                "{}: JS szintaktikai hiba: {first}",
-                path.display()
+                "{}: JS syntax error: {}",
+                "{}: JS szintaktikai hiba: {}",
+                path.display(),
+                first.message
             ));
         }
+        // a sor a teljes fájlban (Vue: a blokk eltolásával); a fájlvégi hiba a hiányos sorra mutat
+        for error in &parsed.errors {
+            let line = lines.line_of(crate::core::clamp_to_content(src.as_bytes(), error.offset));
+            out.builder.parse_error(ParseError::new(line, &error.message));
+        }
+        // végzetes hibánál a passzok az ép előtagot látják (`parse_recovering`)
         let ctx = PassContext {
             path,
-            source: src,
+            source: parsed.source,
             lines,
             setup,
         };
@@ -312,5 +319,41 @@ mod tests {
     #[test]
     fn syntax_error_is_warning() {
         assert_eq!(run("/p/x.js", "const = ;").warnings.len(), 1);
+    }
+
+    fn method_names(a: &Analysis) -> Vec<&str> {
+        a.graph.methods.iter().map(|m| m.name.as_str()).collect()
+    }
+
+    #[test]
+    fn fatal_syntax_error_keeps_the_intact_prefix_and_reports_the_line() {
+        let src = "export function a() { return 1 }\nexport function b() { return 2 }\nexport function c( {\n";
+        for path in ["/p/tail.js", "/p/tail.ts"] {
+            let a = run(path, src);
+            let names = method_names(&a);
+            assert!(names.contains(&"a") && names.contains(&"b"), "{names:?}");
+            let first = &a.graph.parse_errors[0];
+            assert_eq!(first.line, 3, "{:?}", a.graph.parse_errors);
+            assert!(!first.message.is_empty() && !first.message.contains('\n'));
+        }
+    }
+
+    #[test]
+    fn vue_script_error_line_is_relative_to_the_file() {
+        let a = run(
+            "/p/v.vue",
+            "<template><div/></template>\n<script setup>\nfunction a() { return 1 }\nfunction b( {\n</script>\n",
+        );
+        let names = method_names(&a);
+        assert!(names.contains(&"a"), "{names:?}");
+        assert_eq!(a.graph.parse_errors[0].line, 4, "{:?}", a.graph.parse_errors);
+    }
+
+    #[test]
+    fn valid_file_has_no_parse_errors() {
+        let a = run("/p/ok.js", "export function a() { return 1 }\n");
+        assert!(a.graph.parse_errors.is_empty());
+        let json = serde_json::to_string(&a.graph).unwrap();
+        assert!(!json.contains("parseErrors"));
     }
 }

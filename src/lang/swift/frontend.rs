@@ -8,7 +8,7 @@ use super::visitor::SwiftVisitor;
 use crate::core::SourceFile;
 use crate::error::Result;
 use crate::lang::{Analysis, Language, LanguageFrontend, LanguageRole};
-use crate::model::FileGraphBuilder;
+use crate::model::{FileGraphBuilder, MAX_PARSE_ERRORS, ParseError};
 
 /// Swift (és SwiftUI) forrásokat a közös fájlgráfba fordító frontend.
 pub struct SwiftFrontend {
@@ -66,6 +66,10 @@ impl Language for SwiftFrontend {
                 "{}: Swift szintaktikai hiba a(z) {line}. sor körül",
                 file.path.display()
             ));
+        }
+        // a tree-sitter hibatűrő: a gráf a hibák mellett is elkészül, a hibák a gráfba is bekerülnek
+        for (line, message) in parsed.errors(MAX_PARSE_ERRORS) {
+            builder.parse_error(ParseError::new(line, &message));
         }
         let stem = file
             .path
@@ -125,5 +129,15 @@ mod tests {
     fn syntax_error_is_a_warning_not_an_error() {
         let a = run("struct A {\n  func (\n");
         assert_eq!(a.warnings.len(), 1);
+        assert!(!a.graph.parse_errors.is_empty());
+    }
+
+    #[test]
+    fn syntax_error_keeps_earlier_functions_and_reports_the_line() {
+        let a = run("func a() -> Int { 1 }\nfunc b() -> Int { 2 }\nfunc c( {\n");
+        let names: Vec<&str> = a.graph.methods.iter().map(|m| m.name.as_str()).collect();
+        assert!(names.contains(&"a") && names.contains(&"b"), "{names:?}");
+        assert_eq!(a.graph.parse_errors[0].line, 3, "{:?}", a.graph.parse_errors);
+        assert!(run("struct A {}\n").graph.parse_errors.is_empty());
     }
 }

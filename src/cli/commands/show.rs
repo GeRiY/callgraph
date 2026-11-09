@@ -112,7 +112,9 @@ impl Command for ShowCommand {
         // `--grep … --body`: a talált hívó metódusok forrása (a szűrt sorok a hívókat tartják meg);
         // találat nélkül a `--grep` szokásos „nincs találat” kimenete marad
         if self.grep.is_some() && self.body && self.depth <= 1 && !rows.is_empty() {
-            let text = FormatterRegistry::format_body(&rows, self.body_mode);
+            let mut text = FormatterRegistry::format_body(&rows, self.body_mode);
+            let trailer = parse_trailer(&engine, &rows, &text, true);
+            text.push_str(&trailer);
             write!(out, "{}", engine.relativize(&text))?;
             return Ok(0);
         }
@@ -121,12 +123,15 @@ impl Command for ShowCommand {
         }
         if let Some(pattern) = self.grep.as_deref() {
             let scope = engine.depth_scope();
-            let text = match engine.grep_text(
+            let mut text = match engine.grep_text(
                 &rows, &scope, pattern, self.depth, self.guess, self.full, self.limit,
             ) {
                 Ok(value) => value,
                 Err(error) => return Self::report(_err, error),
             };
+            // a beolvasott (nem csak a talált) fájlok hibái: a „nincs találat” se tűnjön biztosnak
+            let trailer = parse_trailer(&engine, &rows, &text, true);
+            text.push_str(&trailer);
             write!(out, "{}", engine.relativize(&text))?;
             return Ok(0);
         }
@@ -179,8 +184,12 @@ impl Command for ShowCommand {
             && self.strings.is_none()
             && self.const_filter.is_none();
         if machine {
+            // a json / jsonl a `parseErrors` mezőben jelzi; a mermaid / dot gépi kimenet, nincs záró sor
             write!(out, "{text}")?;
         } else {
+            let mut text = text;
+            let trailer = parse_trailer(&engine, &rows, &text, false);
+            text.push_str(&trailer);
             write!(out, "{}", engine.relativize(&text))?;
         }
         Ok(0)
@@ -248,6 +257,35 @@ impl ShowCommand {
         }
         Ok(1)
     }
+}
+
+/// A kimenet záró `⚠` sora, ha a lekérdezés beolvasott fájljai közül valamelyik szintaktikai hibás. Egyetlen fájl
+/// nézeténél (nem `--grep`) elmarad, ha a fájl `⚠` sora már a kimenetben van (a `FILE` sor alatt); ha a
+/// kimenet-korlát vagy a nézet elhagyta (metódus-index, `--body`, `--lines`, üres `flow`), itt pótolja.
+fn parse_trailer(
+    engine: &QueryEngine,
+    rows: &[crate::query::QueryResult],
+    text: &str,
+    grep: bool,
+) -> String {
+    let issues = engine.parse_issues();
+    if issues.is_empty() {
+        return String::new();
+    }
+    let lang = crate::i18n::lang();
+    if let [row] = rows {
+        let shown = crate::query::format::parse_error_lines(&row.graph, lang);
+        let first = shown.lines().next().unwrap_or_default();
+        if !grep && issues.len() == 1 && !first.is_empty() && text.contains(first) {
+            return String::new();
+        }
+    }
+    let mut trailer = String::new();
+    if !text.is_empty() && !text.ends_with('\n') {
+        trailer.push('\n');
+    }
+    trailer.push_str(&crate::query::format::parse_trailer(&issues, lang));
+    trailer
 }
 
 fn lines_error(value: &str) -> String {

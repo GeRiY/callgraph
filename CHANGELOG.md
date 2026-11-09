@@ -12,6 +12,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   your computer: nothing is sent anywhere, and no paths, names or search terms are recorded — only counts in ranges.
   The data is in the skill folder (`stats/`, about 90 days); turn it off with `CALLGRAPH_STATS=0`.
 
+### Fixed
+- **Files with a syntax error are no longer shown as if they were complete:** a file you are in the middle of editing,
+  or one with a merge conflict, could come back with no functions at all (JavaScript, TypeScript, Vue, Rust) or
+  without any notice (PHP, Swift). A search then said "no such method" or found no callers, which could make an agent
+  think the code was unused. Now the parts before the error are kept (functions `a` and `b` stay visible when `c` is
+  broken), and every result says so: `⚠ syntax error at L3: … — this file's outline may be incomplete` under the file,
+  a closing line such as `⚠ 2 files had syntax errors (results may be incomplete): src/tail.js L3, src/v.vue L4` when
+  a folder, a search (`--grep`, `--depth`), `locate` or `profile` read a broken file, `parseErrors` in `--format
+  json`, and a warning on the error output of `callers`. The exit code stays 0, because the rest of the result is
+  still correct and useful. Covers JavaScript, TypeScript, Vue, PHP, Rust, Swift and JSON (CSS, SCSS and Markdown
+  are read leniently and are not flagged).
+
 ## [0.5.0] — 2026-11-06
 
 ### Added

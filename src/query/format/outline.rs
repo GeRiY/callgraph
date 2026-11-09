@@ -54,6 +54,8 @@ fn outline(row: &QueryResult, lang: Lang, source: Option<&SourceLines>) -> Strin
             .unwrap_or_default()
     )
     .unwrap();
+    // szintaktikai hiba: közvetlenül a FILE sor alatt (hiba nélkül nincs sor)
+    s.push_str(&super::parse_error_lines(g, lang));
     // jegyzetek (PILOT): fájl-jegyzetek, és a nem listázott (konténer nélküli) függvényeiké
     crate::notes::file_lines(&mut s, &row.notes);
     crate::notes::unlisted_lines(&mut s, &row.notes, g);

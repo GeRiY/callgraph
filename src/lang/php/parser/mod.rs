@@ -14,7 +14,8 @@ pub struct ParsedFile<'a> {
     pub program: &'a Program<'a>,
     file: &'a File,
     source: &'a [u8],
-    errors: Vec<String>,
+    /// (bájt-eltolás, üzenet) párok.
+    errors: Vec<(u32, String)>,
 }
 
 impl<'a> ParsedFile<'a> {
@@ -22,7 +23,7 @@ impl<'a> ParsedFile<'a> {
         program: &'a Program<'a>,
         file: &'a File,
         source: &'a [u8],
-        errors: Vec<String>,
+        errors: Vec<(u32, String)>,
     ) -> Self {
         Self {
             program,
@@ -74,9 +75,21 @@ impl<'a> ParsedFile<'a> {
             .join("\n")
     }
 
-    /// Szintaktikai hibák szövege (a parser hibatűrő, a gráf ettől még elkészül).
-    pub fn errors(&self) -> &[String] {
+    /// Szintaktikai hibák: (bájt-eltolás, üzenet) — a parser hibatűrő, a gráf ettől még elkészül.
+    pub fn errors(&self) -> &[(u32, String)] {
         &self.errors
+    }
+
+    /// A szintaktikai hibák a gráfba: 1-alapú sor (a fájlvégi hiba a hiányos, utolsó tartalmas sorra) + üzenet.
+    pub fn parse_errors(&self) -> Vec<crate::model::ParseError> {
+        self.errors
+            .iter()
+            .map(|(offset, message)| {
+                let at = crate::core::clamp_to_content(self.source, *offset as usize);
+                let line = self.line_of(u32::try_from(at).unwrap_or(*offset));
+                crate::model::ParseError::new(line, message)
+            })
+            .collect()
     }
 }
 

@@ -21,6 +21,7 @@ src/
   core/                         nyelvfüggetlen építőkövek
     chain.rs                    Chain<I> + Rule<I> — generikus Chain of Responsibility
     source.rs                   SourceFile { path, text, mtime } — a nyelvek bemenete
+    recovery.rs                 végzetes szintaktikai hibánál az ép előtag vágási pontjai (JS/TS/Vue, Rust)
   lang/                         a nyelv-réteg
     language.rs                 trait Language (id, role, extensions, analyze), LanguageRole, Analysis
     backend.rs                  trait LanguageBackend: Language   — szerveroldal (framework-felismerés)

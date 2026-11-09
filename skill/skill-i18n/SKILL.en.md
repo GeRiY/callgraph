@@ -241,4 +241,5 @@ with such an extension is refused with the reason.
 Static analysis: dynamic calls (`$this->$method()`, `obj[key]()`), magic methods and class names / registered components
 assembled at runtime cannot be resolved. By default `--depth` follows only the certain (resolved) callers;
 name-only matches are shown by `--guess` with a "?" mark. For the exact control logic you need `--body` (compact, comments kept; `--raw` gives the exact text).
+A `⚠ syntax error` line means a file did not parse fully: the result may be incomplete — read that file directly.
 <!-- /mcp -->

@@ -141,6 +141,7 @@ fn graph(file: &str) -> FileGraph {
         writes: Vec::new(),
         sfc: None,
         binary: false,
+        parse_errors: Vec::new(),
     }
 }
 

@@ -115,6 +115,8 @@ json
 - Nem kód fájlok (sima szöveg, adat-dump): az outline itt keveset ad.
 - Makró- vagy reflexió-nehéz kód: a statikusan nem feloldható, dinamikus hívások csak név szerinti egyezésként (`?`,
   `--guess`-szel) jelennek meg, vagy sehogy.
+- Szintaktikai hibás fájl (szerkesztés közben, merge-konfliktus): `⚠ szintaktikai hiba itt: L<n>` és egy záró `⚠` sor
+  jelzi; a hiba előtti rész a térképen van, a többi hiányozhat — az ilyen fájlt olvasd közvetlenül.
 
 ## Gyors kezdés
 

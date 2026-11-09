@@ -12,7 +12,7 @@ use crate::query::format::{call_lines, grep_outline, method_calls};
 use crate::query::snippet::{self, SourceLines};
 use crate::{t, tf};
 use std::fmt::Write as _;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 impl QueryEngine {
     // a ShowCommand kapcsolói egy az egyben (egyetlen hívóhely)
@@ -53,6 +53,12 @@ impl QueryEngine {
             graph.ensure_callers(&self.analyzer)?;
             let _ = graph.save();
             let graph: &ProjectGraph = graph;
+            // a 2+. szint a teljes hatókört olvasta: a hibás fájlai is a záró sorba
+            for file in &files {
+                if let Some(stored) = graph.slim_graph(&file.to_string_lossy()) {
+                    self.note_parse_issue(file, stored);
+                }
+            }
             let (callers, skipped) = graph
                 .caller_index()
                 .parents_of_with_skips(&direct, depth, guess);
@@ -76,6 +82,9 @@ impl QueryEngine {
         }
         // gráf nélkül: a lekérdezés teljes hatókörének minden fájlja (nem csak az 1. szint fájljainak mappái)
         let all = self.all_graphs(scope)?;
+        for (path, graph) in &all {
+            self.note_parse_issue(Path::new(path), graph);
+        }
         let index = CallerIndex::build(all.iter().map(|(path, graph)| (path.as_str(), graph)));
         let (callers, skipped) = index.parents_of_with_skips(&direct, depth, guess);
         Ok(render_depth(DepthView {
