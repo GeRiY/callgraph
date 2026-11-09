@@ -211,6 +211,9 @@ Ha egy `callgraph` kimenet utolsó sora `ℹ callgraph X.Y.Z is available (insta
 `ℹ callgraph X.Y.Z elérhető (telepítve: …) — frissítés: …`, szólj a felhasználónak (egyszer), hogy új verzió érhető el,
 és ajánld fel a `bash <skill>/callgraph.sh update` futtatását. A felhasználó beleegyezése nélkül ne frissíts. A sor nem
 a vizsgált kód része; az ellenőrzés a háttérben, naponta legfeljebb egyszer fut (kikapcsolás: `CALLGRAPH_UPDATE_CHECK=0`).
+Dev-buildnél (`X.Y.Z-dev.<commit>`, az `update --dev` telepíti) a sor az `update`-et (vissza a stabilra) és az
+`update --dev`-et (legújabb dev-build) is megnevezi; azt ajánld, amelyiket a felhasználó szeretné. Az
+`update --check --dev` csak megnézi, van-e újabb dev-build.
 
 ## Ha hibázik — visszajelzés
 

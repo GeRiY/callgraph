@@ -196,6 +196,12 @@ zip is checked against `--sha256 <hex>` or a `SHA256SUMS` next to it (otherwise 
 if there is one, ends its output with a one-line `ℹ callgraph X is available` notice; `CALLGRAPH_UPDATE_CHECK=0`
 turns this off (it is also off when `CI` is set).
 
+**Dev builds (develop branch):** `update --dev` installs the newest build of the `develop` branch (the rolling `dev`
+pre-release, version `X.Y.Z-dev.<commit>`, verified against its `SHA256SUMS` like a release); `update --check --dev`
+only tells you whether there is a newer one. Dev builds are for trying out unreleased changes and may be unstable. A
+plain `update` takes you back to the latest stable release; the background check and the MCP `--auto-update` stay on
+stable releases (on a dev build they only speak up for a newer stable version).
+
 ## Usage
 
 All commands go through `callgraph.sh` (or the binary directly: `callgraph show …`). `--project <alias>` makes paths

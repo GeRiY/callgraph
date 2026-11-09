@@ -47,6 +47,12 @@ fájlja (v0.1.0), semmit nem telepít — `--insecure-skip-checksum` kihagyja az
 Az `update --check` az `update-check.json`-t is frissíti (a napi háttér-ellenőrzés nem ismétli meg).
 Csak skill-telepítésben fut (a bináris a `<skill>/bin/<os>-<arch>/` alatt); egy `target/release/callgraph`-ot nem ír felül.
 A legutóbbi kiadást a `github.com/GeRiY/callgraph/releases/latest` átirányításából olvassa ki (nincs API-korlát; tartalék: a GitHub API).
+A kérések gyorsítótár-kerülők; ha a válasz „naprakész”, a kiadás-lista (`/releases?per_page=5`) legújabb stabilja is
+számít — így egy friss kiadás után sem mond percekig „naprakész”-t.
+Dev-csatorna: `update --dev` / `update --check --dev` — a `develop` ág gördülő `dev` előzetes kiadása
+(`X.Y.Z-dev.<sha7>`, ugyanúgy `SHA256SUMS`-szal ellenőrizve; tükör: `CALLGRAPH_UPDATE_DEV_API`). A sima `update`
+dev-buildről a legutóbbi stabilra vált; a háttér-ellenőrzés és az MCP `--auto-update` csak stabil kiadást ajánl / telepít
+(dev-buildről csak újabb alapverziót).
 
 Automatikus ellenőrzés: a `callgraph.sh` naponta legfeljebb egyszer, várakozás nélkül egy háttérfolyamatot indít, ami
 megnézi a legutóbbi kiadást (állapot: `update-check.json` a skill-mappában); ha újabb van, a kimenet végére egy sor
@@ -62,7 +68,8 @@ Kikapcsolás: `CALLGRAPH_UPDATE_CHECK=0`; `CI` mellett és skill-telepítésen k
 | `CALLGRAPH_OUT_LIMIT` | a kimenet-korlát sorszáma (alapból 400) |
 | `PHP_AST_HOME` | a hibaüzenetekben mutatott skill-út, ha a skill máshová van linkelve |
 | `CALLGRAPH_LANG` | a terminál-kimenet és a súgó nyelve (`en` / `hu`; pl. `hu_HU.UTF-8` is jó) — felülírja az elmentett beállítást |
-| `CALLGRAPH_UPDATE_API` | API-formátumú (`releases/latest` JSON) kiadás-forrás az `update`-hez és az automatikus ellenőrzéshez (alapból a `github.com/…/releases/latest` átirányítása, tartalékként az API; tükör / teszt, `file://` is lehet) |
+| `CALLGRAPH_UPDATE_API` | API-formátumú (`releases/latest` JSON) kiadás-forrás az `update`-hez és az automatikus ellenőrzéshez (alapból a `github.com/…/releases/latest` átirányítása, tartalékként az API; tükör / teszt, `file://` is lehet; beállítva a kiadás-lista tartalék-lekérdezése elmarad) |
+| `CALLGRAPH_UPDATE_DEV_API` | API-formátumú (`releases/tags/dev` JSON) dev-kiadás-forrás az `update --dev`-hez (alapból `api.github.com/repos/GeRiY/callgraph/releases/tags/dev`; tükör / teszt, `file://` is lehet) |
 | `CALLGRAPH_UPDATE_CHECK` | `0` / `off` / `false`: kikapcsolja az automatikus, napi frissítés-ellenőrzést (a `CI` beállítása is kikapcsolja) |
 
 Az érték elöl álló argumentumként is megadható: `bash callgraph.sh CALLGRAPH_OUT_LIMIT=100 …`.

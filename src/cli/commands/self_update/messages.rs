@@ -9,8 +9,8 @@ use crate::{t, tf};
 
 pub(super) fn usage() -> SkillFailure {
     SkillFailure::usage(t!(
-        "usage: callgraph self-update [--check] [--force] [--from <zip|URL> [--sha256 <hex>]] [--insecure-skip-checksum]",
-        "használat: callgraph self-update [--check] [--force] [--from <zip|URL> [--sha256 <hex>]] [--insecure-skip-checksum]"
+        "usage: callgraph self-update [--check] [--dev] [--force] [--from <zip|URL> [--sha256 <hex>]] [--insecure-skip-checksum]",
+        "használat: callgraph self-update [--check] [--dev] [--force] [--from <zip|URL> [--sha256 <hex>]] [--insecure-skip-checksum]"
     ))
 }
 
@@ -78,6 +78,22 @@ pub(super) fn source_failure(url: &str, e: SourceError) -> SkillFailure {
                 "a legutóbbi kiadás vázlat vagy előzetes: {tag}"
             ),
         },
+    )
+}
+
+/// A dev-kiadás válasza nem használható (nem JSON, vázlat, vagy nincs érvényes `version: X.Y.Z-dev.<sha>` sora).
+pub(super) fn dev_release_failure(url: &str, e: ReleaseError) -> SkillFailure {
+    let detail = match e {
+        ReleaseError::Json(e) => e,
+        ReleaseError::BadTag(_) => "no `version: X.Y.Z-dev.<sha>` line".to_owned(),
+        ReleaseError::NotStable(_) => "draft".to_owned(),
+    };
+    failure(
+        "bad_release",
+        tf!(
+            "unexpected dev release response from {url}: {detail}",
+            "váratlan dev-kiadás-válasz innen: {url}: {detail}"
+        ),
     )
 }
 

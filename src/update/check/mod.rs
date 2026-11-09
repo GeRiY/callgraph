@@ -48,7 +48,14 @@ impl CheckEnv {
 }
 
 /// Az értesítő sor (egy sor, a tokenek miatt): `ℹ callgraph 0.2.0 is available (installed: 0.1.0) — update: …`.
+/// Dev-buildről a stabil `update` mellett a `update --dev` is szerepel.
 pub(crate) fn notice_line(latest: &Version, current: &Version, update_cmd: &str) -> String {
+    if current.is_dev() {
+        return crate::tf!(
+            "ℹ callgraph {latest} is available (installed: dev build {current}) — stable: {update_cmd} update, newest dev build: {update_cmd} update --dev",
+            "ℹ callgraph {latest} elérhető (telepítve: {current} dev-build) — stabil: {update_cmd} update, legújabb dev-build: {update_cmd} update --dev"
+        );
+    }
     crate::tf!(
         "ℹ callgraph {latest} is available (installed: {current}) — update: {update_cmd} update",
         "ℹ callgraph {latest} elérhető (telepítve: {current}) — frissítés: {update_cmd} update"

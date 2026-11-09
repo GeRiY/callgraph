@@ -1,5 +1,7 @@
 //! Szemantikus verzió (`MAJOR.MINOR.PATCH[-pre][+build]`) összehasonlításhoz — a release tag (`v0.2.0`) és a
 //! `CARGO_PKG_VERSION`. A build-metaadat nem számít; az előzetes (pre-release) verzió régebbi a kiadottnál.
+//! A develop-ág CI-buildje (dev-csatorna) verziója `X.Y.Z-dev.<sha7>`: a build-időben megadott
+//! `CALLGRAPH_BUILD_VERSION` (lásd `build_version`); helyi és tag-buildnél a `Cargo.toml` verziója.
 
 use std::cmp::Ordering;
 use std::fmt;
@@ -36,14 +38,51 @@ impl Version {
         Some(Self { core: numbers, pre })
     }
 
-    /// Ennek a binárisnak a verziója (`Cargo.toml`).
+    /// Ennek a binárisnak a verziója (`build_version`: dev-buildnél `X.Y.Z-dev.<sha7>`, különben a `Cargo.toml`-é).
     pub(crate) fn current() -> Self {
-        Self::parse(env!("CARGO_PKG_VERSION")).expect("a Cargo.toml verziója semver")
+        Self::parse(build_version()).expect("a Cargo.toml verziója semver")
     }
 
     /// Előzetes kiadás-e (`1.0.0-rc.1`) — a frissítés ezeket kihagyja.
     pub(crate) fn is_prerelease(&self) -> bool {
         !self.pre.is_empty()
+    }
+
+    /// A develop-ág dev-buildje-e (`X.Y.Z-dev.<sha7>`).
+    pub(crate) fn is_dev(&self) -> bool {
+        self.pre.len() == 2 && self.pre[0] == "dev"
+    }
+
+    /// Egy stabil kiadás (`self`) frissítés-e a `current`-hez a háttér-értesítés és az MCP `--auto-update`
+    /// számára: dev-buildről csak egy újabb alapverzió (a `0.5.1-dev.x` mellett a `0.5.1` nem, a `0.5.2` igen) —
+    /// így a dev-csatornát a felhasználó csak kifejezett `update`-tel hagyja el; különben a semver szerint újabb.
+    pub(crate) fn supersedes(&self, current: &Version) -> bool {
+        if self.is_prerelease() {
+            return false;
+        }
+        if current.is_dev() {
+            return self.core > current.core;
+        }
+        self > current
+    }
+
+    /// A dev-csatorna döntése: a `self` dev-build újabb-e a telepített `current`-nél. Dev-buildről: ha más a
+    /// commit (vagy az alapverzió); stabil (vagy rc) verzióról: ha az alapverziója legfeljebb a dev-build alapja.
+    pub(crate) fn dev_is_newer(&self, current: &Version) -> bool {
+        if current.is_dev() {
+            return self != current;
+        }
+        current.core <= self.core
+    }
+}
+
+/// A bináris verzió-szövege (`--version`, MCP `serverInfo`): a build-időben megadott `CALLGRAPH_BUILD_VERSION`
+/// (a CI csak a develop-ág buildjeinél állítja `X.Y.Z-dev.<sha7>`-re), ha érvényes verzió; különben a
+/// `Cargo.toml` verziója.
+pub(crate) fn build_version() -> &'static str {
+    match option_env!("CALLGRAPH_BUILD_VERSION") {
+        Some(v) if Version::parse(v).is_some() => v,
+        _ => env!("CARGO_PKG_VERSION"),
     }
 }
 
@@ -112,7 +151,8 @@ mod tests {
         ] {
             assert!(Version::parse(bad).is_none(), "{bad}");
         }
-        assert_eq!(Version::current().to_string(), env!("CARGO_PKG_VERSION"));
+        assert_eq!(Version::current().to_string(), build_version());
+        assert!(build_version().starts_with(env!("CARGO_PKG_VERSION")));
     }
 
     #[test]
@@ -127,5 +167,30 @@ mod tests {
         assert!(v("1.0.0-beta") > v("1.0.0-alpha.1"));
         assert!(v("1.0.0-alpha.1") > v("1.0.0-alpha"));
         assert!(v("1.0.0-alpha.beta") > v("1.0.0-alpha.1"));
+    }
+
+    #[test]
+    fn dev_builds_follow_the_channel_rules() {
+        let dev = v("0.5.1-dev.23ed277");
+        assert!(dev.is_dev() && dev.is_prerelease());
+        assert!(!v("0.5.1").is_dev() && !v("0.5.1-rc.1").is_dev() && !v("0.5.1-dev").is_dev());
+        assert_eq!(dev.to_string(), "0.5.1-dev.23ed277");
+        assert!(dev < v("0.5.1") && dev > v("0.5.0"));
+
+        // dev-csatorna: más commit = újabb; stabil telepítéshez képest az alapverzió dönt
+        assert!(v("0.5.1-dev.abc1234").dev_is_newer(&dev));
+        assert!(!dev.dev_is_newer(&dev));
+        assert!(dev.dev_is_newer(&v("0.5.1")));
+        assert!(dev.dev_is_newer(&v("0.5.0")));
+        assert!(dev.dev_is_newer(&v("0.5.1-rc.1")));
+        assert!(!dev.dev_is_newer(&v("0.5.2")));
+
+        // stabil csatorna (értesítés, auto-update): dev-buildről csak újabb alapverzió
+        assert!(!v("0.5.1").supersedes(&dev));
+        assert!(!v("0.5.0").supersedes(&dev));
+        assert!(v("0.5.2").supersedes(&dev));
+        assert!(v("0.5.1").supersedes(&v("0.5.0")));
+        assert!(!v("0.5.1").supersedes(&v("0.5.1")));
+        assert!(!v("0.6.0-rc.1").supersedes(&v("0.5.1")));
     }
 }

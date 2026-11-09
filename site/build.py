@@ -26,6 +26,8 @@ from html.parser import HTMLParser
 HERE = os.path.dirname(os.path.abspath(__file__))
 SITE_DIR = os.path.join(HERE, "content")
 CHANGELOG = os.path.join(os.path.dirname(HERE), "CHANGELOG.md")
+# the Hungarian changelog: same releases and sections, entries in Hungarian (technical terms stay English)
+CHANGELOG_HU = os.path.join(os.path.dirname(HERE), "CHANGELOG.hu.md")
 # the output folder (the gh-pages checkout): python3 site/build.py <out-dir>
 ROOT = os.path.abspath(sys.argv[1]) if len(sys.argv) > 1 else None
 
@@ -275,7 +277,6 @@ def changelog_body(lang, releases):
                '<p class="lead">Minden kiadás dátummal, a legújabb elöl: mi új, mi változott és mi javult. '
                'A verziók letöltései és ellenőrzőösszegei a '
                '<a href="https://github.com/GeRiY/callgraph/releases">GitHub kiadási oldalán</a> vannak.</p>',
-               '<p class="sub">A bejegyzések angolul vannak, ahogy a projekt <code>CHANGELOG.md</code> fájljában.</p>',
                '<div class="cta"><a class="btn primary" href="/hu/#install">A legújabb verzió telepítése</a>'
                '<a class="btn" href="https://github.com/GeRiY/callgraph/releases/latest">Legfrissebb kiadás a GitHubon</a></div>',
                '</div></section>']
@@ -289,7 +290,7 @@ def changelog_body(lang, releases):
         out.append('<h2 id="h-%s">v%s%s</h2>' % (rid, r["version"], date))
         out.append('<p class="sub"><a href="%s">%s</a></p>' % (esc(r["url"]), gh_label))
         for b in r["blocks"]:
-            attr = ' lang="en"' if lang == "hu" else ""
+            attr = ""
             if b["title"]:
                 title = SECTION_HU.get(b["title"], b["title"]) if lang == "hu" else b["title"]
                 out.append("<h3>%s</h3>" % esc(title))
@@ -789,13 +790,18 @@ def main():
     releases = user_facing(parse_changelog(CHANGELOG))
     if not releases:
         sys.exit("no releases found in CHANGELOG.md")
+    releases_hu = user_facing(parse_changelog(CHANGELOG_HU))
+    versions = [r["version"] for r in releases]
+    versions_hu = [r["version"] for r in releases_hu]
+    if versions != versions_hu:
+        sys.exit("CHANGELOG.hu.md is out of step with CHANGELOG.md: %s vs %s" % (versions_hu, versions))
     version = releases[0]["version"]
     lastmod = os.environ.get("LASTMOD") or max(r["date"] for r in releases if r["date"])
     written = []
     for page in PAGES:
         for lang in LANGS:
             if page["key"] == "changelog":
-                body = changelog_body(lang, releases)
+                body = changelog_body(lang, releases if lang == "en" else releases_hu)
             else:
                 with open(os.path.join(SITE_DIR, lang, page["key"] + ".html"), encoding="utf-8") as f:
                     body = f.read()

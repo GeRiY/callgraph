@@ -17,17 +17,19 @@ mod version;
 pub(crate) mod tests;
 
 pub(crate) use fetch::{
-    ASSET_LIMIT, AUTO_UPDATE_CONNECT_TIMEOUT, AUTO_UPDATE_TIMEOUT, BACKGROUND_TIMEOUT,
+    API_LIMIT, ASSET_LIMIT, AUTO_UPDATE_CONNECT_TIMEOUT, AUTO_UPDATE_TIMEOUT, BACKGROUND_TIMEOUT,
     FOREGROUND_TIMEOUT, FetchError, Fetcher, HttpFetcher,
 };
 pub(crate) use install::{InstallError, Installer};
 pub(crate) use platform::Platform;
-pub(crate) use release::{Release, ReleaseError};
+pub(crate) use release::{
+    DEFAULT_DEV_API, DEFAULT_LIST, DevBuild, Release, ReleaseError, newest_stable,
+};
 #[cfg(test)]
 pub(crate) use source::{ApiSource, RedirectSource};
 pub(crate) use source::{ReleaseSource, SourceError, default_source};
 pub(crate) use target::InstallTarget;
-pub(crate) use version::Version;
+pub(crate) use version::{Version, build_version};
 
 /// A Windows-on egy korábbi frissítésből megmaradt `callgraph.exe.old` törlése (a futó bináris mellől; best effort).
 /// Más rendszeren nincs ilyen fájl, ott nem csinál semmit.

@@ -13,6 +13,21 @@ const ASSET: &str = "https://example.invalid/download/callgraph-linux-x86_64.zip
 const WEB: &str = "https://example.invalid/o/callgraph/releases/latest";
 const SUMS: &str = "https://example.invalid/download/SHA256SUMS";
 const NAME: &str = "callgraph-linux-x86_64.zip";
+const DEV_API: &str = "https://example.invalid/releases/tags/dev";
+const DEV_ASSET: &str = "https://example.invalid/download/dev/callgraph-linux-x86_64.zip";
+const DEV_SUMS: &str = "https://example.invalid/download/dev/SHA256SUMS";
+const LIST: &str = "https://example.invalid/releases?per_page=5";
+
+/// A `dev` előzetes kiadás JSON-ja a megadott verzióval (a leírásban), a platform-zippel és a `SHA256SUMS`-szal.
+fn dev_json(version: &str) -> Vec<u8> {
+    format!(
+        r#"{{"tag_name": "dev", "draft": false, "prerelease": true,
+            "body": "Rolling build.\nversion: {version}\ndate: 2026-11-09\n", "assets": [
+            {{"name": "callgraph-linux-x86_64.zip", "browser_download_url": "{DEV_ASSET}"}},
+            {{"name": "SHA256SUMS", "browser_download_url": "{DEV_SUMS}"}}]}}"#
+    )
+    .into_bytes()
+}
 
 /// Egy `SHA256SUMS` a megadott zipre (és egy másik sorra), `sha256sum` formátumban.
 fn sums(zip: &[u8], name: &str) -> Vec<u8> {
@@ -76,18 +91,32 @@ fn run_with(
     in_skill: bool,
     source: Box<dyn ReleaseSource>,
 ) -> (i32, String, String) {
-    let env = UpdateEnv {
+    let mut env = test_env(responses, "0.1.0");
+    env.source = source;
+    env.target = in_skill.then(|| target_of(skill));
+    run_env(args, skill, env)
+}
+
+/// A teszt-környezet: hamis letöltő, API-forrás, nincs kiadás-lista, a dev-kiadás a `DEV_API` alatt.
+fn test_env(responses: Responses, current: &str) -> UpdateEnv {
+    UpdateEnv {
         fetcher: Box::new(FakeFetcher(
             responses
                 .into_iter()
                 .map(|(u, r)| (u.to_owned(), r))
                 .collect(),
         )),
-        source,
-        target: in_skill.then(|| target_of(skill)),
+        source: Box::new(ApiSource::new(API)),
+        target: None,
         platform: test_platform(),
-        current: Version::parse("0.1.0").unwrap(),
-    };
+        current: Version::parse(current).unwrap(),
+        recent: None,
+        dev_api: DEV_API.to_owned(),
+    }
+}
+
+/// A parancs futtatása a megadott környezettel.
+fn run_env(args: &[&str], skill: &Path, env: UpdateEnv) -> (i32, String, String) {
     let args = args.iter().map(|a| a.to_string()).collect();
     let (mut out, mut err) = (Vec::new(), Vec::new());
     let code = SelfUpdateCommand::with_env(args, home(skill), env)
@@ -457,18 +486,13 @@ fn manual_check_refreshes_the_background_state() {
 
 /// Az MCP `--auto-update` lépéséhez: a parancs az API-forrással és a hamis letöltővel, argumentumok nélkül.
 fn auto_command(skill: &Path, responses: Responses) -> SelfUpdateCommand {
-    let env = UpdateEnv {
-        fetcher: Box::new(FakeFetcher(
-            responses
-                .into_iter()
-                .map(|(u, r)| (u.to_owned(), r))
-                .collect(),
-        )),
-        source: Box::new(ApiSource::new(API)),
-        target: Some(target_of(skill)),
-        platform: test_platform(),
-        current: Version::parse("0.1.0").unwrap(),
-    };
+    auto_command_as(skill, responses, "0.1.0")
+}
+
+/// Mint az `auto_command`, a megadott saját verzióval.
+fn auto_command_as(skill: &Path, responses: Responses, current: &str) -> SelfUpdateCommand {
+    let mut env = test_env(responses, current);
+    env.target = Some(target_of(skill));
     SelfUpdateCommand::with_env(Vec::new(), home(skill), env)
 }
 
@@ -536,4 +560,200 @@ fn update_if_newer_installs_only_a_verified_newer_release() {
     assert_eq!(read(binary), "NEW");
     assert_eq!(read(skill.join("lang")), "hu\n");
     let _ = std::fs::remove_dir_all(skill);
+}
+
+/// Futtatás skill-telepítésben a megadott saját verzióval és válaszokkal (opcionális kiadás-listával).
+fn run_as(
+    args: &[&str],
+    skill: &Path,
+    responses: Responses,
+    current: &str,
+    recent: Option<&str>,
+) -> (i32, String, String) {
+    let mut env = test_env(responses, current);
+    env.target = Some(target_of(skill));
+    env.recent = recent.map(str::to_owned);
+    run_env(args, skill, env)
+}
+
+#[test]
+fn dev_flag_is_parsed_and_rejected_with_from_or_background() {
+    let skill = fake_skill("cmd-dev-args");
+    let cmd = |args: &[&str]| {
+        let args = args.iter().map(|a| a.to_string()).collect();
+        SelfUpdateCommand::with_env(args, home(&skill), test_env(vec![], "0.1.0"))
+    };
+    let o = cmd(&["--check", "--dev"]).options().unwrap();
+    assert!(o.dev && o.check && !o.force);
+    assert!(cmd(&["--dev", "--force"]).options().unwrap().dev);
+    assert!(!cmd(&["--check"]).options().unwrap().dev);
+    for bad in [
+        &["--dev", "--from", "x.zip"][..],
+        &["--check", "--dev", "--background"][..],
+    ] {
+        assert!(cmd(bad).options().is_err(), "{bad:?}");
+    }
+    let _ = std::fs::remove_dir_all(skill);
+}
+
+#[test]
+fn dev_check_compares_by_commit_and_base_version() {
+    let skill = fake_skill("cmd-dev-check");
+    let dev = || vec![(DEV_API, Ok(dev_json("0.5.1-dev.abc1234")))];
+
+    // stabil 0.5.1 telepítve: a 0.5.1-es alapú dev-build újabb
+    let (code, out, _) = run_as(&["--check", "--dev"], &skill, dev(), "0.5.1", None);
+    assert_eq!(code, 0);
+    assert!(out.contains("0.5.1-dev.abc1234 (2026-11-09)"), "{out}");
+    assert!(
+        out.contains("0.5.1)") && out.contains("update --dev"),
+        "{out}"
+    );
+
+    // más commit: újabb; ugyanaz a commit vagy újabb stabil: nem
+    let other = "0.5.1-dev.0000000";
+    let (_, out, _) = run_as(&["--check", "--dev"], &skill, dev(), other, None);
+    assert!(out.contains("update --dev"), "{out}");
+    for current in ["0.5.1-dev.abc1234", "0.5.2"] {
+        let (code, out, _) = run_as(&["--check", "--dev"], &skill, dev(), current, None);
+        assert_eq!(code, 0);
+        assert!(
+            !out.contains("update --dev") && out.contains(current),
+            "{out}"
+        );
+    }
+    assert_eq!(read(skill.join("bin/linux-x86_64/callgraph")), "OLD");
+
+    // nincs dev-kiadás: nem hiba; hibás leírás: hiba
+    let (code, out, _) = run_as(&["--check", "--dev"], &skill, vec![], "0.5.1", None);
+    assert_eq!(code, 0);
+    assert!(out.contains(DEV_API), "{out}");
+    let bad = vec![(DEV_API, Ok(dev_json("0.5.1")))];
+    let (code, _, err) = run_as(&["--check", "--dev"], &skill, bad, "0.5.1", None);
+    assert_eq!(code, 1);
+    assert!(err.contains(DEV_API), "{err}");
+    let _ = std::fs::remove_dir_all(skill);
+}
+
+#[test]
+fn dev_update_installs_a_verified_dev_build_and_keeps_the_stable_state() {
+    let skill = fake_skill("cmd-dev-update");
+    let binary = skill.join("bin/linux-x86_64/callgraph");
+    let tampered = vec![
+        (DEV_API, Ok(dev_json("0.5.1-dev.abc1234"))),
+        (DEV_ASSET, Ok(release_zip(b"DEV"))),
+        (DEV_SUMS, Ok(sums(&release_zip(b"OTHER"), NAME))),
+    ];
+    let (code, _, err) = run_as(&["--dev"], &skill, tampered, "0.5.1", None);
+    assert_eq!(code, 1);
+    assert!(err.contains("SHA-256"), "{err}");
+    assert_eq!(read(binary.clone()), "OLD");
+
+    let good = vec![
+        (DEV_API, Ok(dev_json("0.5.1-dev.abc1234"))),
+        (DEV_ASSET, Ok(release_zip(b"DEV"))),
+        (DEV_SUMS, Ok(sums(&release_zip(b"DEV"), NAME))),
+    ];
+    let (code, out, _) = run_as(&["--dev"], &skill, good, "0.5.1-dev.0000000", None);
+    assert_eq!(code, 0);
+    assert!(
+        out.contains("0.5.1-dev.0000000 → 0.5.1-dev.abc1234"),
+        "{out}"
+    );
+    assert_eq!(read(binary), "DEV");
+    assert_eq!(read(skill.join("lang")), "hu\n");
+    // a háttér-ellenőrzés (stabil csatorna) állapota nem változik
+    let state = CheckState::load(&skill.join("update-check.json"));
+    assert_eq!(state.latest.as_deref(), Some("0.2.0"));
+    let _ = std::fs::remove_dir_all(skill);
+}
+
+#[test]
+fn plain_update_from_a_dev_build_switches_to_stable() {
+    let skill = fake_skill("cmd-dev-leave");
+    let binary = skill.join("bin/linux-x86_64/callgraph");
+    let stable = || {
+        vec![
+            (API, Ok(release_json("v0.5.1"))),
+            (ASSET, Ok(release_zip(b"STABLE"))),
+            (SUMS, Ok(sums(&release_zip(b"STABLE"), NAME))),
+        ]
+    };
+    let dev = "0.5.1-dev.abc1234";
+    let (code, out, _) = run_as(&["--check"], &skill, stable(), dev, None);
+    assert_eq!(code, 0);
+    assert!(out.contains(dev) && out.contains(": 0.5.1\n"), "{out}");
+    assert!(out.contains("update --dev"), "{out}");
+    assert_eq!(read(binary.clone()), "OLD");
+
+    let (code, out, _) = run_as(&[], &skill, stable(), dev, None);
+    assert_eq!(code, 0);
+    assert!(out.contains(dev) && out.contains("0.5.1 "), "{out}");
+    assert_eq!(read(binary), "STABLE");
+    let _ = std::fs::remove_dir_all(skill);
+}
+
+#[test]
+fn auto_update_never_leaves_a_dev_build_for_the_same_base() {
+    let skill = fake_skill("cmd-dev-auto");
+    let binary = skill.join("bin/linux-x86_64/callgraph");
+    let release = |tag: &str| {
+        vec![
+            (API, Ok(release_json(tag))),
+            (ASSET, Ok(release_zip(b"NEW"))),
+            (SUMS, Ok(sums(&release_zip(b"NEW"), NAME))),
+        ]
+    };
+    let dev = "0.5.1-dev.abc1234";
+    let same = auto_command_as(&skill, release("v0.5.1"), dev);
+    assert!(same.update_if_newer().unwrap().is_none());
+    assert_eq!(read(binary.clone()), "OLD");
+    let newer = auto_command_as(&skill, release("v0.5.2"), dev);
+    let (version, _) = newer.update_if_newer().unwrap().unwrap();
+    assert_eq!(version, Version::parse("0.5.2").unwrap());
+    assert_eq!(read(binary), "NEW");
+    let _ = std::fs::remove_dir_all(skill);
+}
+
+#[test]
+fn check_falls_back_to_the_release_list_when_latest_is_stale() {
+    let skill = fake_skill("cmd-list");
+    let list = br#"[
+        {"tag_name": "dev", "prerelease": true, "assets": []},
+        {"tag_name": "v0.2.0", "assets": []},
+        {"tag_name": "v0.1.0", "assets": []}
+    ]"#;
+    // a releases/latest még a régit adja, a lista már az újat
+    let stale = vec![(API, Ok(release_json("v0.1.0"))), (LIST, Ok(list.to_vec()))];
+    let (code, out, _) = run_as(&["--check"], &skill, stale, "0.1.0", Some(LIST));
+    assert_eq!(code, 0);
+    assert!(out.contains("0.1.0 → 0.2.0"), "{out}");
+    let state = CheckState::load(&skill.join("update-check.json"));
+    assert_eq!(state.latest.as_deref(), Some("0.2.0"));
+
+    // a lista hibája nem hiba: marad a „naprakész”
+    let broken = vec![
+        (API, Ok(release_json("v0.1.0"))),
+        (LIST, Err(FetchError::Status(403))),
+    ];
+    let (code, out, _) = run_as(&["--check"], &skill, broken, "0.1.0", Some(LIST));
+    assert_eq!(code, 0);
+    assert!(out.contains("(0.1.0)") && !out.contains('→'), "{out}");
+    let _ = std::fs::remove_dir_all(skill);
+}
+
+#[test]
+fn newer_of_prefers_the_higher_version_then_the_source() {
+    let r = |tag: &str| Release::stable(tag.to_owned(), Vec::new()).unwrap();
+    assert_eq!(newer_of(None, None), None);
+    assert_eq!(newer_of(Some(r("v0.1.0")), None), Some(r("v0.1.0")));
+    assert_eq!(newer_of(None, Some(r("v0.2.0"))), Some(r("v0.2.0")));
+    assert_eq!(
+        newer_of(Some(r("v0.1.0")), Some(r("v0.2.0"))),
+        Some(r("v0.2.0"))
+    );
+    assert_eq!(
+        newer_of(Some(r("v0.2.0")), Some(r("v0.1.0"))),
+        Some(r("v0.2.0"))
+    );
 }

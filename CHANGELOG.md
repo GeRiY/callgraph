@@ -5,6 +5,23 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+## [0.5.2] — 2026-11-09
+
+### Added
+- **`update --dev`:** installs the newest build of the `develop` branch (version `X.Y.Z-dev.<commit>`, checked
+  against its `SHA256SUMS` like a release); `update --check --dev` only tells you whether there is a newer one. A plain
+  `update` takes you back to the latest stable release. The daily background check and the MCP `--auto-update` stay
+  on stable releases. On a dev build `callgraph --version` shows the dev version.
+
+### Changed
+- **The changelog in Hungarian too:** `CHANGELOG.hu.md` has every release in Hungarian, and the Hungarian website
+  shows it.
+
+### Fixed
+- **`update --check` right after a release:** for a few minutes after a new release it could still say "up to date",
+  because GitHub briefly served the old answer. It now asks without the cache and also looks at the list of recent
+  releases, so a new version is found immediately.
+
 ## [0.5.1] — 2026-11-09
 
 ### Added
@@ -31,8 +48,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 - **A quoted phrase is one `locate` term:** `locate "Organizer's other events"` searches for the whole text in the
   strings of the code (labels, translations) instead of splitting it into words that matched unrelated names.
 - **`locate` always shows a `root:` line** and paths relative to it, also when only one file matches.
-- **The profile lists the layers by file count:** the biggest layer comes first, so a main layer such as `model` no
-  longer hides behind `… +6 more layers` while layers with one or two files are shown.
+- **The profile lists the main layers first:** the architecture layers (controller, service, model …) come first, by
+  file count, and tests, migrations and configuration come last, so a main layer such as `model` no longer hides
+  behind `… +6 more layers` while layers with one or two files are shown.
 - **`--by-layer` shows a header for each layer:** every group of callers starts with a line such as
   `[service]  3 calls`, in the normal and in the short ("one line per call") `--grep` view, and in every level of
   `--depth`. The group closest to the called method comes first (model → repository → service → controller), as
@@ -338,7 +356,8 @@ First release.
 - Built-in update: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Prebuilt packages for macOS (arm64, x86_64), Linux (x86_64, ARM64, static musl) and Windows.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.5.1...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.5.2...develop
+[0.5.2]: https://github.com/GeRiY/callgraph/releases/tag/v0.5.2
 [0.5.1]: https://github.com/GeRiY/callgraph/releases/tag/v0.5.1
 [0.5.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.5.0
 [0.4.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.4.0

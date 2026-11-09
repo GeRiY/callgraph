@@ -114,7 +114,7 @@ impl ReleaseSource for ApiSource {
     }
 
     fn latest(&self, fetcher: &dyn Fetcher) -> Result<Option<Release>, SourceError> {
-        let body = match fetcher.get(&self.url, API_LIMIT) {
+        let body = match fetcher.get_fresh(&self.url, API_LIMIT) {
             Ok(body) => body,
             Err(FetchError::NotFound) => return Ok(None),
             Err(e) => return Err(SourceError::Fetch(e)),
