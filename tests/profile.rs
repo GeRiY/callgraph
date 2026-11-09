@@ -492,14 +492,17 @@ fn profile_separates_ecosystems_and_skips_vendor_code() {
     assert!(facebook.contains("RequestBuilder.php"), "{facebook}");
 
     // --layer: minősítővel egy ökoszisztéma, nélküle mindkettő
-    let only_js = project.run(&[
-        "show",
-        "modules",
-        "web",
-        "--layer",
-        "controller:js",
-        "--full",
-    ]);
+    let only_js = project
+        .run(&[
+            "show",
+            "modules",
+            "web",
+            "--layer",
+            "controller:js",
+            "--full",
+        ])
+        // Windowson a FILE sor `\`-t ír
+        .replace('\\', "/");
     assert!(
         only_js.contains("frontend/js/controllers/cart.js"),
         "{only_js}"
