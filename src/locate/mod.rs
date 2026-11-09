@@ -52,37 +52,41 @@ impl Locator {
         if terms.is_empty() {
             return Err(CallgraphError::Usage(usage().into()));
         }
-        let (ranked, issues) = ProjectSource::new(&self.root, &self.analyzer).with_files(|files| {
-            // a szintaktikai hibás fájlok a záró sorhoz (a rangsoruk hiányos térképből jön)
-            let issues: Vec<(String, u32)> = files
-                .iter()
-                .filter_map(|file| {
-                    crate::query::format::parse_issue(&self.root, file.path, file.graph)
-                })
-                .collect();
-            let callers = CallerCounts::build(files.iter().map(|file| file.graph));
-            let matcher = Matcher::new(&terms, &callers);
-            let matched: Vec<FileMatch> = files
-                .iter()
-                .filter_map(|file| {
-                    let rel = self.relative(file.path);
-                    let hits = matcher.file_hits(&rel, file.graph, file.code);
-                    FileMatch::new(file.path.to_string_lossy().into_owned(), hits)
-                })
-                .collect();
-            // a teszt-felismerés a gyökérhez relatív úton (a gyökér útja maga ne számítson)
-            let ranked = rank(matched, |path| {
-                rank::is_test_path(&self.relative(Path::new(path)))
-            });
-            (ranked, issues)
-        })?;
+        let (ranked, issues) =
+            ProjectSource::new(&self.root, &self.analyzer).with_files(|files| {
+                // a szintaktikai hibás fájlok a záró sorhoz (a rangsoruk hiányos térképből jön)
+                let issues: Vec<(String, u32)> = files
+                    .iter()
+                    .filter_map(|file| {
+                        crate::query::format::parse_issue(&self.root, file.path, file.graph)
+                    })
+                    .collect();
+                let callers = CallerCounts::build(files.iter().map(|file| file.graph));
+                let matcher = Matcher::new(&terms, &callers);
+                let matched: Vec<FileMatch> = files
+                    .iter()
+                    .filter_map(|file| {
+                        let rel = self.relative(file.path);
+                        let hits = matcher.file_hits(&rel, file.graph, file.code);
+                        FileMatch::new(file.path.to_string_lossy().into_owned(), hits)
+                    })
+                    .collect();
+                // a teszt-felismerés a gyökérhez relatív úton (a gyökér útja maga ne számítson)
+                let ranked = rank(matched, |path| {
+                    rank::is_test_path(&self.relative(Path::new(path)))
+                });
+                (ranked, issues)
+            })?;
         let mut text = Report {
             terms: &terms,
             ranked: &ranked,
             all,
         }
         .render();
-        text.push_str(&crate::query::format::parse_trailer(&issues, crate::i18n::lang()));
+        text.push_str(&crate::query::format::parse_trailer(
+            &issues,
+            crate::i18n::lang(),
+        ));
         // az utak a projekt-gyökérhez relatívan, a többi lekérdezéssel azonos `root:` sorral
         let engine = crate::query::QueryEngine::new(Some(self.root.as_path()), None);
         Ok(engine.relativize(&text))

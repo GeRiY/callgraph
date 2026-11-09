@@ -114,7 +114,10 @@ mod tests {
         assert_eq!(one.1, 3);
         assert_eq!(
             trailer(std::slice::from_ref(&one), Lang::En),
-            format!("⚠ 1 file had syntax errors (results may be incomplete): {} L3\n", one.0)
+            format!(
+                "⚠ 1 file had syntax errors (results may be incomplete): {} L3\n",
+                one.0
+            )
         );
         let seven: Vec<(String, u32)> = (1..=7).map(|n| (format!("f{n}.js"), n)).collect();
         let text = trailer(&seven, Lang::En);

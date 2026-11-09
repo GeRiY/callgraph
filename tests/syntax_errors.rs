@@ -12,8 +12,7 @@ const TAIL: &str =
 const PHP: &str = "<?php\nclass K {\n  public function ok() { return 1; }\n  public function broken( { return $x + ; }\n  public function after() { return 2; }\n}\n";
 const RUST: &str = "fn a() -> u32 { 1 }\nfn b() -> u32 { a() }\nfn c( {\n";
 const SWIFT: &str = "func a() -> Int { 1 }\nfunc b() -> Int { 2 }\nfunc c( {\n";
-const VUE: &str =
-    "<template><div/></template>\n<script setup>\nfunction a() { return 1 }\nfunction b( {\n</script>\n";
+const VUE: &str = "<template><div/></template>\n<script setup>\nfunction a() { return 1 }\nfunction b( {\n</script>\n";
 const GREP_A: &str = r"(^|::|\.|->)a$";
 
 struct Project(PathBuf);
@@ -84,7 +83,11 @@ impl Drop for Project {
 }
 
 /// A gráffal (hideg, majd meleg futás) és gráf nélkül.
-const MODES: [(bool, &str); 3] = [(true, "cold graph"), (true, "warm graph"), (false, "no graph")];
+const MODES: [(bool, &str); 3] = [
+    (true, "cold graph"),
+    (true, "warm graph"),
+    (false, "no graph"),
+];
 
 #[test]
 fn js_and_ts_outline_keeps_the_intact_functions_and_shows_the_warning() {
@@ -137,7 +140,10 @@ fn json_has_parse_errors_with_the_line() {
             .iter()
             .filter_map(|m| m["name"].as_str())
             .collect();
-        assert!(methods.contains(&"a") && methods.contains(&"b"), "{mode}: {out}");
+        assert!(
+            methods.contains(&"a") && methods.contains(&"b"),
+            "{mode}: {out}"
+        );
         // ép fájlnál nincs parseErrors mező
         let ok = project.run(&["show", "src/ok.js", "--format", "json"], graph);
         assert!(!ok.contains("parseErrors"), "{mode}: {ok}");
@@ -155,7 +161,10 @@ fn grep_finds_calls_in_the_broken_file_and_prints_the_trailer() {
             .lines()
             .find(|l| l.contains("files had syntax errors (results may be incomplete): "))
             .unwrap_or_else(|| panic!("{mode}: {out}"));
-        assert!(trailer.starts_with("⚠ 6 files had syntax errors"), "{trailer}");
+        assert!(
+            trailer.starts_with("⚠ 6 files had syntax errors"),
+            "{trailer}"
+        );
         assert!(trailer.contains("src/tail.js L3"), "{trailer}");
         assert!(trailer.ends_with(", … and 1 more"), "{trailer}");
         // a mélységi nézet is jelzi
@@ -182,15 +191,24 @@ fn vue_rust_php_and_swift_files_show_the_warning() {
         assert!(vue.contains("⚠ syntax error at L4: "), "{mode}: {vue}");
 
         let rust = project.run(&["show", "src/r.rs"], graph);
-        assert!(rust.contains("  a()  L1-1") && rust.contains("  b()  L2-2"), "{mode}: {rust}");
+        assert!(
+            rust.contains("  a()  L1-1") && rust.contains("  b()  L2-2"),
+            "{mode}: {rust}"
+        );
         assert!(rust.contains("⚠ syntax error at L3: "), "{mode}: {rust}");
 
         let php = project.run(&["show", "src/k.php"], graph);
-        assert!(php.contains("ok()") && php.contains("after()"), "{mode}: {php}");
+        assert!(
+            php.contains("ok()") && php.contains("after()"),
+            "{mode}: {php}"
+        );
         assert!(php.contains("⚠ syntax error at L4: "), "{mode}: {php}");
 
         let swift = project.run(&["show", "src/s.swift"], graph);
-        assert!(swift.contains("a()") && swift.contains("b()"), "{mode}: {swift}");
+        assert!(
+            swift.contains("a()") && swift.contains("b()"),
+            "{mode}: {swift}"
+        );
         assert!(swift.contains("⚠ syntax error at L3: "), "{mode}: {swift}");
     }
 }
@@ -200,11 +218,20 @@ fn directory_summary_and_locate_print_the_trailer() {
     let project = Project::new();
     for (graph, mode) in MODES {
         let summary = project.run(&["show", "src", "--format", "summary"], graph);
-        assert!(summary.contains("⚠ 6 files had syntax errors"), "{mode}: {summary}");
+        assert!(
+            summary.contains("⚠ 6 files had syntax errors"),
+            "{mode}: {summary}"
+        );
         let outline = project.run(&["show", "src"], graph);
-        assert!(outline.contains("⚠ 6 files had syntax errors"), "{mode}: {outline}");
+        assert!(
+            outline.contains("⚠ 6 files had syntax errors"),
+            "{mode}: {outline}"
+        );
         let locate = project.run(&["locate", "tail"], graph);
-        assert!(locate.contains("⚠ 6 files had syntax errors"), "{mode}: {locate}");
+        assert!(
+            locate.contains("⚠ 6 files had syntax errors"),
+            "{mode}: {locate}"
+        );
     }
 }
 

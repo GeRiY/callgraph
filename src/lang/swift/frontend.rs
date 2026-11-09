@@ -137,7 +137,11 @@ mod tests {
         let a = run("func a() -> Int { 1 }\nfunc b() -> Int { 2 }\nfunc c( {\n");
         let names: Vec<&str> = a.graph.methods.iter().map(|m| m.name.as_str()).collect();
         assert!(names.contains(&"a") && names.contains(&"b"), "{names:?}");
-        assert_eq!(a.graph.parse_errors[0].line, 3, "{:?}", a.graph.parse_errors);
+        assert_eq!(
+            a.graph.parse_errors[0].line, 3,
+            "{:?}",
+            a.graph.parse_errors
+        );
         assert!(run("struct A {}\n").graph.parse_errors.is_empty());
     }
 }

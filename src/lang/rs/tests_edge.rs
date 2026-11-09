@@ -40,7 +40,11 @@ fn syntax_error_keeps_the_intact_prefix() {
     let names: Vec<&str> = a.graph.methods.iter().map(|m| m.name.as_str()).collect();
     assert_eq!(names, ["a", "b"]);
     assert_eq!(a.graph.parse_errors.len(), 1);
-    assert_eq!(a.graph.parse_errors[0].line, 3, "{:?}", a.graph.parse_errors);
+    assert_eq!(
+        a.graph.parse_errors[0].line, 3,
+        "{:?}",
+        a.graph.parse_errors
+    );
     // a fájl-container a teljes fájlt fedi
     let module = &a.graph.containers[0];
     assert_eq!((module.line, module.end_line), (1, 3));

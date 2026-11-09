@@ -96,7 +96,10 @@ impl<P: RustParser> RustBackend<P> {
 fn error_line(text: &str, line: u32) -> u32 {
     let last = text
         .lines()
-        .rposition(|l| !l.trim().is_empty())
+        .enumerate()
+        .filter(|(_, l)| !l.trim().is_empty())
+        .last()
+        .map(|(i, _)| i)
         .map_or(1, |i| i as u32 + 1);
     if line == 0 { last } else { line.min(last) }
 }

@@ -212,7 +212,14 @@ mod tests {
         assert_eq!(graph.parse_errors.len(), 1);
         assert_eq!(graph.parse_errors[0].line, 3, "{:?}", graph.parse_errors);
         let ok = SourceFile::new("c.json", b"{\"a\": 1}\n".to_vec(), None);
-        assert!(JsonDocument.analyze(&ok).unwrap().graph.parse_errors.is_empty());
+        assert!(
+            JsonDocument
+                .analyze(&ok)
+                .unwrap()
+                .graph
+                .parse_errors
+                .is_empty()
+        );
     }
 
     #[test]

@@ -36,7 +36,11 @@ impl Command for ProfileCommand {
         write!(out, "{}", render(&profile, lang, self.full, Tip::Show))?;
         // a gráf-alapú megerősítés hibás fájlnál hiányos: a záró `⚠` sor (hiba nélkül üres)
         let issues = parse_issues(&root);
-        write!(out, "{}", crate::query::format::parse_trailer(&issues, lang))?;
+        write!(
+            out,
+            "{}",
+            crate::query::format::parse_trailer(&issues, lang)
+        )?;
         Ok(0)
     }
 }

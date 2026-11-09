@@ -36,10 +36,11 @@ impl ParseError {
         }
     }
 
-    /// Hibalista lezárása: sor szerint rendezve (stabilan), ismétlés nélkül, legfeljebb `MAX_PARSE_ERRORS` darab.
+    /// Hibalista lezárása: sor szerint rendezve (stabilan), soronként csak az első (a parser ugyanarra a sorra
+    /// gyakran láncban jelez; az első a kiváltó ok), legfeljebb `MAX_PARSE_ERRORS` darab.
     pub fn finish(mut errors: Vec<ParseError>) -> Vec<ParseError> {
         errors.sort_by_key(|e| e.line);
-        errors.dedup();
+        errors.dedup_by_key(|e| e.line);
         errors.truncate(MAX_PARSE_ERRORS);
         errors
     }
@@ -63,5 +64,10 @@ mod tests {
         let done = ParseError::finish(errors);
         assert_eq!(done.len(), MAX_PARSE_ERRORS);
         assert_eq!(done[0].line, 1);
+        let same_line = vec![ParseError::new(4, "first"), ParseError::new(4, "second")];
+        assert_eq!(
+            ParseError::finish(same_line),
+            vec![ParseError::new(4, "first")]
+        );
     }
 }

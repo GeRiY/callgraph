@@ -55,7 +55,10 @@ impl<'s> ParsedSwift<'s> {
         let last = self
             .source
             .lines()
-            .rposition(|l| !l.trim().is_empty())
+            .enumerate()
+            .filter(|(_, l)| !l.trim().is_empty())
+            .last()
+            .map(|(i, _)| i)
             .map_or(1, |i| i as u32 + 1);
         found
             .into_iter()

@@ -75,7 +75,8 @@ impl JsFrontend {
         // a sor a teljes fájlban (Vue: a blokk eltolásával); a fájlvégi hiba a hiányos sorra mutat
         for error in &parsed.errors {
             let line = lines.line_of(crate::core::clamp_to_content(src.as_bytes(), error.offset));
-            out.builder.parse_error(ParseError::new(line, &error.message));
+            out.builder
+                .parse_error(ParseError::new(line, &error.message));
         }
         // végzetes hibánál a passzok az ép előtagot látják (`parse_recovering`)
         let ctx = PassContext {
@@ -346,7 +347,11 @@ mod tests {
         );
         let names = method_names(&a);
         assert!(names.contains(&"a"), "{names:?}");
-        assert_eq!(a.graph.parse_errors[0].line, 4, "{:?}", a.graph.parse_errors);
+        assert_eq!(
+            a.graph.parse_errors[0].line, 4,
+            "{:?}",
+            a.graph.parse_errors
+        );
     }
 
     #[test]

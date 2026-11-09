@@ -10,6 +10,9 @@ use crate::graph::ProjectGraph;
 use crate::io::FileWalker;
 use crate::project::{Project, ProjectLocator, ProjectStore};
 
+/// Szintaktikai hibás fájl: gyökérhez relatív út és az első hiba sora.
+type BrokenFile = (String, u32);
+
 /// A projekten belüli, minta szerinti hívókat JSONL-ként írja ki.
 pub struct CallersCommand {
     pattern: String,
@@ -57,7 +60,7 @@ impl CallersCommand {
     fn callers(
         &self,
         project: &Project,
-    ) -> Result<(Vec<crate::index::CallerRow>, Vec<(String, u32)>)> {
+    ) -> Result<(Vec<crate::index::CallerRow>, Vec<BrokenFile>)> {
         let store = ProjectStore::new(project);
         store.ensure()?;
         let analyzer = Analyzer::with_defaults();
@@ -83,7 +86,10 @@ impl CallersCommand {
                 crate::query::format::parse_issue(project.root(), file, stored)
             })
             .collect();
-        Ok((graph.caller_index().callers(&self.pattern, self.depth)?, issues))
+        Ok((
+            graph.caller_index().callers(&self.pattern, self.depth)?,
+            issues,
+        ))
     }
 }
 

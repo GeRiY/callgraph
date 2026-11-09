@@ -36,11 +36,7 @@ pub struct FileGraph {
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub binary: bool,
     /// A parser szintaktikai hibái (1-alapú sor + rövid üzenet); ha van, a vázlat hiányos lehet.
-    #[serde(
-        default,
-        rename = "parseErrors",
-        skip_serializing_if = "Vec::is_empty"
-    )]
+    #[serde(default, rename = "parseErrors", skip_serializing_if = "Vec::is_empty")]
     pub parse_errors: Vec<ParseError>,
 }
 
