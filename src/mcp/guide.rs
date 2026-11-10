@@ -127,7 +127,7 @@ fn is_marker(line: &str) -> bool {
 mod tests {
     use super::*;
 
-    const TOOLS: [&str; 9] = [
+    const TOOLS: [&str; 10] = [
         "locate",
         "outline",
         "method_body",
@@ -137,6 +137,7 @@ mod tests {
         "notes",
         "projects",
         "guide",
+        "next",
     ];
 
     #[test]

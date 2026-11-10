@@ -136,12 +136,13 @@ impl Command for ShowCommand {
             return Ok(strict_code(&engine));
         }
         if self.body
-            || (self.format == "outline"
+            || (matches!(self.format.as_str(), "outline" | "api")
                 && self.lines.is_none()
                 && self.strings.is_none()
                 && self.const_filter.is_none())
         {
-            // jegyzetek (PILOT) csak az outline-ba és a --body-ba; jegyzet nélkül a kimenet változatlan
+            // jegyzetek (PILOT): az outline-ba és a --body-ba a sorok, az api-ba `  📝 N` jelölő; jegyzet nélkül
+            // a kimenet változatlan
             crate::notes::annotate(&mut rows, engine.root());
         }
         let text = match self.render(&rows) {

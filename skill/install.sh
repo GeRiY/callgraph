@@ -118,6 +118,11 @@ if [[ -n "$RPG" ]]; then
     msg "MCP for Claude Desktop / Cursor / VS Code: $MCP_DOCS (binary: $mcp_bin)" \
         "MCP Claude Desktophoz / Cursorhoz / VS Code-hoz: $MCP_DOCS (bináris: $mcp_bin)"
 fi
+# a helyi statisztika beküldése (opt-in): csak interaktív terminálban és még döntés nélkül kérdez (Igen / Most nem /
+# Soha); a döntést és a terminál-vizsgálatot a bináris végzi (nem interaktívan, CI-ban semmit nem tesz)
+if [[ -n "$RPG" ]]; then
+    CALLGRAPH_SKILL_DIR="$DIR" PHP_AST_HOME="${PHP_AST_HOME:-$DIR}" "./$RPG" telemetry ask || true
+fi
 msg "Done. Register a project: bash projects.sh add <alias> <absolute_path>" \
     "Kész. Projekt regisztrálása: bash projects.sh add <alias> <abszolút_út>"
 msg "Language: $(ui_lang) — switch: bash callgraph.sh set-lang <en|hu>" \

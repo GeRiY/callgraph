@@ -1,5 +1,5 @@
-//! Helyi, passzív használati mérés és a `callgraph stats` riport (a telemetria-terv 1. fázisa: hálózat NINCS,
-//! semmi nem hagyja el a gépet).
+//! Helyi, passzív használati mérés és a `callgraph stats` riport. Hálózat csak az opt-in beküldésnél van
+//! (`telemetry`: alapból KI, csak a felhasználó kapcsolhatja be).
 //!
 //! Minden CLI-parancs (`main.rs`: `CliProbe`) és minden MCP-eszköz-hívás (`mcp::server`: `McpStats`) után egy
 //! napi összesítőbe kerül: a parancs neve a rögzített listából, a kliens (cli / mcp / hook), siker vagy a hiba
@@ -19,16 +19,17 @@ mod mcp_probe;
 mod policy;
 mod report;
 mod store;
+pub(crate) mod telemetry;
 
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
 mod tracking_tests;
 
-pub(crate) use cli_probe::CLIENT_ENV;
+pub(crate) use cli_probe::{CLIENT_ENV, note_failure};
 pub use cli_probe::{CliProbe, Meter};
 pub(crate) use day::Day;
-pub(crate) use event::CommandKind;
+pub(crate) use event::{CommandKind, truncated};
 pub(crate) use mcp_probe::{McpStats, ToolCall};
 pub(crate) use policy::StatsEnv;
 pub(crate) use report::render;
@@ -38,6 +39,15 @@ use buckets::RankBucket;
 use event::Event;
 
 use crate::skill::SkillHome;
+
+/// Az egyszeri tájékoztatás (stderr, csak CLI-n; MCP-n soha: az az agent csatornája).
+pub(crate) fn notice_text() -> String {
+    crate::t!(
+        "ℹ callgraph keeps local usage counts on this machine only (nothing is sent) — see: callgraph.sh stats · off: CALLGRAPH_STATS=0",
+        "ℹ a callgraph helyi használati számlálókat vezet, csak ezen a gépen (semmi nem megy el) — lásd: callgraph.sh stats · kikapcsolás: CALLGRAPH_STATS=0"
+    )
+    .to_owned()
+}
 
 /// A `callgraph stats --days` alapértéke és felső határa.
 pub(crate) const DEFAULT_DAYS: u32 = 7;
@@ -82,6 +92,19 @@ impl Recorder {
     pub(crate) fn record(&self, event: &Event) {
         if let Some(store) = &self.store {
             store.record(Day::today(), event);
+        }
+    }
+
+    /// Az egyszeri tájékoztatás szövege, ha ezen a gépen most rögzítünk először (a jelzőfájl most jött létre).
+    pub(crate) fn first_notice(&self) -> Option<String> {
+        let store = self.store.as_ref()?;
+        store.claim_notice().then(notice_text)
+    }
+
+    /// Egy javaslat-sor / elfogadott javaslat (`next`) rögzítése a mai napra.
+    pub(crate) fn record_next(&self, command: CommandKind, used: bool) {
+        if let Some(store) = &self.store {
+            store.record_next(Day::today(), command, used);
         }
     }
 

@@ -196,6 +196,9 @@ root: a registered alias (`project`, list: `projects`) or the server's working d
 - `framework_view` `{view, path}`: `routes`, `middleware`, `validation`, `jobs`, `events`, `providers`, `magic`,
   `di`, `views` of a directory.
 - `notes`: notes left on files / methods (`📝`, read-only). `guide`: this manual in full (CLI examples, languages).
+- `next` `{result_id, choice}`: when the server runs with `callgraph mcp --next`, some results end with
+  `↪ r7 possible next: [1] … [2] …` (read-only navigation); run one by number (`choice: 1` or `[1, 3]`), only if it
+  fits your task; otherwise ignore the line.
 Output is capped at 400 lines (directory → summary, file → method index, search → 1 line per match): narrow `path`,
 `method` or `pattern` first; `full: true` only when justified.
 <!-- /mcp -->
@@ -208,6 +211,14 @@ Above 400 lines the directory outline switches to `summary`, the single-file out
 1 line per match; `--body` / `--lines` / `--strings` / `--depth` stop at 400 lines. Narrow down (`::name`, `--grep`,
 subdirectory); `--full` turns the limit off, only when justified. The threshold: `CALLGRAPH_OUT_LIMIT`. A leading `KEY=value` argument is passed on as an environment variable
 (e.g. `bash $CG CALLGRAPH_OUT_LIMIT=100 …`).
+
+## Suggested next step (opt-in)
+
+With `CALLGRAPH_NEXT=1` (or `--next`), a result may end with one line such as
+`↪ r7 possible next: [1] OrderService.php::refund --body  [2] callers of refund  [3] outline OrderService.php`.
+These are read-only navigation steps taken from names in that output, not conclusions. Use one only if it fits your
+task (`bash <skill>/callgraph.sh next r7 1`, several: `next r7 1,3`); otherwise ignore the line. Ids are per project
+and expire after 24 hours.
 
 ## New version notice
 
@@ -238,7 +249,8 @@ The workaround (targeted Read, Grep) can still be used, but do not skip the feed
 ## Notes (pilot)
 
 The outline and `--body` may show `📝 <time> · <text>` lines under a file or method: notes left by people or agents.
-Take them into account. Leave one when you learn something lasting (why something is so, a pitfall) — short, no task
+In `--grep` callers, `locate` and `--format api` a trailing `📝 N` marks a hit with notes: read them (outline / `--body`)
+before changing it. Take them into account. Leave one when you learn something lasting (why something is so, a pitfall) — short, no task
 lists. `note list` marks `[orphaned]` notes (the method is gone; remove with `note rm <id>`).
 
 ```bash
@@ -253,8 +265,10 @@ All data goes into the project's own `.callgraph/` directory (cache, project map
 for changed files, so repeated searches are fast; the directory is created automatically,
 with a `*` `.gitignore`, so it never gets into version control). Nothing is written outside the project. If the directory
 is not writable, it runs without a cache. Cleanup: `callgraph prune` (see README).
-Local usage stats (counts and ranges only, no paths or names, never sent anywhere): `bash <skill>/callgraph.sh stats`
-when the user asks how callgraph is used; off: `CALLGRAPH_STATS=0`.
+Local usage stats (counts and ranges only, no paths or names): `bash <skill>/callgraph.sh stats`
+when the user asks how callgraph is used; off: `CALLGRAPH_STATS=0`. Sending them is opt-in and only the user decides:
+NEVER run `telemetry on` yourself (it asks for a terminal confirmation). If an output ends with a `ℹ for the user:` line
+about sharing usage counts, pass it on to the user once and do nothing else.
 
 Processed files: only the supported extensions (upper case too: `B.PHP`), without generated files
 (`package-lock.json`, `*.min.js`, `*.min.css`, minified / bundled JS / CSS by content), binary content, the built-in

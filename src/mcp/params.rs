@@ -205,6 +205,59 @@ pub(crate) struct LocateParams {
     pub all: bool,
 }
 
+/// `next`: egy korábbi eredmény javasolt következő lépése az azonosítójával.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, JsonSchema)]
+pub(crate) struct NextParams {
+    /// The result id from the `↪ rN …` line, e.g. `"r7"`.
+    pub result_id: String,
+    /// Which suggestion(s): `1`, `"1"`, `"1,3"` or `[1, 3]`.
+    pub choice: Choice,
+    /// Registered project alias (the one the result came from); default: the server's working directory.
+    #[serde(default)]
+    pub project: Option<String>,
+}
+
+/// Egy vagy több választás: szám, string (`"1,3"`) vagy tömb.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(untagged)]
+pub(crate) enum Choice {
+    Number(u64),
+    Text(String),
+    List(Vec<ChoiceItem>),
+}
+
+/// A tömb egy eleme: szám vagy string.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(untagged)]
+pub(crate) enum ChoiceItem {
+    Number(u64),
+    Text(String),
+}
+
+impl Default for Choice {
+    fn default() -> Self {
+        Self::Text(String::new())
+    }
+}
+
+impl Choice {
+    /// A `next` alak: `1,3`.
+    pub(crate) fn to_text(&self) -> String {
+        match self {
+            Self::Number(n) => n.to_string(),
+            Self::Text(text) => text.clone(),
+            Self::List(items) => items
+                .iter()
+                .map(|item| match item {
+                    ChoiceItem::Number(n) => n.to_string(),
+                    ChoiceItem::Text(text) => text.clone(),
+                })
+                .collect::<Vec<_>>()
+                .join(","),
+        }
+    }
+}
+
 /// `project_profile`: a projekt architektúrája, rétegei és mintái.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, JsonSchema)]
 pub(crate) struct ProfileParams {

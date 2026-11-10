@@ -3,10 +3,12 @@
 //! a `show --notes <minta>` és a `callgraph note list` keres / listáz. A horgony NÉV szerinti (nem sorszám):
 //! ha a metódus eltűnik a fájlból, a jegyzet „árva” lesz. Leírás: `docs/NOTES.md`.
 
+mod marker;
 mod note;
 mod store;
 mod view;
 
+pub use marker::{NoteMarks, file_count, live_count, mark, method_count, strip_mark};
 pub use note::{FORMAT_VERSION, Note, short_time, truncate};
 pub use store::{NOTES_FILE, NoteStore};
 pub use view::{

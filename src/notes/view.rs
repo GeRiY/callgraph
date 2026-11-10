@@ -83,7 +83,7 @@ pub fn relative_path(root: &Path, input: &Path) -> Option<String> {
 }
 
 /// A relatív út komponensei `/`-rel (`.` kimarad, `..` visszalép); gyökérből kilépő vagy abszolút út → `None`.
-fn normalize(path: &Path) -> Option<String> {
+pub(super) fn normalize(path: &Path) -> Option<String> {
     let mut parts: Vec<String> = Vec::new();
     for component in path.components() {
         match component {

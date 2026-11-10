@@ -74,15 +74,29 @@ fn records_cli_runs_and_reports_them() {
 
     let show = run(&root, &skill, dir, &["show", "src/Order.php"]);
     assert!(show.status.success(), "{show:?}");
+    // az egyszeri tájékoztatás: csak az első rögzítéskor, a stderr-en
+    let notice = "ℹ callgraph keeps local usage counts on this machine only";
+    assert!(
+        String::from_utf8_lossy(&show.stderr).contains(notice),
+        "{show:?}"
+    );
+    assert!(!String::from_utf8_lossy(&show.stdout).contains(notice));
     let missing = run(&root, &skill, dir, &["show", "src/Missing.php"]);
     assert!(!missing.status.success());
+    assert!(!String::from_utf8_lossy(&missing.stderr).contains(notice));
     let locate = run(&root, &skill, dir, &["locate", "processRefund", "refund"]);
     assert!(locate.status.success(), "{locate:?}");
     // a `stats` maga nem számít
     let first = run(&root, &skill, dir, &["stats"]);
     assert!(first.status.success(), "{first:?}");
 
-    let files: Vec<_> = std::fs::read_dir(&stats).unwrap().collect();
+    let files: Vec<_> = std::fs::read_dir(&stats)
+        .unwrap()
+        .filter(|e| {
+            e.as_ref()
+                .is_ok_and(|e| e.file_name().to_string_lossy().ends_with(".json"))
+        })
+        .collect();
     assert_eq!(files.len(), 1, "one month file");
     let text = std::fs::read_to_string(files[0].as_ref().unwrap().path()).unwrap();
     // út, fájl- és szimbólumnév nincs a napi fájlban
@@ -101,7 +115,7 @@ fn records_cli_runs_and_reports_them() {
     assert_eq!(row(&report, "show")[1..3], ["2", "1"], "{report}");
     assert_eq!(row(&report, "locate")[1..3], ["1", "0"], "{report}");
     assert!(
-        report.contains("nothing is sent anywhere") && report.contains("CALLGRAPH_STATS=0"),
+        report.contains("stays local unless") && report.contains("CALLGRAPH_STATS=0"),
         "{report}"
     );
     assert!(!report.contains("Recording is off"), "{report}");

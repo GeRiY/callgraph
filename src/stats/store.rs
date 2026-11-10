@@ -17,6 +17,9 @@ use super::event::{Client, CommandKind, ErrorKind, Event, Outcome};
 /// Ennyi napnál régebbi adat nem marad meg.
 pub(crate) const RETENTION_DAYS: u32 = 90;
 
+/// Az egyszeri „helyi számlálás” tájékoztatás jelzőfájlja a stats-mappában.
+pub(crate) const NOTICE_MARKER: &str = "notice-shown";
+
 /// A havi fájl formátum-verziója.
 const FORMAT: u32 = 1;
 
@@ -39,6 +42,12 @@ pub(crate) struct Counters {
     /// Csak a `locate`-nél: a következő megnyitott fájl helye a rangsorban.
     #[serde(skip_serializing_if = "all_zero")]
     pub(crate) hits: [u64; RankBucket::COUNT],
+    /// Hányszor kapott javaslat-sort (`next`) ennek a parancsnak az eredménye.
+    #[serde(skip_serializing_if = "is_zero")]
+    pub(crate) next_shown: u64,
+    /// Hányszor futtatták egy javaslatát (`next rN k`).
+    #[serde(skip_serializing_if = "is_zero")]
+    pub(crate) next_used: u64,
 }
 
 fn is_zero(n: &u64) -> bool {
@@ -77,11 +86,27 @@ impl Counters {
         add_arrays(&mut self.size, &other.size);
         self.truncated += other.truncated;
         add_arrays(&mut self.hits, &other.hits);
+        self.next_shown += other.next_shown;
+        self.next_used += other.next_used;
     }
 
     /// A hibák száma.
     pub(crate) fn error_count(&self) -> u64 {
         self.errors.values().sum()
+    }
+
+    /// A felhasználói hibák (használat, nincs meg, nem támogatott): számolva, de az `errors.jsonl`-be nem kerülnek.
+    pub(crate) fn user_error_count(&self) -> u64 {
+        self.errors
+            .iter()
+            .filter(|(kind, _)| kind.is_user_error())
+            .map(|(_, n)| n)
+            .sum()
+    }
+
+    /// A belső hibák (I/O, egyéb): ezek az `errors.jsonl`-ben is ott vannak.
+    pub(crate) fn internal_error_count(&self) -> u64 {
+        self.error_count() - self.user_error_count()
     }
 }
 
@@ -188,6 +213,31 @@ impl StatsStore {
         });
     }
 
+    /// Az egyszeri tájékoztatás jelzőfájlja: `true`, ha most jött létre (akkor kell kiírni a tájékoztatást),
+    /// `false`, ha már volt, vagy nem hozható létre (ilyenkor sem írunk ki semmit, hogy ne ismétlődjön).
+    pub(crate) fn claim_notice(&self) -> bool {
+        if std::fs::create_dir_all(&self.dir).is_err() {
+            return false;
+        }
+        std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(self.dir.join(NOTICE_MARKER))
+            .is_ok()
+    }
+
+    /// Egy javaslat-sor (`used: false`) vagy egy elfogadott javaslat (`used: true`) rögzítése.
+    pub(crate) fn record_next(&self, day: Day, command: CommandKind, used: bool) {
+        self.update(day, |file| {
+            let counters = file.counters(day, command);
+            if used {
+                counters.next_used += 1;
+            } else {
+                counters.next_shown += 1;
+            }
+        });
+    }
+
     /// Olvasás → módosítás → atomikus írás; egy új hónap első írásakor a lejárt hónapok törlése.
     fn update(&self, day: Day, change: impl FnOnce(&mut MonthFile)) {
         let _guard = WRITE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
@@ -215,6 +265,14 @@ impl StatsStore {
         for name in expired_months(&names, today) {
             let _ = std::fs::remove_file(self.dir.join(name));
         }
+    }
+
+    /// Egy nap parancsonkénti számlálói (üres, ha nincs adat).
+    pub(crate) fn day_counters(&self, day: Day) -> BTreeMap<CommandKind, Counters> {
+        MonthFile::load(&self.month_file(day))
+            .days
+            .remove(&day)
+            .unwrap_or_default()
     }
 
     /// Az összesítés a `from..=to` napokra.
@@ -250,7 +308,7 @@ pub(crate) fn expired_months(names: &[String], today: Day) -> Vec<String> {
 }
 
 /// Írás ideiglenes fájlba, majd átnevezés (a párhuzamos olvasó nem lát félkész fájlt).
-fn write_atomic(path: &Path, text: &str) -> std::io::Result<()> {
+pub(crate) fn write_atomic(path: &Path, text: &str) -> std::io::Result<()> {
     let mut tmp = path.as_os_str().to_owned();
     tmp.push(format!(".tmp-{}", std::process::id()));
     std::fs::write(&tmp, text)?;

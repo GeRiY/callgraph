@@ -356,10 +356,32 @@ def footer(page, lang):
     return ('<footer>\n  <nav class="foot" aria-label="%s">%s</nav>\n'
             '  <div>callgraph · %s <a href="https://www.linkedin.com/in/gergomakra/" rel="author me">%s</a> · %s · '
             '<a href="%s">GitHub</a> · <a href="%s/releases/latest">%s</a> · '
-            '<a href="%s" hreflang="%s" lang="%s">%s</a></div>\n</footer>'
+            '<a href="%s" hreflang="%s" lang="%s">%s</a></div>\n'
+            '  <div class="sub">%s</div>\n</footer>'
             % (esc(u["pages"]), " · ".join('<a href="%s">%s</a>' % (p, esc(l)) for p, l in links),
-               u["made"], u["author"], u["license"], REPO, REPO, u["releases"], target, other, other, u["switch"]))
+               u["made"], u["author"], u["license"], REPO, REPO, u["releases"], target, other, other, u["switch"],
+               PRIVACY_NOTE[lang]))
 
+
+PRIVACY_NOTE = {
+    "en": "Privacy: no cookies. Page views are counted per day (page, referring site, download clicks) — no IP address, "
+          "no identifiers. Controller: Makra Gergő, mgeri1993@gmail.com.",
+    "hu": "Adatvédelem: nincs cookie. Az oldalmegtekintéseket napi számként rögzítjük (oldal, hivatkozó oldal, "
+          "letöltés-kattintás) — IP-cím és azonosító nélkül. Adatkezelő: Makra Gergő, mgeri1993@gmail.com.",
+}
+
+# Page-view counter: no cookies, no storage, no identifiers — only the page path, the referring site's domain (or a
+# `?ref=` / `utm_source=` source tag from a shared link) and
+# whether a download link was clicked, counted per day on telemetry.callgraph.eu (see server/telemetry/).
+SCRIPT_COUNT = """<script>
+(function(){try{var u="https://telemetry.callgraph.eu/hit",r="";
+try{var h=new URL(document.referrer).hostname;if(h&&h.indexOf("callgraph.eu")<0)r=h.toLowerCase()}catch(e){}
+try{var q=new URLSearchParams(location.search),t=q.get("ref")||q.get("utm_source");if(t)r=t.toLowerCase().replace(/[^a-z0-9.-]/g,"").slice(0,64)}catch(e){}
+function s(e){var d=JSON.stringify({p:location.pathname.toLowerCase().slice(0,80),r:r,e:e});
+if(navigator.sendBeacon)navigator.sendBeacon(u,d);else fetch(u,{method:"POST",body:d,keepalive:true,mode:"no-cors"})}
+s("view");document.addEventListener("click",function(ev){var a=ev.target.closest&&ev.target.closest("a");
+if(a&&/github\.com\/GeRiY\/callgraph\/releases/.test(a.href))s("download")})}catch(e){}})();
+</script>"""
 
 SCRIPT_MENU = """<script>
 // nyelv-menü: kívül kattintásra / Escape-re bezárul (JS nélkül is működik)
@@ -718,7 +740,7 @@ def render(page, lang, body, version):
     elif page["key"] == "mcp":
         extra = [howto_ld("mcp", lang)]
     body = expand(body, lang, version)
-    scripts = SCRIPT_MENU + "\n" + script_copy(lang) + ("\n" + SCRIPT_TABS if 'role="tablist"' in body else "")
+    scripts = SCRIPT_MENU + "\n" + SCRIPT_COUNT + "\n" + script_copy(lang) + ("\n" + SCRIPT_TABS if 'role="tablist"' in body else "")
     return ('<!DOCTYPE html>\n<html lang="%s">\n<head>\n%s\n</head>\n<body>\n<a class="skip" href="#main">%s</a>\n'
             '<div class="wrap">\n%s\n<main id="main">\n%s%s</main>\n\n%s\n</div>\n%s\n</body>\n</html>\n'
             % (lang, head(page, lang, extra, version), UI[lang]["skip"], nav(page, lang),

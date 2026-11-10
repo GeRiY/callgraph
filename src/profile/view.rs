@@ -80,6 +80,7 @@ pub(crate) fn layered_summary(
 pub(crate) fn tag_file_lines(text: &str, scope: &LayerScope) -> String {
     let path_of = |line: &str| -> Option<String> {
         let body = line.strip_prefix("FILE  ")?.trim_end_matches('\n');
+        let body = crate::notes::strip_mark(body);
         Some(body.split("  NS:").next().unwrap_or(body).to_owned())
     };
     let mixed = Mixed::of(

@@ -2,6 +2,7 @@
 
 use crate::i18n::Lang;
 use crate::model::{Call, FileGraph, Method};
+use crate::notes::NoteMarks;
 use crate::query::QueryResult;
 use crate::query::snippet::{self, SourceLines};
 use std::fmt::Write as _;
@@ -11,7 +12,7 @@ use super::Formatter;
 pub struct Outline;
 impl Formatter for Outline {
     fn format(&self, rows: &[QueryResult], lang: Lang) -> String {
-        render(rows, lang, None)
+        render(rows, lang, None, None)
     }
 }
 
@@ -20,19 +21,30 @@ impl Formatter for Outline {
 pub struct GrepOutline;
 impl Formatter for GrepOutline {
     fn format(&self, rows: &[QueryResult], lang: Lang) -> String {
-        grep_outline(rows, lang, &SourceLines::default())
+        grep_outline(rows, lang, &SourceLines::default(), None)
     }
 }
 
-/// A `--grep` outline a megadott forrássor-tárral (a projekt-gráf tárolt hívás-soraival előtöltve is lehet).
-pub(crate) fn grep_outline(rows: &[QueryResult], lang: Lang, source: &SourceLines) -> String {
-    render(rows, lang, Some(source))
+/// A `--grep` outline a megadott forrássor-tárral (a projekt-gráf tárolt hívás-soraival előtöltve is lehet);
+/// `marks`: a jegyzet-jelölők (`  📝 N`) a `FILE` és a metódus-sorok végén.
+pub(crate) fn grep_outline(
+    rows: &[QueryResult],
+    lang: Lang,
+    source: &SourceLines,
+    marks: Option<&NoteMarks>,
+) -> String {
+    render(rows, lang, Some(source), marks)
 }
 
-fn render(rows: &[QueryResult], lang: Lang, source: Option<&SourceLines>) -> String {
+fn render(
+    rows: &[QueryResult],
+    lang: Lang,
+    source: Option<&SourceLines>,
+    marks: Option<&NoteMarks>,
+) -> String {
     let mut text = rows
         .iter()
-        .map(|row| outline(row, lang, source))
+        .map(|row| outline(row, lang, source, marks))
         .collect::<Vec<_>>()
         .join("\n---\n");
     text.push_str(lang.pick(
@@ -41,17 +53,24 @@ fn render(rows: &[QueryResult], lang: Lang, source: Option<&SourceLines>) -> Str
     ));
     text
 }
-fn outline(row: &QueryResult, lang: Lang, source: Option<&SourceLines>) -> String {
+fn outline(
+    row: &QueryResult,
+    lang: Lang,
+    source: Option<&SourceLines>,
+    marks: Option<&NoteMarks>,
+) -> String {
     let g = &row.graph;
+    let notes: &[crate::notes::Note] = marks.map_or(&[], |marks| marks.of(&g.file));
     let mut s = String::new();
     writeln!(
         s,
-        "FILE  {}{}",
+        "FILE  {}{}{}",
         g.file,
         g.namespace
             .as_ref()
             .map(|n| format!("  NS:{n}"))
-            .unwrap_or_default()
+            .unwrap_or_default(),
+        crate::notes::mark(crate::notes::file_count(notes))
     )
     .unwrap();
     // szintaktikai hiba: közvetlenül a FILE sor alatt (hiba nélkül nincs sor)
@@ -142,6 +161,15 @@ fn outline(row: &QueryResult, lang: Lang, source: Option<&SourceLines>) -> Strin
         methods.sort_by_key(|m| m.line);
         for m in methods {
             method_line(&mut s, m);
+            if !notes.is_empty() {
+                let n = crate::notes::method_count(notes, m.container.as_deref(), &m.name);
+                if n > 0 {
+                    // a metódus-sor végére (a sorvége elé)
+                    s.pop();
+                    s.push_str(&crate::notes::mark(n));
+                    s.push('\n');
+                }
+            }
             crate::notes::method_lines(&mut s, &row.notes, m.container.as_deref(), &m.name, "    ");
             for cat in categories(g, m) {
                 writeln!(s, "    {:<18}{}", cat.0, cat.1).unwrap();

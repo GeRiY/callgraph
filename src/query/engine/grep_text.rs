@@ -8,6 +8,7 @@ use crate::graph::ProjectGraph;
 use crate::i18n::Lang;
 use crate::index::{CallerIndex, CallerRow};
 use crate::model::FileGraph;
+use crate::notes::{NoteMarks, strip_mark};
 use crate::profile::{Count, LayerRun, LayerScope, group_header};
 use crate::query::format::{call_lines, grep_outline, method_calls};
 use crate::query::snippet::{self, SourceLines};
@@ -29,6 +30,8 @@ impl QueryEngine {
         limit: Option<usize>,
     ) -> Result<String> {
         let lang = crate::i18n::lang();
+        // jegyzet-jelölők (`  📝 N`): egyszer betöltve; jegyzetfájl nélkül üres
+        let marks = NoteMarks::load(self.root());
         let shared = self.project_graph();
         let mut project = shared.as_ref().map(crate::graph::lock);
         // a hívás-sorok a projekt-gráfból (a fájlok újraolvasása nélkül)
@@ -42,7 +45,7 @@ impl QueryEngine {
         }
         if depth <= 1 {
             let layers = self.layers.as_ref().filter(|scope| scope.by_layer());
-            return Ok(grep_flat(rows, &source, lang, full, limit, layers));
+            return Ok(grep_flat(rows, &source, lang, full, limit, layers, &marks));
         }
         let direct = direct_rows(rows);
         let whole_project = scope == self.depth_scope().as_slice();
@@ -80,6 +83,7 @@ impl QueryEngine {
                 source: &source,
                 lang,
                 layers: self.layers.as_ref().filter(|scope| scope.by_layer()),
+                marks: &marks,
             }));
         }
         // gráf nélkül: a lekérdezés teljes hatókörének minden fájlja (nem csak az 1. szint fájljainak mappái)
@@ -100,6 +104,7 @@ impl QueryEngine {
             source: &source,
             lang,
             layers: self.layers.as_ref().filter(|scope| scope.by_layer()),
+            marks: &marks,
         }))
     }
 }
@@ -143,6 +148,8 @@ struct DepthView<'a> {
     /// `--by-layer`: a hívók rétegek szerint (a hívotthoz legközelebbi elöl), szintenként rétegcsoportokban, a
     /// csoport előtt `[service]  2 callers` fejléccel; `None` = a régi sorrend és sor.
     layers: Option<&'a LayerScope>,
+    /// A jegyzet-jelölők (a hívó-sorok végén `  📝 N`).
+    marks: &'a NoteMarks,
 }
 
 /// A `--by-layer` csoport-fejléce egy sorban (`behúzás` + `[service]  3 calls` + újsor).
@@ -175,7 +182,7 @@ fn with_headers(text: &str, rows: &[QueryResult], runs: &[LayerRun], lang: Lang)
                 .trim_end_matches('\n')
                 .strip_prefix("FILE  ")
                 .and_then(|rest| rest.strip_prefix(rows[run.range.start].graph.file.as_str()))
-            && (rest.is_empty() || rest.starts_with("  NS:"))
+            && (rest.is_empty() || rest.starts_with("  NS:") || strip_mark(rest).is_empty())
         {
             let n = calls_in(rows, run);
             out.push_str(&header_line("", &run.label, n, Count::Calls, lang));
@@ -213,8 +220,9 @@ fn grep_flat(
     full: bool,
     limit: Option<usize>,
     layers: Option<&LayerScope>,
+    marks: &NoteMarks,
 ) -> String {
-    let text = grep_outline(rows, lang, source);
+    let text = grep_outline(rows, lang, source, Some(marks));
     if rows.is_empty() {
         // Nincs találat: csak a záró tipp marad (nincs fejléc-elválasztó).
         return text.trim_start_matches("\n---\n").to_owned();
@@ -235,7 +243,7 @@ fn grep_flat(
         text.lines().count(),
         snippet::MAX_PER_METHOD
     );
-    flat_lines(header, rows, source, lang, max, &runs)
+    flat_lines(header, rows, source, lang, max, &runs, marks)
 }
 
 /// A szintenkénti nézet: 1. szint = a találatok metódusai a hívás-soraikkal, 2+. szint = hívónként egy sor
@@ -252,6 +260,7 @@ fn render_depth(view: DepthView<'_>) -> String {
         source,
         lang,
         layers,
+        marks,
     } = view;
     let mut output = String::new();
     for level in 1..=depth {
@@ -295,12 +304,17 @@ fn render_depth(view: DepthView<'_>) -> String {
                 }
                 writeln!(
                     output,
-                    "  {}  {}::{}()  L{}-{}",
+                    "  {}  {}::{}()  L{}-{}{}",
                     row.graph.file,
                     method.container.as_deref().unwrap_or("__top__"),
                     method.name,
                     method.line,
-                    method.end_line.unwrap_or(method.line)
+                    method.end_line.unwrap_or(method.line),
+                    marks.caller_mark(
+                        &row.graph.file,
+                        method.container.as_deref(),
+                        Some(method.name.as_str())
+                    )
                 )
                 .unwrap();
                 let calls = method_calls(&row.graph, method);
@@ -339,12 +353,17 @@ fn render_depth(view: DepthView<'_>) -> String {
                 .unwrap_or((caller.line, caller.line));
             writeln!(
                 output,
-                "  {}  {}::{}()  L{}-{}{}",
+                "  {}  {}::{}()  L{}-{}{}{}",
                 caller.file,
                 caller.container.as_deref().unwrap_or("__top__"),
                 caller.caller,
                 range.0,
                 range.1,
+                marks.caller_mark(
+                    &caller.file,
+                    caller.container.as_deref(),
+                    Some(caller.caller.as_str())
+                ),
                 if level > 1 {
                     format!(
                         "  ← {}{}",
@@ -404,6 +423,7 @@ fn flat_lines(
     lang: crate::i18n::Lang,
     max: usize,
     runs: &[LayerRun],
+    marks: &NoteMarks,
 ) -> String {
     for (at, row) in rows.iter().enumerate() {
         if let Some(run) = runs.iter().find(|run| run.range.start == at) {
@@ -433,10 +453,11 @@ fn flat_lines(
             }));
             let (shown, rest) = snippet::cap(sites);
             let prefix = format!(
-                "{}  {}::{}",
+                "{}  {}::{}{}",
                 row.graph.file,
                 container.unwrap_or("__top__"),
-                caller.unwrap_or("__top__")
+                caller.unwrap_or("__top__"),
+                marks.caller_mark(&row.graph.file, container, caller)
             );
             for site in &shown {
                 let (target, via) = site.key;

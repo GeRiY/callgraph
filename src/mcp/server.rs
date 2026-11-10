@@ -1,4 +1,4 @@
-//! Az MCP-szerver (rmcp): kilenc, csak olvasó eszköz a meglévő lekérdező-motor fölött. A leírások rövidek (minden
+//! Az MCP-szerver (rmcp): tíz, csak olvasó eszköz a meglévő lekérdező-motor fölött. A leírások rövidek (minden
 //! kliensben kontextus-tokenbe kerülnek): mit ad, egy példa, a fő buktató. Az `initialize` útmutatója és a `guide`
 //! eszköz szövege a skill-utasítás forrásából készül (`guide.rs`), így nem csúszik szét a SKILL.md-vel. Minden
 //! eszköz-hívás vége egy helyen megy át (`finish`): ott méri a helyi használati statisztika (`stats::McpStats`).
@@ -11,8 +11,8 @@ use rmcp::model::{CallToolResult, ContentBlock, Implementation, ServerCapabiliti
 use rmcp::{ServerHandler, tool, tool_handler, tool_router};
 
 use super::params::{
-    FindCallersParams, FrameworkViewParams, LocateParams, MethodBodyParams, NotesParams,
-    OutlineParams, ProfileParams, SearchParams,
+    FindCallersParams, FrameworkViewParams, LocateParams, MethodBodyParams, NextParams,
+    NotesParams, OutlineParams, ProfileParams, SearchParams,
 };
 use super::request::ShowQuery;
 use super::runner::QueryRunner;
@@ -162,6 +162,32 @@ impl CallgraphServer {
                 .await
                 .unwrap_or_else(|e| Err(e.to_string()));
         let call = Self::plain(CommandKind::ProjectProfile, started, project.as_deref());
+        self.finish(&call, result)
+    }
+
+    #[tool(
+        description = "Run a suggested next step by its number instead of composing the call: some results end with `↪ r7 possible next: [1] … [2] …` (only when the server runs with `--next`). Use it only if a suggestion fits your task; otherwise ignore the line. Example: {\"result_id\": \"r7\", \"choice\": 1} or {\"result_id\": \"r7\", \"choice\": [1, 3]}. Ids are per project and expire after 24 hours."
+    )]
+    async fn next(&self, Parameters(p): Parameters<NextParams>) -> CallToolResult {
+        let started = Instant::now();
+        let project = p.project.clone();
+        let runner = Arc::clone(&self.runner);
+        let result = tokio::task::spawn_blocking(move || {
+            let choices = crate::next::parse_choices(&p.choice.to_text()).ok_or_else(|| {
+                crate::tf!(
+                    "Not a choice: {} (expected 1, 2, 3 or a list like [1, 3]).",
+                    "Nem választás: {} (1, 2, 3 vagy lista, pl. [1, 3]).",
+                    p.choice.to_text()
+                )
+            })?;
+            if crate::next::parse_id(&p.result_id).is_none() {
+                return Err(super::runner::unknown_result(&p.result_id));
+            }
+            runner.next(p.project.as_deref(), &p.result_id, &choices)
+        })
+        .await
+        .unwrap_or_else(|e| Err(e.to_string()));
+        let call = Self::plain(CommandKind::Next, started, project.as_deref());
         self.finish(&call, result)
     }
 

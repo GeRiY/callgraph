@@ -24,13 +24,14 @@ pub(crate) enum CommandKind {
     Notes,
     Guide,
     Projects,
+    Next,
     Other,
 }
 
 impl CommandKind {
     /// Minden változat (a tesztekhez).
     #[cfg(test)]
-    pub(crate) const ALL: [Self; 15] = [
+    pub(crate) const ALL: [Self; 16] = [
         Self::Show,
         Self::Outline,
         Self::MethodBody,
@@ -45,6 +46,7 @@ impl CommandKind {
         Self::Notes,
         Self::Guide,
         Self::Projects,
+        Self::Next,
         Self::Other,
     ];
 
@@ -65,6 +67,7 @@ impl CommandKind {
             Self::Notes => "notes",
             Self::Guide => "guide",
             Self::Projects => "projects",
+            Self::Next => "next",
             Self::Other => "other",
         }
     }
@@ -120,6 +123,22 @@ impl ErrorKind {
         Self::Failed,
     ];
 
+    /// Felhasználói hiba-e (használat, nincs meg, nem támogatott): ezek nem kerülnek az `errors.jsonl`-be.
+    pub(crate) fn is_user_error(self) -> bool {
+        matches!(self, Self::Usage | Self::NotFound | Self::Unsupported)
+    }
+
+    /// Egy skill-hiba kontextusának (`skill::SkillFailure::context`) kategóriája.
+    pub(crate) fn of_context(context: &str) -> Self {
+        match context {
+            "usage" => Self::Usage,
+            "not_found" => Self::NotFound,
+            "unsupported" => Self::Unsupported,
+            "io" => Self::Io,
+            _ => Self::Failed,
+        }
+    }
+
     /// A CLI-hiba kategóriája.
     pub(crate) fn of(error: &CallgraphError) -> Self {
         match error {
@@ -142,9 +161,11 @@ impl ErrorKind {
             "Nem található",
             "Nincs ilyen metódus",
         ];
-        const USAGE: [&str; 4] = [
+        const USAGE: [&str; 6] = [
             "usage:",
             "használat:",
+            "Usage:",
+            "Használat:",
             "Unknown project",
             "Ismeretlen projekt",
         ];

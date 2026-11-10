@@ -128,6 +128,7 @@ fn initialize_list_and_call_outline() {
             "guide",
             "locate",
             "method_body",
+            "next",
             "notes",
             "outline",
             "project_profile",

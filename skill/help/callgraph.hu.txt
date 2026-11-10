@@ -97,10 +97,20 @@ Projekt-profil (architektúra, rétegek és minták a mappa- / fájlnevekből, a
   Egy nagy, teljesen kihagyandó régi almappa (pl. egy régi alkalmazás-másolat): útvonal-sor a .callgraphignore-ban
   ("sn_monitoring/").
 
-Helyi használati statisztika (a gépen marad, semmi nem megy el; út, név és keresési kifejezés nélkül):
+Helyi használati statisztika (a gépen marad, hacsak a felhasználó be nem kapcsolja a beküldést; út, név és keresési
+kifejezés nélkül):
   bash ~/.claude/skills/callgraph/callgraph.sh stats [--days N]
-                                                hívások parancsonként / MCP-eszközönként, hibák, idő és kimenet-méret
-                                                sávokban, locate-találati arány; az elmúlt 7 nap (max. 90); kikapcsolás: CALLGRAPH_STATS=0
+                                                hívások parancsonként / MCP-eszközönként, felhasználói és belső hibák, idő
+                                                és kimenet-méret sávokban, locate-találati arány; az elmúlt 7 nap (max. 90);
+                                                kikapcsolás: CALLGRAPH_STATS=0
+  bash ~/.claude/skills/callgraph/callgraph.sh telemetry status|preview|on|off
+                                                e napi számok opt-in beküldése (csak lezárt napok); preview: a pontos JSON;
+                                                on: terminálban y/N megerősítést kér (csak a felhasználó kapcsolhatja be);
+                                                végleges tiltás: CALLGRAPH_TELEMETRY=0
+
+Javasolt következő lépés (opt-in: --next vagy CALLGRAPH_NEXT=1):
+  egy eredmény végén "↪ r7 lehetséges következő: [1] …  [2] …" sor állhat (csak olvasó navigáció a kimenet neveiből)
+  bash ~/.claude/skills/callgraph/callgraph.sh next r7 1 [--project alias]   az r7 eredmény 1. javaslatát futtatja (több: 1,3)
 
 Előre-frissítés (git pull vagy sok szerkesztés után, hogy a következő lekérdezésnek ne kelljen újraelemeznie):
   bash ~/.claude/skills/callgraph/callgraph.sh refresh [--project alias]     a projekt minden változott / új / törölt fájlja

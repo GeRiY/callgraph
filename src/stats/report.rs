@@ -47,7 +47,16 @@ pub(crate) fn render(totals: &Totals, today: Day, days: u32, dir: &Path, enabled
         "idő: {time} · kimenet (token): {size}\n"
     ));
     table(&mut out, totals);
+    if totals.commands.values().any(|c| c.error_count() > 0) {
+        out.push_str(crate::t!(
+            "user err = usage, not found, unsupported file (counted, not logged) · internal = also in errors.jsonl\n",
+            "felh. hiba = használat, nincs meg, nem támogatott fájl (számolva, nem naplózva) · belső = az errors.jsonl-ben is\n"
+        ));
+    }
     if let Some(line) = totals.commands.get(&CommandKind::Locate).and_then(hit_line) {
+        out.push_str(&line);
+    }
+    if let Some(line) = next_line(totals) {
         out.push_str(&line);
     }
     out.push_str(&tail);
@@ -63,13 +72,14 @@ fn table(out: &mut String, totals: &Totals) {
         .map(|(k, c)| (*k, c))
         .collect();
     rows.sort_by(|a, b| b.1.calls.cmp(&a.1.calls).then(a.0.cmp(&b.0)));
-    let cells: Vec<[String; 6]> = rows
+    let cells: Vec<[String; 7]> = rows
         .iter()
         .map(|(kind, c)| {
             [
                 kind.name().to_owned(),
                 c.calls.to_string(),
-                c.error_count().to_string(),
+                c.user_error_count().to_string(),
+                c.internal_error_count().to_string(),
                 slashed(&c.latency),
                 slashed(&c.size),
                 c.truncated.to_string(),
@@ -79,7 +89,8 @@ fn table(out: &mut String, totals: &Totals) {
     let header = [
         crate::t!("command", "parancs"),
         crate::t!("calls", "hívás"),
-        crate::t!("errors", "hiba"),
+        crate::t!("user err", "felh. hiba"),
+        crate::t!("internal", "belső"),
         crate::t!("time", "idő"),
         crate::t!("output", "kimenet"),
         crate::t!("truncated", "levágva"),
@@ -90,15 +101,16 @@ fn table(out: &mut String, totals: &Totals) {
             *width = (*width).max(cell.chars().count());
         }
     }
-    let line = |cells: [&str; 6]| -> String {
-        let [name, calls, errors, time, size, cut] = cells;
+    let line = |cells: [&str; 7]| -> String {
+        let [name, calls, user, internal, time, size, cut] = cells;
         format!(
-            "{name:<w0$}  {calls:>w1$}  {errors:>w2$}  {time:<w3$}  {size:<w4$}  {cut}\n",
+            "{name:<w0$}  {calls:>w1$}  {user:>w2$}  {internal:>w3$}  {time:<w4$}  {size:<w5$}  {cut}\n",
             w0 = widths[0],
             w1 = widths[1],
             w2 = widths[2],
             w3 = widths[3],
             w4 = widths[4],
+            w5 = widths[5],
         )
     };
     out.push_str(&line(header));
@@ -134,12 +146,33 @@ fn hit_line(locate: &Counters) -> Option<String> {
     ))
 }
 
+/// A javaslatok (`next`) elfogadási aránya, ha volt javaslat-sor: összesen és parancsonként.
+fn next_line(totals: &Totals) -> Option<String> {
+    let shown: u64 = totals.commands.values().map(|c| c.next_shown).sum();
+    if shown == 0 {
+        return None;
+    }
+    let used: u64 = totals.commands.values().map(|c| c.next_used).sum();
+    let per = totals
+        .commands
+        .iter()
+        .filter(|(_, c)| c.next_shown > 0)
+        .map(|(kind, c)| format!("{} {}/{}", kind.name(), c.next_used, c.next_shown))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let rate = used * 100 / shown;
+    Some(crate::tf!(
+        "next suggestions: used {used} of {shown} ({rate}%): {per}\n",
+        "next-javaslatok: {used} / {shown} használva ({rate}%): {per}\n"
+    ))
+}
+
 /// Az utolsó sor(ok): hol az adat, hogy nem megy sehova, és a kikapcsolás.
 fn footer(dir: &Path, enabled: bool) -> String {
     let dir = dir.display();
     let mut text = crate::tf!(
-        "Data: {dir} (local only, nothing is sent anywhere) · turn off: CALLGRAPH_STATS=0\n",
-        "Adat: {dir} (csak helyben, semmi nem kerül el a gépről) · kikapcsolás: CALLGRAPH_STATS=0\n"
+        "Data: {dir} (stays local unless the user turned sending on: callgraph.sh telemetry status) · turn off: CALLGRAPH_STATS=0\n",
+        "Adat: {dir} (helyben marad, hacsak a felhasználó be nem kapcsolta a beküldést: callgraph.sh telemetry status) · kikapcsolás: CALLGRAPH_STATS=0\n"
     );
     if !enabled {
         text.push_str(crate::t!(

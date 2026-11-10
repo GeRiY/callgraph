@@ -107,7 +107,7 @@ pub struct SkillFailure {
 }
 
 /// A felhasználói hibák kontextusai (naplózás nélkül).
-const USER_CONTEXTS: &[&str] = &["usage", "not_found"];
+const USER_CONTEXTS: &[&str] = &["usage", "not_found", "unsupported"];
 
 impl SkillFailure {
     pub fn usage(message: impl Into<String>) -> Self {
@@ -120,6 +120,14 @@ impl SkillFailure {
     pub fn not_found(message: impl Into<String>) -> Self {
         Self {
             context: "not_found",
+            message: message.into(),
+        }
+    }
+
+    /// Nem támogatott, generált, bináris vagy kizárt fájl (felhasználói hiba, naplózás nélkül).
+    pub fn unsupported(message: impl Into<String>) -> Self {
+        Self {
+            context: "unsupported",
             message: message.into(),
         }
     }
@@ -164,6 +172,9 @@ pub fn finish(
     result: std::result::Result<(), SkillFailure>,
     err: &mut dyn Write,
 ) -> Result<i32> {
+    if let Err(f) = &result {
+        crate::stats::note_failure(f.context);
+    }
     match result {
         Ok(()) => Ok(0),
         Err(f) if f.is_user_error() => {

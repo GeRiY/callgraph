@@ -1,0 +1,16 @@
+services:
+  callgraph-telemetry:
+    build: .
+    image: callgraph-telemetry:latest
+    container_name: callgraph-telemetry
+    restart: unless-stopped
+    network_mode: bridge
+    # only reachable through the local reverse proxy
+    ports:
+      - "127.0.0.1:3918:8080"
+    volumes:
+      - ./data:/data
+    mem_limit: 128m
+    read_only: true
+    tmpfs:
+      - /tmp

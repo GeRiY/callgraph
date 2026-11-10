@@ -476,6 +476,17 @@ impl Command for SelfUpdateCommand {
             return Ok(0);
         }
         let result = self.run_update(out, err);
+        if result.is_ok() {
+            // az első (interaktív) frissítéskor egyszer rákérdez a statisztika opt-in beküldésére, ha még nem döntött
+            let telemetry = crate::stats::telemetry::Telemetry::from_env(&self.home);
+            let stdin = std::io::stdin();
+            telemetry.ask(
+                crate::stats::telemetry::Tty::from_process(),
+                &mut stdin.lock(),
+                err,
+                crate::stats::telemetry::now_secs(),
+            );
+        }
         finish(&self.home, SOURCE, result, err)
     }
 }
