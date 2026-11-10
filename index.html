@@ -355,6 +355,7 @@ document.addEventListener('keydown', function (e) {
 <script>
 (function(){try{var u="https://telemetry.callgraph.eu/hit",r="";
 try{var h=new URL(document.referrer).hostname;if(h&&h.indexOf("callgraph.eu")<0)r=h.toLowerCase()}catch(e){}
+try{var q=new URLSearchParams(location.search),t=q.get("ref")||q.get("utm_source");if(t)r=t.toLowerCase().replace(/[^a-z0-9.-]/g,"").slice(0,64)}catch(e){}
 function s(e){var d=JSON.stringify({p:location.pathname.toLowerCase().slice(0,80),r:r,e:e});
 if(navigator.sendBeacon)navigator.sendBeacon(u,d);else fetch(u,{method:"POST",body:d,keepalive:true,mode:"no-cors"})}
 s("view");document.addEventListener("click",function(ev){var a=ev.target.closest&&ev.target.closest("a");
