@@ -33,7 +33,7 @@ class Receiver(unittest.TestCase):
     def setUpClass(cls):
         app.db().close()
         cls.srv = ThreadingHTTPServer(("127.0.0.1", 0), app.Handler)
-        cls.url = "http://127.0.0.1:%d/callgraph/telemetry" % cls.srv.server_address[1]
+        cls.url = "http://127.0.0.1:%d/v1" % cls.srv.server_address[1]
         threading.Thread(target=cls.srv.serve_forever, daemon=True).start()
 
     @classmethod

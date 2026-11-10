@@ -415,7 +415,7 @@ terminálban y/N megerősítést kér (agent nem tud rá válaszolni). A `teleme
 ami elmenne, a `telemetry status` az állapotot mutatja, a `telemetry off` leállítja. **Mi megy el:** a fenti számok a
 lezárt napokra (út, fájl-, szimbólum- és projektnév, keresési kifejezés és kód nélkül), legfeljebb az utolsó 7 napra, a
 callgraph verziója, az operációs rendszer / architektúra, naponta egy véletlen kötegazonosító és a séma verziója —
-naponta egyszer, a háttérben, ide: `https://mcp.c3.zmakra.com/callgraph/telemetry`. CI-ben, `CALLGRAPH_STATS=0` vagy
+naponta egyszer, a háttérben, ide: `https://telemetry.callgraph.eu/v1`. CI-ben, `CALLGRAPH_STATS=0` vagy
 `CALLGRAPH_TELEMETRY=0` (végleges tiltás) mellett soha. Adatkezelő: Makra Gergő (mgeri1993@gmail.com); a nyers napi
 adatok 90 napig maradnak meg, utána csak havi összesítők. A telepítő egyszer rákérdez (Igen / Most nem / Soha),
 interaktív terminálban; „Most nem” után a `stats` kb. két hét múlva még egyszer emlékeztet, és nagyon ritkán az agent

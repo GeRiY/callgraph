@@ -413,7 +413,7 @@ y/N confirmation in a terminal (an agent cannot answer it). `telemetry preview` 
 sent, `telemetry status` shows the state, `telemetry off` stops it. **What is sent:** the closed days' counts from
 above (no paths, file, symbol or project names, no search terms or code), at most the last 7 days, the callgraph
 version, the OS / architecture, a random batch id per day and the schema version — once a day, in the background, to
-`https://mcp.c3.zmakra.com/callgraph/telemetry`. Never in CI, with `CALLGRAPH_STATS=0` or with
+`https://telemetry.callgraph.eu/v1`. Never in CI, with `CALLGRAPH_STATS=0` or with
 `CALLGRAPH_TELEMETRY=0` (a hard off switch). Controller: Makra Gergő (mgeri1993@gmail.com); the raw daily records are
 kept for 90 days, then only monthly totals. The installer asks once (Yes / Not now / Never) in an interactive terminal;
 after "Not now" `stats` reminds you once more about two weeks later, and an agent may very rarely be asked to mention it

@@ -35,7 +35,7 @@ pub(crate) const KILL_ENV: &str = "CALLGRAPH_TELEMETRY";
 /// A végpont felülírása.
 pub(crate) const URL_ENV: &str = "CALLGRAPH_TELEMETRY_URL";
 /// Az alapértelmezett végpont (POST JSON).
-pub(crate) const DEFAULT_URL: &str = "https://mcp.c3.zmakra.com/callgraph/telemetry";
+pub(crate) const DEFAULT_URL: &str = "https://telemetry.callgraph.eu/v1";
 /// Az állapotfájl neve a stats-mappában.
 pub(crate) const CONSENT_FILE: &str = "telemetry.json";
 

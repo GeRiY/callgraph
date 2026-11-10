@@ -177,7 +177,7 @@ class Handler(BaseHTTPRequestHandler):
         return self._reply(404)
 
     def do_POST(self):
-        if not self.path.rstrip("/").endswith("/callgraph/telemetry"):
+        if self.path.split("?")[0].rstrip("/") not in ("/v1", "/callgraph/telemetry"):
             return self._reply(404)
         client = self.headers.get("X-Real-IP") or self.client_address[0]
         if not _rate_ok(client):
