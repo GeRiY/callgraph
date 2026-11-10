@@ -83,10 +83,7 @@ fn outline(call: &ShowCall, root: &Path, output: &str) -> Vec<Suggestion> {
         return Vec::new();
     }
     let truncated = crate::stats::truncated(output);
-    let files: Vec<&str> = output
-        .lines()
-        .filter_map(|l| crate::notes::strip_mark(l).strip_prefix("FILE  "))
-        .collect();
+    let files: Vec<&str> = output.lines().filter_map(file_path).collect();
     if files.len() == 1 {
         let methods = method_lines(output);
         if methods.len() < 3 {
@@ -164,10 +161,9 @@ fn callers(
     let mut files: Vec<String> = Vec::new();
     let mut current: Option<String> = None;
     for line in output.lines() {
-        // a sor végi jegyzet-jelölő (`  📝 N`) nem része az útnak
-        if let Some(file) = crate::notes::strip_mark(line).strip_prefix("FILE  ") {
-            current = Some(file.trim().to_owned());
-            files.push(file.trim().to_owned());
+        if let Some(file) = file_path(line) {
+            current = Some(file.to_owned());
+            files.push(file.to_owned());
         } else if let (Some(file), None) = (&current, &first)
             && let Some(method) = method_line(line)
         {
@@ -275,4 +271,14 @@ fn layer_flag(label: &str) -> String {
         Some((role, eco)) => format!("{role}:{eco}"),
         None => label.to_owned(),
     }
+}
+
+/// A `FILE  <út>[  NS:<névtér>][  📝 N]` sor útja: a névtér és a jegyzet-jelölő nem része (PHP-nál a névtér
+/// ugyanabban a sorban áll; nélküle a `--body` javaslat nem létező fájlra mutatna).
+fn file_path(line: &str) -> Option<&str> {
+    let rest = crate::notes::strip_mark(line).strip_prefix("FILE  ")?;
+    rest.split("  ")
+        .next()
+        .map(str::trim)
+        .filter(|p| !p.is_empty())
 }

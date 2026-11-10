@@ -166,6 +166,18 @@ class RefundJob  L1-20
 ";
 
 #[test]
+fn a_php_namespace_on_the_file_line_is_not_part_of_the_path() {
+    let output = "root: /p\nFILE  src/Consumer.php  NS:App\\Service  📝 1\n\nclass Consumer  L5-20\n  run()  L8-12\n    L10 │ Formatter::clean($x);\n";
+    let found = run(&["wrap", "src", "--grep", "Formatter::clean"], output);
+    let body = found
+        .iter()
+        .find(|s| s.kind == SuggestionKind::Body)
+        .unwrap();
+    assert_eq!(slash(body.args.last().unwrap()), "/p/src/Consumer.php::run");
+    assert!(!body.label.contains("NS:"), "{}", body.label);
+}
+
+#[test]
 fn callers_suggest_depth_the_first_caller_and_by_layer_when_two_layers() {
     let args = ["wrap", "app", "--grep", r"(^|::|\.|->)refund$"];
     let found = run(&args, CALLERS);
