@@ -269,11 +269,17 @@ fn note_marker_on_callers_locate_and_api() {
     assert!(!line_with(&out, "FILE  ").contains("📝"), "{out}");
     // hívásonként egy sor (kompakt nézet)
     let out = p.show(&flat);
-    assert!(line_with(&out, "Cart::total").contains("Cart::total  📝 1  L"), "{out}");
+    assert!(
+        line_with(&out, "Cart::total").contains("Cart::total  📝 1  L"),
+        "{out}"
+    );
     // --depth 2: az 1. szinten a metódus-jegyzet, a 2. szinten (csak fájl-jegyzet) a fájlé
     let out = p.show(&deep);
     assert!(line_with(&out, "Cart::total()").contains("  📝 1"), "{out}");
-    assert!(line_with(&out, "Checkout::pay()").contains("  📝 1  ← "), "{out}");
+    assert!(
+        line_with(&out, "Checkout::pay()").contains("  📝 1  ← "),
+        "{out}"
+    );
     // api: a metódus-sor végén
     let out = p.show(&api);
     assert!(line_with(&out, "total(").ends_with("  📝 1"), "{out}");
@@ -281,9 +287,18 @@ fn note_marker_on_callers_locate_and_api() {
     assert!(line_with(&out, "FILE  ").ends_with("  📝 1"), "{out}");
     // locate: a fájl-sor végén a fájl összes (nem árva) jegyzete
     let out = locate();
-    assert!(line_with(&out, ". src/shop.php  ").ends_with("  📝 2"), "{out}");
-    assert!(line_with(&out, ". src/cart.php  ").ends_with("  📝 1"), "{out}");
+    assert!(
+        line_with(&out, ". src/shop.php  ").ends_with("  📝 2"),
+        "{out}"
+    );
+    assert!(
+        line_with(&out, ". src/cart.php  ").ends_with("  📝 1"),
+        "{out}"
+    );
     rewrite(&p.root.join("src/shop.php"), SHOP_WITHOUT_RUN, 5);
     let out = locate();
-    assert!(line_with(&out, ". src/shop.php  ").ends_with("  📝 1"), "{out}");
+    assert!(
+        line_with(&out, ". src/shop.php  ").ends_with("  📝 1"),
+        "{out}"
+    );
 }

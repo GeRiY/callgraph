@@ -145,7 +145,10 @@ mod tests {
         };
         assert_eq!(marks.caller_mark("/r/a.php", None, Some("run")), "  📝 2");
         assert_eq!(marks.caller_mark("/r/a.php", None, Some("other")), "  📝 1");
-        assert_eq!(marks.caller_mark("/r/a.php", None, Some("__top__")), "  📝 1");
+        assert_eq!(
+            marks.caller_mark("/r/a.php", None, Some("__top__")),
+            "  📝 1"
+        );
         assert_eq!(marks.caller_mark("/r/b.php", None, Some("run")), "");
     }
 }
