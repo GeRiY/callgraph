@@ -42,6 +42,10 @@ class Shop  L2-12
   horgonyonként legfeljebb 3, utána `📝 … +N`; a szöveg kb. 100 karakterre vágva). Az outline-ban nem listázott
   függvények (procedurális fájl, konténer nélküli függvény) jegyzetei a `FILE` fejléc alatt, `név(): ` előtaggal.
 - **`--body`:** a metódus fejléce (`== …`) után, a forrás előtt.
+- **Jelölő (`  📝 N`):** a `--grep` hívó-sorainak végén (outline, hívásonként egy sor, minden `--depth` szint: a
+  metódus jegyzeteinek száma, ha nincs, a fájl-jegyzeteké; a grep-outline `FILE` során a fájl-jegyzeteké), a `locate`
+  fájl-sorain (a fájl összes nem árva jegyzete) és az `--format api` `FILE` / metódus-sorain. Az MCP (`find_callers`,
+  `locate`, `outline` api) ugyanezt a szöveget adja.
 - **Lista / keresés:** `note list` → `<id>  <út>::<Osztály>::<metódus>  2026-11-05 20:27  📝 <szöveg>`;
   `show … --notes <minta>` → `<út>[::<metódus>]  2026-11-05 20:27  📝 <szöveg>` (több találatnál az első sor
   `root: /abs/projekt`, utána relatív utak — mint a többi szöveges kimenetnél). A minta regex a szövegre vagy a
@@ -49,7 +53,7 @@ class Shop  L2-12
 - **Árva jegyzet:** ha a metódus (vagy a fájl) már nincs meg, a jegyzet megmarad, a lista `[orphaned]` / `[árva]`
   jellel mutatja, az outline nem. Törlés: `note rm <id>`.
 - Jegyzet nélkül a kimenet bájtra ugyanaz, mint eddig; a gépi formátumok (`json`, `jsonl`, `mermaid`, `dot`) és a
-  többi nézet (api, flow, `--grep` …) nem mutat jegyzetet. A jegyzet-sorok a 400 soros kimeneti korlátba beszámítanak.
+  többi nézet (flow, summary …) nem mutat jegyzetet. A jegyzet-sorok a 400 soros kimeneti korlátba beszámítanak.
 
 ## Tárolás
 

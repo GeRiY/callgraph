@@ -20,6 +20,11 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   a `CALLGRAPH_TELEMETRY=0` végleg letiltja. A telepítő egyszer rákérdez (Igen / Most nem / Soha), csak interaktív
   terminálban.
 
+- **Jegyzet-jelölő a találatokon:** a sor végi `📝 N` mutatja, hogy a találathoz jegyzet tartozik — a `--grep`
+  hívóinál (outline, hívásonként egy sor, minden `--depth` szint; MCP `find_callers`), a `locate` fájl-sorain és az
+  `--format api` metódus-sorain. A metódus-soron a metódus jegyzetei számítanak; ha neki nincs, a fájléi. Az árva
+  jegyzetek nem számítanak; jegyzet nélkül a kimenet változatlan.
+
 ### Változás
 - **A `stats` külön számolja a felhasználói és a belső hibákat:** a hibás használat, a nem létező és a nem támogatott
   fájl „felh. hiba” (0.5.1 óta nem kerül az errors.jsonl-be); a „belső” hibák az errors.jsonl-ben is ott vannak. A

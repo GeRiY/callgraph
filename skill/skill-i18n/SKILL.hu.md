@@ -252,7 +252,8 @@ A kerülőút (célzott Read, Grep) ettől még használható, de a visszajelzé
 ## Jegyzetek (pilot)
 
 Az outline-ban és a `--body`-nál egy fájl vagy metódus alatt `📝 <idő> · <szöveg>` sorok lehetnek: emberek vagy agentek
-jegyzetei. Vedd figyelembe őket. Hagyj jegyzetet, ha tartós tanulságot találsz (miért van így, buktató) — röviden,
+jegyzetei. A `--grep` hívóinál, a `locate`-ben és az `--format api`-ban a sor végi `📝 N` jelzi a jegyzetes találatot:
+módosítás előtt olvasd el (outline / `--body`). Vedd figyelembe őket. Hagyj jegyzetet, ha tartós tanulságot találsz (miért van így, buktató) — röviden,
 feladatlista nélkül. A `note list` az `[árva]` jegyzeteket is jelzi (a metódus már nincs meg; törlés: `note rm <id>`).
 
 ```bash

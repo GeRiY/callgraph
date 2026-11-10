@@ -2,6 +2,8 @@
 //! fájljai (alapból 5, `--all`-lal mind) fájlonként legfeljebb 3 indoklással, végül a találat nélküli és a túl
 //! általános kifejezések, és hogy van-e még fájl.
 
+use std::collections::HashMap;
+
 use super::rank::{FileMatch, stars};
 use super::reasons::{describe, group, pick};
 use super::terms::{Term, TermKind};
@@ -18,6 +20,8 @@ pub(crate) struct Report<'a> {
     pub terms: &'a [Term],
     pub ranked: &'a [FileMatch],
     pub all: bool,
+    /// Fájlonként a (nem árva) jegyzetek száma; a fájl-sor végén `  📝 N`.
+    pub notes: &'a HashMap<String, usize>,
 }
 
 impl Report<'_> {
@@ -41,11 +45,13 @@ impl Report<'_> {
         let shown = if self.all { k } else { k.min(DEFAULT_FILES) };
         let top = self.ranked.first().map_or(0, |file| file.score);
         for (rank, file) in self.ranked.iter().take(shown).enumerate() {
+            let notes = self.notes.get(&file.path).copied().unwrap_or(0);
             out.push_str(&format!(
-                "{}. {}  {}\n",
+                "{}. {}  {}{}\n",
                 rank + 1,
                 file.path,
-                stars(file.score, top)
+                stars(file.score, top),
+                crate::notes::mark(notes)
             ));
             for reason in pick(group(&file.hits), REASONS_PER_FILE) {
                 out.push_str(&format!("   {}\n", describe(&reason, self.terms)));

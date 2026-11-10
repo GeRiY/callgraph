@@ -18,6 +18,7 @@ mod terms;
 #[cfg(test)]
 mod tests;
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use crate::analysis::Analyzer;
@@ -52,6 +53,9 @@ impl Locator {
         if terms.is_empty() {
             return Err(CallgraphError::Usage(usage().into()));
         }
+        // jegyzet-jelölők (`  📝 N`) a fájl-sorokon: egyszer betöltve; jegyzetfájl nélkül üres
+        let marks = crate::notes::NoteMarks::load(&self.root);
+        let mut notes: HashMap<String, usize> = HashMap::new();
         let (ranked, issues) =
             ProjectSource::new(&self.root, &self.analyzer).with_files(|files| {
                 // a szintaktikai hibás fájlok a záró sorhoz (a rangsoruk hiányos térképből jön)
@@ -68,6 +72,17 @@ impl Locator {
                     .filter_map(|file| {
                         let rel = self.relative(file.path);
                         let hits = matcher.file_hits(&rel, file.graph, file.code);
+                        if !hits.is_empty() && !marks.is_empty() {
+                            // az árva (a fájlban már nem létező metódusra szóló) jegyzetek nem számítanak
+                            let methods = file.graph.methods.iter();
+                            let n = crate::notes::live_count(
+                                marks.of(&rel),
+                                methods.map(|m| (m.container.as_deref(), m.name.as_str())),
+                            );
+                            if n > 0 {
+                                notes.insert(rel.clone(), n);
+                            }
+                        }
                         FileMatch::new(rel, hits)
                     })
                     .collect();
@@ -84,6 +99,7 @@ impl Locator {
             terms: &terms,
             ranked: &ranked,
             all,
+            notes: &notes,
         };
         text.push_str(&report.render());
         text.push_str(&crate::query::format::parse_trailer(

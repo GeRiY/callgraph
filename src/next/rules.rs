@@ -85,7 +85,7 @@ fn outline(call: &ShowCall, root: &Path, output: &str) -> Vec<Suggestion> {
     let truncated = crate::stats::truncated(output);
     let files: Vec<&str> = output
         .lines()
-        .filter_map(|l| l.strip_prefix("FILE  "))
+        .filter_map(|l| crate::notes::strip_mark(l).strip_prefix("FILE  "))
         .collect();
     if files.len() == 1 {
         let methods = method_lines(output);
@@ -164,7 +164,8 @@ fn callers(
     let mut files: Vec<String> = Vec::new();
     let mut current: Option<String> = None;
     for line in output.lines() {
-        if let Some(file) = line.strip_prefix("FILE  ") {
+        // a sor végi jegyzet-jelölő (`  📝 N`) nem része az útnak
+        if let Some(file) = crate::notes::strip_mark(line).strip_prefix("FILE  ") {
             current = Some(file.trim().to_owned());
             files.push(file.trim().to_owned());
         } else if let (Some(file), None) = (&current, &first)

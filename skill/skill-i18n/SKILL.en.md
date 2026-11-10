@@ -249,7 +249,8 @@ The workaround (targeted Read, Grep) can still be used, but do not skip the feed
 ## Notes (pilot)
 
 The outline and `--body` may show `📝 <time> · <text>` lines under a file or method: notes left by people or agents.
-Take them into account. Leave one when you learn something lasting (why something is so, a pitfall) — short, no task
+In `--grep` callers, `locate` and `--format api` a trailing `📝 N` marks a hit with notes: read them (outline / `--body`)
+before changing it. Take them into account. Leave one when you learn something lasting (why something is so, a pitfall) — short, no task
 lists. `note list` marks `[orphaned]` notes (the method is gone; remove with `note rm <id>`).
 
 ```bash

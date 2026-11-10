@@ -17,6 +17,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   counts (the same as `stats`, no paths or names) go out once a day in the background; `CALLGRAPH_TELEMETRY=0` blocks it
   for good. The installer asks once (Yes / Not now / Never), only in an interactive terminal.
 
+- **Note marker on hits:** a `📝 N` at the end of the line shows that a hit has notes — in `--grep` callers (outline,
+  one-line-per-call view, every `--depth` level; MCP `find_callers`), in `locate` file lines and in `--format api`
+  method lines. Method notes count on the method line; if the method has none, the file's notes. Orphaned notes do
+  not count; without notes the output is unchanged.
+
 ### Changed
 - **`stats` separates user errors from internal errors:** usage mistakes, missing files and unsupported files are
   counted as "user err" (not logged to errors.jsonl since 0.5.1); "internal" errors are also in errors.jsonl.

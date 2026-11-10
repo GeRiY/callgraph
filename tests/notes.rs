@@ -228,3 +228,62 @@ fn note_without_project_uses_the_working_directory() {
     );
     assert!(list.trim_end().ends_with("📝 returns two"), "{list}");
 }
+
+const CART: &str = "<?php\nclass Cart\n{\n    public function total(): int\n    {\n        return (new Shop())->run();\n    }\n}\n";
+const CHECKOUT: &str = "<?php\nclass Checkout\n{\n    public function pay(): int\n    {\n        return (new Cart())->total();\n    }\n}\n";
+
+/// A `pattern`-t tartalmazó első sor.
+fn line_with<'a>(text: &'a str, pattern: &str) -> &'a str {
+    text.lines().nth(line_of(text, pattern)).unwrap()
+}
+
+#[test]
+fn note_marker_on_callers_locate_and_api() {
+    let p = TempProject::new();
+    fs::write(p.root.join("src/cart.php"), CART).unwrap();
+    fs::write(p.root.join("src/checkout.php"), CHECKOUT).unwrap();
+    let grep = ["--grep", "run$", "src"];
+    let flat = ["CALLGRAPH_OUT_LIMIT=4", "--grep", "run$", "src"];
+    let deep = ["--grep", "run$", "--depth", "2", "--guess", "src"];
+    let api = ["--format", "api", "src/cart.php"];
+    let locate = || stdout(&p.run(&["locate", "Cart", "Shop", "--project", p.root()]));
+    // jegyzet nélkül nincs jelölő
+    for output in [
+        p.show(&grep),
+        p.show(&flat),
+        p.show(&deep),
+        p.show(&api),
+        locate(),
+    ] {
+        assert!(!output.contains("📝"), "{output}");
+    }
+
+    added_id(&p.note(&["add", "src/cart.php::total", "Caller remark"]));
+    added_id(&p.note(&["add", "src/checkout.php", "Payment file"]));
+    added_id(&p.note(&["add", "src/shop.php::run", "Hot path"]));
+    added_id(&p.note(&["add", "src/shop.php", "Shop file"]));
+
+    // --grep outline: a hívó metódus-során a metódus jegyzetei; a FILE sor fájl-jegyzet nélkül jelöletlen
+    let out = p.show(&grep);
+    assert!(line_with(&out, "total()  L").ends_with("  📝 1"), "{out}");
+    assert!(!line_with(&out, "FILE  ").contains("📝"), "{out}");
+    // hívásonként egy sor (kompakt nézet)
+    let out = p.show(&flat);
+    assert!(line_with(&out, "Cart::total").contains("Cart::total  📝 1  L"), "{out}");
+    // --depth 2: az 1. szinten a metódus-jegyzet, a 2. szinten (csak fájl-jegyzet) a fájlé
+    let out = p.show(&deep);
+    assert!(line_with(&out, "Cart::total()").contains("  📝 1"), "{out}");
+    assert!(line_with(&out, "Checkout::pay()").contains("  📝 1  ← "), "{out}");
+    // api: a metódus-sor végén
+    let out = p.show(&api);
+    assert!(line_with(&out, "total(").ends_with("  📝 1"), "{out}");
+    let out = p.show(&["--format", "api", "src/checkout.php"]);
+    assert!(line_with(&out, "FILE  ").ends_with("  📝 1"), "{out}");
+    // locate: a fájl-sor végén a fájl összes (nem árva) jegyzete
+    let out = locate();
+    assert!(line_with(&out, ". src/shop.php  ").ends_with("  📝 2"), "{out}");
+    assert!(line_with(&out, ". src/cart.php  ").ends_with("  📝 1"), "{out}");
+    rewrite(&p.root.join("src/shop.php"), SHOP_WITHOUT_RUN, 5);
+    let out = locate();
+    assert!(line_with(&out, ". src/shop.php  ").ends_with("  📝 1"), "{out}");
+}
