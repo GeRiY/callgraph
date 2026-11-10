@@ -56,7 +56,8 @@ fn locate_carries_a_suggestion_line_and_next_runs_it() {
     let located = run(&root, true, &["locate", "OrderService", "refund"]);
     assert!(located.status.success(), "{located:?}");
     let text = stdout(&located);
-    let last = text.lines().last().unwrap();
+    // Windowson a kiírt út `\`-t tartalmaz
+    let last = text.lines().last().unwrap().replace('\\', "/");
     assert!(
         last.starts_with("↪ r1 possible next: [1] outline app/OrderService.php"),
         "{text}"
@@ -71,7 +72,9 @@ fn locate_carries_a_suggestion_line_and_next_runs_it() {
     // a `next` kimenete is azonos azzal, mintha a felhasználó futtatta volna
     let direct = run(&root, false, &["wrap", "app/OrderService.php"]);
     assert!(
-        outline.starts_with(&stdout(&direct)),
+        outline
+            .replace('\\', "/")
+            .starts_with(&stdout(&direct).replace('\\', "/")),
         "{outline}\n---\n{}",
         stdout(&direct)
     );

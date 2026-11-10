@@ -112,8 +112,9 @@ fn rewrite(path: &Path, text: &str, ahead_secs: u64) {
 
 /// A `pattern`-t tartalmazó első sor indexe.
 fn line_of(text: &str, pattern: &str) -> usize {
+    // Windowson az utak `\`-sel jönnek; a mintában egységesen `/`
     text.lines()
-        .position(|l| l.contains(pattern))
+        .position(|l| l.replace('\\', "/").contains(pattern))
         .unwrap_or_else(|| panic!("no line with {pattern:?}:\n{text}"))
 }
 
