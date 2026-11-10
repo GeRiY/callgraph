@@ -133,15 +133,21 @@ impl WrapCommand {
         // a show hibaszövege (stderr) lesz az üzenet; sikeres futásnál a stderr-t a régi burok is eldobta
         let mut captured = Vec::new();
         // 2 = felhasználói hiba (a `show` így jelzi: hibás kapcsoló, rétegnév, nem létező fájl), 1 = belső hiba
+        // nem támogatott / generált / bináris / kizárt fájl: felhasználói hiba (naplózás nélkül)
+        let mut unsupported = false;
         let code = match CliArgs::parse(show).and_then(build_command) {
-            Ok(command) => command.run(out, &mut captured).or_else(|e| {
-                writeln!(captured, "{e}")?;
-                let code = match e {
-                    crate::error::CallgraphError::Usage(_) => 2,
-                    _ => 1,
-                };
-                Ok::<i32, crate::error::CallgraphError>(code)
-            })?,
+            Ok(command) => match command.run(out, &mut captured) {
+                Ok(code) => code,
+                Err(e) => {
+                    writeln!(captured, "{e}")?;
+                    use crate::error::CallgraphError as E;
+                    unsupported = matches!(
+                        e,
+                        E::Unsupported(_) | E::Generated(_) | E::Binary(_) | E::Excluded(_)
+                    );
+                    if matches!(e, E::Usage(_)) { 2 } else { 1 }
+                }
+            },
             Err(e) => {
                 writeln!(captured, "{e}")?;
                 2
@@ -157,6 +163,8 @@ impl WrapCommand {
             Err(SkillFailure::not_found(message))
         } else if code == 2 {
             Err(SkillFailure::usage(message))
+        } else if unsupported {
+            Err(SkillFailure::unsupported(message))
         } else {
             Err(SkillFailure::internal(message))
         }

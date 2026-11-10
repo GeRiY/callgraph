@@ -1,4 +1,4 @@
-//! `callgraph` CLI-belépő: argumentumok → Command → futtatás; körülötte a helyi használati mérés (`stats::CliProbe`).
+//! `callgraph` CLI-belépő: argumentumok → Command (opt-in javaslat-sorral, `next::decorate`) → futtatás; körülötte a helyi használati mérés (`stats::CliProbe`).
 
 use std::io::{BufWriter, Write};
 use std::process::ExitCode;
@@ -26,10 +26,17 @@ fn main() -> ExitCode {
             std::env::set_var(cli::strict::STRICT_ENV, "1");
         }
     }
+    if callgraph::next::take_next(&mut args) {
+        // SAFETY: mint fent — egyszálú pont; a javaslat-sor (és a `callgraph mcp --next`) ebből tudja, hogy be van
+        // kapcsolva
+        unsafe {
+            std::env::set_var(callgraph::next::NEXT_ENV, "1");
+        }
+    }
     callgraph::update::cleanup_stale_binary();
     let probe = CliProbe::start(&args);
-    let command = match CliArgs::parse(args).and_then(cli::build_command) {
-        Ok(c) => c,
+    let command = match CliArgs::parse(args.clone()).and_then(cli::build_command) {
+        Ok(c) => callgraph::next::decorate(&args, c),
         Err(e) => {
             eprintln!("{e}");
             probe.failed(&e);
@@ -47,6 +54,11 @@ fn main() -> ExitCode {
             1
         }
     };
+    if matches!(result, Ok(0))
+        && let Some(line) = probe.agent_hint()
+    {
+        let _ = writeln!(out, "{line}");
+    }
     let _ = out.flush();
     probe.finish(&result, &out, &err);
     ExitCode::from(u8::try_from(code).unwrap_or(1))

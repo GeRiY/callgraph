@@ -27,6 +27,19 @@ pub(crate) trait QueryRunner: Send + Sync {
     fn startup_note(&self) -> String {
         String::new()
     }
+    /// Egy korábbi eredmény javasolt következő lépése(i) (`next` eszköz, `crate::next`): `id` (`r7`), a választások.
+    fn next(&self, project: Option<&str>, id: &str, choices: &[usize]) -> Result<String, String> {
+        let _ = (project, choices);
+        Err(unknown_result(id))
+    }
+}
+
+/// Az ismeretlen / lejárt eredmény-azonosító üzenete.
+pub(crate) fn unknown_result(id: &str) -> String {
+    crate::tf!(
+        "Unknown or expired result id: {id} — run the query again.",
+        "Ismeretlen vagy lejárt eredmény-azonosító: {id} — futtasd újra a lekérdezést."
+    )
 }
 
 /// Az éles végrehajtó: a skill-mappa registryje és a szerver munkakönyvtára.
@@ -46,8 +59,21 @@ impl ShowRunner {
         }
     }
 
-    /// Egy CLI-parancs futtatása pufferbe: siker → a kimenet, hiba → a hibaszöveg.
-    fn execute(args: Vec<String>) -> Result<String, String> {
+    /// Egy CLI-parancs futtatása pufferbe: siker → a kimenet (bekapcsolt javaslatoknál a végén a javaslat-sorral,
+    /// `crate::next`), hiba → a hibaszöveg.
+    fn execute(args: Vec<String>, root: &ProjectRoot) -> Result<String, String> {
+        let mut text = Self::execute_plain(args.clone())?;
+        if crate::next::enabled() {
+            let project = Some(root.label()).filter(|label| !label.contains('/'));
+            if let Some(line) = crate::next::annotate(&args, root.root(), &text, project) {
+                text.push_str(&line);
+                text.push('\n');
+            }
+        }
+        Ok(text)
+    }
+
+    fn execute_plain(args: Vec<String>) -> Result<String, String> {
         let command = CliArgs::parse(args)
             .and_then(build_command)
             .map_err(|e| e.to_string())?;
@@ -84,7 +110,7 @@ impl QueryRunner for ShowRunner {
         let root = self.root(query.project.as_deref())?;
         let mut args = query.head(&root);
         args.extend(query.to_args(&root)?);
-        Self::execute(args)
+        Self::execute(args, &root)
     }
 
     fn profile(&self, project: Option<&str>, full: bool) -> Result<String, String> {
@@ -97,7 +123,18 @@ impl QueryRunner for ShowRunner {
         if full {
             args.push("--full".into());
         }
-        Self::execute(args)
+        Self::execute(args, &root)
+    }
+
+    fn next(&self, project: Option<&str>, id: &str, choices: &[usize]) -> Result<String, String> {
+        let root = self.root(project)?;
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        let code = crate::next::run_choices(root.root(), id, choices, &mut out, &mut err)
+            .map_err(|e| e.to_string())?;
+        if code != 0 && code != crate::cli::strict::STRICT_EXIT_CODE {
+            return Err(String::from_utf8_lossy(&err).trim_end().to_owned());
+        }
+        Ok(String::from_utf8_lossy(&out).into_owned())
     }
 
     fn startup_note(&self) -> String {

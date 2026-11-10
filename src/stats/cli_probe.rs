@@ -4,6 +4,7 @@
 //! kivételével nem mérnek; a `callgraph mcp` és a `callgraph stats` sem (az MCP-hívásokat a szerver méri).
 
 use std::io::Write;
+use std::sync::Mutex;
 use std::time::Instant;
 
 use super::Recorder;
@@ -15,6 +16,19 @@ use crate::skill::SkillHome;
 /// A leválasztott gyerekfolyamat jelzője (`update::check::spawn_detached_as`): `hook` = a hook háttér-frissítése
 /// (mérjük, hook-kliensként), bármi más (`background`) = nem mérjük (a szülő már mért).
 pub(crate) const CLIENT_ENV: &str = "CALLGRAPH_STATS_CLIENT";
+
+/// A futás közben jelzett hiba-kategória (`note_failure`): a skill-parancs (`wrap`, `project`…) így adja át, hogy
+/// felhasználói vagy belső hiba volt-e (a kilépési kód mindkettőnél 1).
+static NOTED: Mutex<Option<ErrorKind>> = Mutex::new(None);
+
+/// Egy skill-hiba kontextusának jelzése a CLI-mérésnek (`skill::finish`).
+pub(crate) fn note_failure(context: &str) {
+    *NOTED.lock().unwrap_or_else(|e| e.into_inner()) = Some(ErrorKind::of_context(context));
+}
+
+fn noted_failure() -> Option<ErrorKind> {
+    NOTED.lock().unwrap_or_else(|e| e.into_inner()).take()
+}
 
 /// Ennyi bájtot tart meg a kimenet elejéből a levágás-figyelmeztetés felismeréséhez.
 const HEAD_BYTES: usize = 512;
@@ -42,6 +56,24 @@ impl CliProbe {
         }
     }
 
+    /// Ritka sor az agentnek a beküldés lehetőségéről (`telemetry::Telemetry::agent_hint`): csak sikeres, mért
+    /// parancssori lekérdezés (`show` / `locate` / `profile`) végén.
+    pub fn agent_hint(&self) -> Option<String> {
+        let (command, Client::Cli) = self.target? else {
+            return None;
+        };
+        if !self.recorder.enabled()
+            || !matches!(
+                command,
+                CommandKind::Show | CommandKind::Locate | CommandKind::Profile
+            )
+        {
+            return None;
+        }
+        super::telemetry::Telemetry::from_env(&SkillHome::from_env())
+            .agent_hint(super::telemetry::now_secs())
+    }
+
     /// Az argumentumok hibásak voltak (a parancs el sem indult).
     pub fn failed(self, error: &CallgraphError) {
         self.record(Outcome::Error(ErrorKind::of(error)), 0, false);
@@ -53,7 +85,14 @@ impl CliProbe {
         let outcome = match result {
             // `--strict`: a 3-as kód (szintaktikai hibás fájl) sikeres lekérdezés
             Ok(0 | crate::cli::strict::STRICT_EXIT_CODE) => Outcome::Ok,
-            Ok(_) => Outcome::Error(ErrorKind::of_message(&String::from_utf8_lossy(err.head()))),
+            // a skill-parancs pontos kategóriája (`note_failure`), különben a 2-es kód használati hiba
+            Ok(code) => Outcome::Error(noted_failure().unwrap_or_else(|| {
+                if *code == 2 {
+                    ErrorKind::Usage
+                } else {
+                    ErrorKind::of_message(&String::from_utf8_lossy(err.head()))
+                }
+            })),
             Err(error) => Outcome::Error(ErrorKind::of(error)),
         };
         let head = String::from_utf8_lossy(out.head());
@@ -67,6 +106,12 @@ impl CliProbe {
         if !self.recorder.enabled() {
             return;
         }
+        // egyszer gépenként, csak a parancssorban (a hook háttérfolyamatának nincs terminálja)
+        if client == Client::Cli
+            && let Some(notice) = self.recorder.first_notice()
+        {
+            eprintln!("{notice}");
+        }
         self.recorder.record(&Event {
             command,
             client,
@@ -75,6 +120,9 @@ impl CliProbe {
             size: SizeBucket::from_chars(chars),
             truncated,
         });
+        // opt-in beküldés a normál futásokra ráülve (bekapcsolva és esedékesen: leválasztott háttérfolyamat)
+        super::telemetry::Telemetry::from_env(&SkillHome::from_env())
+            .maybe_spawn(super::telemetry::now_secs());
     }
 }
 
@@ -95,6 +143,7 @@ pub(crate) fn classify(args: &[String], client: Option<&str>) -> Option<(Command
         "callers" => CommandKind::Callers,
         "note" => CommandKind::Notes,
         "project" => CommandKind::Projects,
+        "next" => CommandKind::Next,
         _ => CommandKind::Other,
     };
     Some((command, client))

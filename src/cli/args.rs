@@ -7,8 +7,10 @@ use crate::error::{CallgraphError, Result};
 use crate::lang::LanguageRegistry;
 use crate::query::format::BodyMode;
 
+use super::next_args::parse_next;
 use super::profile_args::{LayerArgs, parse_profile};
 use super::stats_args::parse_stats;
+use super::telemetry_args::{TelemetryAction, parse_telemetry};
 
 fn usage() -> &'static str {
     crate::t!(
@@ -183,6 +185,14 @@ pub enum CliArgs {
     },
     /// `stats [--days N]`: a helyi használati statisztika az elmúlt N napról (`crate::stats`).
     Stats { days: u32 },
+    /// `next <rN> <k>[,<k>] [--project X]`: egy korábbi eredmény javasolt következő lépése (`crate::next`).
+    Next {
+        id: String,
+        choices: Vec<usize>,
+        project: Option<String>,
+    },
+    /// `telemetry on|off|status|preview`: a helyi statisztika opt-in beküldése (`crate::stats::telemetry`).
+    Telemetry { action: TelemetryAction },
     /// `--version` / `-V`: a verzió és a platform.
     Version,
     /// `mcp [--auto-update]`: MCP-szerver stdio-n; `--auto-update`: indításkor naponta egyszer frissít.
@@ -239,6 +249,12 @@ impl CliArgs {
         }
         if args.first().is_some_and(|a| a == "stats") {
             return parse_stats(&args[1..]);
+        }
+        if args.first().is_some_and(|a| a == "next") {
+            return parse_next(&args[1..]);
+        }
+        if args.first().is_some_and(|a| a == "telemetry") {
+            return parse_telemetry(&args[1..]);
         }
         // a skill-parancsok maguk értelmezik az argumentumaikat (a hibáik error-id-t kapnak)
         if let Some(command) = args.first().filter(|a| {

@@ -96,10 +96,18 @@ Project profile (architecture, layers and patterns from folder / file names, che
   Own folder names: a .callgraph-layers file in the project root ("service = app/Logic", "ignore-role = app/Legacy").
   A big legacy subtree to leave out entirely (e.g. an old app copy): a path line in .callgraphignore ("sn_monitoring/").
 
-Local usage stats (stays on this computer, nothing is sent anywhere; no paths, names or search terms):
+Local usage stats (stays on this computer unless the user turns sending on; no paths, names or search terms):
   bash ~/.claude/skills/callgraph/callgraph.sh stats [--days N]
-                                                calls per command / MCP tool, errors, time and output size in ranges,
-                                                locate hit rate; last 7 days (max 90); turn off: CALLGRAPH_STATS=0
+                                                calls per command / MCP tool, user errors vs internal errors, time and
+                                                output size in ranges, locate hit rate; last 7 days (max 90); off: CALLGRAPH_STATS=0
+  bash ~/.claude/skills/callgraph/callgraph.sh telemetry status|preview|on|off
+                                                opt-in sending of these daily counts (closed days only); preview: the exact
+                                                JSON; on: asks for a y/N confirmation in a terminal (only the user can turn it
+                                                on); hard off: CALLGRAPH_TELEMETRY=0
+
+Suggested next step (opt-in: --next or CALLGRAPH_NEXT=1):
+  a result may end with "↪ r7 possible next: [1] …  [2] …" (read-only navigation from names in that output)
+  bash ~/.claude/skills/callgraph/callgraph.sh next r7 1 [--project alias]   runs suggestion 1 of result r7 (several: 1,3)
 
 Refresh ahead of time (after a git pull or many edits, so the next query does not have to re-analyse):
   bash ~/.claude/skills/callgraph/callgraph.sh refresh [--project alias]     every changed / new / deleted file of the project

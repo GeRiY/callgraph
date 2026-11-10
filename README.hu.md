@@ -398,10 +398,36 @@ többit megtartja, és előtte `settings.json.bak` mentést ír. Eltávolítás:
 A callgraph a gépeden egy kis használati összesítőt vezet: melyik parancs vagy MCP-eszköz hányszor futott, volt-e
 hiba, és sávokban mennyi ideig tartott és mekkora volt a kimenete. Az MCP-n futó `locate`-nél azt is, hogy az agent
 utána az első találatot nyitotta-e meg. Utat, fájl- és szimbólumnevet, keresési kifejezést, projektnevet és
-hibaszöveget soha nem rögzít, és **semmit nem küld el sehova** (hálózatot nem használ). Megtekintés:
+hibaszöveget soha nem rögzít, és **semmit nem küld el**, hacsak be nem kapcsolod a beküldést (lent). Megtekintés:
 `bash ~/.claude/skills/callgraph/callgraph.sh stats [--days N]` (alapból az elmúlt 7 nap). Az adat helye:
 `~/.claude/skills/callgraph/stats/` (havonta egy kis fájl, kb. 90 napig marad meg); kikapcsolás:
-`CALLGRAPH_STATS=0`. CI-ben és skill-telepítésen kívül magától ki van kapcsolva.
+`CALLGRAPH_STATS=0`. CI-ben és skill-telepítésen kívül magától ki van kapcsolva. Amikor egy gépen először rögzít, egy
+sor a stderr-en jelzi.
+
+A hibák két oszlopban állnak: **felh. hiba** (hibás használat, nem létező fájl, nem támogatott fájl) és **belső** (a
+callgraph hibája). A felhasználói hibákat 0.5.1 óta csak számolja, az `errors.jsonl`-be nem írja; a belső hibák
+error-id-vel az `errors.jsonl`-ben is ott vannak.
+
+#### A statisztika megosztása (opt-in)
+
+Alapból ki van kapcsolva, és csak te kapcsolhatod be: a `bash ~/.claude/skills/callgraph/callgraph.sh telemetry on`
+terminálban y/N megerősítést kér (agent nem tud rá válaszolni). A `telemetry preview` pontosan azt a JSON-t írja ki,
+ami elmenne, a `telemetry status` az állapotot mutatja, a `telemetry off` leállítja. **Mi megy el:** a fenti számok a
+lezárt napokra (út, fájl-, szimbólum- és projektnév, keresési kifejezés és kód nélkül), legfeljebb az utolsó 7 napra, a
+callgraph verziója, az operációs rendszer / architektúra, naponta egy véletlen kötegazonosító és a séma verziója —
+naponta egyszer, a háttérben, ide: `https://mcp.c3.zmakra.com/callgraph/telemetry`. CI-ben, `CALLGRAPH_STATS=0` vagy
+`CALLGRAPH_TELEMETRY=0` (végleges tiltás) mellett soha. Adatkezelő: Makra Gergő (mgeri1993@gmail.com); a nyers napi
+adatok 90 napig maradnak meg, utána csak havi összesítők. A telepítő egyszer rákérdez (Igen / Most nem / Soha),
+interaktív terminálban; „Most nem” után a `stats` kb. két hét múlva még egyszer emlékeztet, és nagyon ritkán az agent
+is kérést kaphat, hogy szóljon neked.
+
+### Javasolt következő lépés (opt-in)
+
+`CALLGRAPH_NEXT=1` (vagy `--next`; MCP: `callgraph mcp --next`) mellett egy eredmény egy sorral végződhet, pl.
+`↪ r7 lehetséges következő: [1] OrderService.php::refund --body  [2] refund hívói  [3] outline OrderService.php`.
+A `bash ~/.claude/skills/callgraph/callgraph.sh next r7 1` (vagy `next r7 1,3`; MCP: a `next` eszköz) pontosan a
+tárolt parancsot futtatja. A javaslatok csak olvasó navigációs lépések a kimenet neveiből; ha semmi sem egyértelmű,
+nincs sor. Az agent-utasítás: csak akkor használja, ha illik a feladathoz, különben hagyja figyelmen kívül a sort.
 
 ### Visszajelzés az agentektől
 

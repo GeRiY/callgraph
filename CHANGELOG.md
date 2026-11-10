@@ -5,6 +5,25 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+### Added
+- **Suggested next step (opt-in):** with `CALLGRAPH_NEXT=1` or `--next` (MCP: `callgraph mcp --next`), a result can
+  end with one line like `↪ r7 possible next: [1] OrderService.php::refund --body  [2] callers of refund  [3] outline
+  OrderService.php`. The agent runs one by number (`callgraph.sh next r7 1`, several: `next r7 1,3`; MCP: the `next`
+  tool) instead of composing the command. Only read-only navigation, only names that appear in that output, at most 3,
+  and no line at all when nothing is clear (errors, empty results, json / mermaid / dot). Stored in the project's
+  `.callgraph/results/` (last 50, 24 hours); `callgraph.sh stats` shows how often a suggestion was used.
+- **Opt-in sending of the usage stats:** `callgraph.sh telemetry status|preview|on|off`. Nothing is sent unless the
+  user turns it on in a terminal (`telemetry on` asks y/N; an agent cannot do it). Then the closed days' banded
+  counts (the same as `stats`, no paths or names) go out once a day in the background; `CALLGRAPH_TELEMETRY=0` blocks it
+  for good. The installer asks once (Yes / Not now / Never), only in an interactive terminal.
+
+### Changed
+- **`stats` separates user errors from internal errors:** usage mistakes, missing files and unsupported files are
+  counted as "user err" (not logged to errors.jsonl since 0.5.1); "internal" errors are also in errors.jsonl.
+  An unsupported / generated / binary file in `callgraph.sh` is now a user error (no error-id).
+- **One-time notice:** the first time local stats are recorded on a machine, one line on stderr says so (and how to
+  turn them off). Never in MCP output.
+
 ## [0.5.3] — 2026-11-09
 
 ### Added

@@ -3,13 +3,16 @@
 mod args;
 mod command;
 pub mod commands;
+mod next_args;
 mod profile_args;
 mod stats_args;
 pub mod strict;
+mod telemetry_args;
 
 pub use args::{CliArgs, HookAction, NO_GITIGNORE_FLAG, NoteAction, take_no_gitignore};
 pub use command::Command;
 pub use profile_args::LayerArgs;
+pub use telemetry_args::TelemetryAction;
 
 use crate::error::Result;
 use crate::lang::LanguageRegistry;
@@ -107,6 +110,20 @@ pub fn build_command(args: CliArgs) -> Result<Box<dyn Command>> {
         CliArgs::Hook { action, settings } => Ok(Box::new(commands::HookCommand::new(
             action,
             settings,
+            crate::skill::SkillHome::from_env(),
+        ))),
+        CliArgs::Next {
+            id,
+            choices,
+            project,
+        } => Ok(Box::new(commands::NextCommand::new(
+            id,
+            choices,
+            project,
+            crate::skill::SkillHome::from_env(),
+        ))),
+        CliArgs::Telemetry { action } => Ok(Box::new(commands::TelemetryCommand::new(
+            action,
             crate::skill::SkillHome::from_env(),
         ))),
         CliArgs::Version => Ok(Box::new(commands::VersionCommand)),

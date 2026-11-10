@@ -6,6 +6,27 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ## [Unreleased]
 
+### Új
+- **Javasolt következő lépés (opt-in):** `CALLGRAPH_NEXT=1` vagy `--next` mellett (MCP: `callgraph mcp --next`) egy
+  eredmény egy ilyen sorral végződhet: `↪ r7 lehetséges következő: [1] OrderService.php::refund --body  [2] refund
+  hívói  [3] outline OrderService.php`. Az agent a számával futtatja (`callgraph.sh next r7 1`, több: `next r7 1,3`;
+  MCP: a `next` eszköz), nem neki kell összeraknia a parancsot. Csak olvasó navigáció, csak a kimenetben szereplő
+  nevekből, legfeljebb 3, és ha semmi sem egyértelmű, nincs sor (hiba, üres eredmény, json / mermaid / dot). A projekt
+  `.callgraph/results/` mappájában tárolódik (az utolsó 50, 24 óráig); a `callgraph.sh stats` mutatja, milyen gyakran
+  használták.
+- **A használati statisztika opt-in beküldése:** `callgraph.sh telemetry status|preview|on|off`. Semmi nem megy el,
+  amíg a felhasználó terminálban be nem kapcsolja (a `telemetry on` y/N-t kérdez; agent nem teheti meg). Utána a
+  lezárt napok sávos számai (ugyanazok, mint a `stats`-ban, út és név nélkül) naponta egyszer, a háttérben mennek el;
+  a `CALLGRAPH_TELEMETRY=0` végleg letiltja. A telepítő egyszer rákérdez (Igen / Most nem / Soha), csak interaktív
+  terminálban.
+
+### Változás
+- **A `stats` külön számolja a felhasználói és a belső hibákat:** a hibás használat, a nem létező és a nem támogatott
+  fájl „felh. hiba” (0.5.1 óta nem kerül az errors.jsonl-be); a „belső” hibák az errors.jsonl-ben is ott vannak. A
+  `callgraph.sh`-ban a nem támogatott / generált / bináris fájl mostantól felhasználói hiba (error-id nélkül).
+- **Egyszeri tájékoztatás:** amikor egy gépen először rögzül helyi statisztika, egy sor a stderr-en jelzi (és hogy
+  hogyan kapcsolható ki). MCP-kimenetben soha.
+
 ## [0.5.3] — 2026-11-09
 
 ### Új

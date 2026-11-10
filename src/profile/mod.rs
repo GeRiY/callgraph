@@ -42,6 +42,7 @@ use std::path::Path;
 use crate::i18n::Lang;
 
 pub(crate) use build::{quick, with_graph};
+pub(crate) use classify::Classifier;
 pub(crate) use format::{Tip, render};
 pub(crate) use scope::{LayerRun, LayerScope};
 pub(crate) use view::{Count, group_header, layered_summary, tag_file_lines};

@@ -6,6 +6,7 @@
 mod autoupdate;
 mod guard;
 mod guide;
+mod hint;
 mod params;
 mod request;
 mod runner;
@@ -35,6 +36,8 @@ pub(crate) fn serve_stdio(home: SkillHome, auto_update: bool) -> Result<()> {
         if !auto_update {
             runner = autoupdate::with_notice(runner, &home);
         }
+        // a beküldés-tipp (ritka, a felhasználónak) és az opt-in beküldés óránkénti vizsgálata
+        runner = hint::with_hint(runner, &home);
         let stats = crate::stats::McpStats::from_env(&home);
         let server = server::CallgraphServer::new(runner, stats);
         let service = server

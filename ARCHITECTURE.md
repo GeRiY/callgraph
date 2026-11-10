@@ -53,7 +53,10 @@ src/
                                 tényeken (matcher), név szerinti hívószám (callers), rangsor (rank), indoklás + kimenet
   stats/                        helyi, passzív használati mérés (hálózat nincs): CLI-próba (main.rs) és MCP-próba
                                 (mcp::server) → napi összesítő `<skill>/stats/YYYY-MM.json` (csak zárt nevek és
-                                sávok, út / név soha), a `locate`-találat követése memóriában, `callgraph stats` riport
+                                sávok, út / név soha), a `locate`-találat követése memóriában, `callgraph stats` riport;
+                                `telemetry/`: a napi összesítők opt-in beküldése (alapból KI, `telemetry on|off|status|preview`)
+  next/                         opt-in javasolt következő lépés: szabályok a kimenetből (rules), `rN` azonosítós tároló
+                                (`.callgraph/results/`), helyi napló (log.jsonl), a CLI-dekorátor és a `next` futtatása
   cli/                          Command minta; args, parancsok (analyze, prune)
   mcp/                          MCP-szerver (`callgraph mcp`, rmcp, stdio): eszköz-paraméter → `show`-lekérdezés, útvonal-őr, frissítés (`--auto-update`, napi értesítés)
 tests/                          integrációs tesztek (pl. languages.rs: teszt-nyelvek a registryn)

@@ -396,10 +396,36 @@ Details (Hungarian): [`docs/PROJECT-GRAPH.md`](docs/PROJECT-GRAPH.md).
 callgraph keeps a small usage summary on your computer: how often each command or MCP tool ran, whether it
 failed, and how long it took and how big its output was, in ranges. For `locate` over MCP it also notes whether the
 file the agent opened next was the first result. It never records paths, file or symbol names, search terms,
-project names or error texts, and **nothing is sent anywhere** (there is no network involved). See it with
+project names or error texts, and **nothing is sent** unless you turn sending on (below). See it with
 `bash ~/.claude/skills/callgraph/callgraph.sh stats [--days N]` (last 7 days by default). The data lives in
 `~/.claude/skills/callgraph/stats/` (one small file per month, kept for about 90 days); turn it off with
-`CALLGRAPH_STATS=0`. It is also off in CI and when callgraph does not run from a skill install.
+`CALLGRAPH_STATS=0`. It is also off in CI and when callgraph does not run from a skill install. The first time it
+records on a machine, one line on stderr tells you so.
+
+Errors are split in two columns: **user err** (wrong usage, a file that does not exist, an unsupported file) and
+**internal** (a fault of callgraph). Since 0.5.1 user mistakes are only counted, not logged to `errors.jsonl`; the
+internal errors are also in `errors.jsonl` with an error id.
+
+#### Sharing the stats (opt-in)
+
+Off by default, and only you can turn it on: `bash ~/.claude/skills/callgraph/callgraph.sh telemetry on` asks for a
+y/N confirmation in a terminal (an agent cannot answer it). `telemetry preview` prints exactly the JSON that would be
+sent, `telemetry status` shows the state, `telemetry off` stops it. **What is sent:** the closed days' counts from
+above (no paths, file, symbol or project names, no search terms or code), at most the last 7 days, the callgraph
+version, the OS / architecture, a random batch id per day and the schema version — once a day, in the background, to
+`https://mcp.c3.zmakra.com/callgraph/telemetry`. Never in CI, with `CALLGRAPH_STATS=0` or with
+`CALLGRAPH_TELEMETRY=0` (a hard off switch). Controller: Makra Gergő (mgeri1993@gmail.com); the raw daily records are
+kept for 90 days, then only monthly totals. The installer asks once (Yes / Not now / Never) in an interactive terminal;
+after "Not now" `stats` reminds you once more about two weeks later, and an agent may very rarely be asked to mention it
+to you.
+
+### Suggested next step (opt-in)
+
+With `CALLGRAPH_NEXT=1` (or `--next`; MCP: `callgraph mcp --next`) a result may end with one line, e.g.
+`↪ r7 possible next: [1] OrderService.php::refund --body  [2] callers of refund  [3] outline OrderService.php`.
+`bash ~/.claude/skills/callgraph/callgraph.sh next r7 1` (or `next r7 1,3`; MCP: the `next` tool) runs the stored
+command exactly. The suggestions are only read-only navigation built from names in that output; nothing is shown when
+nothing is clear. The agent instructions say: use one only if it fits the task, otherwise ignore the line.
 
 ### Feedback from agents
 

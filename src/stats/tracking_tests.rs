@@ -213,6 +213,8 @@ fn the_day_file_holds_no_paths_or_names() {
             "size",
             "truncated",
             "hits",
+            "next_shown",
+            "next_used",
         ])
         .collect();
     let value: serde_json::Value = serde_json::from_str(&text).unwrap();

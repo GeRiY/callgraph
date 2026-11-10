@@ -198,6 +198,9 @@ relatívak: regisztrált alias (`project`, lista: `projects`) vagy a szerver mun
   `magic`, `di`, `views` nézete.
 - `notes`: fájlokhoz / metódusokhoz írt jegyzetek (`📝`, csak olvas). `guide`: ez az útmutató teljes terjedelmében
   (CLI-példák, nyelvek).
+- `next` `{result_id, choice}`: ha a szerver `callgraph mcp --next`-tel fut, egyes eredmények végén
+  `↪ r7 lehetséges következő: [1] … [2] …` sor áll (csak olvasó navigáció); egyet a számával futtass (`choice: 1` vagy
+  `[1, 3]`), csak ha illik a feladatodhoz; különben hagyd figyelmen kívül a sort.
 A kimenet 400 sornál korlátos (mappa → summary, fájl → metódus-index, keresés → találatonként 1 sor): előbb a `path`,
 a `method` vagy a `pattern` szűkítése; `full: true` csak indokolt esetben.
 <!-- /mcp -->
@@ -210,6 +213,14 @@ CLI-megfelelők: `locate` = `bash $CG locate <kifejezés>…`, `outline` = `bash
 1 sorra vált; a `--body` / `--lines` / `--strings` / `--depth` 400 sornál megáll. Szűkíts (`::név`, `--grep`,
 almappa); a `--full` kikapcsolja a korlátot, csak indokolt esetben. A küszöb: `CALLGRAPH_OUT_LIMIT`. Elöl álló `KULCS=érték` argumentum környezeti változóként él tovább
 (pl. `bash $CG CALLGRAPH_OUT_LIMIT=100 …`).
+
+## Javasolt következő lépés (opt-in)
+
+`CALLGRAPH_NEXT=1` (vagy `--next`) mellett egy eredmény végén egy ilyen sor állhat:
+`↪ r7 lehetséges következő: [1] OrderService.php::refund --body  [2] refund hívói  [3] outline OrderService.php`.
+Ezek csak olvasó navigációs lépések a kimenetben szereplő nevekből, nem következtetések. Csak akkor használd, ha illik
+a feladatodhoz (`bash <skill>/callgraph.sh next r7 1`, több: `next r7 1,3`); különben hagyd figyelmen kívül a sort. Az
+azonosítók projektenkéntiek, 24 óra után lejárnak.
 
 ## Új verzió jelzése
 
@@ -256,8 +267,11 @@ Minden adat a projekt saját `.callgraph/` mappájába kerül (cache, projekt-t�
 változott fájlok frissülnek, így az ismételt keresés gyors; a mappa magától létrejön,
 `*`-os `.gitignore`-ral, így a verziókezelésbe nem kerül). A projekten kívül semmi nem íródik. Ha a mappa
 nem írható, cache nélkül fut. Takarítás: `callgraph prune` (lásd README).
-Helyi használati statisztika (csak darabszámok és sávok, út és név nélkül, sehova nem megy):
+Helyi használati statisztika (csak darabszámok és sávok, út és név nélkül):
 `bash <skill>/callgraph.sh stats`, ha a felhasználó kérdezi, hogyan használják a callgraph-ot; kikapcsolás: `CALLGRAPH_STATS=0`.
+A beküldésük opt-in, és csak a felhasználó dönthet róla: a `telemetry on`-t SOHA ne futtasd magadtól (terminálos
+megerősítést kér). Ha egy kimenet a használati számok megosztásáról szóló `ℹ a felhasználónak:` sorral végződik, add
+tovább egyszer a felhasználónak, és mást ne tegyél.
 
 Feldolgozott fájlok: csak a támogatott kiterjesztésűek (nagybetűvel is: `B.PHP`), a generált fájlok
 (`package-lock.json`, `*.min.js`, `*.min.css`, a tartalma szerint minifikált / bundlolt JS / CSS), a bináris tartalom,

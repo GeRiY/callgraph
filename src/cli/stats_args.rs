@@ -8,8 +8,8 @@ use super::CliArgs;
 
 fn stats_usage() -> String {
     crate::tf!(
-        "callgraph stats [--days N]  (local usage stats of the last N days, 1–{MAX_DAYS}, default {DEFAULT_DAYS}; nothing is sent anywhere)",
-        "callgraph stats [--days N]  (helyi használati statisztika az elmúlt N napról, 1–{MAX_DAYS}, alapból {DEFAULT_DAYS}; semmi nem megy el a gépről)"
+        "callgraph stats [--days N]  (local usage stats of the last N days, 1–{MAX_DAYS}, default {DEFAULT_DAYS}; nothing is sent unless telemetry is on)",
+        "callgraph stats [--days N]  (helyi használati statisztika az elmúlt N napról, 1–{MAX_DAYS}, alapból {DEFAULT_DAYS}; semmi nem megy el, hacsak a telemetria nincs bekapcsolva)"
     )
 }
 

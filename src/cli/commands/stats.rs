@@ -1,6 +1,6 @@
 //! `callgraph stats [--days N]`: a helyi használati statisztika (`crate::stats`) az elmúlt N napról — hívások
 //! kliensenként és parancsonként, hibák, idő- és kimenet-méret sávok, a `locate`-találati arány. Csak olvas; a
-//! saját futását nem méri. Hálózat nincs.
+//! saját futását nem méri. Hálózat nincs (a beküldés opt-in: `telemetry`).
 
 use std::io::Write;
 
@@ -27,7 +27,12 @@ impl Command for StatsCommand {
         let store = StatsStore::new(env.data_dir(&self.home));
         let today = Day::today();
         let totals = store.totals(today.minus(self.days.saturating_sub(1)), today);
-        let text = render(&totals, today, self.days, store.dir(), env.enabled());
+        let mut text = render(&totals, today, self.days, store.dir(), env.enabled());
+        // a „most nem” utáni egyetlen emlékeztető a beküldésről (tipp a paranccsal, nem kérdés)
+        let telemetry = crate::stats::telemetry::Telemetry::from_env(&self.home);
+        if let Some(hint) = telemetry.stats_hint(crate::stats::telemetry::now_secs()) {
+            text.push_str(&hint);
+        }
         out.write_all(text.as_bytes())?;
         Ok(0)
     }
