@@ -10,10 +10,8 @@ fn temp_dir() -> PathBuf {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    let dir = std::env::temp_dir().join(format!(
-        "callgraph-it-next-{}-{nanos}",
-        std::process::id()
-    ));
+    let dir =
+        std::env::temp_dir().join(format!("callgraph-it-next-{}-{nanos}", std::process::id()));
     std::fs::create_dir_all(dir.join("app")).unwrap();
     std::fs::write(
         dir.join("app/OrderService.php"),
@@ -72,7 +70,11 @@ fn locate_carries_a_suggestion_line_and_next_runs_it() {
     assert!(outline.contains("refund()  L"), "{outline}");
     // a `next` kimenete is azonos azzal, mintha a felhasználó futtatta volna
     let direct = run(&root, false, &["wrap", "app/OrderService.php"]);
-    assert!(outline.starts_with(&stdout(&direct)), "{outline}\n---\n{}", stdout(&direct));
+    assert!(
+        outline.starts_with(&stdout(&direct)),
+        "{outline}\n---\n{}",
+        stdout(&direct)
+    );
 
     let unknown = run(&root, true, &["next", "r99", "1"]);
     assert_eq!(unknown.status.code(), Some(2), "{unknown:?}");

@@ -76,7 +76,10 @@ fn records_cli_runs_and_reports_them() {
     assert!(show.status.success(), "{show:?}");
     // az egyszeri tájékoztatás: csak az első rögzítéskor, a stderr-en
     let notice = "ℹ callgraph keeps local usage counts on this machine only";
-    assert!(String::from_utf8_lossy(&show.stderr).contains(notice), "{show:?}");
+    assert!(
+        String::from_utf8_lossy(&show.stderr).contains(notice),
+        "{show:?}"
+    );
     assert!(!String::from_utf8_lossy(&show.stdout).contains(notice));
     let missing = run(&root, &skill, dir, &["show", "src/Missing.php"]);
     assert!(!missing.status.success());

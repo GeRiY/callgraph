@@ -254,7 +254,7 @@ fn report_is_short_and_shows_the_locate_hit_rate() {
     let lang = crate::i18n::lang();
     assert!(text.contains(lang.pick("1 of 2", "1 / 2")), "{text}");
     assert!(text.contains("CALLGRAPH_STATS=0"), "{text}");
-    assert!(text.contains("mcp 15, cli 1"), "{text}");
+    assert!(text.contains("mcp 16, cli 1"), "{text}");
 
     let empty = render(&Default::default(), today, 7, &dir, false);
     assert_eq!(empty.lines().count(), 3, "{empty}");
@@ -266,19 +266,34 @@ fn report_splits_user_and_internal_errors_and_shows_next_acceptance() {
     let dir = temp_dir("split");
     let store = StatsStore::new(dir.clone());
     let today = day("2026-11-06");
-    for kind in [ErrorKind::Usage, ErrorKind::NotFound, ErrorKind::Unsupported] {
-        store.record(today, &event(CommandKind::Show, Client::Cli, Outcome::Error(kind), 5));
+    for kind in [
+        ErrorKind::Usage,
+        ErrorKind::NotFound,
+        ErrorKind::Unsupported,
+    ] {
+        store.record(
+            today,
+            &event(CommandKind::Show, Client::Cli, Outcome::Error(kind), 5),
+        );
     }
     store.record(
         today,
-        &event(CommandKind::Show, Client::Cli, Outcome::Error(ErrorKind::Failed), 5),
+        &event(
+            CommandKind::Show,
+            Client::Cli,
+            Outcome::Error(ErrorKind::Failed),
+            5,
+        ),
     );
     store.record_next(today, CommandKind::Locate, false);
     store.record_next(today, CommandKind::Locate, false);
     store.record_next(today, CommandKind::Locate, true);
     let totals = store.totals(today, today);
     let show = &totals.commands[&CommandKind::Show];
-    assert_eq!((show.user_error_count(), show.internal_error_count()), (3, 1));
+    assert_eq!(
+        (show.user_error_count(), show.internal_error_count()),
+        (3, 1)
+    );
     let text = render(&totals, today, 1, &dir, true);
     assert!(text.contains("errors.jsonl"), "{text}");
     assert!(text.contains("locate 1/2"), "{text}");
@@ -300,7 +315,11 @@ fn skill_failure_contexts_and_exit_code_2_map_to_user_errors() {
 fn the_local_stats_notice_is_claimed_only_once() {
     let dir = temp_dir("notice");
     let recorder = Recorder::at(dir.clone());
-    assert!(recorder.first_notice().is_some_and(|text| text.contains("CALLGRAPH_STATS=0")));
+    assert!(
+        recorder
+            .first_notice()
+            .is_some_and(|text| text.contains("CALLGRAPH_STATS=0"))
+    );
     assert!(recorder.first_notice().is_none());
     assert!(Recorder::disabled().first_notice().is_none());
     let _ = std::fs::remove_dir_all(dir);

@@ -88,7 +88,11 @@ impl Invocation {
         for target in &call.targets {
             let mut parts = target.split("::");
             if let Some(file) = parts.next() {
-                let name = file.trim_end_matches('/').rsplit('/').next().unwrap_or(file);
+                let name = file
+                    .trim_end_matches('/')
+                    .rsplit('/')
+                    .next()
+                    .unwrap_or(file);
                 subjects.push(name.to_owned());
             }
             subjects.extend(parts.map(str::to_owned));

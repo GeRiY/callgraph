@@ -53,7 +53,11 @@ fn locate(root: &Path, output: &str) -> Vec<Suggestion> {
     let Some(first) = lines.next() else {
         return Vec::new();
     };
-    let Some(path) = first["1. ".len()..].split("  ").next().filter(|p| !p.is_empty()) else {
+    let Some(path) = first["1. ".len()..]
+        .split("  ")
+        .next()
+        .filter(|p| !p.is_empty())
+    else {
         return Vec::new();
     };
     let mut found = vec![outline_of(root, path, SuggestionKind::Outline)];
@@ -151,7 +155,10 @@ fn callers(
     let base = output
         .lines()
         .next()
-        .and_then(|l| l.strip_prefix("root: ").or_else(|| l.strip_prefix("gyökér: ")))
+        .and_then(|l| {
+            l.strip_prefix("root: ")
+                .or_else(|| l.strip_prefix("gyökér: "))
+        })
         .map_or_else(|| root.to_path_buf(), |r| Path::new(r.trim()).to_path_buf());
     let mut first: Option<(String, String)> = None;
     let mut files: Vec<String> = Vec::new();
@@ -184,7 +191,11 @@ fn callers(
     let file_abs = absolute(&base, &file);
     found.push(Suggestion {
         kind: SuggestionKind::Body,
-        args: show_args(root, &["--body".to_owned()], &[format!("{file_abs}::{name}")]),
+        args: show_args(
+            root,
+            &["--body".to_owned()],
+            &[format!("{file_abs}::{name}")],
+        ),
         label: format!("{}::{name} --body", relative(root, &file_abs)),
     });
     let layers: BTreeSet<String> = files
@@ -219,7 +230,11 @@ fn profile(root: &Path, output: &str) -> Vec<Suggestion> {
             hidden = row.contains("(profile --full)");
             continue;
         }
-        let fields: Vec<&str> = row.split("  ").map(str::trim).filter(|f| !f.is_empty()).collect();
+        let fields: Vec<&str> = row
+            .split("  ")
+            .map(str::trim)
+            .filter(|f| !f.is_empty())
+            .collect();
         let Some(label) = fields.first() else {
             continue;
         };

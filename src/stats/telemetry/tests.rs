@@ -7,7 +7,9 @@ use std::net::TcpListener;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use super::{Choice, HttpSender, MIN_CALLS, REMIND_AFTER, SendOutcome, Telemetry, TelemetryEnv, Tty};
+use super::{
+    Choice, HttpSender, MIN_CALLS, REMIND_AFTER, SendOutcome, Telemetry, TelemetryEnv, Tty,
+};
 use crate::stats::buckets::{LatencyBucket, SizeBucket};
 use crate::stats::day::Day;
 use crate::stats::event::{Client, CommandKind, ErrorKind, Event, Outcome};
@@ -32,7 +34,10 @@ fn temp_dir(name: &str) -> PathBuf {
 /// Egy helyi szerver, ami minden kérésre `status`-szal válaszol, és megjegyzi a törzseket.
 fn server(status: u16) -> (String, Arc<Mutex<Vec<String>>>) {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    let url = format!("http://{}/callgraph/telemetry", listener.local_addr().unwrap());
+    let url = format!(
+        "http://{}/callgraph/telemetry",
+        listener.local_addr().unwrap()
+    );
     let bodies = Arc::new(Mutex::new(Vec::new()));
     let seen = Arc::clone(&bodies);
     std::thread::spawn(move || {
@@ -139,7 +144,10 @@ fn turned_on_sends_closed_days_once_a_day() {
     populate(&dir, 3);
     let telemetry = turned_on(&dir, &url);
     assert_eq!(telemetry.send_now(&HttpSender, NOW), SendOutcome::Sent(2));
-    assert_eq!(telemetry.send_now(&HttpSender, NOW + 60), SendOutcome::Skipped);
+    assert_eq!(
+        telemetry.send_now(&HttpSender, NOW + 60),
+        SendOutcome::Skipped
+    );
     let sent = bodies.lock().unwrap().clone();
     assert_eq!(sent.len(), 1, "{sent:?}");
     let body: serde_json::Value = serde_json::from_str(&sent[0]).unwrap();
@@ -173,7 +181,10 @@ fn a_failed_send_leaves_the_days_pending() {
     assert_eq!(consent.last_sent_day, None);
     assert_eq!(telemetry.pending(&consent, Day::from_secs(NOW)).len(), 2);
     // a következő kísérlet legkorábban egy óra múlva
-    assert_eq!(telemetry.send_now(&HttpSender, NOW + 60), SendOutcome::Skipped);
+    assert_eq!(
+        telemetry.send_now(&HttpSender, NOW + 60),
+        SendOutcome::Skipped
+    );
     let _ = std::fs::remove_dir_all(dir);
 }
 
@@ -206,10 +217,19 @@ fn the_payload_has_no_paths_or_names() {
     let text = telemetry.preview(NOW);
     let dir_text = dir.display().to_string();
     assert!(!text.contains('/') && !text.contains('\\'), "{text}");
-    for secret in [dir_text.as_str(), ".php", ".rs", "callgraph-stats", "telemetry-payload"] {
+    for secret in [
+        dir_text.as_str(),
+        ".php",
+        ".rs",
+        "callgraph-stats",
+        "telemetry-payload",
+    ] {
         assert!(!text.contains(secret), "{secret}: {text}");
     }
-    assert!(text.contains("\"batch\"") && text.contains("\"platform\""), "{text}");
+    assert!(
+        text.contains("\"batch\"") && text.contains("\"platform\""),
+        "{text}"
+    );
     assert!(!text.contains("2026-11-10"), "today is not closed: {text}");
     let _ = std::fs::remove_dir_all(dir);
 }
@@ -251,7 +271,10 @@ fn the_agent_hint_is_rare_and_stops_after_never_or_on() {
     assert!(telemetry.agent_hint(NOW + 60).is_none(), "once per 14 days");
     assert!(telemetry.agent_hint(NOW + REMIND_AFTER).is_some());
     assert!(telemetry.agent_hint(NOW + 2 * REMIND_AFTER).is_some());
-    assert!(telemetry.agent_hint(NOW + 3 * REMIND_AFTER).is_none(), "at most 3");
+    assert!(
+        telemetry.agent_hint(NOW + 3 * REMIND_AFTER).is_none(),
+        "at most 3"
+    );
     let _ = std::fs::remove_dir_all(&dir);
 
     for choice in [Choice::Never, Choice::Yes, Choice::Off] {

@@ -50,9 +50,8 @@ mod tests {
 
     #[test]
     fn parses_telemetry_actions() {
-        let parse = |v: &[&str]| {
-            parse_telemetry(&v.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>())
-        };
+        let parse =
+            |v: &[&str]| parse_telemetry(&v.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>());
         assert_eq!(
             parse(&["on"]).unwrap(),
             CliArgs::Telemetry {

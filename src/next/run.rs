@@ -56,9 +56,7 @@ impl Command for Suggesting {
             return Ok(code);
         }
         let home = SkillHome::from_env();
-        let Ok(root) =
-            crate::cli::commands::project_root(&home, self.invocation.project())
-        else {
+        let Ok(root) = crate::cli::commands::project_root(&home, self.invocation.project()) else {
             return Ok(code);
         };
         if self.observe {

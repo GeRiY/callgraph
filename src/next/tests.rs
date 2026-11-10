@@ -59,15 +59,31 @@ fn locate_suggests_outline_body_and_callers_of_the_exact_method() {
         ]
     );
     assert_eq!(found[0].args.last().unwrap(), "/p/app/OrderService.php");
-    assert_eq!(found[1].args.last().unwrap(), "/p/app/OrderService.php::refund");
+    assert_eq!(
+        found[1].args.last().unwrap(),
+        "/p/app/OrderService.php::refund"
+    );
     assert!(found[1].args.contains(&"--body".to_owned()));
-    assert!(found[1].label.contains("app/OrderService.php::refund --body"));
+    assert!(
+        found[1]
+            .label
+            .contains("app/OrderService.php::refund --body")
+    );
     assert!(found[2].args.contains(&r"(^|::|\.|->)refund$".to_owned()));
     // csak név-részlet / hívás: csak az outline
     let partial = LOCATE.replace("(exact method)", "(name part)");
-    assert_eq!(kinds(&run(&["locate", "refund"], &partial)), [SuggestionKind::Outline]);
+    assert_eq!(
+        kinds(&run(&["locate", "refund"], &partial)),
+        [SuggestionKind::Outline]
+    );
     // nincs találat: nincs sor
-    assert!(run(&["locate", "zzz"], "locate: 1 terms · no match in the project map\n").is_empty());
+    assert!(
+        run(
+            &["locate", "zzz"],
+            "locate: 1 terms · no match in the project map\n"
+        )
+        .is_empty()
+    );
 }
 
 const OUTLINE: &str = "FILE  /p/app/Order.php
@@ -103,7 +119,13 @@ fn a_truncated_output_suggests_the_narrowing_from_the_note() {
     );
     let found = run(&["wrap", "app/Order.php"], &index);
     assert_eq!(kinds(&found), [SuggestionKind::Narrow]);
-    assert!(found[0].args.last().unwrap().ends_with("Order.php::longest"));
+    assert!(
+        found[0]
+            .args
+            .last()
+            .unwrap()
+            .ends_with("Order.php::longest")
+    );
 
     let root = temp_dir("summary");
     std::fs::create_dir_all(root.join("app")).unwrap();
@@ -177,11 +199,19 @@ fn profile_suggests_the_largest_layer_and_the_full_view() {
         kinds(&found),
         [SuggestionKind::LayerSummary, SuggestionKind::ProfileFull]
     );
-    assert!(found[0].args.windows(2).any(|w| w == ["--layer", "view:rust"]));
+    assert!(
+        found[0]
+            .args
+            .windows(2)
+            .any(|w| w == ["--layer", "view:rust"])
+    );
     assert_eq!(found[1].args, s(&["profile", "--project", "/p", "--full"]));
     assert!(run(&["profile", "--full"], PROFILE).is_empty());
     let shown = PROFILE.replace("  … +3 more layers (profile --full)\n", "");
-    assert_eq!(kinds(&run(&["profile"], &shown)), [SuggestionKind::LayerSummary]);
+    assert_eq!(
+        kinds(&run(&["profile"], &shown)),
+        [SuggestionKind::LayerSummary]
+    );
 }
 
 #[test]
@@ -231,11 +261,17 @@ fn store_ids_increase_expire_and_keep_the_last_50() {
     assert_eq!(store.save("locate", None, &sample(), t), Some(1));
     assert_eq!(store.save("show", Some("shop"), &sample(), t), Some(2));
     let got = store.get(2, t + 10).unwrap();
-    assert_eq!((got.cmd.as_str(), got.project.as_deref()), ("show", Some("shop")));
+    assert_eq!(
+        (got.cmd.as_str(), got.project.as_deref()),
+        ("show", Some("shop"))
+    );
     assert_eq!(got.s, sample());
     // lejárat; az azonosító a lejárt rekordok után sem kezdődik újra
     assert!(store.get(1, t + EXPIRY_SECS).is_none());
-    assert_eq!(store.save("show", None, &sample(), t + 2 * EXPIRY_SECS), Some(3));
+    assert_eq!(
+        store.save("show", None, &sample(), t + 2 * EXPIRY_SECS),
+        Some(3)
+    );
     for n in 0..60 {
         store.save("show", None, &sample(), t + 2 * EXPIRY_SECS + n);
     }
@@ -268,14 +304,24 @@ fn concurrent_saves_get_distinct_ids() {
 fn a_different_command_on_the_same_file_after_an_accepted_suggestion_is_a_backtrack() {
     let dir = temp_dir("log");
     let log = EventLog::new(&dir);
-    let suggested = s(&["show", "--project", "/p", "--body", "/p/app/Order.php::refund"]);
+    let suggested = s(&[
+        "show",
+        "--project",
+        "/p",
+        "--body",
+        "/p/app/Order.php::refund",
+    ]);
     let invocation = Invocation::parse(&suggested).unwrap();
     log.append(&LogEvent::Accepted {
         t: 1,
         id: 7,
         choice: 1,
         kind: SuggestionKind::Body,
-        subj: invocation.subjects().iter().map(|s| super::log::hash(s)).collect(),
+        subj: invocation
+            .subjects()
+            .iter()
+            .map(|s| super::log::hash(s))
+            .collect(),
         sig: super::log::hash_args(&suggested),
     });
     let other = s(&["wrap", "app/Order.php", "--lines", "1-40"]);
