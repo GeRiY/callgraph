@@ -99,6 +99,29 @@ class Receiver(unittest.TestCase):
         self.assertEqual(batches, 2)
         self.assertEqual(json.loads(commands)["show"]["calls"], 4)
 
+    def hit(self, body):
+        req = urllib.request.Request(self.url.replace("/v1", "/hit"), data=json.dumps(body).encode(),
+                                     headers={"Content-Type": "text/plain"})
+        try:
+            return urllib.request.urlopen(req, timeout=5).status
+        except urllib.error.HTTPError as e:
+            return e.code
+
+    def test_page_hits_are_counted_without_anything_personal(self):
+        self.assertEqual(self.hit({"p": "/hu/changelog/", "r": "www.linkedin.com", "e": "view"}), 204)
+        self.assertEqual(self.hit({"p": "/hu/changelog/", "r": "linkedin.com", "e": "view"}), 204)
+        self.assertEqual(self.hit({"p": "/", "r": "", "e": "download"}), 204)
+        for bad in ({"p": "https://x.y/", "e": "view"}, {"p": "/a", "e": "click"}, {"p": "/a", "r": "a b", "e": "view"},
+                    {"p": "/../etc", "e": "view"}, {"p": "/a", "e": "view", "ip": "1.2.3.4"}):
+            self.assertEqual(self.hit(bad), 422, bad)
+        con = sqlite3.connect(app.DB_PATH)
+        rows = con.execute("SELECT page, referrer, event, count FROM hits ORDER BY page").fetchall()
+        cols = [r[1] for r in con.execute("PRAGMA table_info(hits)")]
+        con.close()
+        self.assertIn(("/hu/changelog/", "linkedin.com", "view", 2), rows)
+        self.assertIn(("/", "", "download", 1), rows)
+        self.assertEqual(cols, ["day", "page", "referrer", "event", "count"])
+
     def test_rate_limit(self):
         app._hits.clear()
         codes = [self.post(payload(batch="dddd-%d" % i)) for i in range(app.RATE_LIMIT + 2)]

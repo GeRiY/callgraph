@@ -1,4 +1,4 @@
-"""callgraph opt-in telemetry receiver.
+"""callgraph opt-in telemetry receiver and callgraph.eu page-view counter.
 
 Accepts the daily banded usage counts that `callgraph.sh telemetry on` users send (POST JSON, see
 src/stats/telemetry/payload.rs). Stores nothing that identifies a person or a machine: no IP address,
@@ -9,6 +9,7 @@ Standard library only (http.server + sqlite3), so the container has no dependenc
 """
 
 import json
+import re
 import os
 import sqlite3
 import threading
@@ -43,6 +44,14 @@ def db() -> sqlite3.Connection:
             received TEXT NOT NULL
         );
         CREATE INDEX IF NOT EXISTS days_day ON days(day);
+        CREATE TABLE IF NOT EXISTS hits (
+            day TEXT NOT NULL,
+            page TEXT NOT NULL,
+            referrer TEXT NOT NULL,
+            event TEXT NOT NULL,
+            count INTEGER NOT NULL,
+            PRIMARY KEY (day, page, referrer, event)
+        );
         CREATE TABLE IF NOT EXISTS months (
             month TEXT NOT NULL,
             version TEXT NOT NULL,
@@ -107,11 +116,31 @@ def validate(payload) -> list[dict] | None:
     return out
 
 
-def _rate_ok(client: str) -> bool:
+# website page views: a page path, the referring site's domain and the event — nothing else
+PAGE_RE = re.compile(r"^/[a-z0-9/_.-]{0,80}$")
+HOST_RE = re.compile(r"^[a-z0-9.-]{1,64}$")
+EVENTS = ("view", "download")
+SITE_ORIGIN = "https://callgraph.eu"
+HIT_LIMIT = 600
+
+
+def validate_hit(obj) -> tuple[str, str, str] | None:
+    if not isinstance(obj, dict) or set(obj) - {"p", "r", "e"}:
+        return None
+    page, ref, event = obj.get("p"), obj.get("r", ""), obj.get("e")
+    if not isinstance(page, str) or not PAGE_RE.match(page) or ".." in page:
+        return None
+    if not isinstance(ref, str) or (ref and not HOST_RE.match(ref)) or event not in EVENTS:
+        return None
+    ref = ref[4:] if ref.startswith("www.") else ref
+    return page, ref, event
+
+
+def _rate_ok(client: str, limit: int = RATE_LIMIT) -> bool:
     now = time.time()
     with _lock:
         hits = [t for t in _hits.get(client, []) if now - t < RATE_WINDOW]
-        if len(hits) >= RATE_LIMIT:
+        if len(hits) >= limit:
             _hits[client] = hits
             return False
         hits.append(now)
@@ -176,8 +205,46 @@ class Handler(BaseHTTPRequestHandler):
             return self._reply(200, "ok")
         return self._reply(404)
 
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", SITE_ORIGIN)
+        self.send_header("Access-Control-Allow-Methods", "POST")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def _hit(self):
+        client = "hit:" + (self.headers.get("X-Real-IP") or self.client_address[0])
+        if not _rate_ok(client, HIT_LIMIT):
+            return self._reply(429)
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+            hit = validate_hit(json.loads(self.rfile.read(length))) if 0 < length <= 512 else None
+        except (ValueError, UnicodeDecodeError):
+            hit = None
+        if hit is None:
+            return self._reply(422)
+        with _lock:
+            con = db()
+            try:
+                con.execute(
+                    "INSERT INTO hits(day, page, referrer, event, count) VALUES (?,?,?,?,1) "
+                    "ON CONFLICT(day, page, referrer, event) DO UPDATE SET count=count+1",
+                    (date.today().isoformat(), *hit),
+                )
+                con.commit()
+            finally:
+                con.close()
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", SITE_ORIGIN)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
     def do_POST(self):
-        if self.path.split("?")[0].rstrip("/") not in ("/v1", "/callgraph/telemetry"):
+        route = self.path.split("?")[0].rstrip("/")
+        if route == "/hit":
+            return self._hit()
+        if route not in ("/v1", "/callgraph/telemetry"):
             return self._reply(404)
         client = self.headers.get("X-Real-IP") or self.client_address[0]
         if not _rate_ok(client):
