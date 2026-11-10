@@ -370,11 +370,13 @@ PRIVACY_NOTE = {
           "letöltés-kattintás) — IP-cím és azonosító nélkül. Adatkezelő: Makra Gergő, mgeri1993@gmail.com.",
 }
 
-# Page-view counter: no cookies, no storage, no identifiers — only the page path, the referring site's domain and
+# Page-view counter: no cookies, no storage, no identifiers — only the page path, the referring site's domain (or a
+# `?ref=` / `utm_source=` source tag from a shared link) and
 # whether a download link was clicked, counted per day on telemetry.callgraph.eu (see server/telemetry/).
 SCRIPT_COUNT = """<script>
 (function(){try{var u="https://telemetry.callgraph.eu/hit",r="";
 try{var h=new URL(document.referrer).hostname;if(h&&h.indexOf("callgraph.eu")<0)r=h.toLowerCase()}catch(e){}
+try{var q=new URLSearchParams(location.search),t=q.get("ref")||q.get("utm_source");if(t)r=t.toLowerCase().replace(/[^a-z0-9.-]/g,"").slice(0,64)}catch(e){}
 function s(e){var d=JSON.stringify({p:location.pathname.toLowerCase().slice(0,80),r:r,e:e});
 if(navigator.sendBeacon)navigator.sendBeacon(u,d);else fetch(u,{method:"POST",body:d,keepalive:true,mode:"no-cors"})}
 s("view");document.addEventListener("click",function(ev){var a=ev.target.closest&&ev.target.closest("a");
