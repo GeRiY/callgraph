@@ -22,6 +22,10 @@ PORT = int(os.environ.get("PORT", "8080"))
 MAX_BODY = 64 * 1024
 MAX_DAYS = 7
 RETENTION_DAYS = 90
+# the database never grows past this: new data is refused (the disk cannot be filled from outside)
+MAX_DB_BYTES = int(os.environ.get("TELEMETRY_MAX_DB_BYTES", str(200 * 1024 * 1024)))
+# no real day has more calls than this per command — larger numbers are fake, the batch is dropped
+MAX_COUNT = 200_000
 # per-client-address request budget (in memory only, never stored): a few sends per hour are normal
 RATE_LIMIT = 30
 RATE_WINDOW = 3600
@@ -76,9 +80,11 @@ def _counts_only(obj, depth=0) -> bool:
     if isinstance(obj, bool):
         return False
     if isinstance(obj, (int, float)):
-        return obj >= 0
+        return 0 <= obj <= MAX_COUNT
     if isinstance(obj, list):
-        return len(obj) <= 16 and all(isinstance(v, (int, float)) and not isinstance(v, bool) and v >= 0 for v in obj)
+        return len(obj) <= 16 and all(
+            isinstance(v, (int, float)) and not isinstance(v, bool) and 0 <= v <= MAX_COUNT for v in obj
+        )
     if isinstance(obj, dict):
         return len(obj) <= 64 and all(
             _short(k, 32) and all(c.isalnum() or c in "_-" for c in k) and _counts_only(v, depth + 1)
@@ -134,6 +140,13 @@ def validate_hit(obj) -> tuple[str, str, str] | None:
         return None
     ref = ref[4:] if ref.startswith("www.") else ref
     return page, ref, event
+
+
+def _db_full() -> bool:
+    try:
+        return sum(os.path.getsize(DB_PATH + ext) for ext in ("", "-wal") if os.path.exists(DB_PATH + ext)) > MAX_DB_BYTES
+    except OSError:
+        return False
 
 
 def _rate_ok(client: str, limit: int = RATE_LIMIT) -> bool:
@@ -224,6 +237,8 @@ class Handler(BaseHTTPRequestHandler):
             hit = None
         if hit is None:
             return self._reply(422)
+        if _db_full():
+            return self._reply(507)
         with _lock:
             con = db()
             try:
@@ -262,6 +277,8 @@ class Handler(BaseHTTPRequestHandler):
         days = validate(payload)
         if days is None:
             return self._reply(422, "rejected")
+        if _db_full():
+            return self._reply(507, "storage full")
         received = date.today().isoformat()
         with _lock:
             con = db()

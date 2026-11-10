@@ -67,6 +67,8 @@ class Receiver(unittest.TestCase):
             payload(commands={"/home/x": {"calls": 1}}),
             payload(commands={"show": {"calls": -1}}),
             payload(commands={"show": {"calls": True}}),
+            payload(commands={"show": {"calls": app.MAX_COUNT + 1}}),
+            payload(commands={"show": {"latency": [0, app.MAX_COUNT + 1]}}),
             payload(day=(date.today() + timedelta(days=3)).isoformat()),
             payload(day="2020-01-01"),
             payload(batch="not a uuid!"),
@@ -121,6 +123,15 @@ class Receiver(unittest.TestCase):
         self.assertIn(("/hu/changelog/", "linkedin.com", "view", 2), rows)
         self.assertIn(("/", "", "download", 1), rows)
         self.assertEqual(cols, ["day", "page", "referrer", "event", "count"])
+
+    def test_full_database_refuses_new_data(self):
+        old = app.MAX_DB_BYTES
+        app.MAX_DB_BYTES = 1
+        try:
+            self.assertEqual(self.post(payload(batch="eeee-1")), 507)
+            self.assertEqual(self.hit({"p": "/", "e": "view"}), 507)
+        finally:
+            app.MAX_DB_BYTES = old
 
     def test_rate_limit(self):
         app._hits.clear()
