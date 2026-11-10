@@ -58,9 +58,12 @@ fn locate_suggests_outline_body_and_callers_of_the_exact_method() {
             SuggestionKind::Callers
         ]
     );
-    assert_eq!(found[0].args.last().unwrap(), "/p/app/OrderService.php");
     assert_eq!(
-        found[1].args.last().unwrap(),
+        slash(found[0].args.last().unwrap()),
+        "/p/app/OrderService.php"
+    );
+    assert_eq!(
+        slash(found[1].args.last().unwrap()),
         "/p/app/OrderService.php::refund"
     );
     assert!(found[1].args.contains(&"--body".to_owned()));
@@ -99,7 +102,10 @@ class Order  L1-90
 fn outline_suggests_the_body_of_the_unique_longest_method() {
     let found = run(&["wrap", "app/Order.php"], OUTLINE);
     assert_eq!(kinds(&found), [SuggestionKind::Body]);
-    assert_eq!(found[0].args.last().unwrap(), "/p/app/Order.php::longest");
+    assert_eq!(
+        slash(found[0].args.last().unwrap()),
+        "/p/app/Order.php::longest"
+    );
     // kevesebb mint 3 metódus, holtverseny, metódus-szelektor, --body, gépi formátum: semmi
     let two = OUTLINE.replace("  mid()  L62-80\n", "");
     assert!(run(&["wrap", "app/Order.php"], &two).is_empty());
@@ -135,8 +141,8 @@ fn a_truncated_output_suggests_the_narrowing_from_the_note() {
     let found = suggest(&invocation, &root, summary, &no_layer);
     assert_eq!(kinds(&found), [SuggestionKind::Narrow]);
     assert_eq!(
-        found[0].args.last().unwrap(),
-        &root.join("app/Big.php").display().to_string()
+        slash(found[0].args.last().unwrap()),
+        slash(&root.join("app/Big.php").display().to_string())
     );
     // a nem létező fájlt nem javasolja
     let missing = summary.replace("Big.php", "Gone.php");
@@ -166,7 +172,7 @@ fn callers_suggest_depth_the_first_caller_and_by_layer_when_two_layers() {
     assert_eq!(kinds(&found), [SuggestionKind::Depth, SuggestionKind::Body]);
     assert!(found[0].args.windows(2).any(|w| w == ["--depth", "2"]));
     assert_eq!(
-        found[1].args.last().unwrap(),
+        slash(found[1].args.last().unwrap()),
         "/p/app/Http/OrderController.php::store"
     );
     let layer = |rel: &str| Some(rel.split('/').nth(1).unwrap_or("").to_owned());
@@ -370,4 +376,9 @@ fn off_by_default_the_command_runs_unchanged() {
     let mut args = s(&["--next", "locate", "x", "--", "--next"]);
     assert!(super::take_next(&mut args));
     assert_eq!(args, s(&["locate", "x", "--", "--next"]));
+}
+
+/// Windowson a gyökérhez fűzött út `\`-t tartalmaz; az összehasonlításhoz egységesen `/`.
+fn slash(path: &str) -> String {
+    path.replace('\\', "/")
 }
