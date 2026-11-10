@@ -6,6 +6,8 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-11-10
+
 ### Új
 - **Javasolt következő lépés (opt-in):** `CALLGRAPH_NEXT=1` vagy `--next` mellett (MCP: `callgraph mcp --next`) egy
   eredmény egy ilyen sorral végződhet: `↪ r7 lehetséges következő: [1] OrderService.php::refund --body  [2] refund
@@ -446,7 +448,8 @@ Első kiadás.
 - Beépített frissítés: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Előre fordított csomagok macOS-re (arm64, x86_64), Linuxra (x86_64, ARM64, statikus musl) és Windowsra.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.5.3...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.6.0...develop
+[0.6.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.6.0
 [0.5.3]: https://github.com/GeRiY/callgraph/releases/tag/v0.5.3
 [0.5.2]: https://github.com/GeRiY/callgraph/releases/tag/v0.5.2
 [0.5.1]: https://github.com/GeRiY/callgraph/releases/tag/v0.5.1

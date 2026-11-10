@@ -5,6 +5,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-11-10
+
 ### Added
 - **Suggested next step (opt-in):** with `CALLGRAPH_NEXT=1` or `--next` (MCP: `callgraph mcp --next`), a result can
   end with one line like `↪ r7 possible next: [1] OrderService.php::refund --body  [2] callers of refund  [3] outline
@@ -414,7 +416,8 @@ First release.
 - Built-in update: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Prebuilt packages for macOS (arm64, x86_64), Linux (x86_64, ARM64, static musl) and Windows.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.5.3...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.6.0...develop
+[0.6.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.6.0
 [0.5.3]: https://github.com/GeRiY/callgraph/releases/tag/v0.5.3
 [0.5.2]: https://github.com/GeRiY/callgraph/releases/tag/v0.5.2
 [0.5.1]: https://github.com/GeRiY/callgraph/releases/tag/v0.5.1
