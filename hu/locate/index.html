@@ -129,6 +129,7 @@
 <footer>
   <nav class="foot" aria-label="Oldalak"><a href="/hu/">Kezdőlap</a> · <a href="/hu/mcp/">MCP</a> · <a href="/hu/php/">PHP</a> · <a href="/hu/rust/">Rust</a> · <a href="/hu/typescript/">TypeScript / Vue</a> · <a href="/hu/swift/">Swift</a> · <a href="/hu/locate/">locate</a> · <a href="/hu/profile/">Profil</a> · <a href="/hu/changelog/">Változásnapló</a></nav>
   <div>callgraph · készítette: <a href="https://www.linkedin.com/in/gergomakra/" rel="author me">Makra Gergő</a> · MIT licenc · <a href="https://github.com/GeRiY/callgraph">GitHub</a> · <a href="https://github.com/GeRiY/callgraph/releases/latest">Kiadások</a> · <a href="/locate/" hreflang="en" lang="en">English</a></div>
+  <div class="sub">Adatvédelem: nincs cookie. Az oldalmegtekintéseket napi számként rögzítjük (oldal, hivatkozó oldal, letöltés-kattintás) — IP-cím és azonosító nélkül. Adatkezelő: Makra Gergő, mgeri1993@gmail.com.</div>
 </footer>
 </div>
 <script>
@@ -140,6 +141,14 @@ document.addEventListener('keydown', function (e) {
   if (e.key !== 'Escape') return;
   document.querySelectorAll('details.menu[open]').forEach(function (d) { d.open = false; d.querySelector('summary').focus(); });
 });
+</script>
+<script>
+(function(){try{var u="https://telemetry.callgraph.eu/hit",r="";
+try{var h=new URL(document.referrer).hostname;if(h&&h.indexOf("callgraph.eu")<0)r=h.toLowerCase()}catch(e){}
+function s(e){var d=JSON.stringify({p:location.pathname.toLowerCase().slice(0,80),r:r,e:e});
+if(navigator.sendBeacon)navigator.sendBeacon(u,d);else fetch(u,{method:"POST",body:d,keepalive:true,mode:"no-cors"})}
+s("view");document.addEventListener("click",function(ev){var a=ev.target.closest&&ev.target.closest("a");
+if(a&&/github\.com\/GeRiY\/callgraph\/releases/.test(a.href))s("download")})}catch(e){}})();
 </script>
 <script>
 // másoló gomb a parancs- és konfig-blokkokon (JS nélkül a blokk ugyanúgy olvasható)
