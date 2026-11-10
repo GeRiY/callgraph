@@ -5,9 +5,18 @@
   <link rel="self" type="application/atom+xml" href="https://callgraph.eu/changelog/feed.xml"/>
   <link rel="alternate" type="text/html" href="https://callgraph.eu/changelog/"/>
   <id>https://callgraph.eu/changelog/</id>
-  <updated>2026-11-09T00:00:00Z</updated>
+  <updated>2026-11-10T00:00:00Z</updated>
   <author><name>Gergő Makra</name></author>
   <icon>https://callgraph.eu/assets/favicon.svg</icon>
+  <entry>
+    <title>callgraph v0.6.0</title>
+    <link rel="alternate" type="text/html" href="https://callgraph.eu/changelog/#v0.6.0"/>
+    <link rel="related" type="text/html" href="https://github.com/GeRiY/callgraph/releases/tag/v0.6.0"/>
+    <id>https://github.com/GeRiY/callgraph/releases/tag/v0.6.0</id>
+    <updated>2026-11-10T00:00:00Z</updated>
+    <published>2026-11-10T00:00:00Z</published>
+    <content type="html">&lt;h3&gt;Added&lt;/h3&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;Suggested next step (opt-in):&lt;/b&gt; with &lt;code&gt;CALLGRAPH_NEXT=1&lt;/code&gt; or &lt;code&gt;--next&lt;/code&gt; (MCP: &lt;code&gt;callgraph mcp --next&lt;/code&gt;), a result can end with one line like &lt;code&gt;↪ r7 possible next: [1] OrderService.php::refund --body  [2] callers of refund  [3] outline OrderService.php&lt;/code&gt;. The agent runs one by number (&lt;code&gt;callgraph.sh next r7 1&lt;/code&gt;, several: &lt;code&gt;next r7 1,3&lt;/code&gt;; MCP: the &lt;code&gt;next&lt;/code&gt; tool) instead of composing the command. Only read-only navigation, only names that appear in that output, at most 3, and no line at all when nothing is clear (errors, empty results, json / mermaid / dot). Stored in the project&#x27;s &lt;code&gt;.callgraph/results/&lt;/code&gt; (last 50, 24 hours); &lt;code&gt;callgraph.sh stats&lt;/code&gt; shows how often a suggestion was used.&lt;/li&gt;&lt;li&gt;&lt;b&gt;Opt-in sending of the usage stats:&lt;/b&gt; &lt;code&gt;callgraph.sh telemetry status|preview|on|off&lt;/code&gt;. Nothing is sent unless the user turns it on in a terminal (&lt;code&gt;telemetry on&lt;/code&gt; asks y/N; an agent cannot do it). Then the closed days&#x27; banded counts (the same as &lt;code&gt;stats&lt;/code&gt;, no paths or names) go out once a day in the background; &lt;code&gt;CALLGRAPH_TELEMETRY=0&lt;/code&gt; blocks it for good. The installer asks once (Yes / Not now / Never), only in an interactive terminal.&lt;/li&gt;&lt;li&gt;&lt;b&gt;Note marker on hits:&lt;/b&gt; a &lt;code&gt;📝 N&lt;/code&gt; at the end of the line shows that a hit has notes — in &lt;code&gt;--grep&lt;/code&gt; callers (outline, one-line-per-call view, every &lt;code&gt;--depth&lt;/code&gt; level; MCP &lt;code&gt;find_callers&lt;/code&gt;), in &lt;code&gt;locate&lt;/code&gt; file lines and in &lt;code&gt;--format api&lt;/code&gt; method lines. Method notes count on the method line; if the method has none, the file&#x27;s notes. Orphaned notes do not count; without notes the output is unchanged.&lt;/li&gt;&lt;/ul&gt;&lt;h3&gt;Changed&lt;/h3&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;&lt;code&gt;stats&lt;/code&gt; separates user errors from internal errors:&lt;/b&gt; usage mistakes, missing files and unsupported files are counted as &quot;user err&quot; (not logged to errors.jsonl since 0.5.1); &quot;internal&quot; errors are also in errors.jsonl. An unsupported / generated / binary file in &lt;code&gt;callgraph.sh&lt;/code&gt; is now a user error (no error-id).&lt;/li&gt;&lt;li&gt;&lt;b&gt;One-time notice:&lt;/b&gt; the first time local stats are recorded on a machine, one line on stderr says so (and how to turn them off). Never in MCP output.&lt;/li&gt;&lt;/ul&gt;</content>
+  </entry>
   <entry>
     <title>callgraph v0.5.3</title>
     <link rel="alternate" type="text/html" href="https://callgraph.eu/changelog/#v0.5.3"/>
