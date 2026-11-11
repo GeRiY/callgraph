@@ -131,9 +131,8 @@ pub(super) fn unquote(text: &str) -> String {
 pub(super) fn package_name(path: &str) -> String {
     let mut parts = path.rsplit('/');
     let mut last = parts.next().unwrap_or(path);
-    let major = last.len() > 1
-        && last.starts_with('v')
-        && last[1..].chars().all(|c| c.is_ascii_digit());
+    let major =
+        last.len() > 1 && last.starts_with('v') && last[1..].chars().all(|c| c.is_ascii_digit());
     if major && let Some(previous) = parts.next() {
         last = previous;
     }

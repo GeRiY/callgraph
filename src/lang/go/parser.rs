@@ -77,9 +77,7 @@ pub(crate) struct TreeSitterGo;
 impl GoParser for TreeSitterGo {
     fn parse<'s>(&self, source: &'s str) -> Option<ParsedGo<'s>> {
         let mut parser = Parser::new();
-        parser
-            .set_language(&tree_sitter_go::LANGUAGE.into())
-            .ok()?;
+        parser.set_language(&tree_sitter_go::LANGUAGE.into()).ok()?;
         let tree = parser.parse(source, None)?;
         Some(ParsedGo::new(tree, source))
     }

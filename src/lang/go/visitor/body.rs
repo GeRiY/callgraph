@@ -25,7 +25,14 @@ impl GoVisitor<'_, '_> {
     /// A node és a leszármazottai bejárása a `scope` hívóval.
     pub(super) fn walk_body(&mut self, node: Node<'_>, scope: &Scope, b: &mut FileGraphBuilder) {
         match node.kind() {
-            "call_expression" => self.call(node, scope, b),
+            "call_expression" => {
+                if let Some(expr) = node.child_by_field_name("function") {
+                    let args = self.args(node);
+                    self.emit_call(expr, node, args, scope, b);
+                }
+            }
+            // `Map[int](xs)`: a grammar generikus típus-konverziónak olvassa — valójában függvényhívás
+            "type_conversion_expression" => self.generic_conversion(node, scope, b),
             "composite_literal" => self.literal(node, scope, b),
             "interpreted_string_literal" | "raw_string_literal" => {
                 self.string_literal(node, scope, b)
@@ -39,10 +46,14 @@ impl GoVisitor<'_, '_> {
     }
 
     /// Egy `call_expression` felvétele `Call`-ként (a `go f()` és a `defer f()` is ide tartozik).
-    fn call(&mut self, node: Node<'_>, scope: &Scope, b: &mut FileGraphBuilder) {
-        let Some(expr) = node.child_by_field_name("function") else {
-            return;
-        };
+    fn emit_call(
+        &mut self,
+        expr: Node<'_>,
+        node: Node<'_>,
+        args: Option<Vec<String>>,
+        scope: &Scope,
+        b: &mut FileGraphBuilder,
+    ) {
         let Some(callee) = self.callee(expr) else {
             return;
         };
@@ -83,9 +94,26 @@ impl GoVisitor<'_, '_> {
                 .root
                 .filter(|_| callee.member && !on_self && callee.path.is_some()),
             category: category.to_string(),
-            args: self.args(node),
+            args,
             handler: None,
         });
+    }
+
+    /// `Map[int](xs)` mint `type_conversion_expression`, ha a típus generikus: hívásként vesszük fel.
+    fn generic_conversion(&mut self, node: Node<'_>, scope: &Scope, b: &mut FileGraphBuilder) {
+        let Some(ty) = node.child_by_field_name("type") else {
+            return;
+        };
+        if ty.kind() != "generic_type" {
+            return;
+        }
+        let Some(inner) = ty.child_by_field_name("type") else {
+            return;
+        };
+        let args = node
+            .child_by_field_name("operand")
+            .map(|o| vec![clip(self.text(o), 60)]);
+        self.emit_call(inner, node, args, scope, b);
     }
 
     fn callee<'t>(&self, expr: Node<'t>) -> Option<Callee<'t>> {
@@ -113,6 +141,30 @@ impl GoVisitor<'_, '_> {
             }
             // generikus példányosítás: `Map[int, string](xs)`
             "index_expression" => self.callee(expr.child_by_field_name("operand")?),
+            // a tree-sitter-go `Map[int](xs)`-et típus-példányosításnak olvassa: `Map` típus-azonosító
+            "type_instantiation_expression" => self.callee(expr.child_by_field_name("type")?),
+            "type_identifier" => Some(Callee {
+                name_node: expr,
+                name: self.text(expr).to_string(),
+                member: false,
+                path: None,
+                root: None,
+                chained: false,
+            }),
+            // `pkg.Map[int](xs)`
+            "qualified_type" => {
+                let name_node = expr.child_by_field_name("name")?;
+                let package = expr.child_by_field_name("package")?;
+                let pkg = self.text(package).to_string();
+                Some(Callee {
+                    name_node,
+                    name: self.text(name_node).to_string(),
+                    member: true,
+                    path: Some(pkg.clone()),
+                    root: Some(pkg),
+                    chained: false,
+                })
+            }
             _ => None,
         }
     }
@@ -135,9 +187,7 @@ impl GoVisitor<'_, '_> {
         match node.kind() {
             "identifier" => (Some(self.text(node).to_string()), false),
             "selector_expression" | "index_expression" => {
-                match node
-                    .child_by_field_name("operand")
-                {
+                match node.child_by_field_name("operand") {
                     Some(o) => self.root_of(o),
                     None => (None, false),
                 }
@@ -192,7 +242,11 @@ impl GoVisitor<'_, '_> {
         };
         let (target, category, on) = match package {
             Some(package) => {
-                let stdlib = self.symbols.imports.get(package).is_some_and(|p| is_stdlib(p));
+                let stdlib = self
+                    .symbols
+                    .imports
+                    .get(package)
+                    .is_some_and(|p| is_stdlib(p));
                 (
                     format!("{package}.{name}"),
                     if stdlib { "native_go" } else { "instantiation" },
@@ -221,9 +275,7 @@ impl GoVisitor<'_, '_> {
     /// String-literál: az idézőjelek közötti szöveg (üres / csak szóköz kimarad).
     fn string_literal(&self, node: Node<'_>, scope: &Scope, b: &mut FileGraphBuilder) {
         let raw = self.text(node);
-        let inner = raw
-            .get(1..raw.len().saturating_sub(1))
-            .unwrap_or_default();
+        let inner = raw.get(1..raw.len().saturating_sub(1)).unwrap_or_default();
         if inner.trim().is_empty() {
             return;
         }

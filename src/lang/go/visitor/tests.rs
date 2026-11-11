@@ -143,10 +143,19 @@ fn structure_types_and_ranges() {
         Some(&["Base".to_string(), "Logger".to_string()][..])
     );
     let finder = &g.containers[3];
-    assert_eq!(finder.extends.as_deref(), Some(&["Fetcher".to_string()][..]));
+    assert_eq!(
+        finder.extends.as_deref(),
+        Some(&["Fetcher".to_string()][..])
+    );
     assert_eq!(finder.is_abstract, Some(true));
-    assert_eq!(g.containers[4].extends.as_deref(), Some(&["int".to_string()][..]));
-    assert_eq!(g.containers[5].extends.as_deref(), Some(&["Repo".to_string()][..]));
+    assert_eq!(
+        g.containers[4].extends.as_deref(),
+        Some(&["int".to_string()][..])
+    );
+    assert_eq!(
+        g.containers[5].extends.as_deref(),
+        Some(&["Repo".to_string()][..])
+    );
     assert_eq!(
         g.containers[6].traits.as_deref(),
         Some(&["[T any]".to_string()][..])
@@ -225,7 +234,13 @@ fn constants_properties_and_imports() {
     let props: Vec<(&str, &str, Option<&str>)> = g
         .properties
         .iter()
-        .map(|p| (p.name.as_str(), p.visibility.as_str(), p.type_hint.as_deref()))
+        .map(|p| {
+            (
+                p.name.as_str(),
+                p.visibility.as_str(),
+                p.type_hint.as_deref(),
+            )
+        })
         .collect();
     assert_eq!(
         props,

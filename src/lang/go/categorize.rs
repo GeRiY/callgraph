@@ -161,7 +161,8 @@ mod tests {
         s.methods.insert("Save".into());
         s.imports.insert("fmt".into(), "fmt".into());
         s.imports.insert("http".into(), "net/http".into());
-        s.imports.insert("gin".into(), "github.com/gin-gonic/gin".into());
+        s.imports
+            .insert("gin".into(), "github.com/gin-gonic/gin".into());
         s
     }
 

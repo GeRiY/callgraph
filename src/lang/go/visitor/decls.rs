@@ -65,9 +65,7 @@ impl<'s> GoVisitor<'_, 's> {
             if self.symbols.types.contains(&ty) {
                 continue;
             }
-            let span = foreign
-                .entry(ty)
-                .or_insert((line(node), end_line(node)));
+            let span = foreign.entry(ty).or_insert((line(node), end_line(node)));
             span.0 = span.0.min(line(node));
             span.1 = span.1.max(end_line(node));
         }

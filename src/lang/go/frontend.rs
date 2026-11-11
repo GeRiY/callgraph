@@ -136,6 +136,11 @@ mod tests {
             "{:?}",
             a.graph.parse_errors
         );
-        assert!(run("package a\n\ntype A int\n").graph.parse_errors.is_empty());
+        assert!(
+            run("package a\n\ntype A int\n")
+                .graph
+                .parse_errors
+                .is_empty()
+        );
     }
 }

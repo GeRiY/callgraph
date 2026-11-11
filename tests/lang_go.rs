@@ -58,14 +58,11 @@ impl Project {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let root = std::env::temp_dir().join(format!(
-            "callgraph-go-{id}-{}-{}",
-            std::process::id(),
-            {
+        let root =
+            std::env::temp_dir().join(format!("callgraph-go-{id}-{}-{}", std::process::id(), {
                 static N: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
                 N.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
-            }
-        ));
+            }));
         fs::create_dir_all(&root).unwrap();
         let project = Self(root.canonicalize().unwrap());
         project.write("shop/cart.go", CART);
