@@ -58,7 +58,7 @@ impl CallFilter for CategorySpec {
 
 /// A `--grep` minta regexe: a callgraph jq-szűrője, `test($pattern; "i")` — kis-/nagybetű-független.
 pub(crate) fn pattern_regex(pattern: &str) -> Result<Regex, regex::Error> {
-    regex::RegexBuilder::new(pattern)
+    regex::RegexBuilder::new(&super::namespace_pattern(pattern))
         .case_insensitive(true)
         .build()
 }
