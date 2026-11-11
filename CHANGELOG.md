@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+## [0.6.1] — 2026-11-11
+
+### Fixed
+- **Files that are not UTF-8 (e.g. ISO-8859-2 / Latin-2) no longer give an empty result:** `--lines` and `--body` /
+  the MCP `method_body` printed nothing at all for a file with accented text in another encoding (even in a single
+  comment), with no message. The lines are now printed, with the bytes that are not valid UTF-8 shown as `�`; the
+  line numbers stay correct.
+
 ## [0.6.0] — 2026-11-10
 
 ### Added
@@ -416,7 +424,8 @@ First release.
 - Built-in update: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Prebuilt packages for macOS (arm64, x86_64), Linux (x86_64, ARM64, static musl) and Windows.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.6.0...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.6.1...develop
+[0.6.1]: https://github.com/GeRiY/callgraph/releases/tag/v0.6.1
 [0.6.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.6.0
 [0.5.3]: https://github.com/GeRiY/callgraph/releases/tag/v0.5.3
 [0.5.2]: https://github.com/GeRiY/callgraph/releases/tag/v0.5.2

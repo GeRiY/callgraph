@@ -66,7 +66,8 @@ impl Formatter for Constants {
             }
             // továbbexportálások (`pub use …`, `export { … } from`, `use const …`): a forrásszövegből
             if let Some(syntax) = Syntax::for_path(&row.graph.file) {
-                let source = std::fs::read_to_string(&row.graph.file).unwrap_or_default();
+                let source = crate::io::read_source_lossy(std::path::Path::new(&row.graph.file))
+                    .unwrap_or_default();
                 if source.contains(&self.filter) {
                     let label = lang.pick("[re-export]", "[továbbexportálás]");
                     for found in reexports::find(&source, syntax, &self.filter) {
