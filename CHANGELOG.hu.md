@@ -6,6 +6,8 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-11-11
+
 ### Új
 - **`protect` sorok a `.callgraphignore`-ban:** a `protect migrations/` a találó fájlokat a térképben tartja (teljesen
   lekérdezhetők), de az outline-ban, `--body`-ban, `--lines`-ban, `locate`-ban és `--format json`-ban
@@ -473,7 +475,8 @@ Első kiadás.
 - Beépített frissítés: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Előre fordított csomagok macOS-re (arm64, x86_64), Linuxra (x86_64, ARM64, statikus musl) és Windowsra.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.6.1...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.7.0...develop
+[0.7.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.7.0
 [0.6.1]: https://github.com/GeRiY/callgraph/releases/tag/v0.6.1
 [0.6.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.6.0
 [0.5.3]: https://github.com/GeRiY/callgraph/releases/tag/v0.5.3

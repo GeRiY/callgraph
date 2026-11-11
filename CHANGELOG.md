@@ -5,6 +5,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-11-11
+
 ### Added
 - **`protect` lines in `.callgraphignore`:** `protect migrations/` keeps the matching files in the map (fully
   queryable) but marks them `🔒` in the outline, `--body`, `--lines`, `locate` and `--format json` (`"protected": true`):
@@ -439,7 +441,8 @@ First release.
 - Built-in update: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Prebuilt packages for macOS (arm64, x86_64), Linux (x86_64, ARM64, static musl) and Windows.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.6.1...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.7.0...develop
+[0.7.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.7.0
 [0.6.1]: https://github.com/GeRiY/callgraph/releases/tag/v0.6.1
 [0.6.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.6.0
 [0.5.3]: https://github.com/GeRiY/callgraph/releases/tag/v0.5.3
