@@ -337,7 +337,10 @@ fn grep_does_not_find_the_markers() {
 fn grep_on_the_ordinary_call_of_the_same_method_still_works() {
     let project = Project::new();
     let out = project.run(&["show", "src", "--grep", "Builder::join"]);
-    assert!(out.contains("Builder::apply") || out.contains("apply"), "{out}");
+    assert!(
+        out.contains("Builder::apply") || out.contains("apply"),
+        "{out}"
+    );
     assert!(out.contains("plain"), "{out}");
     assert!(!out.contains("dynamic_call"), "{out}");
 }

@@ -116,7 +116,10 @@ fn require_with_non_literal_argument() {
     assert_eq!(dynamic("require('./x' + k);"), vec!["require('./x' + k)"]);
     // a `require` hívás marad, mellé jön a jelölés
     let all = analyze("/p/x.js", "function f(p) { require(p); }\n");
-    assert!(all.iter().any(|c| c.target == "require" && c.category == "native_js"));
+    assert!(
+        all.iter()
+            .any(|c| c.target == "require" && c.category == "native_js")
+    );
     assert!(all.iter().any(|c| c.category == "dynamic_call"));
 }
 
@@ -129,7 +132,9 @@ fn require_with_literal_argument_is_not_dynamic() {
 
 #[test]
 fn ordinary_calls_are_unchanged() {
-    none("fn(); a.b(); a?.b(); a.b.c(); fn.call(this, 1); fn.apply(null, []); obj.m?.(); new Foo();");
+    none(
+        "fn(); a.b(); a?.b(); a.b.c(); fn.call(this, 1); fn.apply(null, []); obj.m?.(); new Foo();",
+    );
     none("[1, 2].map((x) => x * 2);");
     none("(() => 1)();");
     none("(0, obj.m)(1);");
@@ -154,14 +159,25 @@ fn works_in_methods_and_at_module_level() {
         "/p/x.ts",
         "class A {\n  run(k: string) {\n    this.m[k]();\n  }\n}\nconst h: any = {};\nh[name]();\n",
     );
-    let dyns: Vec<_> = all.iter().filter(|c| c.category == "dynamic_call").collect();
+    let dyns: Vec<_> = all
+        .iter()
+        .filter(|c| c.category == "dynamic_call")
+        .collect();
     assert_eq!(dyns.len(), 2, "{all:?}");
     assert_eq!(
-        (dyns[0].target.as_str(), dyns[0].caller.as_deref(), dyns[0].line),
+        (
+            dyns[0].target.as_str(),
+            dyns[0].caller.as_deref(),
+            dyns[0].line
+        ),
         ("this.m[k]", Some("run"), 3)
     );
     assert_eq!(
-        (dyns[1].target.as_str(), dyns[1].caller.as_deref(), dyns[1].line),
+        (
+            dyns[1].target.as_str(),
+            dyns[1].caller.as_deref(),
+            dyns[1].line
+        ),
         ("h[name]", Some("__module__"), 7)
     );
 }
@@ -175,5 +191,9 @@ fn works_in_a_vue_script() {
         .filter(|c| c.category == "dynamic_call")
         .map(|c| c.target.as_str())
         .collect();
-    assert_eq!(targets, vec!["actions[name]", "import(`./m/${name}.js`)"], "{all:?}");
+    assert_eq!(
+        targets,
+        vec!["actions[name]", "import(`./m/${name}.js`)"],
+        "{all:?}"
+    );
 }

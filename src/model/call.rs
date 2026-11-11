@@ -76,7 +76,10 @@ mod tests {
     #[test]
     fn dynamic_target_is_one_line_and_at_most_60_chars() {
         assert_eq!(Call::dynamic_target("$this->$m"), "$this->$m");
-        assert_eq!(Call::dynamic_target("$obj\n    ->{$expr}"), "$obj ->{$expr}");
+        assert_eq!(
+            Call::dynamic_target("$obj\n    ->{$expr}"),
+            "$obj ->{$expr}"
+        );
         let exactly = "a".repeat(60);
         assert_eq!(Call::dynamic_target(&exactly), exactly);
         let long = "b".repeat(61);

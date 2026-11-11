@@ -118,8 +118,7 @@ trait MethodRanges {
 
 /// Egy hívás a megadott (konténer, metódus) hívója-e (`__top__` = nincs hívó metódus).
 fn call_in(call: &crate::model::Call, container: Option<&str>, name: &str) -> bool {
-    call.container.as_deref() == container
-        && call.caller.as_deref().unwrap_or("__top__") == name
+    call.container.as_deref() == container && call.caller.as_deref().unwrap_or("__top__") == name
 }
 
 impl MethodRanges for ProjectGraph {

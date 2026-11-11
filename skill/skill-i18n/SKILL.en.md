@@ -304,7 +304,7 @@ relative to its folder (`public/build`, `/storage/`, `!keep.js`). `--no-gitignor
 Static analysis: dynamic calls (`$this->$method()`, `obj[key]()`), magic methods and class names / registered components
 assembled at runtime cannot be resolved. They are marked `dynamic_call` in the outline (PHP, JS / TS / Vue, Python;
 listed last, the target is the called expression): not a caller edge, so `--grep` / `--depth` / `locate` ignore it —
-`--depth` only notes how many callers contain one ("check them by hand"); `--category dynamic_call` lists them. By default `--depth` follows only the certain (resolved) callers;
+`--depth` only notes how many callers contain one ("check them by hand"). By default `--depth` follows only the certain (resolved) callers;
 name-only matches are shown by `--guess` with a "?" mark. For the exact control logic you need `--body` (compact, comments kept; `--raw` gives the exact text).
 A `⚠ syntax error` line means a file did not parse fully: the result may be incomplete — read that file directly.
 <!-- /mcp -->

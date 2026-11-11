@@ -40,10 +40,7 @@ fn variable_method_name() {
 #[test]
 fn expression_method_name() {
     assert_eq!(dynamic("$obj->{$expr}(1);"), vec!["$obj->{$expr}"]);
-    assert_eq!(
-        dynamic("$obj->{'get' . $x}();"),
-        vec!["$obj->{'get' . $x}"]
-    );
+    assert_eq!(dynamic("$obj->{'get' . $x}();"), vec!["$obj->{'get' . $x}"]);
 }
 
 #[test]
@@ -91,22 +88,28 @@ fn variable_class_instantiation() {
 
 #[test]
 fn call_user_func_with_non_literal_first_argument() {
-    assert_eq!(dynamic("call_user_func($x, 1);"), vec!["call_user_func($x)"]);
+    assert_eq!(
+        dynamic("call_user_func($x, 1);"),
+        vec!["call_user_func($x)"]
+    );
     assert_eq!(
         dynamic("call_user_func_array([$obj, $m], []);"),
         vec!["call_user_func_array([$obj, $m])"]
     );
+    assert_eq!(dynamic("\\call_user_func($x);"), vec!["call_user_func($x)"]);
     assert_eq!(
-        dynamic("\\call_user_func($x);"),
+        dynamic("call_user_func(...$x);"),
         vec!["call_user_func($x)"]
     );
-    assert_eq!(dynamic("call_user_func(...$x);"), vec!["call_user_func($x)"]);
 }
 
 #[test]
 fn call_user_func_keeps_its_func_call_and_adds_the_marker() {
     let all = calls("call_user_func($x);");
-    assert!(all.iter().any(|c| c.kind == "func_call" && c.target == "call_user_func"));
+    assert!(
+        all.iter()
+            .any(|c| c.kind == "func_call" && c.target == "call_user_func")
+    );
     assert!(all.iter().any(|c| c.category == "dynamic_call"));
 }
 
@@ -160,7 +163,10 @@ fn ordinary_calls_are_unchanged() {
     none("$obj->prop;");
     let all = calls("$this->run(); Foo::bar(); new Foo(1); strlen($x);");
     let kinds: Vec<_> = all.iter().map(|c| c.kind.as_str()).collect();
-    assert_eq!(kinds, vec!["method_call", "static_call", "new", "func_call"]);
+    assert_eq!(
+        kinds,
+        vec!["method_call", "static_call", "new", "func_call"]
+    );
 }
 
 #[test]
@@ -171,7 +177,8 @@ fn literal_method_chains_stay_ordinary() {
 
 #[test]
 fn long_expression_is_shortened() {
-    let long = "$this->handlers['aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa']";
+    let long =
+        "$this->handlers['aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa']";
     let found = dynamic(&format!("{long}(1);"));
     assert_eq!(found.len(), 1);
     assert!(found[0].chars().count() <= 60, "{}", found[0]);
@@ -200,6 +207,13 @@ fn works_at_top_level() {
     let g = PhpBackend::with_defaults()
         .analyze_source("a.php", src.as_bytes())
         .graph;
-    let c = g.calls.iter().find(|c| c.category == "dynamic_call").unwrap();
-    assert_eq!((c.target.as_str(), c.caller.as_deref()), ("$fn", Some("__top__")));
+    let c = g
+        .calls
+        .iter()
+        .find(|c| c.category == "dynamic_call")
+        .unwrap();
+    assert_eq!(
+        (c.target.as_str(), c.caller.as_deref()),
+        ("$fn", Some("__top__"))
+    );
 }

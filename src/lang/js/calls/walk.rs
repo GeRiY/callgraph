@@ -255,7 +255,6 @@ fn is_dynamic_new_callee(callee: &Expression<'_>) -> bool {
         | Expression::StaticMemberExpression(_)
         | Expression::PrivateFieldExpression(_)
         | Expression::ThisExpression(_)
-        | Expression::MetaProperty(_)
         | Expression::ClassExpression(_)
         | Expression::FunctionExpression(_) => false,
         Expression::ComputedMemberExpression(m) => !is_literal(&m.expression),

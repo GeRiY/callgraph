@@ -8,7 +8,11 @@ use crate::model::Call;
 
 fn calls_of(src: &str) -> Vec<Call> {
     PythonFrontend::with_defaults()
-        .analyze(&SourceFile::new("/p/sample.py", src.as_bytes().to_vec(), None))
+        .analyze(&SourceFile::new(
+            "/p/sample.py",
+            src.as_bytes().to_vec(),
+            None,
+        ))
         .unwrap()
         .graph
         .calls
@@ -63,14 +67,20 @@ fn getattr_alone_is_an_ordinary_call() {
 #[test]
 fn getattr_marker_is_one_entry_with_its_inner_call() {
     let all = calls_of("def f(obj, name):\n    getattr(obj, name)(1)\n");
-    let dyns: Vec<_> = all.iter().filter(|c| c.category == "dynamic_call").collect();
+    let dyns: Vec<_> = all
+        .iter()
+        .filter(|c| c.category == "dynamic_call")
+        .collect();
     assert_eq!(dyns.len(), 1, "{all:?}");
     let c = dyns[0];
     assert_eq!((c.kind.as_str(), c.line), ("dynamic", 2));
     assert!(c.resolved.is_none() && c.on.is_none());
     assert_eq!(c.caller.as_deref(), Some("f"));
     // a belső getattr(...) közönséges hívás marad
-    assert!(all.iter().any(|c| c.target == "getattr" && c.category != "dynamic_call"));
+    assert!(
+        all.iter()
+            .any(|c| c.target == "getattr" && c.category != "dynamic_call")
+    );
 }
 
 #[test]
@@ -126,7 +136,10 @@ fn dynamic_import_with_literal_argument_is_not_dynamic() {
 #[test]
 fn import_calls_keep_their_ordinary_entry() {
     let all = calls_of("def f(name):\n    importlib.import_module(name)\n");
-    assert!(all.iter().any(|c| c.target == "importlib.import_module" && c.category != "dynamic_call"));
+    assert!(
+        all.iter()
+            .any(|c| c.target == "importlib.import_module" && c.category != "dynamic_call")
+    );
     assert!(all.iter().any(|c| c.category == "dynamic_call"));
 }
 
@@ -170,10 +183,17 @@ fn works_in_methods_and_at_module_level() {
     let all = calls_of(
         "class A:\n    def run(self, name):\n        getattr(self, name)()\n\nglobals()[x]()\n",
     );
-    let dyns: Vec<_> = all.iter().filter(|c| c.category == "dynamic_call").collect();
+    let dyns: Vec<_> = all
+        .iter()
+        .filter(|c| c.category == "dynamic_call")
+        .collect();
     assert_eq!(dyns.len(), 2, "{all:?}");
     assert_eq!(
-        (dyns[0].target.as_str(), dyns[0].container.as_deref(), dyns[0].caller.as_deref()),
+        (
+            dyns[0].target.as_str(),
+            dyns[0].container.as_deref(),
+            dyns[0].caller.as_deref()
+        ),
         ("getattr(self, name)", Some("A"), Some("run"))
     );
     assert_eq!(dyns[1].target, "globals()[x]");
