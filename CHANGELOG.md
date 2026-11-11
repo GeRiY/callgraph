@@ -5,6 +5,26 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+### Added
+- **JSX component use is a call:** a capitalized JSX element (`<Button />`, `<Button>…</Button>`, `<Ui.Button />`) in
+  `.tsx` / `.jsx` / `.js` is a `component_use` call (the same category as in Vue), resolved through the import like an
+  ordinary function call, so `--grep 'Button$'` and `--depth` find the component's users; a component defined in the
+  same file is an `internal_helper`. `<div>` and other lowercase elements, and fragments, are not calls.
+- **Vue `--format api`** lists the component's `props:` (name, type if known, `[required]`) and `emits:`.
+
+### Fixed
+- **JSX in plain `.js` / `.mjs` / `.cjs` files** no longer gives `syntax error: Unexpected JSX expression` and an empty
+  outline: these files are parsed as JSX-capable (as in CRA / babel / vite projects). `.ts` stays non-JSX (`<T>x` is a
+  type assertion there).
+- **Namespaced `--grep` pattern** (`App\Svc\Real::m`): a single `\` after an identifier character and before a capital
+  letter is read as the namespace separator instead of a regex escape (`\S`, `\R`, `\B` used to match silently
+  wrong or fail); `\.`, `\d`, `\w`, `\b` and a doubled `\\` are unchanged. A still-invalid pattern gets a 💡 line
+  explaining the doubling. Same for `--depth` and `callers`.
+- **`--layer` / `--layers` / `--by-layer` without a path** run on the project root (like `profile`) instead of
+  printing the usage line.
+- **The `protect` 🔒 mark** now also shows in `--format summary` (and the `stats` header); json, mermaid and dot are
+  unchanged.
+
 ## [0.9.0] — 2026-11-11
 
 ### Added

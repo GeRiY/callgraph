@@ -77,6 +77,7 @@ bash $CG --project myapp app --grep 'Order::cancel'                  # only call
 bash $CG --project myapp app --grep 'Order::cancel' --depth 3        # impact analysis: the callers' callers
 bash $CG --project myapp app --grep 'Order::cancel' --depth 3 --guess # + name-only matches ("?")
 bash $CG --project myapp app --grep 'Order::cancel' --body           # source of the caller methods found
+bash $CG --project myapp app --grep 'App\Svc\Order::cancel'        # PHP namespace: a single \ is read as the separator (App\\Svc\\ also works); a bad regex gets a 💡 hint
 bash $CG --project myapp app --category model_use,orm_relation       # filter by call category
 bash $CG --project myapp app --category dynamic_call                 # the calls whose target is decided at runtime
 ```

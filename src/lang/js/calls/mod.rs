@@ -197,7 +197,7 @@ mod tests {
                     "Page",
                     "Ui.Card.Head",
                     "component_use",
-                    Some("ui-kit::Ui::*.Card.Head"),
+                    Some("ui-kit::Ui.Card.Head"),
                 ),
             );
             has(&c, ("Page", "Local", "internal_helper", None));

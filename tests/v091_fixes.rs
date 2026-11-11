@@ -209,7 +209,7 @@ fn layer_switches_work_without_a_path() {
         "app/Http/Controllers/OrderController.php",
         "<?php\nnamespace App\\Http\\Controllers;\n\nclass OrderController\n{\n    public function store()\n    {\n        return 2;\n    }\n}\n",
     );
-    for args in [&["--layers"][..], &["--layer", "service"][..]] {
+    for args in [&["--full", "--layers"][..], &["--full", "--layer", "service"][..]] {
         let out = project.show(args);
         assert!(
             out.contains("OrderService") && !out.contains("callgraph show ["),
