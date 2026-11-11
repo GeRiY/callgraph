@@ -18,7 +18,7 @@ const END: &str = "<!-- /mcp -->";
 
 /// CLI-kapcsoló → MCP-eszköz / -paraméter (a jelölt szakaszokban, backtickkel együtt). A név szerinti hívó-minta
 /// idézőjelei is lekerülnek: MCP-n a `pattern` sima JSON-string.
-const CLI_TO_MCP: [(&str, &str); 14] = [
+const CLI_TO_MCP: [(&str, &str); 15] = [
     ("`--grep`", "`find_callers`"),
     ("`--depth`", "`depth`"),
     ("`--strings`", "`search` (strings)"),
@@ -31,6 +31,7 @@ const CLI_TO_MCP: [(&str, &str); 14] = [
     ("`--project`", "`project`"),
     ("`--format`", "`format`"),
     ("`--all`", "`all: true`"),
+    ("`profile`", "`project_profile`"),
     ("`'(^|::|\\.|->)", "`(^|::|\\.|->)"),
     ("$'`", "$`"),
 ];

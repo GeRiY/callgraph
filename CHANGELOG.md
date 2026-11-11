@@ -14,6 +14,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   Literal cases (`obj['x']()`, `app(Foo::class)`, `getattr(obj, 'x')()`) stay ordinary. It is a marker, not a caller
   edge: `--grep`, `--depth` and `locate` ignore it; `--depth` adds a line telling how many of the callers contain
   dynamic calls ("check them by hand"). In PHP, callback parameters typed `Closure` / `callable` and local closures (`$f = fn …`) do not count as dynamic calls, and `($this->invokable)()` on a class-typed property is a plain `Type::__invoke` call. Filter with `--category dynamic_call`. Rust, Swift and Go: not yet.
+- **Recovery hints:** an empty or wrong result now tells the next step instead of staying silent. `--grep` with no match
+  explains that the pattern is a regular expression on the call target, suggests the name-only pattern
+  (`(^|::|\.|->)name$`, `--guess`) and `did you mean: User::find`; `Not found: <path>` and `No such method` add a
+  second `Did you mean: …` line (up to 3 similar paths / method names); `--depth` says whether the target does not exist
+  or exists but nothing calls it; `--strings` with no match explains the matching rule; `locate` with no match suggests
+  name parts, English code names and `--strings`. An unknown `--category` is now an error listing the known categories
+  (`Unknown category: … (known: …)`) instead of an empty result. The hints appear in the text output only; json,
+  mermaid, dot, stats and the `next` suggestions are unchanged.
+- **Recipes in the skill:** a short "Recipes — task → call sequence" section (bug fix, who calls this, unfamiliar
+  project, where is this text) in the skill instructions, and the same in 3 lines in the MCP instructions.
 
 ## [0.8.0] — 2026-11-11
 

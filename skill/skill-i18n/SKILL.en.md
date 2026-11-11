@@ -30,6 +30,9 @@ file names, columns, routes, translation keys, and for a non-English domain word
 visszatérítés → `refund`). It answers from the project map without reading files: the top 5 files (`--all`: every
 match), each with its reasons (exact definition, file name, name part, string, call, `callers: N`). Continue on
 those files with the outline / `--body` / `--grep`.
+**Recipes:** bug fix = `locate` → outline of the top file → `--body` of the method. "Who calls it / what breaks" =
+the name pattern with `--grep` and `--depth` 2 → `--body` of the calling method. Unfamiliar project = `profile` →
+`locate` → outline. "Where is this text / constant" = `--strings` / `--const` (exact text: Grep).
 <!-- /mcp -->
 Special terms: a quoted phrase with spaces (`"Szervező további eseményei"`) is ONE term, matched as a whole against
 string literals (UI labels, translations), never split into words; `route::events.show` finds the route definition
@@ -42,6 +45,20 @@ bash <skill>/callgraph.sh locate RefundController processRefund refund payment_s
 bash <skill>/callgraph.sh locate refund --all --project myapp                                                       # every matching file, not just the top 5
 bash <skill>/callgraph.sh locate route::events.show "Szervező további eseményei" --project myapp                     # a route (definition first) and a UI phrase
 ```
+
+## Recipes — task → call sequence
+
+Four typical tasks and the calls that answer them (an empty or wrong result comes with a hint: `no call target matches …`,
+`Did you mean: …` — follow it instead of retrying blindly):
+
+- **Fix a bug / change behaviour:** `locate <the names in the task>` → the outline of the top file
+  (`callgraph.sh <file>`) → `callgraph.sh <file>::<method> --body` for just the method you need.
+- **"Who calls this / what does it affect if I change it":** `callgraph.sh <dir> --grep '(^|::|\.|->)name$' --depth 2`
+  (the name pattern catches every call) → `callgraph.sh <caller file>::<caller method> --body`.
+- **Unfamiliar project:** `callgraph.sh profile` (architecture, layers) → `locate <terms>` → the outline of the files it
+  lists → `--body`.
+- **"Where is this text / constant":** `callgraph.sh <dir> --strings <fragment>` (UI text, messages; a case-insensitive
+  substring) or `--const <name>`; for an exact text, or in non-code files, use Grep.
 
 ## Quick commands
 

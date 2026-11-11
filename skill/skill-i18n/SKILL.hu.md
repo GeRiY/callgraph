@@ -30,6 +30,9 @@ fájlneveket, oszlopokat, útvonalakat, fordítási kulcsokat, a nem angol domai
 kódnév-megfelelőjét is (pl. visszatérítés → `refund`). A projekt-térképből válaszol, fájl-olvasás nélkül: az első 5
 fájl (`--all`: minden találat), mindegyik az indoklásával (pontos definíció, fájlnév, név-részlet, string, hívás,
 `hívók: N`). Ezekkel a fájlokkal folytasd: outline / `--body` / `--grep`.
+**Receptek:** hibajavítás = `locate` → a fő fájl outline-ja → a metódus `--body`-ja. „Ki hívja / mi törik” = a név
+szerinti minta `--grep`-pel és `--depth` 2 → a hívó metódus `--body`-ja. Ismeretlen projekt = `profile` → `locate` →
+outline. „Hol van ez a szöveg / konstans” = `--strings` / `--const` (pontos szöveg: Grep).
 <!-- /mcp -->
 Különleges kifejezések: a szóközös, idézőjeles kifejezés (`"Szervező további eseményei"`) EGY kifejezés, egészében a
 string-literálokra illesztve (feliratok, fordítások), szavakra sosem bontva; a `route::events.show` az útvonal
@@ -42,6 +45,20 @@ bash <skill>/callgraph.sh locate RefundController processRefund refund payment_s
 bash <skill>/callgraph.sh locate refund --all --project myapp                                                       # minden egyező fájl, nem csak az első 5
 bash <skill>/callgraph.sh locate route::events.show "Szervező további eseményei" --project myapp                     # egy útvonal (a definíció elöl) és egy felirat
 ```
+
+## Receptek — feladat → hívássorozat
+
+Négy tipikus feladat és a rájuk válaszoló hívások (az üres vagy hibás eredményhez tipp jár: `egyetlen hívás-cél sem
+illeszkedik …`, `Esetleg erre gondoltál: …` — kövesd, ne próbálkozz vaktában újra):
+
+- **Hibajavítás / viselkedés módosítása:** `locate <a feladat nevei>` → a fő fájl outline-ja (`callgraph.sh <fájl>`) →
+  `callgraph.sh <fájl>::<metódus> --body` csak arra a metódusra, amelyik kell.
+- **„Ki hívja ezt / mit érint, ha módosítom”:** `callgraph.sh <mappa> --grep '(^|::|\.|->)név$' --depth 2` (a név
+  szerinti minta minden hívást megtalál) → `callgraph.sh <hívó fájl>::<hívó metódus> --body`.
+- **Ismeretlen projekt:** `callgraph.sh profile` (architektúra, rétegek) → `locate <kifejezések>` → a listázott fájlok
+  outline-ja → `--body`.
+- **„Hol van ez a szöveg / konstans”:** `callgraph.sh <mappa> --strings <töredék>` (felületi szöveg, üzenet; kis-/nagybetű-
+  független részlet) vagy `--const <név>`; pontos szövegre, illetve nem kód fájlokban Grep.
 
 ## Gyors parancsok
 

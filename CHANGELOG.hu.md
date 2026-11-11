@@ -15,6 +15,17 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   `eval` / `exec`. A literál esetek (`obj['x']()`, `app(Foo::class)`, `getattr(obj, 'x')()`) közönségesek maradnak.
   Jelölés, nem hívó-él: a `--grep`, a `--depth` és a `locate` figyelmen kívül hagyja; a `--depth` egy sorban jelzi,
   hány hívó tartalmaz dinamikus hívást („kézzel nézd át”). PHP-ban a `Closure` / `callable` típusú callback-paraméterek és a helyi closure-ök (`$f = fn …`) nem számítanak dinamikus hívásnak, az osztály-típusú property hívása (`($this->invokable)()`) pedig sima `Típus::__invoke` hívás. Szűrés: `--category dynamic_call`. Rust, Swift, Go: még nincs.
+- **Helyreállító tippek:** az üres vagy hibás eredmény mostantól megmondja a következő lépést, nem marad néma. A találat
+  nélküli `--grep` elmagyarázza, hogy a minta reguláris kifejezés a hívás céljára, javasolja a név szerinti mintát
+  (`(^|::|\.|->)név$`, `--guess`) és az `esetleg erre gondoltál: User::find` javaslatot; a `Nem található: <út>` és a
+  `Nincs ilyen metódus` egy második `Esetleg erre gondoltál: …` sort kap (legfeljebb 3 hasonló útvonal / metódusnév);
+  a `--depth` megmondja, hogy a cél nem létezik, vagy létezik, de senki sem hívja; a találat nélküli `--strings`
+  elmagyarázza az illesztési szabályt; a találat nélküli `locate` névrészeket, angol kódneveket és `--strings`-et
+  javasol. Az ismeretlen `--category` mostantól hiba az ismert kategóriák listájával
+  (`Ismeretlen kategória: … (ismertek: …)`), nem üres eredmény. A tippek csak a szöveges kimenetben jelennek meg; a
+  json, mermaid, dot, stats és a `next` javaslatok változatlanok.
+- **Receptek a skillben:** rövid „Receptek — feladat → hívássorozat” szakasz (hibajavítás, ki hívja ezt, ismeretlen
+  projekt, hol van ez a szöveg) a skill-utasításban, és ugyanez 3 sorban az MCP-utasításban.
 
 ## [0.8.0] — 2026-11-11
 
