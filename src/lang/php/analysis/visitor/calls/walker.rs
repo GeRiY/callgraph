@@ -80,6 +80,8 @@ impl<'a, 'arena> Walker<'a, 'arena, State> for Collector<'_, '_> {
         }
         s.caller = Some(name);
         s.tracker.clear_locals();
+        s.callables.clear();
+        self.register_callable_params(s, &n.parameter_list);
         s.tracker
             .set("__caller", s.caller.clone().unwrap_or_default());
         for p in n.parameter_list.parameters.iter() {
@@ -115,6 +117,7 @@ impl<'a, 'arena> Walker<'a, 'arena, State> for Collector<'_, '_> {
         }
     }
     fn walk_in_assignment(&self, n: &Assignment<'arena>, s: &mut State) {
+        self.register_local_closure(s, n);
         if !n.operator.is_assign() {
             return;
         }
@@ -128,13 +131,19 @@ impl<'a, 'arena> Walker<'a, 'arena, State> for Collector<'_, '_> {
     fn walk_out_method(&self, _: &Method<'arena>, s: &mut State) {
         s.caller = None
     }
-    fn walk_in_closure(&self, _: &Closure<'arena>, s: &mut State) {
+    fn walk_in_function(&self, n: &Function<'arena>, s: &mut State) {
+        s.callables.clear();
+        self.register_callable_params(s, &n.parameter_list);
+    }
+    fn walk_in_closure(&self, n: &Closure<'arena>, s: &mut State) {
+        self.register_callable_params(s, &n.parameter_list);
         s.closure_depth += 1;
     }
     fn walk_out_closure(&self, _: &Closure<'arena>, s: &mut State) {
         s.closure_depth = s.closure_depth.saturating_sub(1);
     }
-    fn walk_in_arrow_function(&self, _: &ArrowFunction<'arena>, s: &mut State) {
+    fn walk_in_arrow_function(&self, n: &ArrowFunction<'arena>, s: &mut State) {
+        self.register_callable_params(s, &n.parameter_list);
         s.closure_depth += 1;
     }
     fn walk_out_arrow_function(&self, _: &ArrowFunction<'arena>, s: &mut State) {

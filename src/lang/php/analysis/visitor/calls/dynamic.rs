@@ -3,6 +3,7 @@
 //! `dynamic_call`), célja a hívott kifejezés szövege; hívó-él nem keletkezik belőle.
 
 use super::{helpers::Collector, state::State};
+use crate::lang::php::analysis::type_tracker::TypeTracker;
 use crate::lang::php::printer::lossy;
 use crate::model::{Call, DYNAMIC_KIND};
 use mago_span::HasSpan;
@@ -61,10 +62,79 @@ impl Collector<'_, '_> {
     pub(super) fn dynamic_callee(&self, s: &mut State, n: &FunctionCall<'_>) {
         match super::strip(n.function) {
             Expression::Identifier(_) | Expression::Closure(_) | Expression::ArrowFunction(_) => {}
+            // `$next($r)`, ahol a `$next` Closure / callable paraméter vagy helyi closure: callback, nem dinamikus
+            Expression::Variable(Variable::Direct(v)) if s.callables.contains(&lossy(v.name)) => {}
+            // `($this->prop)(…)`: osztály-típusú property → statikusan ismert `__invoke` hívás
+            Expression::Access(Access::Property(p))
+                if self.invokable_property(s, n, p) => {}
             other => {
                 let text = self.parsed.text(other.span());
                 self.push_dynamic(s, n, &text);
             }
+        }
+    }
+
+    /// `($this->prop)(…)` osztály- / interfész-típusú property-n: felveszi a `Típus::__invoke` method_call-t és
+    /// `true`-t ad. `Closure` / `callable` / típus nélküli property-re `false` (marad dinamikus).
+    fn invokable_property(&self, s: &mut State, n: &FunctionCall<'_>, p: &PropertyAccess<'_>) -> bool {
+        let (Expression::Variable(Variable::Direct(v)), ClassLikeMemberSelector::Identifier(i)) =
+            (super::strip(p.object), &p.property)
+        else {
+            return false;
+        };
+        if v.name != b"$this" {
+            return false;
+        }
+        let name = lossy(i.value);
+        let Some(ty) = s
+            .tracker
+            .type_of(&format!("this->{name}"))
+            .or_else(|| s.tracker.type_of(&format!("this->${name}")))
+        else {
+            return false;
+        };
+        if ty
+            .rsplit('\\')
+            .next()
+            .is_some_and(|t| t.eq_ignore_ascii_case("closure"))
+        {
+            return false;
+        }
+        let x = self.push(s, n, "method_call", "__invoke".into());
+        s.calls[x].on = Some(format!("this->{name}"));
+        s.calls[x].resolved = Some(format!("{ty}::__invoke"));
+        s.calls[x].args = self.args(&n.argument_list);
+        true
+    }
+
+    /// A paraméterlista `Closure` / `callable` típusú paramétereit (`?Closure`, `Closure|callable`, `\Closure`) felveszi
+    /// a hívható változók közé.
+    pub(super) fn register_callable_params(&self, s: &mut State, list: &FunctionLikeParameterList<'_>) {
+        for p in list.parameters.iter() {
+            let Some(h) = &p.hint else { continue };
+            let text = self.parsed.text(h.span());
+            let callable = text
+                .split(|c: char| matches!(c, '|' | '&' | '?' | '(' | ')'))
+                .map(|t| t.trim().trim_start_matches('\\').to_ascii_lowercase())
+                .any(|t| t == "closure" || t == "callable");
+            if callable {
+                s.callables.insert(lossy(p.variable.name));
+            }
+        }
+    }
+
+    /// `$var = function (…) {…}` / `fn (…) => …` / `static fn …`: helyi closure.
+    pub(super) fn register_local_closure(&self, s: &mut State, n: &Assignment<'_>) {
+        if !n.operator.is_assign() {
+            return;
+        }
+        if let Expression::Variable(Variable::Direct(v)) = super::strip(n.lhs)
+            && matches!(
+                super::strip(n.rhs),
+                Expression::Closure(_) | Expression::ArrowFunction(_)
+            )
+        {
+            s.callables.insert(lossy(v.name));
         }
     }
 

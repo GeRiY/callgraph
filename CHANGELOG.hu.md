@@ -14,7 +14,7 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   `import(expr)`, `require(expr)`; Python: `getattr(obj, név)()`, `globals()[név]()`, `importlib.import_module(név)`,
   `eval` / `exec`. A literál esetek (`obj['x']()`, `app(Foo::class)`, `getattr(obj, 'x')()`) közönségesek maradnak.
   Jelölés, nem hívó-él: a `--grep`, a `--depth` és a `locate` figyelmen kívül hagyja; a `--depth` egy sorban jelzi,
-  hány hívó tartalmaz dinamikus hívást („kézzel nézd át”). Szűrés: `--category dynamic_call`. Rust, Swift, Go: még nincs.
+  hány hívó tartalmaz dinamikus hívást („kézzel nézd át”). PHP-ban a `Closure` / `callable` típusú callback-paraméterek és a helyi closure-ök (`$f = fn …`) nem számítanak dinamikus hívásnak, az osztály-típusú property hívása (`($this->invokable)()`) pedig sima `Típus::__invoke` hívás. Szűrés: `--category dynamic_call`. Rust, Swift, Go: még nincs.
 
 ## [0.8.0] — 2026-11-11
 

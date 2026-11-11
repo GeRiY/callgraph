@@ -13,7 +13,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   `require(expr)`; Python: `getattr(obj, name)()`, `globals()[name]()`, `importlib.import_module(name)`, `eval` / `exec`.
   Literal cases (`obj['x']()`, `app(Foo::class)`, `getattr(obj, 'x')()`) stay ordinary. It is a marker, not a caller
   edge: `--grep`, `--depth` and `locate` ignore it; `--depth` adds a line telling how many of the callers contain
-  dynamic calls ("check them by hand"). Filter with `--category dynamic_call`. Rust, Swift and Go: not yet.
+  dynamic calls ("check them by hand"). In PHP, callback parameters typed `Closure` / `callable` and local closures (`$f = fn …`) do not count as dynamic calls, and `($this->invokable)()` on a class-typed property is a plain `Type::__invoke` call. Filter with `--category dynamic_call`. Rust, Swift and Go: not yet.
 
 ## [0.8.0] — 2026-11-11
 

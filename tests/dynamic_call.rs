@@ -78,6 +78,32 @@ class Clean
 }
 "#;
 
+const MIDDLEWARE: &str = r#"<?php
+namespace App\Builders;
+
+use Closure;
+
+class Middleware
+{
+    public function __construct(private readonly Builder $builder, private readonly Closure $cb)
+    {
+    }
+
+    public function handle(Request $r, Closure $next)
+    {
+        $local = fn ($x) => $x;
+        $local(1);
+        ($this->builder)(1);
+        return $next($r);
+    }
+
+    public function callback(?callable $done)
+    {
+        return $done(1);
+    }
+}
+"#;
+
 const APP_TS: &str = r#"export class Panel {
   run(actions: any, action: string) {
     actions[action]();
@@ -137,6 +163,7 @@ impl Project {
             ("src/Caller.php", CALLER),
             ("src/Dispatcher.php", DISPATCHER),
             ("src/Clean.php", CLEAN_PHP),
+            ("src/Middleware.php", MIDDLEWARE),
             ("web/app.ts", APP_TS),
             ("web/clean.ts", CLEAN_TS),
             ("lib/plugin.py", PLUGIN_PY),
@@ -239,12 +266,17 @@ fn ts_and_python_outlines_list_dynamic_calls() {
 #[test]
 fn literal_and_ordinary_calls_are_not_marked() {
     let project = Project::new();
-    for file in ["src/Clean.php", "web/clean.ts", "lib/clean.py"] {
+    for file in [
+        "src/Clean.php",
+        "src/Middleware.php",
+        "web/clean.ts",
+        "lib/clean.py",
+    ] {
         let out = project.run(&["show", file]);
         assert!(!out.contains("dynamic_call"), "{file}:\n{out}");
     }
     let all = project.run(&["show", "src", "web", "lib", "--category", "dynamic_call"]);
-    for clean in ["Clean", "clean.ts", "clean.py"] {
+    for clean in ["Clean", "Middleware", "clean.ts", "clean.py"] {
         assert!(!all.contains(clean), "{clean} in:\n{all}");
     }
 }
