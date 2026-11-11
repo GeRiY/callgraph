@@ -9,6 +9,15 @@
   <author><name>Gergő Makra</name></author>
   <icon>https://callgraph.eu/assets/favicon.svg</icon>
   <entry>
+    <title>callgraph v0.7.0</title>
+    <link rel="alternate" type="text/html" href="https://callgraph.eu/changelog/#v0.7.0"/>
+    <link rel="related" type="text/html" href="https://github.com/GeRiY/callgraph/releases/tag/v0.7.0"/>
+    <id>https://github.com/GeRiY/callgraph/releases/tag/v0.7.0</id>
+    <updated>2026-11-11T00:00:00Z</updated>
+    <published>2026-11-11T00:00:00Z</published>
+    <content type="html">&lt;h3&gt;Added&lt;/h3&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;&lt;code&gt;protect&lt;/code&gt; lines in &lt;code&gt;.callgraphignore&lt;/code&gt;:&lt;/b&gt; &lt;code&gt;protect migrations/&lt;/code&gt; keeps the matching files in the map (fully queryable) but marks them &lt;code&gt;🔒&lt;/code&gt; in the outline, &lt;code&gt;--body&lt;/code&gt;, &lt;code&gt;--lines&lt;/code&gt;, &lt;code&gt;locate&lt;/code&gt; and &lt;code&gt;--format json&lt;/code&gt; (&lt;code&gt;&quot;protected&quot;: true&lt;/code&gt;): protected, read them, don&#x27;t edit them. Same pattern rules as the exclusions; no &lt;code&gt;protect&lt;/code&gt; line, no change.&lt;/li&gt;&lt;li&gt;&lt;b&gt;Signatures in outlines:&lt;/b&gt; &lt;code&gt;--signatures&lt;/code&gt; (or &lt;code&gt;CALLGRAPH_SIGNATURES=1&lt;/code&gt;) prints the compact signature on the method line of the outline and the &lt;code&gt;--grep&lt;/code&gt; caller outlines: &lt;code&gt;updateOrders(array $ids, bool $notify = false): array  L4-9&lt;/code&gt; (where the language provides params / return type). &lt;code&gt;--format api&lt;/code&gt; now also shows TS / Vue return types, and for PHP a more specific DocBlock type (&lt;code&gt;@return array{updated:int}&lt;/code&gt;, &lt;code&gt;list&amp;lt;int&amp;gt;&lt;/code&gt;, &lt;code&gt;@param&lt;/code&gt; shapes), at most 80 characters.&lt;/li&gt;&lt;/ul&gt;&lt;h3&gt;Changed&lt;/h3&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;Non-UTF-8 sources are decoded, not replaced with &lt;code&gt;�&lt;/code&gt;:&lt;/b&gt; ISO-8859-2, windows-1250 and ISO-8859-1/windows-1252 files are detected and read properly (display, outline, &lt;code&gt;locate&lt;/code&gt;, &lt;code&gt;--strings&lt;/code&gt;); garbage still falls back to &lt;code&gt;�&lt;/code&gt;.&lt;/li&gt;&lt;li&gt;&lt;b&gt;Stronger change detection (Linux / macOS):&lt;/b&gt; the freshness stamp also includes the inode change time, so a same-size edit with a restored mtime is noticed. The stored graph is rebuilt once, quietly.&lt;/li&gt;&lt;/ul&gt;</content>
+  </entry>
+  <entry>
     <title>callgraph v0.6.1</title>
     <link rel="alternate" type="text/html" href="https://callgraph.eu/changelog/#v0.6.1"/>
     <link rel="related" type="text/html" href="https://github.com/GeRiY/callgraph/releases/tag/v0.6.1"/>
