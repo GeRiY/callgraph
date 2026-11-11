@@ -33,7 +33,9 @@ pub(super) fn procedural(
     for c in &g.calls {
         groups.entry(&c.category).or_default().insert(target(c));
     }
-    for (category, targets) in &groups {
+    let mut ordered: Vec<_> = groups.iter().collect();
+    ordered.sort_by_key(|(category, _)| crate::model::category_rank(category));
+    for (category, targets) in ordered {
         let list: Vec<&str> = targets.iter().map(String::as_str).collect();
         writeln!(s, "  {}{}", pad(category, 18), list.join(", ")).unwrap();
     }

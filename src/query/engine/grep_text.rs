@@ -112,11 +112,22 @@ impl QueryEngine {
 /// Egy hívó metódus sortartománya (a projekt-gráf szimbólumaiból, vagy a bejárt gráfokból).
 trait MethodRanges {
     fn range(&self, file: &str, container: Option<&str>, name: &str) -> Option<(u32, u32)>;
+    /// Van-e a metódusnak dinamikus (`dynamic_call`) hívása — a `--grep` szűrő előtti, teljes gráfból.
+    fn has_dynamic(&self, file: &str, container: Option<&str>, name: &str) -> bool;
+}
+
+/// Egy hívás a megadott (konténer, metódus) hívója-e (`__top__` = nincs hívó metódus).
+fn call_in(call: &crate::model::Call, container: Option<&str>, name: &str) -> bool {
+    call.container.as_deref() == container
+        && call.caller.as_deref().unwrap_or("__top__") == name
 }
 
 impl MethodRanges for ProjectGraph {
     fn range(&self, file: &str, container: Option<&str>, name: &str) -> Option<(u32, u32)> {
         self.method_range(file, container, name)
+    }
+    fn has_dynamic(&self, file: &str, container: Option<&str>, name: &str) -> bool {
+        self.has_dynamic_call(file, container, name)
     }
 }
 
@@ -130,6 +141,16 @@ impl MethodRanges for Vec<(String, FileGraph)> {
                     .iter()
                     .find(|m| m.container.as_deref() == container && m.name == name)
                     .map(|m| (m.line, m.end_line.unwrap_or(m.line)))
+            })
+    }
+    fn has_dynamic(&self, file: &str, container: Option<&str>, name: &str) -> bool {
+        self.iter()
+            .find(|(path, _)| path.as_str() == file)
+            .is_some_and(|(_, graph)| {
+                graph
+                    .calls
+                    .iter()
+                    .any(|call| call.is_dynamic() && call_in(call, container, name))
             })
     }
 }
@@ -395,6 +416,36 @@ fn render_depth(view: DepthView<'_>) -> String {
             output.push_str(&tf!(
                 "  (+{count} unresolved, name-only matches skipped — --guess shows them)\n",
                 "  (+{count} feloldatlan, csak név szerinti egyezés kihagyva — --guess mutatja)\n"
+            ));
+        }
+        // a szint hívó-metódusai közül hánynak van dinamikus (`dynamic_call`) hívása: azok kézzel nézendők
+        let mut level_methods: Vec<(&str, Option<&str>, &str)> = if level == 1 {
+            direct
+                .iter()
+                .map(|(row, method)| {
+                    (
+                        row.graph.file.as_str(),
+                        method.container.as_deref(),
+                        method.name.as_str(),
+                    )
+                })
+                .collect()
+        } else {
+            level_callers
+                .iter()
+                .map(|c| (c.file.as_str(), c.container.as_deref(), c.caller.as_str()))
+                .collect()
+        };
+        level_methods.sort_unstable();
+        level_methods.dedup();
+        let dynamic = level_methods
+            .iter()
+            .filter(|(file, container, name)| ranges.has_dynamic(file, *container, name))
+            .count();
+        if dynamic > 0 {
+            output.push_str(&tf!(
+                "  ({dynamic} of these callers contain dynamic calls — check them by hand)\n",
+                "  ({dynamic} hívó dinamikus hívást tartalmaz — kézzel nézd át)\n"
             ));
         }
         output.push('\n');

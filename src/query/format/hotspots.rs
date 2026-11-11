@@ -35,7 +35,7 @@ impl Formatter for Hotspots {
             for m in &graph.methods {
                 own.insert(symbol(&ns, m.container.as_deref(), &m.name));
             }
-            for call in &graph.calls {
+            for call in graph.calls.iter().filter(|call| !call.is_dynamic()) {
                 let caller = call.caller.as_deref().unwrap_or("");
                 let id = symbol(&ns, call.container.as_deref(), caller);
                 degrees.entry(id).or_default().outgoing += 1;

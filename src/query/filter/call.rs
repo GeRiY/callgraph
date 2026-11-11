@@ -31,6 +31,10 @@ pub(crate) fn receiver_target(graph: &FileGraph, call: &Call) -> Option<String> 
 struct RegexSpec(Regex, Option<ViaMatcher>);
 impl CallFilter for RegexSpec {
     fn matches(&self, graph: &FileGraph, call: &Call) -> bool {
+        // a dinamikus hívás jelölés, nem hívó-él: a `--grep` nem találja meg (csak a `--category dynamic_call`)
+        if call.is_dynamic() {
+            return false;
+        }
         let target = call.resolved.as_deref().unwrap_or(&call.target);
         // `?::név` (feloldatlan fogadó): a `Típus::név` minta név szerint illeszkedik rá
         if self.0.is_match(target)

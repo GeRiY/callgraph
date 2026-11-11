@@ -231,7 +231,7 @@ impl<'a> Matcher<'a> {
     }
 
     fn calls(&self, graph: &FileGraph, hits: &mut Vec<Hit>) {
-        for call in &graph.calls {
+        for call in graph.calls.iter().filter(|call| !call.is_dynamic()) {
             let target = call.resolved.as_deref().unwrap_or(&call.target);
             // a névtér nélkül: `App\Services\RefundService::processRefund` → `RefundService::processRefund`
             let short = target.rsplit('\\').next().unwrap_or(target);

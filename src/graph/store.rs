@@ -492,6 +492,17 @@ impl ProjectGraph {
             .or_else(|| self.facts.as_ref()?.get(path).map(|entry| &entry.facts))
     }
 
+    /// Van-e a metódusnak dinamikus (`dynamic_call`) hívása a tárolt tényekben.
+    pub(crate) fn has_dynamic_call(&self, file: &str, container: Option<&str>, name: &str) -> bool {
+        self.facts_of(file).is_some_and(|facts| {
+            facts.graph.calls.iter().any(|call| {
+                call.is_dynamic()
+                    && call.container.as_deref() == container
+                    && call.caller.as_deref().unwrap_or("__top__") == name
+            })
+        })
+    }
+
     /// Szimbólum-keresés: egy metódus / függvény sortartománya (az első egyező definíció).
     pub(crate) fn method_range(
         &self,

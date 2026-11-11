@@ -290,7 +290,10 @@ pub(super) fn categories(g: &FileGraph, m: &Method) -> Vec<(String, String)> {
             .or_default()
             .push(c.resolved.clone().unwrap_or_else(|| c.target.clone()));
     }
-    grouped
+    let mut ordered: Vec<(String, Vec<String>)> = grouped.into_iter().collect();
+    // a `dynamic_call` a lista végére (a rendezés stabil: a többi marad ábécében)
+    ordered.sort_by_key(|(category, _)| crate::model::category_rank(category));
+    ordered
         .into_iter()
         .map(|(category, targets)| {
             let mut unique = Vec::new();

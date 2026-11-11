@@ -44,6 +44,8 @@ impl Formatter for Api {
                         .or_default()
                         .push(call.resolved.clone().unwrap_or_else(|| call.target.clone()));
                 }
+                let mut groups: Vec<_> = groups.into_iter().collect();
+                groups.sort_by_key(|(category, _)| crate::model::category_rank(category));
                 for (category, mut targets) in groups {
                     targets.sort();
                     targets.dedup();
