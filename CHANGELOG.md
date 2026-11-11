@@ -5,6 +5,23 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-11-11
+
+### Added
+- **`protect` lines in `.callgraphignore`:** `protect migrations/` keeps the matching files in the map (fully
+  queryable) but marks them `🔒` in the outline, `--body`, `--lines`, `locate` and `--format json` (`"protected": true`):
+  protected, read them, don't edit them. Same pattern rules as the exclusions; no `protect` line, no change.
+- **Signatures in outlines:** `--signatures` (or `CALLGRAPH_SIGNATURES=1`) prints the compact signature on the method
+  line of the outline and the `--grep` caller outlines: `updateOrders(array $ids, bool $notify = false): array  L4-9`
+  (where the language provides params / return type). `--format api` now also shows TS / Vue return types, and for PHP
+  a more specific DocBlock type (`@return array{updated:int}`, `list<int>`, `@param` shapes), at most 80 characters.
+
+### Changed
+- **Non-UTF-8 sources are decoded, not replaced with `�`:** ISO-8859-2, windows-1250 and ISO-8859-1/windows-1252
+  files are detected and read properly (display, outline, `locate`, `--strings`); garbage still falls back to `�`.
+- **Stronger change detection (Linux / macOS):** the freshness stamp also includes the inode change time, so a
+  same-size edit with a restored mtime is noticed. The stored graph is rebuilt once, quietly.
+
 ## [0.6.1] — 2026-11-11
 
 ### Fixed
@@ -424,7 +441,8 @@ First release.
 - Built-in update: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Prebuilt packages for macOS (arm64, x86_64), Linux (x86_64, ARM64, static musl) and Windows.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.6.1...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.7.0...develop
+[0.7.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.7.0
 [0.6.1]: https://github.com/GeRiY/callgraph/releases/tag/v0.6.1
 [0.6.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.6.0
 [0.5.3]: https://github.com/GeRiY/callgraph/releases/tag/v0.5.3

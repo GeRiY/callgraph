@@ -155,6 +155,7 @@ impl<'a> CssScanner<'a> {
             is_abstract: false,
             params: Vec::new(),
             return_type: None,
+            doc_types: None,
             doc: None,
             body: None,
             kind: Some(kind.into()),

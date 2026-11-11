@@ -18,6 +18,7 @@ mod outline_procedural;
 mod parse_errors;
 mod reexports;
 mod selection;
+mod signature;
 mod source;
 mod stats;
 mod strings;

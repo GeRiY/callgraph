@@ -25,10 +25,16 @@ impl SourceFile {
 
     /// Fájl beolvasása a lemezről.
     pub fn read(path: &Path) -> Result<Self> {
-        let text = std::fs::read(path).map_err(|source| CallgraphError::Read {
+        let raw = std::fs::read(path).map_err(|source| CallgraphError::Read {
             path: path.to_path_buf(),
             source,
         })?;
+        // nem UTF-8 (legacy kódolású) fájl: UTF-8-ra dekódolva elemezzük, hogy a kommentek / stringek olvashatók legyenek
+        let decoded = match crate::io::decode_source(&raw) {
+            std::borrow::Cow::Owned(text) => Some(text),
+            std::borrow::Cow::Borrowed(_) => None,
+        };
+        let text = decoded.map_or(raw, String::into_bytes);
         let mtime = std::fs::metadata(path)
             .ok()
             .and_then(|m| m.modified().ok())

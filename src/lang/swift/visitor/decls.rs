@@ -187,6 +187,7 @@ impl SwiftVisitor<'_, '_> {
             kind: Some("top-level".to_string()),
             params: Vec::new(),
             return_type: None,
+            doc_types: None,
             doc: None,
             body: None,
         });

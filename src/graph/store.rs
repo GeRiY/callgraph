@@ -118,6 +118,7 @@ impl ProjectGraph {
                             stamp: FileStamp {
                                 mtime: entry.mtime,
                                 size: entry.size,
+                                ctime: entry.ctime,
                             },
                             offset: entry.offset,
                             len: entry.len,
@@ -551,6 +552,7 @@ impl ProjectGraph {
                     path: path.clone(),
                     mtime: tracked.stamp.mtime,
                     size: tracked.stamp.size,
+                    ctime: tracked.stamp.ctime,
                     offset: tracked.offset,
                     len: tracked.len,
                 })

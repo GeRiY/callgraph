@@ -42,6 +42,15 @@ impl<'a, 'b> FnRef<'a, 'b> {
         }
     }
 
+    /// A TS visszatérési típus (a `:` utáni rész) helye, ha van.
+    fn return_span(&self) -> Option<Span> {
+        match self {
+            Self::Func(f) => f.return_type.as_ref(),
+            Self::Arrow(f) => f.return_type.as_ref(),
+        }
+        .map(|r| r.type_annotation.span())
+    }
+
     /// A blokk-törzs utasításai (nyíl kifejezés-törzsnél és törzs nélkülinél `None`).
     pub fn block(&self) -> Option<&'b [Statement<'a>]> {
         match self {
@@ -145,7 +154,10 @@ impl<'s> Collector<'s> {
             is_static: o.is_static,
             is_abstract: false,
             params: self.param_srcs(f.params()),
-            return_type: None,
+            return_type: f
+                .return_span()
+                .map(|s| self.docs.src_of(s.start, s.end, 60)),
+            doc_types: None,
             doc,
             body: None,
             kind: Some(o.kind.to_string()),

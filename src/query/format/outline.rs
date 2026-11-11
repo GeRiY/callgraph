@@ -64,13 +64,14 @@ fn outline(
     let mut s = String::new();
     writeln!(
         s,
-        "FILE  {}{}{}",
+        "FILE  {}{}{}{}",
         g.file,
         g.namespace
             .as_ref()
             .map(|n| format!("  NS:{n}"))
             .unwrap_or_default(),
-        crate::notes::mark(crate::notes::file_count(notes))
+        crate::notes::mark(crate::notes::file_count(notes)),
+        crate::io::protect_mark(&g.file)
     )
     .unwrap();
     // szintaktikai hiba: közvetlenül a FILE sor alatt (hiba nélkül nincs sor)
@@ -216,11 +217,15 @@ pub(super) fn method_line(s: &mut String, m: &Method) {
         writeln!(s, "  {indent}{hashes} {}  L{}-{end}", m.name, m.line).unwrap();
         return;
     }
+    // `--signatures`: a hívható tagnál `name(params): ret` a `name()` helyett (ha nincs adat, ugyanaz marad)
+    let label = if crate::cli::signatures::enabled() && !parens(m).is_empty() {
+        super::signature::signature(m)
+    } else {
+        format!("{}{}", m.name, parens(m))
+    };
     writeln!(
         s,
-        "  {}{}  L{}-{}{}{}",
-        m.name,
-        parens(m),
+        "  {label}  L{}-{}{}{}",
         m.line,
         m.end_line.unwrap_or(m.line),
         if m.is_static { " [static]" } else { "" },

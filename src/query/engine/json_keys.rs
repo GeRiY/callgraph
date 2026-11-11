@@ -39,6 +39,7 @@ pub(super) fn add_key_sections(path: &Path, graph: &mut FileGraph, names: &[Stri
                 kind: Some("key".into()),
                 params: Vec::new(),
                 return_type: None,
+                doc_types: None,
                 doc: None,
                 body: None,
             });

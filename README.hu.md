@@ -118,6 +118,10 @@ public/build/
 legacy/**/*.php
 ```
 
+A `protect <minta>` sor (pl. `protect migrations/`) a kizárás ellentéte: a találó fájlok bent maradnak a térképben,
+teljesen lekérdezhetők, de a kimenetben 🔒 jelöli őket (outline, `--body`, `--lines`, `locate`): védettek, olvasd,
+de ne szerkeszd őket. Ugyanazok a mintaszabályok; a puszta `protect` sor továbbra is kiterjesztés-szabály.
+
 Ha a `.gitignore` által kizárt fájlokat is fel akarod térképezni, add hozzá bármelyik parancshoz a `--no-gitignore`
 kapcsolót (az MCP-szervernél és a hooknál: `CALLGRAPH_GITIGNORE=0`); a `.callgraphignore` és a beépített kihagyott
 mappák ekkor is érvényesek. Figyelem: a `.callgraphignore`-ban egy puszta szó (pl. `build`) kiterjesztés-szabály;
@@ -134,6 +138,8 @@ mappához írd így: `build/` vagy `/build`.
   osztálytól, elemtől), csak a hibás rész hiányzik — az ilyen fájlt olvasd közvetlenül. A kilépési kód 0 marad; CI-hez
   add hozzá a `--strict` kapcsolót (vagy `CALLGRAPH_STRICT=1`): a `show`, a `locate` és a `profile` ilyenkor 3-as
   kóddal lép ki, ha egy beolvasott fájl szintaktikai hibás, a kimenet ugyanaz.
+
+A `--signatures` (vagy `CALLGRAPH_SIGNATURES=1`) az outline metódussorában a szignatúrát (paraméterek, visszatérési típus) is kiírja.
 
 ## Gyors kezdés
 

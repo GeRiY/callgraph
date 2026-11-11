@@ -22,6 +22,8 @@ pub(crate) struct Report<'a> {
     pub all: bool,
     /// Fájlonként a (nem árva) jegyzetek száma; a fájl-sor végén `  📝 N`.
     pub notes: &'a HashMap<String, usize>,
+    /// A projekt gyökere (a `protect` minták ellenőrzéséhez; védett fájl során `  🔒`).
+    pub root: &'a std::path::Path,
 }
 
 impl Report<'_> {
@@ -47,11 +49,16 @@ impl Report<'_> {
         for (rank, file) in self.ranked.iter().take(shown).enumerate() {
             let notes = self.notes.get(&file.path).copied().unwrap_or(0);
             out.push_str(&format!(
-                "{}. {}  {}{}\n",
+                "{}. {}  {}{}{}\n",
                 rank + 1,
                 file.path,
                 stars(file.score, top),
-                crate::notes::mark(notes)
+                crate::notes::mark(notes),
+                if crate::io::is_protected(&self.root.join(&file.path)) {
+                    crate::io::PROTECT_MARK
+                } else {
+                    ""
+                }
             ));
             for reason in pick(group(&file.hits), REASONS_PER_FILE) {
                 out.push_str(&format!("   {}\n", describe(&reason, self.terms)));

@@ -15,7 +15,15 @@ impl Formatter for Lines {
         let mut out = String::new();
         for row in rows {
             let (start, end) = self.range;
-            writeln!(out, "FILE  {}  L{}-{}", row.graph.file, start, end).unwrap();
+            writeln!(
+                out,
+                "FILE  {}  L{}-{}{}",
+                row.graph.file,
+                start,
+                end,
+                crate::io::protect_mark(&row.graph.file)
+            )
+            .unwrap();
             out.push_str(&numbered(&source_lines(row), start, end));
         }
         out

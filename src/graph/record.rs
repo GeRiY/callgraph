@@ -2,12 +2,15 @@
 
 use crate::model::FileGraph;
 
-/// Egy fájl változás-bélyege: mtime (ns) + méret. A méret azért kell, mert több fájlrendszer
+/// Egy fájl változás-bélyege: mtime (ns) + méret + (unixon) ctime (ns). A méret azért kell, mert több fájlrendszer
 /// (pl. Docker bind mount) durva, ms-os mtime-ot ad: két gyors írás azonos mtime-ot kaphat.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) struct FileStamp {
     pub mtime: u64,
     pub size: u64,
+    /// Az inode-változás ideje (ns); unixon `touch -d`-vel / visszaállított mtime-mal sem hamisítható. Windowson 0
+    /// (ott a ctime a létrehozás ideje, ami nem jelzi a változást).
+    pub ctime: u64,
 }
 
 impl FileStamp {
@@ -25,8 +28,23 @@ impl FileStamp {
         Self {
             mtime,
             size: meta.len(),
+            ctime: ctime_ns(&meta),
         }
     }
+}
+
+/// Az inode-változás ideje ns-ban (unix); máshol 0.
+#[cfg(unix)]
+fn ctime_ns(meta: &std::fs::Metadata) -> u64 {
+    use std::os::unix::fs::MetadataExt;
+    let secs = u64::try_from(meta.ctime()).unwrap_or(0);
+    let nanos = u64::try_from(meta.ctime_nsec()).unwrap_or(0);
+    secs.saturating_mul(1_000_000_000).saturating_add(nanos)
+}
+
+#[cfg(not(unix))]
+fn ctime_ns(_: &std::fs::Metadata) -> u64 {
+    0
 }
 
 /// Egy fájl tényei a gráfban: a nyelvi frontend `FileGraph`-ja változatlanul (így minden új levél-mező automatikusan

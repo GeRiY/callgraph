@@ -6,6 +6,25 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-11-11
+
+### Új
+- **`protect` sorok a `.callgraphignore`-ban:** a `protect migrations/` a találó fájlokat a térképben tartja (teljesen
+  lekérdezhetők), de az outline-ban, `--body`-ban, `--lines`-ban, `locate`-ban és `--format json`-ban
+  (`"protected": true`) `🔒`-kal jelöli: védettek, olvasd, de ne szerkeszd őket. Ugyanazok a mintaszabályok, mint a
+  kizárásnál; `protect` sor nélkül nincs változás.
+- **Szignatúrák az outline-ban:** a `--signatures` (vagy `CALLGRAPH_SIGNATURES=1`) a normál outline és a `--grep`
+  hívó-outline metódussorában a tömör szignatúrát írja ki: `updateOrders(array $ids, bool $notify = false): array  L4-9`
+  (ahol a nyelv adja a paramétereket / visszatérési típust). A `--format api` mostantól a TS / Vue visszatérési
+  típust, PHP-nál pedig a pontosabb DocBlock-típust is mutatja (`@return array{updated:int}`, `list<int>`, `@param`
+  shape), legfeljebb 80 karakterben.
+
+### Változás
+- **A nem UTF-8 forrás dekódolva jelenik meg, nem `�`-ként:** az ISO-8859-2, windows-1250 és ISO-8859-1/windows-1252
+  fájlokat felismeri és helyesen olvassa (megjelenítés, outline, `locate`, `--strings`); a szemét továbbra is `�`.
+- **Erősebb változásészlelés (Linux / macOS):** a frissesség-bélyeg az inode-változás idejét (ctime) is tartalmazza,
+  így az azonos méretű, visszaállított mtime-ú szerkesztés is észrevehető. A tárolt gráf egyszer, csendben újraépül.
+
 ## [0.6.1] — 2026-11-11
 
 ### Javítás
@@ -456,7 +475,8 @@ Első kiadás.
 - Beépített frissítés: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Előre fordított csomagok macOS-re (arm64, x86_64), Linuxra (x86_64, ARM64, statikus musl) és Windowsra.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.6.1...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.7.0...develop
+[0.7.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.7.0
 [0.6.1]: https://github.com/GeRiY/callgraph/releases/tag/v0.6.1
 [0.6.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.6.0
 [0.5.3]: https://github.com/GeRiY/callgraph/releases/tag/v0.5.3

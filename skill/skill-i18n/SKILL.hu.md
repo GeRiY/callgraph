@@ -78,6 +78,7 @@ az interfészén / szülőjén / trait-jén át menőket), ezért hívók maradh
 - `via Resolver`: a hívás a keresett típus interfészén, szülőosztályán vagy trait-jén át megy.
 - `L12, L40 │ …`: ugyanaz a hívás több soron; hívónként legfeljebb 3 sor, utána `… +2 további: L55, L61`.
 - `?` / `?::név`: ismeretlen fogadó-típus, csak név szerinti egyezés; lehet téves, nézd meg a sort.
+- `🔒` a fájl útja után: védett fájl; olvasd, de ne szerkeszd.
 <!-- /mcp -->
 
 ## Projekt-profil (ismeretlen projektben ezzel kezdj)
@@ -295,3 +296,5 @@ A hibás rész előtti és utáni kód a térképen van (JS / TS / Vue, Rust: a 
 osztálytól, elemtől); csak a hibás rész hiányzik. A kilépési kód 0 marad; CI-ben add hozzá a `--strict` kapcsolót
 (vagy `CALLGRAPH_STRICT=1`): a `show`, a `locate` és a `profile` ilyenkor 3-as kóddal lép ki, ha egy beolvasott fájl
 szintaktikai hibás, a kimenet ugyanaz.
+
+A `--signatures` (vagy `CALLGRAPH_SIGNATURES=1`) az outline metódussorában a szignatúrát (paraméterek, visszatérési típus) is kiírja.

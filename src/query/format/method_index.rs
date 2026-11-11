@@ -10,7 +10,13 @@ impl Formatter for MethodIndex {
     fn format(&self, rows: &[QueryResult], lang: crate::i18n::Lang) -> String {
         let mut s = String::new();
         for r in rows {
-            writeln!(s, "FILE  {}", r.graph.file).unwrap();
+            writeln!(
+                s,
+                "FILE  {}{}",
+                r.graph.file,
+                crate::io::protect_mark(&r.graph.file)
+            )
+            .unwrap();
             for c in &r.graph.containers {
                 writeln!(s, "{} {}  L{}-{}", c.kind, c.name, c.line, c.end_line).unwrap();
                 let mut methods: Vec<_> = r

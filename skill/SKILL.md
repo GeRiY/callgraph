@@ -79,6 +79,7 @@ calls through its interface / parent / trait), so it can miss callers; use it to
 - `via Resolver`: the call goes through an interface, parent class or trait of the searched type.
 - `L12, L40 │ …`: the same call on several lines; at most 3 rows per caller, then `… +2 more: L55, L61`.
 - `?` / `?::name`: the receiver type is unknown, a name-only match; it may be wrong, check the line.
+- `🔒` after a file path: the file is protected; read it, don't edit it.
 <!-- /mcp -->
 
 ## Project profile (start here in an unfamiliar project)
@@ -291,3 +292,5 @@ The code before and after the broken part is still mapped (JS / TS / Vue, Rust: 
 class or item on); only the broken part is missing. The exit code stays 0; in CI add `--strict` (or set
 `CALLGRAPH_STRICT=1`): `show`, `locate` and `profile` then exit with code 3 when a file they read has a syntax error,
 with the same output.
+
+`--signatures` (or `CALLGRAPH_SIGNATURES=1`) prints the signature (params, return type) on the outline method lines.

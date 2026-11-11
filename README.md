@@ -118,6 +118,10 @@ public/build/
 legacy/**/*.php
 ```
 
+A `protect <pattern>` line (e.g. `protect migrations/`) is the opposite of an exclusion: the matching files stay in
+the map and fully queryable, but are marked 🔒 in the output (outline, `--body`, `--lines`, `locate`): protected, read
+them, don't edit them. Same pattern rules; a line that is just `protect` stays an extension rule.
+
 To map files your `.gitignore` excludes, add `--no-gitignore` to any command (or set `CALLGRAPH_GITIGNORE=0` for the
 MCP server and the hook); `.callgraphignore` and the built-in skipped folders still apply. Note: a bare word such as
 `build` in `.callgraphignore` is an extension rule; write `build/` or `/build` for a folder.
@@ -133,6 +137,8 @@ MCP server and the hook); `.callgraphignore` and the built-in skipped folders st
   function, class or item on), the broken part itself is missing — read such a file directly. The exit code stays 0;
   for CI, add `--strict` (or set `CALLGRAPH_STRICT=1`): `show`, `locate` and `profile` then exit with code 3 when a
   file they read has a syntax error, with the same output.
+
+`--signatures` (or `CALLGRAPH_SIGNATURES=1`) prints the signature (params, return type) on the outline method lines.
 
 ## Quick start
 

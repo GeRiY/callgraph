@@ -9,7 +9,7 @@ use mago_syntax::cst::{Identifier, Statement, TriviaKind};
 use mago_syntax::{cst, walker};
 
 use super::FileVisitor;
-use crate::lang::php::analysis::docblock::doc_for;
+use crate::lang::php::analysis::docblock::{doc_for, doc_types_for};
 use crate::lang::php::analysis::{AnalysisContext, NameResolver};
 use crate::lang::php::parser::ParsedFile;
 use crate::model::{Container, FileGraphBuilder, Method};
@@ -412,6 +412,7 @@ fn method(parsed: &ParsedFile<'_>, container: &str, m: &mago_syntax::cst::Method
             .return_type_hint
             .as_ref()
             .map(|r| hint_text(parsed, &r.hint)),
+        doc_types: doc_types_for(parsed, m.span()),
         doc: doc_for(parsed, m.span()),
         body: body(parsed, m),
         kind: None,

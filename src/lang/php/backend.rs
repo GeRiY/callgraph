@@ -112,6 +112,18 @@ mod tests {
     }
 
     #[test]
+    fn docblock_shape_is_kept_next_to_the_declared_type() {
+        let src = b"<?php\nclass A {\n  /**\n   * @param list<int> $ids\n   * @return array{updated:int}\n   */\n  public function f(array $ids): array { return []; }\n}\n";
+        let g = PhpBackend::with_defaults()
+            .analyze_source("a.php", src)
+            .graph;
+        assert_eq!(
+            g.methods[0].doc_types.as_deref(),
+            Some("@return array{updated:int}; @param $ids list<int>")
+        );
+    }
+
+    #[test]
     fn language_trait_reports_php_backend() {
         let b = PhpBackend::with_defaults();
         assert_eq!(

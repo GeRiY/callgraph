@@ -236,6 +236,7 @@ impl SwiftVisitor<'_, '_> {
             kind: Some(kind.to_string()),
             params,
             return_type,
+            doc_types: None,
             doc: self.doc_of(node),
             body: None,
         });

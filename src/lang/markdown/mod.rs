@@ -170,6 +170,7 @@ impl Language for MdDocument {
                 is_abstract: false,
                 params: vec![],
                 return_type: None,
+                doc_types: None,
                 doc: None,
                 body: None,
                 kind: None,

@@ -22,6 +22,8 @@ pub(super) struct OrderedGraph<'a> {
     writes: &'a [crate::model::Write],
     sfc: &'a Option<serde_json::Value>,
     parse_errors: &'a [crate::model::ParseError],
+    /// `protect` minta találja (csak ilyenkor kerül a kimenetbe).
+    protected: bool,
 }
 
 impl serde::Serialize for OrderedGraph<'_> {
@@ -56,6 +58,9 @@ impl serde::Serialize for OrderedGraph<'_> {
         // csak szintaktikai hibánál (hiba nélkül a kimenet bájtra változatlan)
         if !self.parse_errors.is_empty() {
             m.serialize_entry("parseErrors", self.parse_errors)?;
+        }
+        if self.protected {
+            m.serialize_entry("protected", &true)?;
         }
         m.end()
     }
@@ -149,6 +154,7 @@ pub(super) fn ordered_graph(graph: &FileGraph) -> OrderedGraph<'_> {
         writes: &graph.writes,
         sfc: &graph.sfc,
         parse_errors: &graph.parse_errors,
+        protected: crate::io::is_protected(std::path::Path::new(&graph.file)),
     }
 }
 
