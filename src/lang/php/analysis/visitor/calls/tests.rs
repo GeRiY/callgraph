@@ -285,7 +285,8 @@ fn invokable_class_property_is_an_invoke_call() {
 
 #[test]
 fn declared_property_with_class_type_is_an_invoke_call() {
-    let src = "<?php\nclass S {\n  private Gen $gen;\n  function run() { return ($this->gen)(1); }\n}\n";
+    let src =
+        "<?php\nclass S {\n  private Gen $gen;\n  function run() { return ($this->gen)(1); }\n}\n";
     let all = full(src);
     assert!(all.iter().all(|c| c.category != "dynamic_call"), "{all:?}");
     assert!(

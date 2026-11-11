@@ -65,8 +65,7 @@ impl Collector<'_, '_> {
             // `$next($r)`, ahol a `$next` Closure / callable paraméter vagy helyi closure: callback, nem dinamikus
             Expression::Variable(Variable::Direct(v)) if s.callables.contains(&lossy(v.name)) => {}
             // `($this->prop)(…)`: osztály-típusú property → statikusan ismert `__invoke` hívás
-            Expression::Access(Access::Property(p))
-                if self.invokable_property(s, n, p) => {}
+            Expression::Access(Access::Property(p)) if self.invokable_property(s, n, p) => {}
             other => {
                 let text = self.parsed.text(other.span());
                 self.push_dynamic(s, n, &text);
@@ -76,7 +75,12 @@ impl Collector<'_, '_> {
 
     /// `($this->prop)(…)` osztály- / interfész-típusú property-n: felveszi a `Típus::__invoke` method_call-t és
     /// `true`-t ad. `Closure` / `callable` / típus nélküli property-re `false` (marad dinamikus).
-    fn invokable_property(&self, s: &mut State, n: &FunctionCall<'_>, p: &PropertyAccess<'_>) -> bool {
+    fn invokable_property(
+        &self,
+        s: &mut State,
+        n: &FunctionCall<'_>,
+        p: &PropertyAccess<'_>,
+    ) -> bool {
         let (Expression::Variable(Variable::Direct(v)), ClassLikeMemberSelector::Identifier(i)) =
             (super::strip(p.object), &p.property)
         else {
@@ -109,12 +113,16 @@ impl Collector<'_, '_> {
 
     /// A paraméterlista `Closure` / `callable` típusú paramétereit (`?Closure`, `Closure|callable`, `\Closure`) felveszi
     /// a hívható változók közé.
-    pub(super) fn register_callable_params(&self, s: &mut State, list: &FunctionLikeParameterList<'_>) {
+    pub(super) fn register_callable_params(
+        &self,
+        s: &mut State,
+        list: &FunctionLikeParameterList<'_>,
+    ) {
         for p in list.parameters.iter() {
             let Some(h) = &p.hint else { continue };
             let text = self.parsed.text(h.span());
             let callable = text
-                .split(|c: char| matches!(c, '|' | '&' | '?' | '(' | ')'))
+                .split(['|', '&', '?', '(', ')'])
                 .map(|t| t.trim().trim_start_matches('\\').to_ascii_lowercase())
                 .any(|t| t == "closure" || t == "callable");
             if callable {
