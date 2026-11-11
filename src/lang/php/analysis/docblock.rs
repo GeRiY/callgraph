@@ -165,7 +165,6 @@ mod tests {
         assert_eq!(shape_tags("/** @return int */"), None);
     }
 
-
     #[test]
     fn joins_summary_and_stops_at_tag() {
         let raw = "/**\n * Első sor.\n * Második.\n *\n * @param int $a\n */";

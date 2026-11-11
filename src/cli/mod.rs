@@ -5,8 +5,8 @@ mod command;
 pub mod commands;
 mod next_args;
 mod profile_args;
-mod stats_args;
 pub mod signatures;
+mod stats_args;
 pub mod strict;
 mod telemetry_args;
 

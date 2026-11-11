@@ -130,6 +130,12 @@ fn ts_return_type_is_captured() {
         .into_iter()
         .map(|m| (m.name, m.return_type))
         .collect();
-    assert!(got.contains(&("f".into(), Some("Promise<string[]>".into()))), "{got:?}");
-    assert!(got.contains(&("h".into(), Some("boolean".into()))), "{got:?}");
+    assert!(
+        got.contains(&("f".into(), Some("Promise<string[]>".into()))),
+        "{got:?}"
+    );
+    assert!(
+        got.contains(&("h".into(), Some("boolean".into()))),
+        "{got:?}"
+    );
 }

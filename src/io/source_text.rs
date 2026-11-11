@@ -30,7 +30,13 @@ pub fn decode_source(bytes: &[u8]) -> Cow<'_, str> {
         Some((_, table)) => Cow::Owned(
             bytes
                 .iter()
-                .map(|&b| if b < 0x80 { char::from(b) } else { table[usize::from(b - 0x80)] })
+                .map(|&b| {
+                    if b < 0x80 {
+                        char::from(b)
+                    } else {
+                        table[usize::from(b - 0x80)]
+                    }
+                })
                 .collect(),
         ),
         None => String::from_utf8_lossy(bytes),
@@ -47,7 +53,8 @@ fn score(bytes: &[u8], table: &[char; 128]) -> i64 {
             let c = table[usize::from(b - 0x80)];
             if HUNGARIAN.contains(c) {
                 2
-            } else if c.is_alphabetic() {
+            } else if c.is_alphabetic() && !('\u{2b0}'..='\u{2ff}').contains(&c) {
+                // a módosító jelek (ˇ ˘ ˛ …) nem betűk: egyébként a windows-1250 egy Latin-2 szövegen döntetlent hozna
                 1
             } else if c.is_control() {
                 -4
@@ -67,11 +74,15 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("callgraph-latin2-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let file = dir.join("a.php");
-        std::fs::write(&file, b"<?php\n// t\xf6bb v\xe1ltoz\xf3 \xf5\xfb\n$x = 1;\n").unwrap();
+        std::fs::write(
+            &file,
+            b"<?php\n// t\xf6bb v\xe1ltoz\xf3 \xf5\xfb\n$x = 1;\n",
+        )
+        .unwrap();
         let text = read_source_lossy(&file).unwrap();
         let lines: Vec<&str> = text.lines().collect();
         assert_eq!(lines.len(), 3);
-        assert_eq!(lines[1], "// többb változó őű");
+        assert_eq!(lines[1], "// több változó őű");
         assert_eq!(lines[2], "$x = 1;");
         assert!(read_source_lossy(&dir.join("missing.php")).is_err());
         let _ = std::fs::remove_dir_all(dir);
@@ -82,14 +93,20 @@ mod tests {
         // cp1250: ą (0xB9), ż (0xBF), ś (0x9C), ź (0x9F) csak itt betű
         assert_eq!(decode_source(b"\xb9\xbf\x9c\x9f"), "ążśź");
         // latin1/cp1252: é, ü, ñ
-        assert_eq!(decode_source(b"caf\xe9 \xfcber ma\xf1ana"), "café über mañana");
+        assert_eq!(
+            decode_source(b"caf\xe9 \xfcber ma\xf1ana"),
+            "café über mañana"
+        );
         // ISO-8859-2: Ą (0xA1) és ł (0xB3) csak itt betű
         assert_eq!(decode_source(b"\xa1 \xb3\xf3d\xbc"), "Ą łódź");
     }
 
     #[test]
     fn valid_utf8_is_untouched_and_garbage_falls_back_to_lossy() {
-        assert!(matches!(decode_source("árvíztűrő".as_bytes()), Cow::Borrowed(_)));
+        assert!(matches!(
+            decode_source("árvíztűrő".as_bytes()),
+            Cow::Borrowed(_)
+        ));
         let garbage = [b'a', 0x81, 0x8d, 0x8f, 0x90, b'\n', 0x9d];
         let text = decode_source(&garbage);
         assert!(text.contains('\u{FFFD}') && text.lines().count() == 2);

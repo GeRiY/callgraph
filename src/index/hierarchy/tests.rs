@@ -31,6 +31,7 @@ fn method(container: &str, name: &str) -> Method {
         params: Vec::new(),
         return_type: None,
         doc: None,
+        doc_types: None,
         body: None,
     }
 }
