@@ -14,7 +14,7 @@ mod string_lit;
 mod write;
 
 pub use builder::FileGraphBuilder;
-pub use call::Call;
+pub use call::{Call, DYNAMIC_CALL, DYNAMIC_KIND, KNOWN_CATEGORIES, category_rank};
 pub use comment::Comment;
 pub use constant::Constant;
 pub use container::Container;

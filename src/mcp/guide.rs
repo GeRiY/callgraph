@@ -18,7 +18,7 @@ const END: &str = "<!-- /mcp -->";
 
 /// CLI-kapcsoló → MCP-eszköz / -paraméter (a jelölt szakaszokban, backtickkel együtt). A név szerinti hívó-minta
 /// idézőjelei is lekerülnek: MCP-n a `pattern` sima JSON-string.
-const CLI_TO_MCP: [(&str, &str); 14] = [
+const CLI_TO_MCP: [(&str, &str); 15] = [
     ("`--grep`", "`find_callers`"),
     ("`--depth`", "`depth`"),
     ("`--strings`", "`search` (strings)"),
@@ -31,6 +31,7 @@ const CLI_TO_MCP: [(&str, &str); 14] = [
     ("`--project`", "`project`"),
     ("`--format`", "`format`"),
     ("`--all`", "`all: true`"),
+    ("`profile`", "`project_profile`"),
     ("`'(^|::|\\.|->)", "`(^|::|\\.|->)"),
     ("$'`", "$`"),
 ];
@@ -185,6 +186,43 @@ mod tests {
             assert!(!text.contains("<!--"), "{lang:?}: marker left");
         }
         assert_ne!(instructions(Lang::En), instructions(Lang::Hu));
+    }
+
+    #[test]
+    fn start_section_carries_the_recipes_with_mcp_names() {
+        for lang in Lang::ALL {
+            let text = instructions(lang);
+            let marker = lang.pick("**Recipes:**", "**Receptek:**");
+            let recipes = text
+                .lines()
+                .skip_while(|line| !line.starts_with(marker))
+                .take(3)
+                .collect::<Vec<_>>()
+                .join("\n");
+            assert!(recipes.starts_with(marker), "{lang:?}: no recipes\n{text}");
+            // a négy recept eszköz-nevei (bug fix, hívók, ismeretlen projekt, szöveg / konstans)
+            for tool in [
+                "`locate`",
+                "`outline`",
+                "`method_body`",
+                "`find_callers`",
+                "`depth`",
+                "`project_profile`",
+                "`search` (strings)",
+                "`search` (constants)",
+            ] {
+                assert!(recipes.contains(tool), "{lang:?}: {tool}\n{recipes}");
+            }
+            assert!(
+                !recipes.contains("--"),
+                "{lang:?}: CLI flag left\n{recipes}"
+            );
+            assert!(!recipes.contains("bash "), "{lang:?}: shell command left");
+            assert!(
+                recipes.contains("Grep"),
+                "{lang:?}: exact text goes to Grep"
+            );
+        }
     }
 
     #[test]

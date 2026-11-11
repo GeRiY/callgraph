@@ -30,6 +30,9 @@ fájlneveket, oszlopokat, útvonalakat, fordítási kulcsokat, a nem angol domai
 kódnév-megfelelőjét is (pl. visszatérítés → `refund`). A projekt-térképből válaszol, fájl-olvasás nélkül: az első 5
 fájl (`--all`: minden találat), mindegyik az indoklásával (pontos definíció, fájlnév, név-részlet, string, hívás,
 `hívók: N`). Ezekkel a fájlokkal folytasd: outline / `--body` / `--grep`.
+**Receptek:** hibajavítás = `locate` → a fő fájl `outline`-ja → a metódus `--body`-ja. „Ki hívja / mi törik” = a név
+szerinti minta `--grep`-pel és `--depth` 2 → a hívó metódus `--body`-ja. Ismeretlen projekt = `profile` → `locate` →
+`outline`. „Hol van ez a szöveg / konstans” = `--strings` / `--const` (pontos szöveg: Grep).
 <!-- /mcp -->
 Különleges kifejezések: a szóközös, idézőjeles kifejezés (`"Szervező további eseményei"`) EGY kifejezés, egészében a
 string-literálokra illesztve (feliratok, fordítások), szavakra sosem bontva; a `route::events.show` az útvonal
@@ -42,6 +45,20 @@ bash <skill>/callgraph.sh locate RefundController processRefund refund payment_s
 bash <skill>/callgraph.sh locate refund --all --project myapp                                                       # minden egyező fájl, nem csak az első 5
 bash <skill>/callgraph.sh locate route::events.show "Szervező további eseményei" --project myapp                     # egy útvonal (a definíció elöl) és egy felirat
 ```
+
+## Receptek — feladat → hívássorozat
+
+Négy tipikus feladat és a rájuk válaszoló hívások (az üres vagy hibás eredményhez tipp jár: `egyetlen hívás-cél sem
+illeszkedik …`, `Esetleg erre gondoltál: …` — kövesd, ne próbálkozz vaktában újra):
+
+- **Hibajavítás / viselkedés módosítása:** `locate <a feladat nevei>` → a fő fájl outline-ja (`callgraph.sh <fájl>`) →
+  `callgraph.sh <fájl>::<metódus> --body` csak arra a metódusra, amelyik kell.
+- **„Ki hívja ezt / mit érint, ha módosítom”:** `callgraph.sh <mappa> --grep '(^|::|\.|->)név$' --depth 2` (a név
+  szerinti minta minden hívást megtalál) → `callgraph.sh <hívó fájl>::<hívó metódus> --body`.
+- **Ismeretlen projekt:** `callgraph.sh profile` (architektúra, rétegek) → `locate <kifejezések>` → a listázott fájlok
+  outline-ja → `--body`.
+- **„Hol van ez a szöveg / konstans”:** `callgraph.sh <mappa> --strings <töredék>` (felületi szöveg, üzenet; kis-/nagybetű-
+  független részlet) vagy `--const <név>`; pontos szövegre, illetve nem kód fájlokban Grep.
 
 ## Gyors parancsok
 
@@ -60,6 +77,7 @@ bash $CG --project myapp app --grep 'Order::cancel' --depth 3        # hatásele
 bash $CG --project myapp app --grep 'Order::cancel' --depth 3 --guess # + a csak név szerinti egyezések („?”)
 bash $CG --project myapp app --grep 'Order::cancel' --body           # a talált hívó metódusok forrása
 bash $CG --project myapp app --category model_use,orm_relation       # szűrés hívás-kategóriára
+bash $CG --project myapp app --category dynamic_call                 # a futásidőben eldőlő célú hívások
 ```
 
 <!-- mcp:callers -->
@@ -182,7 +200,8 @@ property típusa előtt látszik. Hívás-kategóriák: `swiftui_view`, `swiftui
 Ugyanazok a kapcsolók. A fájl-szintű függvények és konstansok a `<fájl>.py` `module` containerben; `class` ősökkel
 (`extends`) és dekorátorokkal (`uses @dataclass`). Metódus-fajták: `method` / `staticmethod` / `classmethod` /
 `property` (`async ` előtaggal); a `self` / `cls` kimarad a szignatúrából; a vezető `_` = privát. Hívás-kategóriák:
-`native_python`, `internal_helper`, `static_call`, `instantiation`, `external_call`. Részletek: `docs/LANG-PYTHON.md`.
+`native_python`, `internal_helper`, `static_call`, `instantiation`, `external_call`, `dynamic_call` (`getattr(obj, név)()`,
+`globals()[név]()`, `import_module(név)`, `eval` / `exec`). Részletek: `docs/LANG-PYTHON.md`.
 
 ## Go
 
@@ -306,7 +325,9 @@ parancsnál) vagy a `CALLGRAPH_GITIGNORE=0` (MCP-szerver, hook) kikapcsolja a `.
 
 <!-- mcp:limits -->
 Statikus elemzés: dinamikus hívás (`$this->$method()`, `obj[key]()`), magic method és futásidőben összeállított
-osztálynév / regisztrált komponens nem oldható fel. A `--depth` alapból csak a biztos (feloldott) hívókat követi;
+osztálynév / regisztrált komponens nem oldható fel. Az outline `dynamic_call` kategóriával jelöli őket (PHP,
+JS / TS / Vue, Python; a lista végén, a cél a hívott kifejezés): ez nem hívó-él, ezért a `--grep` / `--depth` /
+`locate` nem veszi figyelembe — a `--depth` csak jelzi, hány hívó tartalmaz ilyet („kézzel nézd át”). A `--depth` alapból csak a biztos (feloldott) hívókat követi;
 a név szerinti egyezést a `--guess` mutatja „?” jellel. A pontos vezérlési logikához a `--body` kell (tömör, kommentekkel; a `--raw` a pontos szöveget adja).
 A `⚠ szintaktikai hiba` sor: egy fájl nem elemezhető teljesen, az eredmény hiányos lehet — azt a fájlt olvasd közvetlenül.
 <!-- /mcp -->

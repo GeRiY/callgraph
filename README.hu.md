@@ -67,7 +67,8 @@ $ callgraph.sh --project shop app --grep saveTranslations --depth 2
   konstansok, importok, docblockok, string-literálok és `if` / `match` / `switch` ágak.
 - **Kategorizált hívás-gráf.** Minden hívás besorolást kap: `native_php`, `orm_relation`, `model_use`, `global_helper`,
   `internal_helper`, `external_call`, `framework_use`, Vue `composable_use` és még több — az agent a szándékot látja,
-  nem csak neveket.
+  nem csak neveket. A futásidőben eldőlő célú hívásokat (`$this->$method()`, `obj[key]()`, `getattr(obj, név)()`)
+  `dynamic_call` jelöli, nem tűnnek el csendben.
 - **„Ki hívja?” és hatáselemzés.** A `--grep <minta> --depth N` a hívók hívóit járja be az egész projektben, cache-elt,
   inkrementális projektindexszel.
 - **Célzott olvasás.** A `fájl::metódus --body` csak azt a metódust írja ki, sorszámozva; a `--lines 30-60` bármely sávot.
@@ -133,8 +134,9 @@ mappához írd így: `build/` vagy `/build`.
 
 - Egy ismert sorsáv pontos szövege kell: `--lines` vagy célzott olvasás.
 - Nem kód fájlok (sima szöveg, adat-dump): az outline itt keveset ad.
-- Makró- vagy reflexió-nehéz kód: a statikusan nem feloldható, dinamikus hívások csak név szerinti egyezésként (`?`,
-  `--guess`-szel) jelennek meg, vagy sehogy.
+- Makró- vagy reflexió-nehéz kód: a statikusan nem feloldható, dinamikus hívásokat az outline `dynamic_call`-lal
+  jelöli (PHP, JS / TS / Vue, Python); a `--grep` / `--depth` nem tekinti hívónak őket, a `--guess`-szel név szerinti
+  egyezésként (`?`) csak ott látszanak, ahol a név ismert.
 - Szintaktikai hibás fájl (szerkesztés közben, merge-konfliktus): `⚠ szintaktikai hiba itt: L<n>` és egy záró `⚠` sor
   jelzi; a hibás rész előtti és utáni kód a térképen van (JS / TS / Vue, Rust: a következő felső szintű függvénytől,
   osztálytól, elemtől), csak a hibás rész hiányzik — az ilyen fájlt olvasd közvetlenül. A kilépési kód 0 marad; CI-hez

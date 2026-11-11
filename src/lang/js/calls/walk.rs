@@ -15,7 +15,7 @@ use super::receivers::{
 };
 use crate::lang::js::analysis::PassContext;
 use crate::lang::js::methods::{Docs, MethodIndex};
-use crate::model::Call;
+use crate::model::{Call, DYNAMIC_CALL, DYNAMIC_KIND};
 
 pub struct Walker<'s> {
     ctx: &'s PassContext<'s>,
@@ -151,6 +151,28 @@ impl<'s> Walker<'s> {
         });
     }
 
+    /// Dinamikus hívás-jelölés: a cél a hívott kifejezés szövege (egy sorra vágva, ~60 karakterre rövidítve).
+    fn record_dynamic(&mut self, start: u32, expr: &str) {
+        self.calls.push(Call {
+            handler: None,
+            container: Some(self.container.clone()),
+            caller: Some(self.caller.clone()),
+            line: self.ctx.lines.line_of(start as usize),
+            end_line: None,
+            kind: DYNAMIC_KIND.to_string(),
+            target: Call::dynamic_target(expr),
+            resolved: None,
+            on: None,
+            category: DYNAMIC_CALL.to_string(),
+            args: None,
+        });
+    }
+
+    /// A kifejezés forrásszövege, egy sorba húzva (vágás nélkül).
+    fn text(&self, span: oxc_span::Span) -> String {
+        self.docs.src_of(span.start, span.end, usize::MAX)
+    }
+
     /// Egy metódusként felvett függvény belépése: a `caller` / container átáll.
     fn enter(&mut self, start: u32) -> Option<(String, String)> {
         let (name, cont) = self.index.fns.get(&start)?.clone();
@@ -216,6 +238,30 @@ impl<'s> Walker<'s> {
     }
 }
 
+/// Literál kulcs / argumentum: sztring, szám, helyettesítés nélküli sablon.
+fn is_literal(e: &Expression<'_>) -> bool {
+    let e = e.get_inner_expression();
+    matches!(
+        e,
+        Expression::StringLiteral(_) | Expression::NumericLiteral(_)
+    ) || e.is_no_substitution_template()
+}
+
+/// A `new` hívott kifejezése futásidőben dől el (`new (expr)()`, `new obj[k]()`); a név- és tag-elérés,
+/// az osztály-/függvény-kifejezés és a `this` nem az.
+fn is_dynamic_new_callee(callee: &Expression<'_>) -> bool {
+    match callee.get_inner_expression() {
+        Expression::Identifier(_)
+        | Expression::StaticMemberExpression(_)
+        | Expression::PrivateFieldExpression(_)
+        | Expression::ThisExpression(_)
+        | Expression::ClassExpression(_)
+        | Expression::FunctionExpression(_) => false,
+        Expression::ComputedMemberExpression(m) => !is_literal(&m.expression),
+        _ => true,
+    }
+}
+
 /// Zárójel és TS non-null (`x!`) nélkül.
 fn strip_ts<'b, 'a>(mut e: &'b Expression<'a>) -> &'b Expression<'a> {
     loop {
@@ -266,12 +312,39 @@ impl<'a> Visit<'a> for Walker<'_> {
     }
 
     fn visit_call_expression(&mut self, it: &CallExpression<'a>) {
-        let r = self.callee(&it.callee);
-        self.record(it.span.start, r, &it.arguments);
+        let callee = it.callee.without_parentheses();
+        match callee {
+            // `obj[action]()`: a kulcs futásidőben dől el (a literál kulcs, `obj['x']()`, marad a régi)
+            Expression::ComputedMemberExpression(m) if !is_literal(&m.expression) => {
+                let text = self.text(callee.span());
+                self.record_dynamic(it.span.start, &text);
+            }
+            _ => {
+                let r = self.callee(&it.callee);
+                self.record(it.span.start, r, &it.arguments);
+                // `require(expr)`: nem literál modul-név (a `require` hívás marad, mellé a jelölés)
+                if matches!(callee, Expression::Identifier(i) if i.name.as_str() == "require")
+                    && it
+                        .arguments
+                        .first()
+                        .is_some_and(|a| !a.as_expression().is_some_and(is_literal))
+                {
+                    let text = self.text(it.span);
+                    self.record_dynamic(it.span.start, &text);
+                }
+            }
+        }
         walk::walk_call_expression(self, it);
     }
 
     fn visit_new_expression(&mut self, it: &NewExpression<'a>) {
+        if is_dynamic_new_callee(&it.callee) {
+            // `new (expr)(...)`: az osztály futásidőben dől el
+            let text = format!("new {}", self.text(it.callee.span()));
+            self.record_dynamic(it.span.start, &text);
+            walk::walk_new_expression(self, it);
+            return;
+        }
         let mut r = self.scope.resolve(&it.callee);
         r.kind = "new";
         if r.resolved.is_none() {
@@ -286,6 +359,13 @@ impl<'a> Visit<'a> for Walker<'_> {
     }
 
     fn visit_import_expression(&mut self, it: &ImportExpression<'a>) {
+        // `import(expr)` nem literál forrással: dinamikus jelölés (a literál import marad a régi `<expr>` sor)
+        if !is_literal(&it.source) {
+            let text = self.text(it.span);
+            self.record_dynamic(it.span.start, &text);
+            walk::walk_import_expression(self, it);
+            return;
+        }
         let mut args = Vec::new();
         let span = it.source.without_parentheses().span();
         args.push(self.docs.src_of(span.start, span.end, 60));

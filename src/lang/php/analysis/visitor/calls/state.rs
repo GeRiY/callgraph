@@ -18,6 +18,8 @@ pub(super) struct State {
     pub(super) framework: Rc<dyn FrameworkStrategy>,
     pub(super) chain: CategoryChain,
     pub(super) calls: Vec<Call>,
+    /// A függvény hívható változói (`Closure` / `callable` paraméter, closure-literál értékadás): a `$var()` nem dinamikus.
+    pub(super) callables: HashSet<String>,
 }
 
 impl Default for State {
@@ -33,6 +35,7 @@ impl Default for State {
             framework: Rc::new(GenericStrategy),
             chain: CategoryChain::with_defaults(),
             calls: Vec::new(),
+            callables: HashSet::new(),
         }
     }
 }

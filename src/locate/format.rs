@@ -90,6 +90,7 @@ impl Report<'_> {
         if !missing.is_empty() {
             let list = missing.join(", ");
             out.push_str(&crate::tf!("no match: {list}\n", "nincs találat: {list}\n"));
+            out.push_str(crate::query::hint::locate_no_match(crate::i18n::lang()));
         }
         // a találat nélküli útvonalnévnél: mit kerestünk
         for (i, term) in self.terms.iter().enumerate() {

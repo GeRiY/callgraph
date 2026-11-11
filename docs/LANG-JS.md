@@ -37,6 +37,12 @@ Top-level `ImportDeclaration`. Kulcs = helyi név; érték = `display` + `''` (d
 `categorize` (104): forrás `vue` → `vue_api`; `@inertiajs/*` → `inertia`; `vue-i18n`/`laravel-vue-i18n` → `i18n_helper`; `ziggy-js` vagy `ziggy` a névben → `route_helper`; `axios` vagy `…AxiosHandler.js` → `http_call`; lokális és (`/Composable(s)/` az útban vagy `use[A-Z]…` név) → `composable_use`; `use[A-Z]…` bármi → `composable_use`; lokális → `module_use`; különben `package_use`.
 `resolveCallee` (399–435) további: `internal_helper` (metódusnév / fájlon belüli függvény / `this.metódus`), `vue_macro` (VUE_MACROS, `resolved:'vue::<név>'`), `route_helper` (`route`, `resolved:'ziggy::route'`), `i18n_helper` (`t`,`$t`), `native_js` (NATIVE_GLOBALS), `global_helper` (ismeretlen azonosító), `external_call` (ismeretlen tag-hívás, `on:'<expr>'` nem azonosító gyökérnél), `vue_emit`, `vue_props`, `instantiation` (NewExpression, nem natív), `component_use` (template), `inertia` (`this.$inertia/$page`). A golden-ben előfordul még 6 hívás `category` nélkül (template `exprCalls` ágak) — a Rust-portnak ezt is reprodukálnia kell.
 
+## Dinamikus hívás-jelölés (`dynamic_call`)
+`obj[expr](…)` nem literál kulccsal (`type:"dynamic"`, `target` = `obj[expr]`, a régi `obj.[]` `external_call` helyett),
+`new (expr)(…)` / `new obj[k]()`, `import(expr)` nem literál forrással (a literál `import('./x')` marad a régi `<expr>`
+sor), `require(expr)` nem literál argumentummal (a `require` `native_js` hívás megmarad mellette). Nem hívó-él.
+A Vue template-kifejezések (regex-alapú `exprCalls`) még nem jelölnek. Lásd `src/lang/js/calls/walk.rs`.
+
 ## methods (addMethod 273, nested 285, optionsApi 296, topStmt 316)
 Alak: `{container,name,line,endLine,visibility,static,abstract:false,kind,params[],returnType:null,doc,body:null}`; `params` = a paraméter-forrás ≤60 kar., `doc` = docblock (stmt, majd fn), a `line/endLine` a **statement** (nem a függvény-node) sorai. Név-ütközés → `<név>@L<sor>`.
 - **Top-level** (`topStmt`): `FunctionDeclaration` → `név`; `const x = fn|arrow` → `x` (egy deklarátoros stmt-nél a stmt, többnél a declarator sorai); `const x = computed|useMemo|debounce|throttle|useDebounceFn|useThrottleFn(fn)` → `x`, `kind` = a wrapper neve; export → `visibility:'public'`, különben `private`; `kind:'function'`.

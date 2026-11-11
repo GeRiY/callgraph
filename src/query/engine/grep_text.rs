@@ -11,6 +11,7 @@ use crate::model::FileGraph;
 use crate::notes::{NoteMarks, strip_mark};
 use crate::profile::{Count, LayerRun, LayerScope, group_header};
 use crate::query::format::{call_lines, grep_outline, method_calls};
+use crate::query::hint::{self, Catalog};
 use crate::query::snippet::{self, SourceLines};
 use crate::{t, tf};
 use std::fmt::Write as _;
@@ -44,6 +45,10 @@ impl QueryEngine {
             }
         }
         if depth <= 1 {
+            // nulla találat: a generikus „törzs-logika” tipp helyett a helyreállító üzenet
+            if rows.is_empty() {
+                return Ok(hint::empty_grep(lang, pattern, &self.take_scope_catalog()));
+            }
             let layers = self.layers.as_ref().filter(|scope| scope.by_layer());
             return Ok(grep_flat(rows, &source, lang, full, limit, layers, &marks));
         }
@@ -72,6 +77,17 @@ impl QueryEngine {
                     source.remember(&caller.file, snippets);
                 }
             }
+            // az 1. szinten nincs hívó: létezik-e a cél (a teljes projekt gráfjából)
+            let no_caller = if rows.is_empty() {
+                let catalog = Catalog::from_graphs(
+                    files
+                        .iter()
+                        .filter_map(|file| graph.slim_graph(&file.to_string_lossy())),
+                );
+                no_caller_hint(lang, pattern, &catalog)
+            } else {
+                String::new()
+            };
             return Ok(render_depth(DepthView {
                 rows,
                 pattern,
@@ -84,6 +100,7 @@ impl QueryEngine {
                 lang,
                 layers: self.layers.as_ref().filter(|scope| scope.by_layer()),
                 marks: &marks,
+                no_caller: &no_caller,
             }));
         }
         // gráf nélkül: a lekérdezés teljes hatókörének minden fájlja (nem csak az 1. szint fájljainak mappái)
@@ -93,6 +110,12 @@ impl QueryEngine {
         }
         let index = CallerIndex::build(all.iter().map(|(path, graph)| (path.as_str(), graph)));
         let (callers, skipped) = index.parents_of_with_skips(&direct, depth, guess);
+        let no_caller = if rows.is_empty() {
+            let catalog = Catalog::from_graphs(all.iter().map(|(_, graph)| graph));
+            no_caller_hint(lang, pattern, &catalog)
+        } else {
+            String::new()
+        };
         Ok(render_depth(DepthView {
             rows,
             pattern,
@@ -105,18 +128,36 @@ impl QueryEngine {
             lang,
             layers: self.layers.as_ref().filter(|scope| scope.by_layer()),
             marks: &marks,
+            no_caller: &no_caller,
         }))
     }
+}
+
+/// A `--depth` 1. szintjének üzenete, ha nincs hívó: létezik-e a cél (a minta a teljes katalógusban), és mire hasonlít.
+fn no_caller_hint(lang: Lang, pattern: &str, catalog: &Catalog) -> String {
+    let presence = crate::query::filter::pattern_regex(pattern)
+        .map_or(hint::Presence::Missing, |regex| catalog.presence(&regex));
+    hint::no_caller(lang, pattern, presence, catalog)
 }
 
 /// Egy hívó metódus sortartománya (a projekt-gráf szimbólumaiból, vagy a bejárt gráfokból).
 trait MethodRanges {
     fn range(&self, file: &str, container: Option<&str>, name: &str) -> Option<(u32, u32)>;
+    /// Van-e a metódusnak dinamikus (`dynamic_call`) hívása — a `--grep` szűrő előtti, teljes gráfból.
+    fn has_dynamic(&self, file: &str, container: Option<&str>, name: &str) -> bool;
+}
+
+/// Egy hívás a megadott (konténer, metódus) hívója-e (`__top__` = nincs hívó metódus).
+fn call_in(call: &crate::model::Call, container: Option<&str>, name: &str) -> bool {
+    call.container.as_deref() == container && call.caller.as_deref().unwrap_or("__top__") == name
 }
 
 impl MethodRanges for ProjectGraph {
     fn range(&self, file: &str, container: Option<&str>, name: &str) -> Option<(u32, u32)> {
         self.method_range(file, container, name)
+    }
+    fn has_dynamic(&self, file: &str, container: Option<&str>, name: &str) -> bool {
+        self.has_dynamic_call(file, container, name)
     }
 }
 
@@ -130,6 +171,16 @@ impl MethodRanges for Vec<(String, FileGraph)> {
                     .iter()
                     .find(|m| m.container.as_deref() == container && m.name == name)
                     .map(|m| (m.line, m.end_line.unwrap_or(m.line)))
+            })
+    }
+    fn has_dynamic(&self, file: &str, container: Option<&str>, name: &str) -> bool {
+        self.iter()
+            .find(|(path, _)| path.as_str() == file)
+            .is_some_and(|(_, graph)| {
+                graph
+                    .calls
+                    .iter()
+                    .any(|call| call.is_dynamic() && call_in(call, container, name))
             })
     }
 }
@@ -150,6 +201,8 @@ struct DepthView<'a> {
     layers: Option<&'a LayerScope>,
     /// A jegyzet-jelölők (a hívó-sorok végén `  📝 N`).
     marks: &'a NoteMarks,
+    /// Az 1. szint „nincs hívó” sora(i): a cél létezésének megállapítása; üres = a szokásos „nincs további hívó”.
+    no_caller: &'a str,
 }
 
 /// A `--by-layer` csoport-fejléce egy sorban (`behúzás` + `[service]  3 calls` + újsor).
@@ -261,6 +314,7 @@ fn render_depth(view: DepthView<'_>) -> String {
         lang,
         layers,
         marks,
+        no_caller,
     } = view;
     let mut output = String::new();
     for level in 1..=depth {
@@ -386,7 +440,11 @@ fn render_depth(view: DepthView<'_>) -> String {
         if (level == 1 && direct.is_empty())
             || (level > 1 && !callers.iter().any(|row| row.level == level))
         {
-            output.push_str(t!("  (no more callers)\n", "  (nincs további hívó)\n"));
+            if level == 1 && !no_caller.is_empty() {
+                output.push_str(no_caller);
+            } else {
+                output.push_str(t!("  (no more callers)\n", "  (nincs további hívó)\n"));
+            }
         }
         if level > 1
             && !guess
@@ -395,6 +453,36 @@ fn render_depth(view: DepthView<'_>) -> String {
             output.push_str(&tf!(
                 "  (+{count} unresolved, name-only matches skipped — --guess shows them)\n",
                 "  (+{count} feloldatlan, csak név szerinti egyezés kihagyva — --guess mutatja)\n"
+            ));
+        }
+        // a szint hívó-metódusai közül hánynak van dinamikus (`dynamic_call`) hívása: azok kézzel nézendők
+        let mut level_methods: Vec<(&str, Option<&str>, &str)> = if level == 1 {
+            direct
+                .iter()
+                .map(|(row, method)| {
+                    (
+                        row.graph.file.as_str(),
+                        method.container.as_deref(),
+                        method.name.as_str(),
+                    )
+                })
+                .collect()
+        } else {
+            level_callers
+                .iter()
+                .map(|c| (c.file.as_str(), c.container.as_deref(), c.caller.as_str()))
+                .collect()
+        };
+        level_methods.sort_unstable();
+        level_methods.dedup();
+        let dynamic = level_methods
+            .iter()
+            .filter(|(file, container, name)| ranges.has_dynamic(file, *container, name))
+            .count();
+        if dynamic > 0 {
+            output.push_str(&tf!(
+                "  ({dynamic} of these callers contain dynamic calls — check them by hand)\n",
+                "  ({dynamic} hívó dinamikus hívást tartalmaz — kézzel nézd át)\n"
             ));
         }
         output.push('\n');

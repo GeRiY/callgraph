@@ -39,7 +39,7 @@ impl CallerCounts {
                     .iter()
                     .map(|c| short_name(&c.name.to_lowercase()).to_owned()),
             );
-            for call in &graph.calls {
+            for call in graph.calls.iter().filter(|call| !call.is_dynamic()) {
                 let target = call
                     .resolved
                     .as_deref()

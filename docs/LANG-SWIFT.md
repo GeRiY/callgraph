@@ -105,6 +105,8 @@ attribútumú tag törzse.
   közvetlenül előtte álló `/** */` blokk; ≤300 kar. Container, metódus, property, konstans és enum case kapja.
 
 ## Ismert korlátok
+- A dinamikus hívás-jelölés (`dynamic_call`: closure-értéken, `perform(_:)`-en, KVC-n át hívott cél) még nincs — a PHP,
+  JS/TS/Vue és Python már jelöli (2. fázis).
 - Nincs típus-feloldás és fájlok közötti szimbólum-tábla: a kategória a fájlbeli nevekből és az ismert listákból
   (`known.rs`) dől el; egy másik fájlban deklarált nézet nézet-törzsön kívül `instantiation`, egy fájlbeli
   metódussal azonos nevű idegen hívás puszta hívásként `internal_helper`.

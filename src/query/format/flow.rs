@@ -57,6 +57,8 @@ impl Formatter for Flow {
                         let target = call.resolved.as_deref().unwrap_or(&call.target);
                         groups.entry(&call.category).or_default().push(target);
                     }
+                    let mut groups: Vec<_> = groups.into_iter().collect();
+                    groups.sort_by_key(|(category, _)| crate::model::category_rank(category));
                     for (category, mut targets) in groups {
                         targets.sort_unstable();
                         targets.dedup();

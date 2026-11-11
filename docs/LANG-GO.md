@@ -72,4 +72,5 @@ Framework-nézetek (Gin / Echo / Chi route-ok, gRPC szolgáltatások, cobra para
 `chan` jelölése a hívásokon), típus-feloldás (`r.repo` típusa a struct-mezőből), függvényen belüli típusok /
 konstansok, a generikus függvények típusparaméterei a szignatúrában, profil-szerepek (`cmd/`, `internal/`, `pkg/`,
 `*_test.go`) és `go.mod`-alapú framework-felismerés, `go.mod`-modulútvonalból a belső import fájlútra oldása,
-build-tagek (`//go:build`) és a `//go:generate` direktívák.
+build-tagek (`//go:build`) és a `//go:generate` direktívák, a dinamikus hívás-jelölés (`dynamic_call`: függvényértéken,
+`reflect`-en át hívott cél) — még nincs.

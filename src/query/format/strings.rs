@@ -69,7 +69,10 @@ impl Formatter for Strings {
     fn format(&self, rows: &[QueryResult], lang: crate::i18n::Lang) -> String {
         let hits = self.collect(rows);
         if hits.is_empty() {
-            return lang.pick("(no matches)\n", "(nincs találat)\n").to_owned();
+            // nulla találat: a „nincs találat” mellett az illesztési szabály és a következő lépés
+            let mut out = lang.pick("(no matches)\n", "(nincs találat)\n").to_owned();
+            out.push_str(crate::query::hint::empty_strings(lang));
+            return out;
         }
         let mut out = String::new();
         let mut prev: Option<&str> = None;
