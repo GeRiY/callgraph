@@ -6,6 +6,8 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ## [Unreleased]
 
+## [0.9.1] — 2026-11-11
+
 ### Új
 - **A JSX komponens-használat hívás:** a nagybetűs JSX-elem (`<Button />`, `<Button>…</Button>`, `<Ui.Button />`)
   `.tsx` / `.jsx` / `.js` fájlban `component_use` hívás (ugyanaz a kategória, mint a Vue-ban), az importból úgy oldódik
@@ -537,7 +539,8 @@ Első kiadás.
 - Beépített frissítés: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Előre fordított csomagok macOS-re (arm64, x86_64), Linuxra (x86_64, ARM64, statikus musl) és Windowsra.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.9.0...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.9.1...develop
+[0.9.1]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.1
 [0.9.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.0
 [0.8.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.8.0
 [0.7.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.7.0
