@@ -311,6 +311,40 @@ fn skill_failure_contexts_and_exit_code_2_map_to_user_errors() {
     assert_eq!(ErrorKind::of_message("Usage: bash …"), ErrorKind::Usage);
 }
 
+/// A helyreállító tippek (második `Did you mean:` sor) nem változtatják a hibaosztályt: az osztályozás az első
+/// sor előtagjából jön, mindkét nyelven.
+#[test]
+fn recovery_hints_keep_the_error_class() {
+    for (message, kind) in [
+        (
+            "Not found: /p/app/Model/User.php (relative to the --project p root)\nDid you mean: app/Models/User.php",
+            ErrorKind::NotFound,
+        ),
+        (
+            "Nem található: /p/app/Model/User.php (--project p gyökeréhez képest)\nEsetleg erre gondoltál: app/Models/User.php",
+            ErrorKind::NotFound,
+        ),
+        (
+            "No such method: /p/User.php::fnd (see --format outline for the file's full list)\nDid you mean: find",
+            ErrorKind::NotFound,
+        ),
+        (
+            "Nincs ilyen metódus: /p/User.php::fnd (lásd: --format outline a fájl teljes listájához)\nEsetleg erre gondoltál: find",
+            ErrorKind::NotFound,
+        ),
+        (
+            "Unknown category: modle_use (known: model_use, orm_relation)\nDid you mean: model_use",
+            ErrorKind::Usage,
+        ),
+        (
+            "Ismeretlen kategória: modle_use (ismertek: model_use)\nEsetleg erre gondoltál: model_use",
+            ErrorKind::Usage,
+        ),
+    ] {
+        assert_eq!(ErrorKind::of_message(message), kind, "{message}");
+    }
+}
+
 #[test]
 fn the_local_stats_notice_is_claimed_only_once() {
     let dir = temp_dir("notice");

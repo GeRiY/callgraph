@@ -149,4 +149,105 @@ mod tests {
             vec!["internal_helper", "external_call", "zzz_last", DYNAMIC_CALL]
         );
     }
+
+    /// A kategória-szerű alakú, de nem kategória literálok (hívás-fajták, PHP-függvénynevek, makró-fajta).
+    const NOT_CATEGORIES: [&str; 6] = [
+        "func_call",
+        "method_call",
+        "nullsafe_method_call",
+        "forward_static_call",
+        "spl_autoload_call",
+        "proc_macro",
+    ];
+
+    /// Egy mappa minden `.rs` fájlja (rekurzívan; a teszt-fájlok és -mappák kimaradnak).
+    fn rust_sources(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            let name = path.file_name().unwrap().to_string_lossy().into_owned();
+            if path.is_dir() {
+                if name != "tests" {
+                    rust_sources(&path, out);
+                }
+            } else if name.ends_with(".rs") && !name.starts_with("tests") {
+                out.push(path);
+            }
+        }
+    }
+
+    /// A fájl éles kódja: az első `#[cfg(test)]` előtti rész.
+    fn production_code(path: &std::path::Path) -> String {
+        let text = std::fs::read_to_string(path).unwrap();
+        text.split("#[cfg(test)]").next().unwrap_or("").to_owned()
+    }
+
+    /// A frontend-források (fájl, szöveg); `production`: csak az éles kód, különben a teljes fájl.
+    fn frontend_sources(production: bool) -> Vec<(std::path::PathBuf, String)> {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/lang");
+        let mut files = Vec::new();
+        rust_sources(&dir, &mut files);
+        assert!(files.len() > 50, "the frontend sources were not found");
+        files
+            .into_iter()
+            .map(|file| {
+                let code = if production {
+                    production_code(&file)
+                } else {
+                    std::fs::read_to_string(&file).unwrap()
+                };
+                (file, code)
+            })
+            .collect()
+    }
+
+    #[test]
+    fn known_categories_are_sorted_with_dynamic_call_last() {
+        let (last, rest) = KNOWN_CATEGORIES.split_last().unwrap();
+        assert_eq!(*last, DYNAMIC_CALL);
+        assert!(rest.windows(2).all(|pair| pair[0] < pair[1]), "{rest:?}");
+        // a rendezés megegyezik a kimeneti listák sorrendjével
+        let mut ranked = KNOWN_CATEGORIES.to_vec();
+        ranked.sort_by_key(|category| category_rank(category));
+        assert_eq!(ranked, KNOWN_CATEGORIES.to_vec());
+    }
+
+    /// Minden frontend éles kódjában kategóriaként kiosztott literál szerepel a közös listában (új kategóriát a
+    /// frontendben felvenni, a `KNOWN_CATEGORIES`-ba nem: ez a teszt bukik).
+    #[test]
+    fn known_categories_cover_every_frontend() {
+        let assigned = regex::Regex::new(r#"category(?:: |\s*=\s*)"([a-z_0-9]+)""#).unwrap();
+        let verdict = regex::Regex::new(r#"Verdict::new\(\s*"([a-z_]+)""#).unwrap();
+        let shaped = regex::Regex::new(
+            r#""([a-z]+(?:_[a-z]+)*_(?:use|helper|go|js|php|python|rust|swift|api|modifier|view|emit|macro|props|relation|call))""#,
+        )
+        .unwrap();
+        let mut missing = std::collections::BTreeSet::new();
+        for (file, code) in frontend_sources(true) {
+            for pattern in [&assigned, &verdict, &shaped] {
+                for found in pattern.captures_iter(&code) {
+                    let name = &found[1];
+                    if !NOT_CATEGORIES.contains(&name) && !KNOWN_CATEGORIES.contains(&name) {
+                        missing.insert(format!("{name} ({})", file.display()));
+                    }
+                }
+            }
+        }
+        assert!(
+            missing.is_empty(),
+            "add these call categories to model::KNOWN_CATEGORIES: {missing:?}"
+        );
+    }
+
+    /// A lista nem tartalmaz elavult nevet: mindegyik literálként szerepel valamelyik frontendben.
+    #[test]
+    fn known_categories_are_all_produced_by_a_frontend() {
+        let sources = frontend_sources(false);
+        for name in KNOWN_CATEGORIES.iter().filter(|name| **name != DYNAMIC_CALL) {
+            let quoted = format!("\"{name}\"");
+            assert!(
+                sources.iter().any(|(_, code)| code.contains(&quoted)),
+                "{name} is not produced by any frontend: remove it from KNOWN_CATEGORIES"
+            );
+        }
+    }
 }

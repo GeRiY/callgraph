@@ -394,3 +394,24 @@ fn off_by_default_the_command_runs_unchanged() {
 fn slash(path: &str) -> String {
     path.replace('\\', "/")
 }
+
+/// A helyreállító tipp-sorok (`ℹ` / `💡`, `Did you mean`) nem fájl- és nem metódus-sorok: nincs belőlük javaslat.
+#[test]
+fn recovery_hint_lines_produce_no_suggestions() {
+    let empty_grep = "ℹ no call target matches Usr::find\n\
+        💡 the pattern is a regular expression on the call TARGET (case-insensitive): (^|::|\\.|->)name$ finds every call by name\n\
+        💡 by name only: '(^|::|\\.|->)find$'\n\
+        💡 did you mean: User::find\n";
+    let args = ["wrap", "app", "--grep", "Usr::find"];
+    assert!(run(&args, empty_grep).is_empty());
+    let no_caller = "== level 1 — directly calls: /Usr::find/\n  (no method named Usr::find in the project map — check the spelling)\n  💡 did you mean: User::find\n";
+    let deep = ["wrap", "app", "--grep", "Usr::find", "--depth", "2"];
+    assert!(run(&deep, no_caller).is_empty());
+    let located = "locate: 1 terms · no match in the project map\n\
+        no match: zzz\n\
+        💡 try one part of the name (a camelCase / snake_case piece, singular form); for UI text quote the phrase (\"…\")\n";
+    assert!(run(&["locate", "zzz"], located).is_empty());
+    // a hibás útvonal hibaüzenete sem kínál javaslatot
+    let missing = "Not found: /p/app/Model/User.php (relative to the --project p root)\nDid you mean: app/Models/User.php\n";
+    assert!(run(&["wrap", "app/Model/User.php"], missing).is_empty());
+}

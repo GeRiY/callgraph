@@ -245,10 +245,6 @@ impl Catalog {
         }
     }
 
-    pub(crate) fn is_empty(&self) -> bool {
-        self.symbols.is_empty()
-    }
-
     /// A mintára illeszkedő név jelenléte: hívják (máshol), csak definiált, vagy sehol.
     pub(crate) fn presence(&self, regex: &Regex) -> Presence {
         if self.called.iter().any(|name| regex.is_match(name)) {
@@ -271,7 +267,7 @@ impl Catalog {
                 let key = if qualified {
                     symbol.as_str()
                 } else {
-                    symbol.rsplit("::").next().unwrap_or(symbol)
+                    symbol.rsplit("::").next().unwrap_or(symbol.as_str())
                 };
                 (key, symbol.as_str())
             }),
@@ -452,3 +448,5 @@ pub(crate) fn similar_paths(requested: &str, known: &[String]) -> Vec<String> {
         .collect()
 }
 
+#[cfg(test)]
+mod tests;

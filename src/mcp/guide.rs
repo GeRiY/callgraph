@@ -189,6 +189,37 @@ mod tests {
     }
 
     #[test]
+    fn start_section_carries_the_recipes_with_mcp_names() {
+        for lang in Lang::ALL {
+            let text = instructions(lang);
+            let marker = lang.pick("**Recipes:**", "**Receptek:**");
+            let recipes = text
+                .lines()
+                .skip_while(|line| !line.starts_with(marker))
+                .take(3)
+                .collect::<Vec<_>>()
+                .join("\n");
+            assert!(recipes.starts_with(marker), "{lang:?}: no recipes\n{text}");
+            // a négy recept eszköz-nevei (bug fix, hívók, ismeretlen projekt, szöveg / konstans)
+            for tool in [
+                "`locate`",
+                "`outline`",
+                "`method_body`",
+                "`find_callers`",
+                "`depth`",
+                "`project_profile`",
+                "`search` (strings)",
+                "`search` (constants)",
+            ] {
+                assert!(recipes.contains(tool), "{lang:?}: {tool}\n{recipes}");
+            }
+            assert!(!recipes.contains("--"), "{lang:?}: CLI flag left\n{recipes}");
+            assert!(!recipes.contains("bash "), "{lang:?}: shell command left");
+            assert!(recipes.contains("Grep"), "{lang:?}: exact text goes to Grep");
+        }
+    }
+
+    #[test]
     fn both_languages_have_the_same_shape() {
         let en = instructions(Lang::En);
         let hu = instructions(Lang::Hu);

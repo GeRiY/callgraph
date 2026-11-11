@@ -131,7 +131,6 @@ fn name_pattern_uses_the_last_segment() {
 #[test]
 fn catalog_collects_definitions_and_suggests_in_order() {
     let catalog = definitions();
-    assert!(!catalog.is_empty());
     // minősített azonosító: a teljes `Típus::metódus`-hoz hasonlít
     assert_eq!(catalog.suggest("Usr::find"), strings(&["User::find"]));
     assert_eq!(catalog.suggest("User::fnd"), strings(&["User::find"]));
@@ -172,7 +171,6 @@ fn presence_tells_missing_from_defined_from_called() {
     assert_eq!(with_caller.presence(&regex("User::find")), Presence::DefinedOnly);
     // az üres katalógus semmit sem ismer
     assert_eq!(Catalog::default().presence(&regex("x")), Presence::Missing);
-    assert!(Catalog::default().is_empty());
 }
 
 #[test]
