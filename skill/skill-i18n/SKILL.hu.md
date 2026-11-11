@@ -60,6 +60,7 @@ bash $CG --project myapp app --grep 'Order::cancel' --depth 3        # hatásele
 bash $CG --project myapp app --grep 'Order::cancel' --depth 3 --guess # + a csak név szerinti egyezések („?”)
 bash $CG --project myapp app --grep 'Order::cancel' --body           # a talált hívó metódusok forrása
 bash $CG --project myapp app --category model_use,orm_relation       # szűrés hívás-kategóriára
+bash $CG --project myapp app --category dynamic_call                 # a futásidőben eldőlő célú hívások
 ```
 
 <!-- mcp:callers -->
@@ -182,7 +183,8 @@ property típusa előtt látszik. Hívás-kategóriák: `swiftui_view`, `swiftui
 Ugyanazok a kapcsolók. A fájl-szintű függvények és konstansok a `<fájl>.py` `module` containerben; `class` ősökkel
 (`extends`) és dekorátorokkal (`uses @dataclass`). Metódus-fajták: `method` / `staticmethod` / `classmethod` /
 `property` (`async ` előtaggal); a `self` / `cls` kimarad a szignatúrából; a vezető `_` = privát. Hívás-kategóriák:
-`native_python`, `internal_helper`, `static_call`, `instantiation`, `external_call`. Részletek: `docs/LANG-PYTHON.md`.
+`native_python`, `internal_helper`, `static_call`, `instantiation`, `external_call`, `dynamic_call` (`getattr(obj, név)()`,
+`globals()[név]()`, `import_module(név)`, `eval` / `exec`). Részletek: `docs/LANG-PYTHON.md`.
 
 ## Go
 
@@ -306,7 +308,10 @@ parancsnál) vagy a `CALLGRAPH_GITIGNORE=0` (MCP-szerver, hook) kikapcsolja a `.
 
 <!-- mcp:limits -->
 Statikus elemzés: dinamikus hívás (`$this->$method()`, `obj[key]()`), magic method és futásidőben összeállított
-osztálynév / regisztrált komponens nem oldható fel. A `--depth` alapból csak a biztos (feloldott) hívókat követi;
+osztálynév / regisztrált komponens nem oldható fel. Az outline `dynamic_call` kategóriával jelöli őket (PHP,
+JS / TS / Vue, Python; a lista végén, a cél a hívott kifejezés): ez nem hívó-él, ezért a `--grep` / `--depth` /
+`locate` nem veszi figyelembe — a `--depth` csak jelzi, hány hívó tartalmaz ilyet („kézzel nézd át”); a
+`--category dynamic_call` felsorolja őket. A `--depth` alapból csak a biztos (feloldott) hívókat követi;
 a név szerinti egyezést a `--guess` mutatja „?” jellel. A pontos vezérlési logikához a `--body` kell (tömör, kommentekkel; a `--raw` a pontos szöveget adja).
 A `⚠ szintaktikai hiba` sor: egy fájl nem elemezhető teljesen, az eredmény hiányos lehet — azt a fájlt olvasd közvetlenül.
 <!-- /mcp -->

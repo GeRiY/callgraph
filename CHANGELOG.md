@@ -5,6 +5,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+### Added
+- **`dynamic_call` marker:** calls whose target is decided at runtime used to be missing from the outline, so the graph
+  looked complete where it was not. They are now listed (last, after the other categories) with the called expression
+  as the target — PHP: `$obj->$m()`, `$obj->{$expr}()`, `$class::$m()`, `$fn()`, `new $class`, `call_user_func($x)`,
+  `app($var)` / `resolve($var)` / `$this->app->make($var)`; JS / TS / Vue: `obj[expr]()`, `new (expr)()`, `import(expr)`,
+  `require(expr)`; Python: `getattr(obj, name)()`, `globals()[name]()`, `importlib.import_module(name)`, `eval` / `exec`.
+  Literal cases (`obj['x']()`, `app(Foo::class)`, `getattr(obj, 'x')()`) stay ordinary. It is a marker, not a caller
+  edge: `--grep`, `--depth` and `locate` ignore it; `--depth` adds a line telling how many of the callers contain
+  dynamic calls ("check them by hand"). Filter with `--category dynamic_call`. Rust, Swift and Go: not yet.
+
 ## [0.8.0] — 2026-11-11
 
 ### Added

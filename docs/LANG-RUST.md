@@ -123,6 +123,8 @@ kimaradnak (azok a `doc` mezőkbe kerülnek). Felvétel: `TODO` / `FIXME` / `XXX
 `text` ≤150. `caller` = a legszűkebb tartalmazó függvény, különben `__top__` (a container a legszűkebb tartalmazó).
 
 ## Ismert korlátok
+- A dinamikus hívás-jelölés (`dynamic_call`: függvény-mutatón, `dyn Fn`-en át hívott cél) még nincs — a PHP, JS/TS/Vue
+  és Python már jelöli (2. fázis).
 - **Makrók nincsenek kibontva**: a derive-, attribútum- és függvényszerű makrók által generált kód nem látszik; a makró
   törzse csak akkor elemzett, ha kifejezés-lista vagy utasítás-sorozat.
 - **Csak egyszerű típus-következtetés** (lásd fent): a visszatérési típusok (`let x = repo.find()`), a láncolt hívások

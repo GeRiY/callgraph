@@ -6,6 +6,16 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ## [Unreleased]
 
+### Új
+- **`dynamic_call` jelölés:** a futásidőben eldőlő célú hívások eddig hiányoztak az outline-ból, így a gráf ott is
+  teljesnek látszott, ahol nem az. Mostantól szerepelnek (a többi kategória után, a lista végén), célnak a hívott
+  kifejezéssel — PHP: `$obj->$m()`, `$obj->{$expr}()`, `$class::$m()`, `$fn()`, `new $class`, `call_user_func($x)`,
+  `app($var)` / `resolve($var)` / `$this->app->make($var)`; JS / TS / Vue: `obj[expr]()`, `new (expr)()`,
+  `import(expr)`, `require(expr)`; Python: `getattr(obj, név)()`, `globals()[név]()`, `importlib.import_module(név)`,
+  `eval` / `exec`. A literál esetek (`obj['x']()`, `app(Foo::class)`, `getattr(obj, 'x')()`) közönségesek maradnak.
+  Jelölés, nem hívó-él: a `--grep`, a `--depth` és a `locate` figyelmen kívül hagyja; a `--depth` egy sorban jelzi,
+  hány hívó tartalmaz dinamikus hívást („kézzel nézd át”). Szűrés: `--category dynamic_call`. Rust, Swift, Go: még nincs.
+
 ## [0.8.0] — 2026-11-11
 
 ### Új

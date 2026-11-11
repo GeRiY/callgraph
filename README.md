@@ -67,7 +67,8 @@ $ callgraph.sh --project shop app --grep saveTranslations --depth 2
   imports, docblocks, string literals and `if` / `match` / `switch` branches.
 - **Categorized call graph.** Every call is classified: `native_php`, `orm_relation`, `model_use`, `global_helper`,
   `internal_helper`, `external_call`, `framework_use`, Vue `composable_use` and more, so the agent sees intent,
-  not just names.
+  not just names. Calls whose target is decided at runtime (`$this->$method()`, `obj[key]()`, `getattr(obj, name)()`)
+  are marked `dynamic_call` instead of silently missing.
 - **"Who calls this?" and impact analysis.** `--grep <pattern> --depth N` walks callers of callers across the whole
   project using a cached, incremental project index.
 - **Surgical reads.** `file::method --body` prints just that method, line-numbered; `--lines 30-60` prints any range.
@@ -132,8 +133,9 @@ MCP server and the hook); `.callgraphignore` and the built-in skipped folders st
 
 - You need the exact text of a known line range: use `--lines` or a targeted read.
 - Non-code files (plain text, data dumps): the outline adds little.
-- Macro- or reflection-heavy code: dynamic calls that can't be resolved statically are shown as name-only matches
-  (`?`) with `--guess`, or not at all.
+- Macro- or reflection-heavy code: dynamic calls that can't be resolved statically are marked `dynamic_call` in the
+  outline (PHP, JS / TS / Vue, Python), are not callers for `--grep` / `--depth`, and show up as name-only matches
+  (`?`) with `--guess` only where the name is known.
 - Files with a syntax error (mid-edit, merge conflict) are flagged with `⚠ syntax error at L<n>` and a closing `⚠`
   line: the code before and after the broken part is still mapped (JS / TS / Vue, Rust: from the next top-level
   function, class or item on), the broken part itself is missing — read such a file directly. The exit code stays 0;

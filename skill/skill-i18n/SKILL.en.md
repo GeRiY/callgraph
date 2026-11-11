@@ -60,6 +60,7 @@ bash $CG --project myapp app --grep 'Order::cancel' --depth 3        # impact an
 bash $CG --project myapp app --grep 'Order::cancel' --depth 3 --guess # + name-only matches ("?")
 bash $CG --project myapp app --grep 'Order::cancel' --body           # source of the caller methods found
 bash $CG --project myapp app --category model_use,orm_relation       # filter by call category
+bash $CG --project myapp app --category dynamic_call                 # the calls whose target is decided at runtime
 ```
 
 <!-- mcp:callers -->
@@ -181,7 +182,8 @@ shown before the property type. Call categories: `swiftui_view`, `swiftui_modifi
 Same switches. File-level functions and constants are in the `<file>.py` `module` container; `class` with bases
 (`extends`) and decorators (`uses @dataclass`). Method kinds: `method` / `staticmethod` / `classmethod` / `property`
 (`async ` prefix); `self` / `cls` is left out of the signature; a leading `_` = private. Call categories: `native_python`,
-`internal_helper`, `static_call`, `instantiation`, `external_call`. Details: `docs/LANG-PYTHON.md`.
+`internal_helper`, `static_call`, `instantiation`, `external_call`, `dynamic_call` (`getattr(obj, name)()`, `globals()[name]()`,
+`import_module(name)`, `eval` / `exec`). Details: `docs/LANG-PYTHON.md`.
 
 ## Go
 
@@ -300,7 +302,9 @@ relative to its folder (`public/build`, `/storage/`, `!keep.js`). `--no-gitignor
 
 <!-- mcp:limits -->
 Static analysis: dynamic calls (`$this->$method()`, `obj[key]()`), magic methods and class names / registered components
-assembled at runtime cannot be resolved. By default `--depth` follows only the certain (resolved) callers;
+assembled at runtime cannot be resolved. They are marked `dynamic_call` in the outline (PHP, JS / TS / Vue, Python;
+listed last, the target is the called expression): not a caller edge, so `--grep` / `--depth` / `locate` ignore it —
+`--depth` only notes how many callers contain one ("check them by hand"); `--category dynamic_call` lists them. By default `--depth` follows only the certain (resolved) callers;
 name-only matches are shown by `--guess` with a "?" mark. For the exact control logic you need `--body` (compact, comments kept; `--raw` gives the exact text).
 A `⚠ syntax error` line means a file did not parse fully: the result may be incomplete — read that file directly.
 <!-- /mcp -->

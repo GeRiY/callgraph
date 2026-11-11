@@ -48,6 +48,12 @@ puszta név). A `self.attr.method()` fogadója `on: "self"` marad (nincs típus-
 ## strings
 String-literálok (f-stringnél a statikus részek, a kifejezés `{…}`); a docstring nem.
 
+## Dinamikus hívás-jelölés (`dynamic_call`)
+`getattr(obj, név)(…)` nem sztring-literál névvel (a jelölés célja `getattr(obj, név)`), `globals()[név](…)` /
+`locals()[név](…)`, `importlib.import_module(név)` / `__import__(név)` nem literál argumentummal, `eval(…)` / `exec(…)`.
+`type: "dynamic"`, `resolved: None`; a közönséges hívás (`eval`, `import_module`, a belső `getattr`) megmarad mellette.
+Nem hívó-él: a `--grep` / `--depth` / `locate` nem látja. Lásd `src/lang/python/visitor/body.rs` (`dynamic_expr`).
+
 ## 2. fázis (nincs kész)
 Framework-nézetek (Django `urls`/modellek, Flask/FastAPI route-ok), vezérlési ágak (`if`/`match`/`try`), kommentek
 (`TODO`), `--body` tömör nézet és `--const` re-export (`from x import NAME`, `__all__`) a forrásszövegből, `self.x = …`
