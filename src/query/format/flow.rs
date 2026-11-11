@@ -25,7 +25,8 @@ impl Formatter for Flow {
                 "FILE  {}{}",
                 graph.file,
                 crate::io::protect_mark(&graph.file)
-            ).unwrap();
+            )
+            .unwrap();
             out.push_str(&super::parse_error_lines(&graph, lang));
             out.push('\n');
             for cf in &graph.control_flow {

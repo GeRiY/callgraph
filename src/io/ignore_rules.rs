@@ -105,10 +105,10 @@ thread_local! {
 fn protect_matcher(dir: &Path) -> Option<Rc<Gitignore>> {
     let file = dir.join(IGNORE_FILE);
     let mtime = std::fs::metadata(&file).and_then(|m| m.modified()).ok();
-    if let Some(entry) = PROTECT.with(|c| c.borrow().get(dir).cloned()) {
-        if entry.0 == mtime {
-            return entry.1;
-        }
+    if let Some(entry) = PROTECT.with(|c| c.borrow().get(dir).cloned())
+        && entry.0 == mtime
+    {
+        return entry.1;
     }
     let matcher = mtime
         .and_then(|_| std::fs::read_to_string(&file).ok())
@@ -487,8 +487,12 @@ mod tests {
     /// A `protect` sor külön fajta: nem kiterjesztés, nem útminta; a puszta `protect` marad kiterjesztés-szabály.
     #[test]
     fn protect_lines_are_their_own_kind() {
-        let text = "md\nprotect migrations/\nprotect\tapp/Generated/\nprotect\nprotects/\n# protect x\n";
-        assert_eq!(super::protect_patterns(text), ["migrations/", "app/Generated/"]);
+        let text =
+            "md\nprotect migrations/\nprotect\tapp/Generated/\nprotect\nprotects/\n# protect x\n";
+        assert_eq!(
+            super::protect_patterns(text),
+            ["migrations/", "app/Generated/"]
+        );
         assert_eq!(super::parse_ignore(text), ["md", "protect"]);
         assert_eq!(super::path_patterns(text), ["protects/"]);
     }
@@ -497,12 +501,18 @@ mod tests {
     #[test]
     fn protected_files_stay_in_the_walk() {
         let project = Project::new(&[
-            (".callgraphignore", "protect migrations/\nprotect *.gen.php\n"),
+            (
+                ".callgraphignore",
+                "protect migrations/\nprotect *.gen.php\n",
+            ),
             ("migrations/a.php", "x"),
             ("app/b.php", "x"),
             ("app/c.gen.php", "x"),
             ("sub/migrations/d.php", "x"),
-            ("sub/.callgraphignore", "protect /lib/\nprotect !c.gen.php\n"),
+            (
+                "sub/.callgraphignore",
+                "protect /lib/\nprotect !c.gen.php\n",
+            ),
             ("sub/lib/e.php", "x"),
             ("sub/c.gen.php", "x"),
         ]);
@@ -521,7 +531,12 @@ mod tests {
             .collect();
         assert_eq!(
             protected,
-            ["migrations/a.php", "app/c.gen.php", "sub/migrations/d.php", "sub/lib/e.php"]
+            [
+                "migrations/a.php",
+                "app/c.gen.php",
+                "sub/migrations/d.php",
+                "sub/lib/e.php"
+            ]
         );
         assert_eq!(super::protect_mark("/nonexistent/x.php"), "");
     }

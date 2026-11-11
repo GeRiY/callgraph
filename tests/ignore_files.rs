@@ -176,19 +176,40 @@ fn protect_lines_mark_files_without_excluding_them() {
         all.extend_from_slice(args);
         project.run(&all)
     };
-    let plain = (show(&["migrations/m1.php"]), project.run(&["locate", "M1", "Shop", "--project", &root]));
-    assert!(!plain.0.contains('\u{1f512}') && !plain.1.contains('\u{1f512}'), "{plain:?}");
+    let plain = (
+        show(&["migrations/m1.php"]),
+        project.run(&["locate", "M1", "Shop", "--project", &root]),
+    );
+    assert!(
+        !plain.0.contains('\u{1f512}') && !plain.1.contains('\u{1f512}'),
+        "{plain:?}"
+    );
 
     project.write(".callgraphignore", "protect migrations/\n");
     let outline = show(&["migrations/m1.php"]);
-    assert!(outline.contains("FILE  migrations/m1.php  \u{1f512}"), "{outline}");
+    // egyetlen fájlnál a FILE sor abszolút utat ír: a végén áll a 🔒
+    assert!(
+        outline.lines().any(|l| l.starts_with("FILE  ")
+            && l.contains("migrations/m1.php")
+            && l.ends_with("\u{1f512}")),
+        "{outline}"
+    );
     assert!(outline.contains("up"), "{outline}");
     assert!(!show(&["app/Shop.php"]).contains('\u{1f512}'));
     let body = show(&["migrations/m1.php::up", "--body"]);
-    assert!(body.contains("\u{1f512}") && body.contains("return 1"), "{body}");
+    assert!(
+        body.contains("\u{1f512}") && body.contains("return 1"),
+        "{body}"
+    );
     let located = project.run(&["locate", "M1", "Shop", "--all", "--project", &root]);
-    let lock: Vec<&str> = located.lines().filter(|l| l.contains('\u{1f512}')).collect();
-    assert!(lock.len() == 1 && lock[0].contains("migrations/m1.php"), "{located}");
+    let lock: Vec<&str> = located
+        .lines()
+        .filter(|l| l.contains('\u{1f512}'))
+        .collect();
+    assert!(
+        lock.len() == 1 && lock[0].contains("migrations/m1.php"),
+        "{located}"
+    );
     assert!(located.contains("app/Shop.php"), "{located}");
     // JSON: csak a védettnél
     let json = show(&["migrations/m1.php", "--format", "json"]);

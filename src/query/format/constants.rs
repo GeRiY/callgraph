@@ -86,7 +86,8 @@ impl Formatter for Constants {
                 "FILE  {}{}",
                 row.graph.file,
                 crate::io::protect_mark(&row.graph.file)
-            ).unwrap();
+            )
+            .unwrap();
             for (line, caller, value) in lines {
                 writeln!(out, "  L{line:<5} {caller:<49}{value}").unwrap();
             }

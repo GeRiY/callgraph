@@ -80,7 +80,8 @@ impl Formatter for Strings {
                     "FILE  {}{}",
                     hit.file,
                     crate::io::protect_mark(&hit.file)
-                ).unwrap();
+                )
+                .unwrap();
                 prev = Some(hit.file.as_str());
             }
             writeln!(out, "  L{:<5} {:<48} {}", hit.line, hit.caller, hit.value).unwrap();

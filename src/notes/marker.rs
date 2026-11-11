@@ -22,9 +22,7 @@ pub fn mark(n: usize) -> String {
 
 /// A sor a jelölő nélkül (a kimenetet olvasó szabályokhoz: `FILE  <út>  📝 2  🔒` → `FILE  <út>`; a `🔒` védett-jelölőt is).
 pub fn strip_mark(line: &str) -> &str {
-    let line = line
-        .strip_suffix(crate::io::PROTECT_MARK)
-        .unwrap_or(line);
+    let line = line.strip_suffix(crate::io::PROTECT_MARK).unwrap_or(line);
     line.split_once(PREFIX).map_or(line, |(head, _)| head)
 }
 
