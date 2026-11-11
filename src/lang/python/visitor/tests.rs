@@ -111,14 +111,22 @@ fn structure_classes_functions_and_ranges() {
     // a dekorátor sora a tartomány eleje
     assert_eq!((repo.line, repo.end_line), (12, 49));
     assert_eq!(repo.extends.as_deref(), Some(&["Base".to_string()][..]));
-    assert_eq!(repo.traits.as_deref(), Some(&["@dataclass(frozen=True)".to_string()][..]));
+    assert_eq!(
+        repo.traits.as_deref(),
+        Some(&["@dataclass(frozen=True)".to_string()][..])
+    );
     assert_eq!(repo.doc.as_deref(), Some("Stores users."));
     assert_eq!(g.containers[0].doc.as_deref(), Some("Sample module."));
     let names: Vec<&str> = g.methods.iter().map(|m| m.name.as_str()).collect();
-    for n in ["__init__", "make", "build", "size", "fetch", "_hidden", "save", "helper"] {
+    for n in [
+        "__init__", "make", "build", "size", "fetch", "_hidden", "save", "helper",
+    ] {
         assert!(names.contains(&n), "{n}: {names:?}");
     }
-    assert!(!names.contains(&"inner") && !names.contains(&"<lambda>"), "{names:?}");
+    assert!(
+        !names.contains(&"inner") && !names.contains(&"<lambda>"),
+        "{names:?}"
+    );
 }
 
 #[test]
@@ -164,7 +172,10 @@ fn constants_properties_and_imports() {
         .collect();
     assert!(consts.contains(&("MAX_SIZE", Some("10"))), "{consts:?}");
     assert!(consts.contains(&("TIMEOUT", Some("2.5"))), "{consts:?}");
-    assert!(consts.contains(&("__all__", Some("[\"Repo\", \"make\"]"))), "{consts:?}");
+    assert!(
+        consts.contains(&("__all__", Some("[\"Repo\", \"make\"]"))),
+        "{consts:?}"
+    );
     assert!(consts.contains(&("LIMIT", Some("5"))), "{consts:?}");
     let props: Vec<(&str, Option<&str>)> = g
         .properties
@@ -198,7 +209,10 @@ fn calls_are_categorized() {
     assert_eq!(call(&g, "helper").category, "internal_helper");
     assert_eq!(call(&g, "User").category, "instantiation");
     let repo = call(&g, "Repo");
-    assert_eq!((repo.kind.as_str(), repo.category.as_str()), ("new", "instantiation"));
+    assert_eq!(
+        (repo.kind.as_str(), repo.category.as_str()),
+        ("new", "instantiation")
+    );
     // beágyazott függvény és lambda hívása a külső függvényhez tartozik
     assert_eq!(call(&g, "transform").caller.as_deref(), Some("make"));
     assert_eq!(call(&g, "inner").caller.as_deref(), Some("make"));
@@ -219,8 +233,14 @@ fn strings_skip_docstrings_and_keep_fstring_text() {
 
 #[test]
 fn framework_from_imports() {
-    assert_eq!(graph("from flask import Flask\n").framework.as_deref(), Some("flask"));
-    assert_eq!(graph("import fastapi\n").framework.as_deref(), Some("fastapi"));
+    assert_eq!(
+        graph("from flask import Flask\n").framework.as_deref(),
+        Some("flask")
+    );
+    assert_eq!(
+        graph("import fastapi\n").framework.as_deref(),
+        Some("fastapi")
+    );
     assert_eq!(graph("import os\n").framework.as_deref(), Some("python"));
 }
 
@@ -232,6 +252,11 @@ fn conditional_definitions_and_setter_collision() {
          class A:\n    @property\n    def x(self):\n        return 1\n\n    @x.setter\n    def x(self, v):\n        pass\n",
     );
     assert!(g.methods.iter().any(|m| m.name == "cond"));
-    let xs: Vec<&str> = g.methods.iter().filter(|m| m.name.starts_with('x')).map(|m| m.name.as_str()).collect();
+    let xs: Vec<&str> = g
+        .methods
+        .iter()
+        .filter(|m| m.name.starts_with('x'))
+        .map(|m| m.name.as_str())
+        .collect();
     assert_eq!(xs, ["x", "x@L15"]);
 }

@@ -145,9 +145,7 @@ mod tests {
 
     #[test]
     fn parses_and_reports_lines() {
-        let parsed = TreeSitterPython
-            .parse("class A:\n    x = 1\n")
-            .unwrap();
+        let parsed = TreeSitterPython.parse("class A:\n    x = 1\n").unwrap();
         let root = parsed.root();
         assert_eq!(root.kind(), "module");
         let decl = named_children(root)[0];

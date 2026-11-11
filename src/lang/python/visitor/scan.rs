@@ -67,7 +67,10 @@ fn import(
             ) else {
                 continue;
             };
-            let (path, alias) = (parsed.text(path).to_string(), parsed.text(alias).to_string());
+            let (path, alias) = (
+                parsed.text(path).to_string(),
+                parsed.text(alias).to_string(),
+            );
             symbols.imports.insert(alias.clone(), path.clone());
             imports.push((alias, path));
         } else {

@@ -59,8 +59,11 @@ impl<'s> PythonVisitor<'_, 's> {
         b: &mut FileGraphBuilder,
     ) {
         match node.kind() {
-            "import_statement" | "import_from_statement" | "future_import_statement"
-            | "comment" | "pass_statement" => {}
+            "import_statement"
+            | "import_from_statement"
+            | "future_import_statement"
+            | "comment"
+            | "pass_statement" => {}
             "class_definition" => self.class(node, node, &[], ctx, b),
             "function_definition" => self.function(node, node, &[], ctx, b),
             "decorated_definition" => {
@@ -196,10 +199,7 @@ impl<'s> PythonVisitor<'_, 's> {
 
     /// A dekorátorok forrása (`@dataclass(frozen=True)`), ≤60 karakter.
     pub(super) fn decorator_texts(&self, decorators: &[Node<'_>]) -> Vec<String> {
-        decorators
-            .iter()
-            .map(|d| clip(self.text(*d), 60))
-            .collect()
+        decorators.iter().map(|d| clip(self.text(*d), 60)).collect()
     }
 
     /// A törzs első utasítása, ha önálló string: `(a node, a docstring szövege ≤300 karakter)`.

@@ -41,7 +41,7 @@ impl Language for PythonFrontend {
     }
 
     fn extensions(&self) -> &'static [&'static str] {
-        &["python"]
+        &["py", "pyi"]
     }
 
     fn analyze(&self, file: &SourceFile) -> Result<Analysis> {
@@ -96,11 +96,7 @@ mod tests {
 
     fn run(text: &str) -> Analysis {
         PythonFrontend::with_defaults()
-            .analyze(&SourceFile::new(
-                "/p/a.py",
-                text.as_bytes().to_vec(),
-                None,
-            ))
+            .analyze(&SourceFile::new("/p/a.py", text.as_bytes().to_vec(), None))
             .unwrap()
     }
 
@@ -108,11 +104,8 @@ mod tests {
     fn identity_and_role() {
         let f = PythonFrontend::with_defaults();
         assert_eq!((f.id(), f.role()), ("python", LanguageRole::Frontend));
-        assert_eq!(f.extensions(), &["python"]);
-        assert!(
-            f.resolve_module("SwiftUI", Path::new("/p/a.py"))
-                .is_none()
-        );
+        assert_eq!(f.extensions(), &["py", "pyi"]);
+        assert!(f.resolve_module("SwiftUI", Path::new("/p/a.py")).is_none());
     }
 
     #[test]

@@ -6,9 +6,10 @@ use super::super::parser::{children, end_line, line, named_children};
 use super::{Ctx, PythonVisitor, Scope, clip, visibility};
 use crate::model::{Constant, FileGraphBuilder, Method, Property};
 
-/// `MAX_SIZE`, `__all__`-nál is igaz: van betű, és nincs kisbetű.
+/// `MAX_SIZE`: van betű, és nincs kisbetű; az `__all__` kivétel, az is konstans.
 fn is_const_name(name: &str) -> bool {
-    name.chars().any(char::is_alphabetic) && !name.chars().any(char::is_lowercase)
+    name == "__all__"
+        || (name.chars().any(char::is_alphabetic) && !name.chars().any(char::is_lowercase))
 }
 
 impl PythonVisitor<'_, '_> {

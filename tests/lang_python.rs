@@ -44,10 +44,14 @@ impl Project {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let root = std::env::temp_dir().join(format!("callgraph-python-{id}-{}-{}", std::process::id(), {
-            static N: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
-            N.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
-        }));
+        let root = std::env::temp_dir().join(format!(
+            "callgraph-python-{id}-{}-{}",
+            std::process::id(),
+            {
+                static N: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+                N.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+            }
+        ));
         fs::create_dir_all(&root).unwrap();
         let project = Self(root.canonicalize().unwrap());
         project.write("shop.py", SHOP);
@@ -96,7 +100,11 @@ fn registry_routes_python_to_frontend() {
     let r = LanguageRegistry::with_defaults();
     for path in ["a/shop.py", "a/Shop.PY", "a/types.pyi"] {
         let l = r.for_path(Path::new(path)).unwrap();
-        assert_eq!((l.id(), l.role()), ("python", LanguageRole::Frontend), "{path}");
+        assert_eq!(
+            (l.id(), l.role()),
+            ("python", LanguageRole::Frontend),
+            "{path}"
+        );
     }
     assert!(r.for_path(Path::new("a/shop.pyc")).is_none());
 }
@@ -127,7 +135,10 @@ fn outline_body_and_signatures() {
         "TAX_RATE = 0.27",
         "checkout()  L15-18",
     ] {
-        assert!(outline.contains(expected), "missing {expected:?} in:\n{outline}");
+        assert!(
+            outline.contains(expected),
+            "missing {expected:?} in:\n{outline}"
+        );
     }
     let sigs = project.run(&["show", "shop.py", "--signatures"]);
     assert!(
@@ -136,7 +147,10 @@ fn outline_body_and_signatures() {
     );
     assert!(sigs.contains("empty(): \"Cart\""), "{sigs}");
     let body = project.run(&["show", "shop.py::checkout", "--body"]);
-    assert!(body.contains("total = compute_total(self.items(), TAX_RATE)"), "{body}");
+    assert!(
+        body.contains("total = compute_total(self.items(), TAX_RATE)"),
+        "{body}"
+    );
     let api = project.run(&["show", "pricing.py", "--format", "api"]);
     assert!(
         api.contains("compute_total(items, rate: float = 0.0): float"),
@@ -148,10 +162,7 @@ fn outline_body_and_signatures() {
 fn grep_finds_callers_across_modules() {
     let project = Project::new();
     let out = project.run(&["show", ".", "--grep", "compute_total"]);
-    assert!(
-        out.contains("shop.py") && out.contains("checkout"),
-        "{out}"
-    );
+    assert!(out.contains("shop.py") && out.contains("checkout"), "{out}");
     let strings = project.run(&["show", ".", "--strings", "checkout"]);
     assert!(strings.contains("checkout %s"), "{strings}");
 }
@@ -160,5 +171,8 @@ fn grep_finds_callers_across_modules() {
 fn locate_indexes_python_names() {
     let project = Project::new();
     let out = project.run(&["locate", "compute_total", "Cart"]);
-    assert!(out.contains("pricing.py") && out.contains("shop.py"), "{out}");
+    assert!(
+        out.contains("pricing.py") && out.contains("shop.py"),
+        "{out}"
+    );
 }
