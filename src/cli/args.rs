@@ -427,7 +427,11 @@ impl CliArgs {
             }
         }
         if paths.is_empty() {
-            return Err(CallgraphError::Usage(show_usage().into()));
+            // réteg-kapcsolóhoz (`--layer`, `--layers`, `--by-layer`) út nélkül a projekt gyökere (mint a `profile`-nál)
+            if !layers.any() {
+                return Err(CallgraphError::Usage(show_usage().into()));
+            }
+            paths.push(project.clone().unwrap_or_else(|| PathBuf::from(".")));
         }
         Ok(Self::Show {
             paths,
@@ -848,6 +852,31 @@ mod tests {
             mode(&["show", "--raw", "--doc", "a.php::m"]),
             (true, BodyMode::Raw)
         );
+    }
+
+    #[test]
+    fn layer_switches_without_a_path_run_on_the_project_root() {
+        let paths = |a: &[&str]| match parse(a).unwrap() {
+            CliArgs::Show { paths, .. } => paths,
+            other => panic!("{other:?}"),
+        };
+        let dot = vec![PathBuf::from(".")];
+        assert_eq!(paths(&["show", "--layer", "service"]), dot);
+        assert_eq!(paths(&["show", "--layers"]), dot);
+        assert_eq!(paths(&["show", "--by-layer", "--grep", "x"]), dot);
+        assert_eq!(
+            paths(&["show", "--project", "/p", "--layer", "service"]),
+            vec![PathBuf::from("/p")]
+        );
+        // útvonallal változatlan
+        assert_eq!(
+            paths(&["show", "--layers", "src"]),
+            vec![PathBuf::from("src")]
+        );
+        // réteg-kapcsoló nélkül továbbra is használati hiba
+        assert!(parse(&["show"]).is_err());
+        assert!(parse(&["show", "--project", "/p"]).is_err());
+        assert!(parse(&["show", "--grep", "x"]).is_err());
     }
 
     #[test]
