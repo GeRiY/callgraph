@@ -128,6 +128,7 @@ pub fn build_command(args: CliArgs) -> Result<Box<dyn Command>> {
             crate::skill::SkillHome::from_env(),
         ))),
         CliArgs::Version => Ok(Box::new(commands::VersionCommand)),
+        CliArgs::Help => Ok(Box::new(commands::HelpCommand)),
         CliArgs::Stats { days } => Ok(Box::new(commands::StatsCommand::new(
             days,
             crate::skill::SkillHome::from_env(),

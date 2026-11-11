@@ -78,6 +78,13 @@ Kizárt fájlok: a beépített mappák (vendor, node_modules, …), a minifikál
   .gitignore-ja (git-szabályokkal), és a .callgraphignore: az "md" / ".md" / "*.md" egy kiterjesztést zár ki, minden
   más sor a mappájához relatív .gitignore-minta ("public/build", "/storage/", "!keep.js"). --no-gitignore (bármely
   parancsnál) vagy CALLGRAPH_GITIGNORE=0 (MCP-szerver, hook): a .gitignore fájlok nem számítanak (a .callgraphignore igen).
+  "protect <minta>" a .callgraphignore-ban: a fájl benne marad a térképben (outline, grep, locate), de 🔒 jelölést
+  kap — jelzés az agentnek, hogy ne szerkessze (migrációk, generált kód); a forrás továbbra is olvasható.
+Támogatott fájlok: PHP, JS, TS, Vue, Rust, Swift, Python (.py, .pyi), Go (.go) + CSS/SCSS, JSON, Markdown.
+  --signatures (show): paraméter- és visszatérési típusok a metódusok mellett (--format api-ban is; TS/Vue
+  visszatérési típus, PHP DocBlock @param / @return, Python annotációk, Go típusok).
+  --help / -h / help: ez a szöveg. Környezeti változók: CALLGRAPH_LANG, CALLGRAPH_STATS=0, CALLGRAPH_TELEMETRY=0,
+  CALLGRAPH_UPDATE_CHECK=0, CALLGRAPH_NEXT=1, CALLGRAPH_STRICT=1, CALLGRAPH_GITIGNORE=0, CALLGRAPH_WATCH=0.
   bash ~/.claude/skills/callgraph/callgraph.sh --version                       verzió, platform és a bináris helye
 
 Projekt-profil (architektúra, rétegek és minták a mappa- / fájlnevekből, a gráffal ellenőrizve):

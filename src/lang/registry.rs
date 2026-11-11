@@ -3,10 +3,12 @@
 use std::path::Path;
 
 use super::css::CssFrontend;
+use super::go::GoFrontend;
 use super::js::JsFrontend;
 use super::json::JsonDocument;
 use super::markdown::MdDocument;
 use super::php::PhpBackend;
+use super::python::PythonFrontend;
 use super::rs::RustBackend;
 use super::scss::ScssFrontend;
 use super::swift::SwiftFrontend;
@@ -26,7 +28,7 @@ impl LanguageRegistry {
         Self::default()
     }
 
-    /// Az alapértelmezett összeállítás: backend `PhpBackend`, `RustBackend`; frontend `CssFrontend`, `ScssFrontend`, `JsFrontend`, `SwiftFrontend`; dokumentum `JsonDocument`, `MdDocument`.
+    /// Az alapértelmezett összeállítás: backend `PhpBackend`, `RustBackend`; frontend `CssFrontend`, `ScssFrontend`, `JsFrontend`, `SwiftFrontend`, `PythonFrontend`, `GoFrontend`; dokumentum `JsonDocument`, `MdDocument`.
     pub fn with_defaults() -> Self {
         let mut registry = Self::new();
         registry.register_backend(Box::new(PhpBackend::with_defaults()));
@@ -35,6 +37,8 @@ impl LanguageRegistry {
         registry.register_frontend(Box::new(ScssFrontend::new()));
         registry.register_frontend(Box::new(JsFrontend::with_defaults()));
         registry.register_frontend(Box::new(SwiftFrontend::with_defaults()));
+        registry.register_frontend(Box::new(PythonFrontend::with_defaults()));
+        registry.register_frontend(Box::new(GoFrontend::with_defaults()));
         registry.register_document(Box::new(JsonDocument));
         registry.register_document(Box::new(MdDocument));
         registry
@@ -163,7 +167,7 @@ mod tests {
             r.extensions(),
             vec![
                 "php", "rs", "css", "scss", "js", "mjs", "cjs", "ts", "tsx", "jsx", "vue", "swift",
-                "json", "md"
+                "py", "pyi", "go", "json", "md"
             ]
         );
         let php = r.for_path(Path::new("src/A.php")).unwrap();

@@ -1,12 +1,12 @@
 ---
 name: callgraph
-description: Token-efficient mapping of a PHP / Rust / JS / TS / Vue / Swift codebase with AST analysis, WITHOUT reading the file — where to start with a task (locate: ranked files from the names in the task), categorized call graph (class/component, method/function with line ranges), method body, "where is it called" search, impact analysis (--depth), string and constant search, control-flow branches, framework views (routes, validation, events…). Use it to understand PHP, .rs, .vue, .js, .ts, .swift files, for call relationships and "who calls this / where is it used" questions — make it the FIRST step instead of a full Read/Grep. Do NOT use it for non-code files (md, json, css, plain text), or when you need the exact file text in an already known range (then --lines or a targeted Read).
+description: Token-efficient mapping of a PHP / Rust / JS / TS / Vue / Swift / Python / Go codebase with AST analysis, WITHOUT reading the file — where to start with a task (locate: ranked files from the names in the task), categorized call graph (class/component, method/function with line ranges), method body, "where is it called" search, impact analysis (--depth), string and constant search, control-flow branches, framework views (routes, validation, events…). Use it to understand PHP, .rs, .vue, .js, .ts, .swift files, for call relationships and "who calls this / where is it used" questions — make it the FIRST step instead of a full Read/Grep. Do NOT use it for non-code files (md, json, css, plain text), or when you need the exact file text in an already known range (then --lines or a targeted Read).
 ---
 
 # callgraph — code map without Read
 
 `bash <skill>/callgraph.sh …` (`<skill>` is this skill's directory, e.g. `~/.claude/skills/callgraph`).
-For every target (PHP, Rust, JS / TS / Vue, Swift / SwiftUI, CSS / SCSS, JSON, MD) the native `callgraph` binary (`callgraph show`) does the work; the output has a common
+For every target (PHP, Rust, JS / TS / Vue, Swift / SwiftUI, Python, Go, CSS / SCSS, JSON, MD) the native `callgraph` binary (`callgraph show`) does the work; the output has a common
 structure: container (class / component / module) → methods with line ranges → calls by category.
 
 ## Step 0 — register the project (once per project)
@@ -176,10 +176,27 @@ and the other computed properties are methods; the property wrapper (`@State`, `
 shown before the property type. Call categories: `swiftui_view`, `swiftui_modifier`, `component_use`,
 `native_swift`, `internal_helper`, `external_call`. Details: `docs/LANG-SWIFT.md`.
 
+## Python
+
+Same switches. File-level functions and constants are in the `<file>.py` `module` container; `class` with bases
+(`extends`) and decorators (`uses @dataclass`). Method kinds: `method` / `staticmethod` / `classmethod` / `property`
+(`async ` prefix); `self` / `cls` is left out of the signature; a leading `_` = private. Call categories: `native_python`,
+`internal_helper`, `static_call`, `instantiation`, `external_call`. Details: `docs/LANG-PYTHON.md`.
+
+## Go
+
+Same switches. File-level functions and package constants / variables are in the `<file>.go` `module` container;
+a `struct` is a `class` (fields = properties, embedded types in `extends`), an `interface` is an `interface` (methods
+abstract), `type X int` is a `type`, `type A = B` an `alias`. A method with a receiver (`func (r *Repo) Find`) belongs
+to the `Repo` type, even if it is declared in another file. Capitalised name = `public`, lower case = `private`.
+`--signatures` shows several return values (`Find(id int): (*User, error)`). Call categories: `native_go`
+(builtins, standard library), `internal_helper`, `static_call`, `instantiation`, `external_call`. `_test.go` files
+rank as tests in `locate`; `vendor` and `testdata` are skipped. Details: `docs/LANG-GO.md`.
+
 ## MCP server (`callgraph mcp`)
 
 <!-- mcp:tools -->
-callgraph (`callgraph mcp`): AST-based, token-efficient code map (PHP, Rust, JS / TS / Vue, Swift, SCSS); the CLI's
+callgraph (`callgraph mcp`): AST-based, token-efficient code map (PHP, Rust, JS / TS / Vue, Swift, Python, Go, SCSS); the CLI's
 queries as read-only tools, with the same output. Use it before reading a code file. Paths are relative to the project
 root: a registered alias (`project`, list: `projects`) or the server's working directory. Typical flow: `locate`
 (where to start) → `outline` → `method_body` for just the method you need → `find_callers` with the name pattern.

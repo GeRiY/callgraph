@@ -49,7 +49,7 @@ impl Project {
             "src/A.php.bak",
             "src/A.php.orig",
             "src/noext",
-            "src/script.py",
+            "src/script.rb",
             "docs/notes.txt",
             "docs/conf.yml",
             "docs/data.csv",
