@@ -3,6 +3,8 @@
 mod callee;
 mod receivers;
 mod scan;
+#[cfg(test)]
+mod tests_dynamic;
 mod walk;
 
 use oxc_ast::ast::{Program, PropertyKey};
