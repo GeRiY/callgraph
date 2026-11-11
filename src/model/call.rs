@@ -5,6 +5,53 @@ use serde::{Deserialize, Serialize};
 /// A statikusan fel nem oldható (futásidőben eldőlő) hívások kategóriája: nem hívó-él, csak jelölés.
 pub const DYNAMIC_CALL: &str = "dynamic_call";
 
+/// Az összes ismert hívás-kategória (a nyelvi frontendek kategorizálóinak közös listája): a `--category` ellenőrzése
+/// és az „ismeretlen kategória” hibaüzenet ebből jön. Ábécében, a `dynamic_call` a végén (`category_rank`).
+/// Új kategória a frontendben: ide is fel kell venni — a `known_categories_cover_every_frontend` teszt őrzi.
+pub const KNOWN_CATEGORIES: [&str; 41] = [
+    "anchor",
+    "component_use",
+    "composable_use",
+    "extend",
+    "external_call",
+    "external_url",
+    "framework_use",
+    "function",
+    "global_helper",
+    "helper_use",
+    "http_call",
+    "i18n_helper",
+    "image",
+    "include",
+    "inertia",
+    "instantiation",
+    "internal_file",
+    "internal_helper",
+    "interpolation",
+    "macro_use",
+    "model_use",
+    "module_use",
+    "native_go",
+    "native_js",
+    "native_php",
+    "native_python",
+    "native_rust",
+    "native_swift",
+    "orm_relation",
+    "package_use",
+    "route_helper",
+    "static_call",
+    "swiftui_api",
+    "swiftui_modifier",
+    "swiftui_view",
+    "var",
+    "vue_api",
+    "vue_emit",
+    "vue_macro",
+    "vue_props",
+    DYNAMIC_CALL,
+];
+
 /// A `Call.kind` (`type`) a dinamikus hívásoknál.
 pub const DYNAMIC_KIND: &str = "dynamic";
 
