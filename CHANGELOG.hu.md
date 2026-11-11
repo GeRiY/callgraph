@@ -6,7 +6,12 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-11-11
+
 ### Új
+- **`--help` a binárisban:** a `callgraph --help`, `-h` és `help` a teljes, naprakész súgót írja ki (angolul vagy
+  magyarul) — ugyanazt a szöveget, mint a `callgraph.sh --help`; most már a Python, a Go, a `--signatures`, a
+  `protect` és a környezeti változók is benne vannak.
 - **Python (1. fázis):** `.py` / `.pyi` fájlok a térképben (tree-sitter): osztályok ősökkel és dekorátorokkal,
   függvények, metódusok (`async`, `@staticmethod`, `@classmethod`, `@property`), konstansok, `__all__`, docstringek,
   szignatúrák (`--signatures`, `--format api`), importok, kategorizált hívások (`native_python`, `internal_helper`,
@@ -489,7 +494,8 @@ Első kiadás.
 - Beépített frissítés: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Előre fordított csomagok macOS-re (arm64, x86_64), Linuxra (x86_64, ARM64, statikus musl) és Windowsra.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.7.0...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.8.0...develop
+[0.8.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.8.0
 [0.7.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.7.0
 [0.6.1]: https://github.com/GeRiY/callgraph/releases/tag/v0.6.1
 [0.6.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.6.0
