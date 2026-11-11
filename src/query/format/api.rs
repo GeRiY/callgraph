@@ -152,7 +152,7 @@ fn write_container(
         }
         out.push('\n');
     }
-    write_vue_contract(out, row, container, lang);
+    write_vue_contract(out, row, container);
     let mut methods: Vec<_> = row
         .graph
         .methods
@@ -196,12 +196,7 @@ fn write_container(
 
 /// A Vue-komponens szerződése: a `props:` (név, ismert típus, kötelező) és az `emits:` lista; a JS-prop / emit
 /// csak a JS-frontendből jön, így más nyelv kimenete nem változik.
-fn write_vue_contract(
-    out: &mut String,
-    row: &QueryResult,
-    container: &crate::model::Container,
-    lang: Lang,
-) {
+fn write_vue_contract(out: &mut String, row: &QueryResult, container: &crate::model::Container) {
     let props: Vec<_> = row
         .graph
         .properties
@@ -212,7 +207,10 @@ fn write_vue_contract(
         let n = props.len();
         writeln!(out, "  props ({n}):").unwrap();
         for p in props {
-            let ty = p.type_hint.as_deref().filter(|t| !t.is_empty() && *t != "mixed");
+            let ty = p
+                .type_hint
+                .as_deref()
+                .filter(|t| !t.is_empty() && *t != "mixed");
             writeln!(
                 out,
                 "    {}{}{}",
@@ -298,12 +296,18 @@ mod tests {
     #[test]
     fn components_without_props_and_other_languages_have_no_such_lists() {
         let out = api("src/Plain.vue", "<template><p>hi</p></template>\n");
-        assert!(!out.contains("props (") && !out.contains("emits ("), "{out}");
+        assert!(
+            !out.contains("props (") && !out.contains("emits ("),
+            "{out}"
+        );
         let out = api(
             "src/a.ts",
             "export class A { public go(x: number): void {} }\n",
         );
-        assert!(!out.contains("props (") && !out.contains("emits ("), "{out}");
+        assert!(
+            !out.contains("props (") && !out.contains("emits ("),
+            "{out}"
+        );
         assert!(out.contains("go(") && out.contains("public API"), "{out}");
     }
 }

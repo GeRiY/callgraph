@@ -120,11 +120,13 @@ mod tests {
 
     #[test]
     fn invalid_pattern_error_carries_the_namespace_hint() {
-        let error = regex::Regex::new(r"app\models").unwrap_err();
-        let text = invalid_pattern(&error, r"app\models").to_string();
+        let bad = String::from(r"app\models");
+        let error = regex::Regex::new(&bad).unwrap_err();
+        let text = invalid_pattern(&error, &bad).to_string();
         assert!(text.contains("💡") && text.contains("Real::m"), "{text}");
-        let error = regex::Regex::new("(").unwrap_err();
-        let text = invalid_pattern(&error, "(").to_string();
+        let open = String::from("(");
+        let error = regex::Regex::new(&open).unwrap_err();
+        let text = invalid_pattern(&error, &open).to_string();
         assert!(!text.contains("💡"), "{text}");
     }
 }

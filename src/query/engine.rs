@@ -241,7 +241,8 @@ impl QueryEngine {
         if pattern.is_none() && categories.is_none() {
             return Ok(rows);
         }
-        let invalid = |e: regex::Error| super::filter::invalid_pattern(&e, pattern.unwrap_or_default());
+        let invalid =
+            |e: regex::Error| super::filter::invalid_pattern(&e, pattern.unwrap_or_default());
         // Interfészen át: a hatókör típus-hierarchiájából (a mintára nem illeszkedő, de rokon típuson át hívott metódus).
         let via = match pattern {
             // csak `Típus::metódus` alakú mintára van értelme (lásd `ViaMatcher::new`)

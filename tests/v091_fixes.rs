@@ -114,7 +114,10 @@ fn jsx_component_use_is_a_call_in_tsx_and_js() {
             "{file}: {outline}"
         );
         // a kisbetűs elem nem hívás
-        assert!(!outline.contains("section") && !outline.contains("div"), "{outline}");
+        assert!(
+            !outline.contains("section") && !outline.contains("div"),
+            "{outline}"
+        );
     }
     let grep = project.show(&[".", "--grep", "Button$"]);
     assert!(grep.contains("Page") && grep.contains("Home"), "{grep}");
@@ -122,14 +125,7 @@ fn jsx_component_use_is_a_call_in_tsx_and_js() {
     assert!(depth.contains("Page") && depth.contains("Home"), "{depth}");
     // a `<section>` / `<div>` nem találat
     let root = project.0.to_string_lossy().into_owned();
-    let none = project.raw(&[
-        "show",
-        "--project",
-        &root,
-        ".",
-        "--grep",
-        "^(section|div)$",
-    ]);
+    let none = project.raw(&["show", "--project", &root, ".", "--grep", "^(section|div)$"]);
     let text = String::from_utf8_lossy(&none.stdout);
     assert!(!text.contains("Page") && !text.contains("Home"), "{text}");
 }
@@ -147,12 +143,12 @@ fn vue_api_shows_props_and_emits() {
     assert!(api.contains("emits (1):"), "{api}");
     assert!(api.contains("    save\n"), "{api}");
     // más nyelv api-kimenete nem kap ilyen listát
-    project.write(
-        "a.ts",
-        "export class A { public go(x: number): void {} }\n",
-    );
+    project.write("a.ts", "export class A { public go(x: number): void {} }\n");
     let other = project.show(&["a.ts", "--format", "api"]);
-    assert!(!other.contains("props (") && !other.contains("emits ("), "{other}");
+    assert!(
+        !other.contains("props (") && !other.contains("emits ("),
+        "{other}"
+    );
 }
 
 fn php_project() -> Project {
@@ -209,7 +205,10 @@ fn layer_switches_work_without_a_path() {
         "app/Http/Controllers/OrderController.php",
         "<?php\nnamespace App\\Http\\Controllers;\n\nclass OrderController\n{\n    public function store()\n    {\n        return 2;\n    }\n}\n",
     );
-    for args in [&["--full", "--layers"][..], &["--full", "--layer", "service"][..]] {
+    for args in [
+        &["--full", "--layers"][..],
+        &["--full", "--layer", "service"][..],
+    ] {
         let out = project.show(args);
         assert!(
             out.contains("OrderService") && !out.contains("callgraph show ["),
@@ -238,7 +237,9 @@ fn protect_mark_shows_in_summary_but_not_in_machine_formats() {
     let lock = '\u{1f512}';
     let summary = project.show(&["migrations/m1.php", "--format", "summary"]);
     assert!(
-        summary.lines().any(|l| l.contains("M1") && l.ends_with(lock)),
+        summary
+            .lines()
+            .any(|l| l.contains("M1") && l.ends_with(lock)),
         "{summary}"
     );
     let plain = project.show(&["app/Shop.php", "--format", "summary"]);
