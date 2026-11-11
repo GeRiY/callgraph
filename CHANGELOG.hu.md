@@ -6,6 +6,8 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-11-11
+
 ### Új
 - **`dynamic_call` jelölés:** a futásidőben eldőlő célú hívások eddig hiányoztak az outline-ból, így a gráf ott is
   teljesnek látszott, ahol nem az. Mostantól szerepelnek (a többi kategória után, a lista végén), célnak a hívott
@@ -515,7 +517,8 @@ Első kiadás.
 - Beépített frissítés: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Előre fordított csomagok macOS-re (arm64, x86_64), Linuxra (x86_64, ARM64, statikus musl) és Windowsra.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.8.0...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.9.0...develop
+[0.9.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.0
 [0.8.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.8.0
 [0.7.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.7.0
 [0.6.1]: https://github.com/GeRiY/callgraph/releases/tag/v0.6.1

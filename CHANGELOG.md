@@ -5,6 +5,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-11-11
+
 ### Added
 - **`dynamic_call` marker:** calls whose target is decided at runtime used to be missing from the outline, so the graph
   looked complete where it was not. They are now listed (last, after the other categories) with the called expression
@@ -480,7 +482,8 @@ First release.
 - Built-in update: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Prebuilt packages for macOS (arm64, x86_64), Linux (x86_64, ARM64, static musl) and Windows.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.8.0...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.9.0...develop
+[0.9.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.0
 [0.8.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.8.0
 [0.7.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.7.0
 [0.6.1]: https://github.com/GeRiY/callgraph/releases/tag/v0.6.1
