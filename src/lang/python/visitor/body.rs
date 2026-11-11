@@ -6,7 +6,7 @@ use tree_sitter::Node;
 use super::super::categorize::CallInfo;
 use super::super::parser::{end_line, line, named_children};
 use super::{PythonVisitor, Scope, clip};
-use crate::model::{Call, FileGraphBuilder, StringLit};
+use crate::model::{Call, DYNAMIC_CALL, DYNAMIC_KIND, FileGraphBuilder, StringLit};
 
 /// A hívott kifejezés felbontása.
 struct Callee<'t> {
@@ -40,6 +40,24 @@ impl PythonVisitor<'_, '_> {
         let Some(expr) = node.child_by_field_name("function") else {
             return;
         };
+        // futásidőben eldőlő hívás: jelölés (a közönséges hívás-él felvétele ettől függetlenül megy tovább)
+        if let Some(text) = self.dynamic_expr(node, expr) {
+            let start = line(node);
+            let end = end_line(node);
+            b.call(Call {
+                container: scope.container.clone(),
+                caller: Some(scope.caller.clone()),
+                line: start,
+                end_line: (end > start).then_some(end),
+                kind: DYNAMIC_KIND.to_string(),
+                target: Call::dynamic_target(&text),
+                resolved: None,
+                on: None,
+                category: DYNAMIC_CALL.to_string(),
+                args: None,
+                handler: None,
+            });
+        }
         let Some(callee) = self.callee(expr) else {
             return;
         };
@@ -84,6 +102,79 @@ impl PythonVisitor<'_, '_> {
             args: self.args(node),
             handler: None,
         });
+    }
+
+    /// A hívott kifejezés szövege, ha a hívás célja futásidőben dől el: getattr(obj, név)(…) nem literál névvel,
+    /// globals()[név](…) / locals()[név](…), importlib.import_module(név) / __import__(név) nem literál
+    /// argumentummal, eval(…) / exec(…).
+    fn dynamic_expr(&self, call: Node<'_>, function: Node<'_>) -> Option<String> {
+        match function.kind() {
+            "call" => {
+                let inner = function.child_by_field_name("function")?;
+                if inner.kind() != "identifier" || self.text(inner) != "getattr" {
+                    return None;
+                }
+                let args = self.positional_args(function);
+                let name = args.get(1)?;
+                (!self.is_plain_string(*name)).then(|| self.text(function).to_string())
+            }
+            "subscript" => {
+                let value = function.child_by_field_name("value")?;
+                let scope_call = value.kind() == "call"
+                    && value.child_by_field_name("function").is_some_and(|f| {
+                        f.kind() == "identifier" && matches!(self.text(f), "globals" | "locals")
+                    });
+                let key = function.child_by_field_name("subscript")?;
+                (scope_call && !self.is_plain_string(key)).then(|| self.text(function).to_string())
+            }
+            "identifier" => match self.text(function) {
+                "eval" | "exec" => Some(self.text(call).to_string()),
+                "__import__" => self.non_literal_first_arg(call),
+                _ => None,
+            },
+            "attribute" if self.path_of(function).as_deref() == Some("importlib.import_module") => {
+                self.non_literal_first_arg(call)
+            }
+            _ => None,
+        }
+    }
+
+    /// A hívás szövege, ha az első argumentuma nem sztring-literál.
+    fn non_literal_first_arg(&self, call: Node<'_>) -> Option<String> {
+        let args = self.positional_args(call);
+        let first = args.first()?;
+        (!self.is_plain_string(*first)).then(|| self.text(call).to_string())
+    }
+
+    /// A hívás argumentumai (a kulcsszavas argumentumnál az érték, a megjegyzések nélkül).
+    fn positional_args<'t>(&self, call: Node<'t>) -> Vec<Node<'t>> {
+        let Some(arguments) = call.child_by_field_name("arguments") else {
+            return Vec::new();
+        };
+        named_children(arguments)
+            .into_iter()
+            .filter(|c| c.kind() != "comment")
+            .map(|c| {
+                if c.kind() == "keyword_argument" {
+                    c.child_by_field_name("value").unwrap_or(c)
+                } else {
+                    c
+                }
+            })
+            .collect()
+    }
+
+    /// Sztring-literál (az f-string {…} kifejezéssel nem az; az összefűzött literálok igen).
+    fn is_plain_string(&self, node: Node<'_>) -> bool {
+        match node.kind() {
+            "string" => !named_children(node)
+                .iter()
+                .any(|c| c.kind() == "interpolation"),
+            "concatenated_string" => named_children(node)
+                .iter()
+                .all(|c| self.is_plain_string(*c)),
+            _ => false,
+        }
     }
 
     fn callee<'t>(&self, expr: Node<'t>) -> Option<Callee<'t>> {
