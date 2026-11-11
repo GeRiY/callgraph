@@ -7,6 +7,10 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 ## [Unreleased]
 
 ### Új
+- **`protect` sorok a `.callgraphignore`-ban:** a `protect migrations/` a találó fájlokat a térképben tartja (teljesen
+  lekérdezhetők), de az outline-ban, `--body`-ban, `--lines`-ban, `locate`-ban és `--format json`-ban
+  (`"protected": true`) `🔒`-kal jelöli: védettek, olvasd, de ne szerkeszd őket. Ugyanazok a mintaszabályok, mint a
+  kizárásnál; `protect` sor nélkül nincs változás.
 - **Szignatúrák az outline-ban:** a `--signatures` (vagy `CALLGRAPH_SIGNATURES=1`) a normál outline és a `--grep`
   hívó-outline metódussorában a tömör szignatúrát írja ki: `updateOrders(array $ids, bool $notify = false): array  L4-9`
   (ahol a nyelv adja a paramétereket / visszatérési típust). A `--format api` mostantól a TS / Vue visszatérési

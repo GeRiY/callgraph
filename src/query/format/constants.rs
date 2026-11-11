@@ -81,7 +81,12 @@ impl Formatter for Constants {
             // stabil: azonos soron a hivatkozások (már rendezve) maradnak a definíció előtt
             lines.sort_by_key(|(line, _, _)| *line);
             found = true;
-            writeln!(out, "FILE  {}", row.graph.file).unwrap();
+            writeln!(
+                out,
+                "FILE  {}{}",
+                row.graph.file,
+                crate::io::protect_mark(&row.graph.file)
+            ).unwrap();
             for (line, caller, value) in lines {
                 writeln!(out, "  L{line:<5} {caller:<49}{value}").unwrap();
             }

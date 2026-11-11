@@ -78,6 +78,7 @@ az interfészén / szülőjén / trait-jén át menőket), ezért hívók maradh
 - `via Resolver`: a hívás a keresett típus interfészén, szülőosztályán vagy trait-jén át megy.
 - `L12, L40 │ …`: ugyanaz a hívás több soron; hívónként legfeljebb 3 sor, utána `… +2 további: L55, L61`.
 - `?` / `?::név`: ismeretlen fogadó-típus, csak név szerinti egyezés; lehet téves, nézd meg a sort.
+- `🔒` a fájl útja után: védett fájl; olvasd, de ne szerkeszd.
 <!-- /mcp -->
 
 ## Projekt-profil (ismeretlen projektben ezzel kezdj)

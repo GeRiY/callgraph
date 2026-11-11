@@ -158,3 +158,40 @@ fn callgraphignore_path_patterns_work_without_gitignore() {
     let out = project.locate(&[]);
     assert!(!out.contains(COMPONENT) && out.contains(PLAIN), "{out}");
 }
+
+#[test]
+fn protect_lines_mark_files_without_excluding_them() {
+    let project = Project::new();
+    project.write(
+        "migrations/m1.php",
+        "<?php\nclass M1 { public function up() { return 1; } }\n",
+    );
+    project.write(
+        "app/Shop.php",
+        "<?php\nclass Shop { public function up() { return 2; } }\n",
+    );
+    let root = project.0.to_string_lossy().into_owned();
+    let show = |args: &[&str]| {
+        let mut all = vec!["show", "--project", root.as_str()];
+        all.extend_from_slice(args);
+        project.run(&all)
+    };
+    let plain = (show(&["migrations/m1.php"]), project.run(&["locate", "M1", "Shop", "--project", &root]));
+    assert!(!plain.0.contains('\u{1f512}') && !plain.1.contains('\u{1f512}'), "{plain:?}");
+
+    project.write(".callgraphignore", "protect migrations/\n");
+    let outline = show(&["migrations/m1.php"]);
+    assert!(outline.contains("FILE  migrations/m1.php  \u{1f512}"), "{outline}");
+    assert!(outline.contains("up"), "{outline}");
+    assert!(!show(&["app/Shop.php"]).contains('\u{1f512}'));
+    let body = show(&["migrations/m1.php::up", "--body"]);
+    assert!(body.contains("\u{1f512}") && body.contains("return 1"), "{body}");
+    let located = project.run(&["locate", "M1", "Shop", "--all", "--project", &root]);
+    let lock: Vec<&str> = located.lines().filter(|l| l.contains('\u{1f512}')).collect();
+    assert!(lock.len() == 1 && lock[0].contains("migrations/m1.php"), "{located}");
+    assert!(located.contains("app/Shop.php"), "{located}");
+    // JSON: csak a védettnél
+    let json = show(&["migrations/m1.php", "--format", "json"]);
+    assert!(json.contains("\"protected\": true"), "{json}");
+    assert!(!show(&["app/Shop.php", "--format", "json"]).contains("protected"));
+}

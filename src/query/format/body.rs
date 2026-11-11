@@ -55,8 +55,11 @@ impl Formatter for Body {
                 let parens = super::outline::parens(method);
                 write!(
                     out,
-                    "== {}  {container}::{}{parens}  L{}-{end}",
-                    row.graph.file, method.name, method.line
+                    "== {}  {container}::{}{parens}  L{}-{end}{}",
+                    row.graph.file,
+                    method.name,
+                    method.line,
+                    crate::io::protect_mark(&row.graph.file)
                 )
                 .unwrap();
                 if let Some((first, last)) = source.omitted_doc {

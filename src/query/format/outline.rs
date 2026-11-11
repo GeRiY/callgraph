@@ -64,13 +64,14 @@ fn outline(
     let mut s = String::new();
     writeln!(
         s,
-        "FILE  {}{}{}",
+        "FILE  {}{}{}{}",
         g.file,
         g.namespace
             .as_ref()
             .map(|n| format!("  NS:{n}"))
             .unwrap_or_default(),
-        crate::notes::mark(crate::notes::file_count(notes))
+        crate::notes::mark(crate::notes::file_count(notes)),
+        crate::io::protect_mark(&g.file)
     )
     .unwrap();
     // szintaktikai hiba: közvetlenül a FILE sor alatt (hiba nélkül nincs sor)

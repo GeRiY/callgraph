@@ -9,6 +9,10 @@
 //! `.gitignore`-minta a fájl mappájához relatívan (`public/build`, `/storage/`, `*.d.ts`, `!keep.js`). A
 //! `.callgraphignore` mintái a `.gitignore` után jönnek, így felülírhatják (`!`).
 //!
+//! `protect <minta>` sor: a találó fájl BENNE marad a térképben (teljesen lekérdezhető), de védettnek számít, a
+//! kimenet `🔒`-val jelöli (`is_protected`). Ugyanazok a szabályok (mappához relatív minta, beágyazott fájl, `!`);
+//! a külön álló `protect` szó továbbra is sima kiterjesztés-szabály, a `protect` sor sosem zár ki fájlt.
+//!
 //! Kapcsoló: `--no-gitignore` (CLI) / `CALLGRAPH_GITIGNORE=0` (MCP, hook) — ekkor a `.gitignore` fájlok nem
 //! számítanak; a `.callgraphignore` és a beépített kihagyott mappák igen. A projekt-gráf (`.callgraph/`) a két módot
 //! nem keveri: kulcsa a fájl útja, és minden teljes hatókörű lekérdezés / `refresh` a bejárás aktuális fájllistájára
@@ -71,8 +75,97 @@ pub fn parse_ignore(contents: &str) -> Vec<String> {
 /// A `.callgraphignore` útmintái (minden sor, ami nem kiterjesztés-szabály), változatlanul.
 pub fn path_patterns(contents: &str) -> Vec<&str> {
     rule_lines(contents)
-        .filter(|line| extension_rule(line).is_none() && !matches!(*line, "." | "*."))
+        .filter(|line| {
+            extension_rule(line).is_none()
+                && !matches!(*line, "." | "*.")
+                && protect_pattern(line).is_none()
+        })
         .collect()
+}
+
+/// A `protect <minta>` sor mintája (a `protect` szó után szóköz / tab és nem üres minta kell); különben `None`.
+pub fn protect_pattern(line: &str) -> Option<&str> {
+    let rest = line.trim().strip_prefix("protect")?;
+    let pattern = rest.trim_start();
+    (pattern.len() < rest.len() && !pattern.is_empty()).then_some(pattern)
+}
+
+/// A `.callgraphignore` `protect` mintái, változatlanul.
+pub fn protect_patterns(contents: &str) -> Vec<&str> {
+    rule_lines(contents).filter_map(protect_pattern).collect()
+}
+
+/// Egy mappa `protect` matchere, a `.callgraphignore` módosítási idejével (az MCP-folyamat is frissen lásson).
+type ProtectEntry = (Option<std::time::SystemTime>, Option<Rc<Gitignore>>);
+
+thread_local! {
+    static PROTECT: std::cell::RefCell<HashMap<PathBuf, ProtectEntry>> = Default::default();
+}
+
+fn protect_matcher(dir: &Path) -> Option<Rc<Gitignore>> {
+    let file = dir.join(IGNORE_FILE);
+    let mtime = std::fs::metadata(&file).and_then(|m| m.modified()).ok();
+    if let Some(entry) = PROTECT.with(|c| c.borrow().get(dir).cloned()) {
+        if entry.0 == mtime {
+            return entry.1;
+        }
+    }
+    let matcher = mtime
+        .and_then(|_| std::fs::read_to_string(&file).ok())
+        .and_then(|contents| {
+            let mut builder = GitignoreBuilder::new(dir);
+            let mut lines = 0usize;
+            for pattern in protect_patterns(&contents) {
+                if builder.add_line(Some(file.clone()), pattern).is_ok() {
+                    lines += 1;
+                }
+            }
+            builder.build().ok().filter(|m| lines > 0 && !m.is_empty())
+        })
+        .map(Rc::new);
+    PROTECT.with(|c| {
+        c.borrow_mut()
+            .insert(dir.to_path_buf(), (mtime, matcher.clone()))
+    });
+    matcher
+}
+
+/// Védett-e a fájl (`protect` minta a felmenő mappák `.callgraphignore`-jában, a git-tároló gyökeréig; a mélyebb
+/// fájl, azon belül a későbbi sor az erősebb). `file`: a lekérdezésben használt (abszolút vagy munkamappához
+/// relatív) út.
+pub fn is_protected(file: &Path) -> bool {
+    let Ok(abs) = std::path::absolute(file) else {
+        return false;
+    };
+    let mut dir = abs.parent();
+    while let Some(current) = dir {
+        if let Some(matcher) = protect_matcher(current) {
+            let found = matcher.matched_path_or_any_parents(&abs, false);
+            if found.is_ignore() {
+                return true;
+            }
+            if found.is_whitelist() {
+                return false;
+            }
+        }
+        if current.join(".git").exists() {
+            break;
+        }
+        dir = current.parent();
+    }
+    false
+}
+
+/// A védett fájl jelölője a kimenetben (a sor végén, két szóköz után).
+pub const PROTECT_MARK: &str = "  🔒";
+
+/// A `🔒` jelölő a fájl-sor végére, vagy üres, ha a fájl nem védett.
+pub fn protect_mark(file: &str) -> &'static str {
+    if is_protected(Path::new(file)) {
+        PROTECT_MARK
+    } else {
+        ""
+    }
 }
 
 /// A nem üres, nem megjegyzés sorok, a szélső szóközök nélkül.
@@ -389,5 +482,47 @@ mod tests {
         for on in ["1", "", "yes", "true"] {
             assert!(!super::switched_off(on), "{on:?}");
         }
+    }
+
+    /// A `protect` sor külön fajta: nem kiterjesztés, nem útminta; a puszta `protect` marad kiterjesztés-szabály.
+    #[test]
+    fn protect_lines_are_their_own_kind() {
+        let text = "md\nprotect migrations/\nprotect\tapp/Generated/\nprotect\nprotects/\n# protect x\n";
+        assert_eq!(super::protect_patterns(text), ["migrations/", "app/Generated/"]);
+        assert_eq!(super::parse_ignore(text), ["md", "protect"]);
+        assert_eq!(super::path_patterns(text), ["protects/"]);
+    }
+
+    /// Védett fájl a térképben marad; mappához relatív, beágyazott fájl, `!` visszavétel.
+    #[test]
+    fn protected_files_stay_in_the_walk() {
+        let project = Project::new(&[
+            (".callgraphignore", "protect migrations/\nprotect *.gen.php\n"),
+            ("migrations/a.php", "x"),
+            ("app/b.php", "x"),
+            ("app/c.gen.php", "x"),
+            ("sub/migrations/d.php", "x"),
+            ("sub/.callgraphignore", "protect /lib/\nprotect !c.gen.php\n"),
+            ("sub/lib/e.php", "x"),
+            ("sub/c.gen.php", "x"),
+        ]);
+        let names = [
+            "migrations/a.php",
+            "app/b.php",
+            "app/c.gen.php",
+            "sub/migrations/d.php",
+            "sub/lib/e.php",
+            "sub/c.gen.php",
+        ];
+        assert_eq!(project.included(&names, true).len(), names.len());
+        let protected: Vec<&str> = names
+            .into_iter()
+            .filter(|n| super::is_protected(&project.0.join(n)))
+            .collect();
+        assert_eq!(
+            protected,
+            ["migrations/a.php", "app/c.gen.php", "sub/migrations/d.php", "sub/lib/e.php"]
+        );
+        assert_eq!(super::protect_mark("/nonexistent/x.php"), "");
     }
 }

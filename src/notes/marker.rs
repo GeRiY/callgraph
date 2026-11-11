@@ -20,8 +20,11 @@ pub fn mark(n: usize) -> String {
     }
 }
 
-/// A sor a jelölő nélkül (a kimenetet olvasó szabályokhoz: `FILE  <út>  📝 2` → `FILE  <út>`).
+/// A sor a jelölő nélkül (a kimenetet olvasó szabályokhoz: `FILE  <út>  📝 2  🔒` → `FILE  <út>`; a `🔒` védett-jelölőt is).
 pub fn strip_mark(line: &str) -> &str {
+    let line = line
+        .strip_suffix(crate::io::PROTECT_MARK)
+        .unwrap_or(line);
     line.split_once(PREFIX).map_or(line, |(head, _)| head)
 }
 
@@ -139,6 +142,8 @@ mod tests {
         assert_eq!(live_count(&notes, methods.iter().copied()), 3);
         assert_eq!(strip_mark("FILE  a.php  📝 2"), "FILE  a.php");
         assert_eq!(strip_mark("FILE  a.php"), "FILE  a.php");
+        assert_eq!(strip_mark("FILE  a.php  📝 2  🔒"), "FILE  a.php");
+        assert_eq!(strip_mark("FILE  a.php  🔒"), "FILE  a.php");
         let marks = NoteMarks {
             root: PathBuf::from("/r"),
             by_file: HashMap::from([("a.php".to_owned(), notes)]),

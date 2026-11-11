@@ -14,14 +14,15 @@ impl Formatter for Api {
         for row in rows {
             writeln!(
                 out,
-                "FILE  {}{}{}",
+                "FILE  {}{}{}{}",
                 row.graph.file,
                 row.graph
                     .namespace
                     .as_ref()
                     .map(|n| format!("  NS:{n}"))
                     .unwrap_or_default(),
-                crate::notes::mark(crate::notes::file_count(&row.notes))
+                crate::notes::mark(crate::notes::file_count(&row.notes)),
+                crate::io::protect_mark(&row.graph.file)
             )
             .unwrap();
             out.push_str(&super::parse_error_lines(&row.graph, lang));

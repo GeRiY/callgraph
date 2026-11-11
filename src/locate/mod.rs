@@ -100,6 +100,7 @@ impl Locator {
             ranked: &ranked,
             all,
             notes: &notes,
+            root: &self.root,
         };
         text.push_str(&report.render());
         text.push_str(&crate::query::format::parse_trailer(

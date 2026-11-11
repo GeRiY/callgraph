@@ -9,7 +9,8 @@ mod walker;
 
 pub use cache::{CacheStore, CompactStats, JsonlCacheStore, SCHEMA, tool_version};
 pub use ignore_rules::{
-    GITIGNORE_ENV, IGNORE_FILE, excluded_extensions, gitignore_enabled, parse_ignore, path_patterns,
+    GITIGNORE_ENV, IGNORE_FILE, PROTECT_MARK, excluded_extensions, gitignore_enabled, is_protected,
+    parse_ignore, path_patterns, protect_mark,
 };
 pub use jsonl_writer::JsonlWriter;
 pub use source_text::{decode_source, read_source_lossy};

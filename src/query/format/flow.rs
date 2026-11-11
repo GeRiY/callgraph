@@ -20,7 +20,12 @@ impl Formatter for Flow {
             if graph.control_flow.is_empty() {
                 continue;
             }
-            writeln!(out, "FILE  {}", graph.file).unwrap();
+            writeln!(
+                out,
+                "FILE  {}{}",
+                graph.file,
+                crate::io::protect_mark(&graph.file)
+            ).unwrap();
             out.push_str(&super::parse_error_lines(&graph, lang));
             out.push('\n');
             for cf in &graph.control_flow {

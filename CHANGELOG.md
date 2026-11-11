@@ -6,6 +6,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 ## [Unreleased]
 
 ### Added
+- **`protect` lines in `.callgraphignore`:** `protect migrations/` keeps the matching files in the map (fully
+  queryable) but marks them `🔒` in the outline, `--body`, `--lines`, `locate` and `--format json` (`"protected": true`):
+  protected, read them, don't edit them. Same pattern rules as the exclusions; no `protect` line, no change.
 - **Signatures in outlines:** `--signatures` (or `CALLGRAPH_SIGNATURES=1`) prints the compact signature on the method
   line of the outline and the `--grep` caller outlines: `updateOrders(array $ids, bool $notify = false): array  L4-9`
   (where the language provides params / return type). `--format api` now also shows TS / Vue return types, and for PHP

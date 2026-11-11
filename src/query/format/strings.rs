@@ -75,7 +75,12 @@ impl Formatter for Strings {
         let mut prev: Option<&str> = None;
         for hit in &hits {
             if prev != Some(hit.file.as_str()) {
-                writeln!(out, "FILE  {}", hit.file).unwrap();
+                writeln!(
+                    out,
+                    "FILE  {}{}",
+                    hit.file,
+                    crate::io::protect_mark(&hit.file)
+                ).unwrap();
                 prev = Some(hit.file.as_str());
             }
             writeln!(out, "  L{:<5} {:<48} {}", hit.line, hit.caller, hit.value).unwrap();
