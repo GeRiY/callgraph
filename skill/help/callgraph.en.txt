@@ -78,6 +78,13 @@ Excluded files: built-in folders (vendor, node_modules, …), minified / bundled
   (git rules), and .callgraphignore: "md" / ".md" / "*.md" excludes an extension, any other line is a .gitignore
   pattern relative to its folder ("public/build", "/storage/", "!keep.js"). --no-gitignore (any command) or
   CALLGRAPH_GITIGNORE=0 (MCP server, hook): the .gitignore files are not applied (.callgraphignore still is).
+  "protect <pattern>" in .callgraphignore: the file stays in the map (outline, grep, locate) but is marked 🔒 —
+  a hint for the agent not to edit it (migrations, generated code); the source can still be read.
+Supported files: PHP, JS, TS, Vue, Rust, Swift, Python (.py, .pyi) + CSS/SCSS, JSON, Markdown.
+  --signatures (show): parameter and return types next to each method (also in --format api; TS/Vue return types,
+  PHP DocBlock @param / @return, Python annotations).
+  --help / -h / help: this text. Environment: CALLGRAPH_LANG, CALLGRAPH_STATS=0, CALLGRAPH_TELEMETRY=0,
+  CALLGRAPH_UPDATE_CHECK=0, CALLGRAPH_NEXT=1, CALLGRAPH_STRICT=1, CALLGRAPH_GITIGNORE=0, CALLGRAPH_WATCH=0.
   bash ~/.claude/skills/callgraph/callgraph.sh --version                       version, platform and the binary's path
 
 Project profile (architecture, layers and patterns from folder / file names, checked against the graph):

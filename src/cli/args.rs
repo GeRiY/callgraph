@@ -195,6 +195,8 @@ pub enum CliArgs {
     Telemetry { action: TelemetryAction },
     /// `--version` / `-V`: a verzió és a platform.
     Version,
+    /// `--help` / `-h` / `help`: a teljes súgó.
+    Help,
     /// `mcp [--auto-update]`: MCP-szerver stdio-n; `--auto-update`: indításkor naponta egyszer frissít.
     Mcp { auto_update: bool },
     /// Skill-parancs (`project`, `feedback`, `wrap`, `error`, `set-lang`, `self-update`, `skill-sync`) nyers argumentumokkal.
@@ -207,6 +209,9 @@ impl CliArgs {
         let args: Vec<String> = args.into_iter().collect();
         if args.len() == 1 && matches!(args[0].as_str(), "--version" | "-V" | "version") {
             return Ok(Self::Version);
+        }
+        if args.len() == 1 && matches!(args[0].as_str(), "--help" | "-h" | "help") {
+            return Ok(Self::Help);
         }
         if args.first().is_some_and(|a| a == "mcp") {
             let auto_update = args
@@ -1028,6 +1033,9 @@ mod tests {
         assert_eq!(parse(&["--version"]).unwrap(), CliArgs::Version);
         assert_eq!(parse(&["-V"]).unwrap(), CliArgs::Version);
         assert_eq!(parse(&["version"]).unwrap(), CliArgs::Version);
+        assert_eq!(parse(&["--help"]).unwrap(), CliArgs::Help);
+        assert_eq!(parse(&["-h"]).unwrap(), CliArgs::Help);
+        assert_eq!(parse(&["help"]).unwrap(), CliArgs::Help);
         // több argumentummal a `version` egy elemzendő út (mint eddig)
         assert!(matches!(
             parse(&["version", "x"]).unwrap(),
