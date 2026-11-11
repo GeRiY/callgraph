@@ -30,9 +30,9 @@ fájlneveket, oszlopokat, útvonalakat, fordítási kulcsokat, a nem angol domai
 kódnév-megfelelőjét is (pl. visszatérítés → `refund`). A projekt-térképből válaszol, fájl-olvasás nélkül: az első 5
 fájl (`--all`: minden találat), mindegyik az indoklásával (pontos definíció, fájlnév, név-részlet, string, hívás,
 `hívók: N`). Ezekkel a fájlokkal folytasd: outline / `--body` / `--grep`.
-**Receptek:** hibajavítás = `locate` → a fő fájl outline-ja → a metódus `--body`-ja. „Ki hívja / mi törik” = a név
+**Receptek:** hibajavítás = `locate` → a fő fájl `outline`-ja → a metódus `--body`-ja. „Ki hívja / mi törik” = a név
 szerinti minta `--grep`-pel és `--depth` 2 → a hívó metódus `--body`-ja. Ismeretlen projekt = `profile` → `locate` →
-outline. „Hol van ez a szöveg / konstans” = `--strings` / `--const` (pontos szöveg: Grep).
+`outline`. „Hol van ez a szöveg / konstans” = `--strings` / `--const` (pontos szöveg: Grep).
 <!-- /mcp -->
 Különleges kifejezések: a szóközös, idézőjeles kifejezés (`"Szervező további eseményei"`) EGY kifejezés, egészében a
 string-literálokra illesztve (feliratok, fordítások), szavakra sosem bontva; a `route::events.show` az útvonal

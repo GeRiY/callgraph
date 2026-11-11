@@ -30,9 +30,9 @@ file names, columns, routes, translation keys, and for a non-English domain word
 visszatérítés → `refund`). It answers from the project map without reading files: the top 5 files (`--all`: every
 match), each with its reasons (exact definition, file name, name part, string, call, `callers: N`). Continue on
 those files with the outline / `--body` / `--grep`.
-**Recipes:** bug fix = `locate` → outline of the top file → `--body` of the method. "Who calls it / what breaks" =
+**Recipes:** bug fix = `locate` → `outline` of the top file → `--body` of the method. "Who calls it / what breaks" =
 the name pattern with `--grep` and `--depth` 2 → `--body` of the calling method. Unfamiliar project = `profile` →
-`locate` → outline. "Where is this text / constant" = `--strings` / `--const` (exact text: Grep).
+`locate` → `outline`. "Where is this text / constant" = `--strings` / `--const` (exact text: Grep).
 <!-- /mcp -->
 Special terms: a quoted phrase with spaces (`"Szervező további eseményei"`) is ONE term, matched as a whole against
 string literals (UI labels, translations), never split into words; `route::events.show` finds the route definition
