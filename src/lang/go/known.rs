@@ -1,0 +1,120 @@
+//! Ismert nevek (adatfájl): a Go beépített függvényei és típusai, a standard könyvtár (stdlib) csomagjai,
+//! a standard típusok gyakori metódusai, valamint a felismert webes keretrendszerek.
+
+/// Beépített függvények és típusok (a puszta hívásuk / konverziójuk `native_go`).
+pub(crate) const BUILTINS: &[&str] = &[
+    "append",
+    "cap",
+    "clear",
+    "close",
+    "complex",
+    "copy",
+    "delete",
+    "imag",
+    "len",
+    "make",
+    "max",
+    "min",
+    "new",
+    "panic",
+    "print",
+    "println",
+    "real",
+    "recover",
+    // beépített típusok (konverzió: `int(x)`, `string(b)`)
+    "any",
+    "bool",
+    "byte",
+    "comparable",
+    "complex64",
+    "complex128",
+    "error",
+    "float32",
+    "float64",
+    "int",
+    "int8",
+    "int16",
+    "int32",
+    "int64",
+    "rune",
+    "string",
+    "uint",
+    "uint8",
+    "uint16",
+    "uint32",
+    "uint64",
+    "uintptr",
+];
+
+/// A standard típusok gyakori metódusai (`Error`, `Lock`, `Close`…): bármilyen fogadón `native_go`.
+pub(crate) const NATIVE_METHODS: &[&str] = &[
+    "Error", "String", "Close", "Lock", "Unlock", "RLock", "RUnlock", "Unwrap", "Done", "Wait",
+];
+
+/// A standard könyvtár csomagjainak gyökér-elemei (az import-út első szegmense).
+pub(crate) const STDLIB_ROOTS: &[&str] = &[
+    "archive",
+    "bufio",
+    "bytes",
+    "cmp",
+    "compress",
+    "container",
+    "context",
+    "crypto",
+    "database",
+    "debug",
+    "embed",
+    "encoding",
+    "errors",
+    "expvar",
+    "flag",
+    "fmt",
+    "go",
+    "hash",
+    "html",
+    "image",
+    "index",
+    "io",
+    "iter",
+    "log",
+    "maps",
+    "math",
+    "mime",
+    "net",
+    "os",
+    "path",
+    "plugin",
+    "reflect",
+    "regexp",
+    "runtime",
+    "slices",
+    "sort",
+    "strconv",
+    "strings",
+    "structs",
+    "sync",
+    "syscall",
+    "testing",
+    "text",
+    "time",
+    "unicode",
+    "unique",
+    "unsafe",
+];
+
+/// Webes keretrendszerek / könyvtárak: (import-út előtag, `framework` mező).
+pub(crate) const FRAMEWORKS: &[(&str, &str)] = &[
+    ("github.com/gin-gonic/gin", "gin"),
+    ("github.com/labstack/echo", "echo"),
+    ("github.com/gofiber/fiber", "fiber"),
+    ("github.com/go-chi/chi", "chi"),
+    ("github.com/gorilla/mux", "gorilla-mux"),
+    ("google.golang.org/grpc", "grpc"),
+    ("gorm.io/gorm", "gorm"),
+    ("github.com/spf13/cobra", "cobra"),
+];
+
+/// A név szerepel-e a (rendezetlen) táblában.
+pub(crate) fn is_in(table: &[&str], name: &str) -> bool {
+    table.contains(&name)
+}

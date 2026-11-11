@@ -11,6 +11,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   (`--signatures`, `--format api`), imports, categorized calls (`native_python`, `internal_helper`, `static_call`,
   `external_call`), strings, syntax errors, Django / Flask / FastAPI detection. `venv`, `.venv`, `site-packages` and
   `__pycache__` are skipped by default.
+- **Go (phase 1):** `.go` files in the map (tree-sitter): structs (fields as properties, embedded types), interfaces,
+  type aliases and defined types, functions and methods with receivers (also when the type is declared in another
+  file), generics, `const` / `var`, imports (alias, blank, dot), signatures with several return values
+  (`--signatures`, `--format api`), categorized calls (`native_go`, `internal_helper`, `static_call`, `instantiation`,
+  `external_call`; `go` / `defer` included), strings, doc comments, exported (capitalised) = public, syntax errors,
+  Gin / Echo / Fiber / Chi / gRPC / GORM detection. `testdata` is skipped by default (`vendor` already was);
+  `_test.go` files rank as tests in `locate`.
 
 ## [0.7.0] — 2026-11-11
 

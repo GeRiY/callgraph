@@ -12,6 +12,13 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   szignatúrák (`--signatures`, `--format api`), importok, kategorizált hívások (`native_python`, `internal_helper`,
   `static_call`, `external_call`), stringek, szintaktikai hibák, Django / Flask / FastAPI felismerés. A `venv`,
   `.venv`, `site-packages` és `__pycache__` mappák alapból kimaradnak.
+- **Go (1. fázis):** `.go` fájlok a térképben (tree-sitter): structok (mezők property-ként, beágyazott típusok),
+  interfészek, típus-aliasok és definiált típusok, függvények és receiveres metódusok (akkor is, ha a típus másik
+  fájlban van), generikusok, `const` / `var`, importok (alias, blank, dot), több visszatérési értékű szignatúrák
+  (`--signatures`, `--format api`), kategorizált hívások (`native_go`, `internal_helper`, `static_call`,
+  `instantiation`, `external_call`; a `go` / `defer` is), stringek, doc-kommentek, nagybetűs név = public,
+  szintaktikai hibák, Gin / Echo / Fiber / Chi / gRPC / GORM felismerés. A `testdata` alapból kimarad (a `vendor`
+  eddig is); a `_test.go` fájlok a `locate`-ben tesztnek számítanak.
 
 ## [0.7.0] — 2026-11-11
 

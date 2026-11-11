@@ -331,6 +331,7 @@ fn test_paths_are_recognised() {
         "lib/util.test.js",
         "crates/core/src/lib_test.rs",
         "App/AppTests.swift",
+        "internal/repo/repo_test.go",
         "packages\\a\\test\\x.php",
     ] {
         assert!(super::rank::is_test_path(path), "{path}");
@@ -339,6 +340,7 @@ fn test_paths_are_recognised() {
         "app/Services/TestingService.php",
         "src/contest.ts",
         "app/Http/Controllers/A.php",
+        "internal/repo/repo.go",
     ] {
         assert!(!super::rank::is_test_path(path), "{path}");
     }

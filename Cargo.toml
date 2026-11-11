@@ -42,6 +42,7 @@ thiserror = "2"
 tree-sitter = "=0.27.1"
 tree-sitter-swift = "=0.7.4"
 tree-sitter-python = "=0.25.0"
+tree-sitter-go = "=0.25.0"
 # MCP-szerver (`callgraph mcp`): a hivatalos Rust SDK, csak szerver + stdio + makrók; tokio minimális funkciókkal
 rmcp = { version = "=3.8.0", default-features = false, features = ["server", "macros", "transport-io"] }
 tokio = { version = "1", default-features = false, features = ["rt"] }

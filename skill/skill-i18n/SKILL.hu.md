@@ -1,12 +1,12 @@
 ---
 name: callgraph
-description: PHP / Rust / JS / TS / Vue / Swift / Python kódbázis token-hatékony feltérképezése AST-elemzéssel, a fájl beolvasása NÉLKÜL — honnan induljak egy feladattal (locate: rangsorolt fájlok a feladat neveiből), kategorizált hívás-gráf (osztály/komponens, metódus/függvény sortartománnyal), metódus-törzs, "hol hívják" keresés, hatáselemzés (--depth), string- és konstans-keresés, vezérlési ágak, framework-nézetek (routes, validation, events…). Használd PHP-, .rs-, .vue-, .js-, .ts-, .swift-fájl megértéséhez, hívási kapcsolatok, "ki hívja / hol használják" kérdésekhez — ez legyen az ELSŐ lépés a teljes Read/Grep helyett. NE használd nem kód fájlra (md, json, css, sima szöveg), vagy ha a pontos fájlszöveg kell egy már ismert sávban (akkor --lines vagy célzott Read).
+description: PHP / Rust / JS / TS / Vue / Swift / Python / Go kódbázis token-hatékony feltérképezése AST-elemzéssel, a fájl beolvasása NÉLKÜL — honnan induljak egy feladattal (locate: rangsorolt fájlok a feladat neveiből), kategorizált hívás-gráf (osztály/komponens, metódus/függvény sortartománnyal), metódus-törzs, "hol hívják" keresés, hatáselemzés (--depth), string- és konstans-keresés, vezérlési ágak, framework-nézetek (routes, validation, events…). Használd PHP-, .rs-, .vue-, .js-, .ts-, .swift-fájl megértéséhez, hívási kapcsolatok, "ki hívja / hol használják" kérdésekhez — ez legyen az ELSŐ lépés a teljes Read/Grep helyett. NE használd nem kód fájlra (md, json, css, sima szöveg), vagy ha a pontos fájlszöveg kell egy már ismert sávban (akkor --lines vagy célzott Read).
 ---
 
 # callgraph — kód-térkép Read nélkül
 
 `bash <skill>/callgraph.sh …` (a `<skill>` ennek a skillnek a mappája, pl. `~/.claude/skills/callgraph`).
-Minden célra (PHP, Rust, JS / TS / Vue, Swift / SwiftUI, Python, CSS / SCSS, JSON, MD) a natív `callgraph` bináris (`callgraph show`) dolgozik; a kimenet közös
+Minden célra (PHP, Rust, JS / TS / Vue, Swift / SwiftUI, Python, Go, CSS / SCSS, JSON, MD) a natív `callgraph` bináris (`callgraph show`) dolgozik; a kimenet közös
 szerkezetű: container (osztály / komponens / modul) → metódusok sortartománnyal → hívások kategóriánként.
 
 ## 0. lépés — projekt regisztrálása (egyszer, projektenként)
@@ -184,10 +184,21 @@ Ugyanazok a kapcsolók. A fájl-szintű függvények és konstansok a `<fájl>.p
 `property` (`async ` előtaggal); a `self` / `cls` kimarad a szignatúrából; a vezető `_` = privát. Hívás-kategóriák:
 `native_python`, `internal_helper`, `static_call`, `instantiation`, `external_call`. Részletek: `docs/LANG-PYTHON.md`.
 
+## Go
+
+Ugyanazok a kapcsolók. A fájl-szintű függvények és a csomag-szintű konstansok / változók a `<fájl>.go` `module`
+containerben; a `struct` `class` (mezők = property-k, a beágyazott típusok az `extends`-ben), az `interface`
+`interface` (absztrakt metódusokkal), a `type X int` `type`, a `type A = B` `alias`. A receiveres metódus
+(`func (r *Repo) Find`) a `Repo` típushoz tartozik, akkor is, ha másik fájlban van. Nagybetűs név = `public`,
+kisbetűs = `private`. A `--signatures` a több visszatérési értéket is mutatja (`Find(id int): (*User, error)`).
+Hívás-kategóriák: `native_go` (beépített, standard könyvtár), `internal_helper`, `static_call`, `instantiation`,
+`external_call`. A `_test.go` fájlok a `locate`-ben tesztnek számítanak; a `vendor` és a `testdata` kimarad.
+Részletek: `docs/LANG-GO.md`.
+
 ## MCP-szerver (`callgraph mcp`)
 
 <!-- mcp:tools -->
-callgraph (`callgraph mcp`): AST-alapú, token-hatékony kód-térkép (PHP, Rust, JS / TS / Vue, Swift, Python, SCSS); a CLI
+callgraph (`callgraph mcp`): AST-alapú, token-hatékony kód-térkép (PHP, Rust, JS / TS / Vue, Swift, Python, Go, SCSS); a CLI
 lekérdezései csak olvasó eszközként, azonos kimenettel. Kódfájl beolvasása előtt használd. Az utak a projektgyökérhez
 relatívak: regisztrált alias (`project`, lista: `projects`) vagy a szerver munkakönyvtára. Szokásos menet: `locate`
 (honnan induljak) → `outline` → `method_body` csak a szükséges metódusra → `find_callers` a név szerinti mintával.

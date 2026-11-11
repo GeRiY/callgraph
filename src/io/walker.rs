@@ -79,6 +79,7 @@ fn default_skip_dirs() -> Vec<String> {
         "venv",
         ".venv",
         "site-packages",
+        "testdata",
     ]
     .map(String::from)
     .to_vec()
