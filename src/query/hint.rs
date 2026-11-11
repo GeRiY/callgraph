@@ -263,14 +263,18 @@ impl Catalog {
         let qualified = wanted.contains("::");
         closest(
             &wanted,
-            self.symbols.iter().map(|symbol| {
-                let key = if qualified {
-                    symbol.as_str()
-                } else {
-                    symbol.rsplit("::").next().unwrap_or(symbol.as_str())
-                };
-                (key, symbol.as_str())
-            }),
+            self.symbols
+                // minősített azonosítónál csak minősített jelölt (a puszta típusnév előtag-egyezése zaj)
+                .iter()
+                .filter(|symbol| !qualified || symbol.contains("::"))
+                .map(|symbol| {
+                    let key = if qualified {
+                        symbol.as_str()
+                    } else {
+                        symbol.rsplit("::").next().unwrap_or(symbol.as_str())
+                    };
+                    (key, symbol.as_str())
+                }),
             MAX_SUGGESTIONS,
         )
     }

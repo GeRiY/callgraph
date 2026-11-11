@@ -204,11 +204,9 @@ impl Command for ShowCommand {
 impl ShowCommand {
     /// A `--category` első ismeretlen neve hibaként (`Unknown category: … (known: …)`); az üres tagok (`a,,b`) kimaradnak.
     fn unknown_category(&self) -> Option<crate::error::CallgraphError> {
-        let unknown = self
-            .category
-            .as_deref()?
-            .iter()
-            .find(|name| !name.is_empty() && !crate::model::KNOWN_CATEGORIES.contains(&name.as_str()))?;
+        let unknown = self.category.as_deref()?.iter().find(|name| {
+            !name.is_empty() && !crate::model::KNOWN_CATEGORIES.contains(&name.as_str())
+        })?;
         Some(crate::error::CallgraphError::Usage(
             crate::query::hint::unknown_category(
                 crate::i18n::lang(),

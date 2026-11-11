@@ -242,7 +242,10 @@ mod tests {
     #[test]
     fn known_categories_are_all_produced_by_a_frontend() {
         let sources = frontend_sources(false);
-        for name in KNOWN_CATEGORIES.iter().filter(|name| **name != DYNAMIC_CALL) {
+        for name in KNOWN_CATEGORIES
+            .iter()
+            .filter(|name| **name != DYNAMIC_CALL)
+        {
             let quoted = format!("\"{name}\"");
             assert!(
                 sources.iter().any(|(_, code)| code.contains(&quoted)),

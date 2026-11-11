@@ -90,7 +90,10 @@ impl Project {
     fn same_with_and_without_graph(&self, args: &[&str], lang: &str) -> String {
         let with = self.command(args, lang, true);
         let without = self.command(args, lang, false);
-        assert!(with.status.success() && without.status.success(), "{args:?}");
+        assert!(
+            with.status.success() && without.status.success(),
+            "{args:?}"
+        );
         assert_eq!(with.stdout, without.stdout, "{args:?}");
         String::from_utf8(with.stdout).unwrap().replace('\\', "/")
     }
@@ -113,12 +116,16 @@ fn grep_without_a_match_explains_the_pattern_and_suggests_the_next_step() {
         out.starts_with("ℹ no call target matches Usr::find\n"),
         "{out}"
     );
-    assert!(out.contains("regular expression on the call TARGET"), "{out}");
-    assert!(out.contains("(^|::|\\.|->)name$"), "{out}");
+    assert!(
+        out.contains("regular expression on the call TARGET"),
+        "{out}"
+    );
+    // a segéd a `\`-t `/`-re cseréli, ezért a minta `\.`-ja itt `/.`
+    assert!(out.contains("(^|::|/.|->)name$"), "{out}");
     assert!(out.contains("--guess"), "{out}");
     assert!(out.contains("Type::method"), "{out}");
     // az azonosítóból kinyert név szerinti minta, és a hasonló nevű metódus
-    assert!(out.contains("by name only: '(^|::|\\.|->)find$'"), "{out}");
+    assert!(out.contains("by name only: '(^|::|/.|->)find$'"), "{out}");
     assert!(out.contains("did you mean: User::find"), "{out}");
     // a generikus „törzs-logika” tipp ilyenkor nem jelenhet meg
     assert!(!out.contains(GENERIC_TIP_EN), "{out}");
@@ -139,7 +146,10 @@ fn grep_hint_adapts_to_the_pattern() {
     let project = Project::new();
     // elgépelt metódusnév: a név szerinti minta ugyanaz, mint amit a skill ajánl, ezért nem ismétli
     let by_name = project.ok(&["show", "app", "--grep", r"(^|::|\.|->)fnd$"], "en");
-    assert!(by_name.starts_with("ℹ no call target matches "), "{by_name}");
+    assert!(
+        by_name.starts_with("ℹ no call target matches "),
+        "{by_name}"
+    );
     assert!(!by_name.contains("by name only"), "{by_name}");
     assert!(by_name.contains("did you mean: User::find"), "{by_name}");
     // elgépelt típus
@@ -148,14 +158,23 @@ fn grep_hint_adapts_to_the_pattern() {
     // összetett reguláris kifejezés: magyarázat van, kinyert név és javaslat nincs
     let regex = project.ok(&["show", "app", "--grep", "^zork(a|b)$"], "en");
     assert!(regex.starts_with("ℹ no call target matches "), "{regex}");
-    assert!(!regex.contains("by name only") && !regex.contains("did you mean"), "{regex}");
+    assert!(
+        !regex.contains("by name only") && !regex.contains("did you mean"),
+        "{regex}"
+    );
     // semmire sem hasonlító név
     let nothing = project.ok(&["show", "app", "--grep", "zork"], "en");
-    assert!(nothing.contains("by name only: '(^|::|\\.|->)zork$'"), "{nothing}");
+    assert!(
+        nothing.contains("by name only: '(^|::|/.|->)zork$'"),
+        "{nothing}"
+    );
     assert!(!nothing.contains("did you mean"), "{nothing}");
     // a javaslat legfeljebb 3 név
     let many = project.ok(&["show", "app", "--grep", "Usr::sav"], "en");
-    let suggestion = many.lines().find(|l| l.contains("did you mean")).unwrap_or("");
+    let suggestion = many
+        .lines()
+        .find(|l| l.contains("did you mean"))
+        .unwrap_or("");
     assert!(suggestion.matches("::").count() <= 3, "{many}");
 }
 
@@ -167,7 +186,12 @@ fn grep_with_a_match_has_no_recovery_hint() {
         assert!(out.contains("FILE  "), "{out}");
         assert!(out.contains("UserController"), "{out}");
         assert!(out.contains(GENERIC_TIP_EN), "{out}");
-        for hint in ["ℹ", "no call target matches", "did you mean", "by name only"] {
+        for hint in [
+            "ℹ",
+            "no call target matches",
+            "did you mean",
+            "by name only",
+        ] {
             assert!(!out.contains(hint), "{pattern}: {hint}\n{out}");
         }
     }
@@ -184,7 +208,10 @@ fn not_found_path_gets_a_second_line_with_similar_paths() {
     assert_eq!(code, 2);
     assert_eq!(lines.len(), 2, "{lines:?}");
     assert!(lines[0].starts_with("Not found: "), "{lines:?}");
-    assert!(lines[0].contains("(relative to the --project "), "{lines:?}");
+    assert!(
+        lines[0].contains("(relative to the --project "),
+        "{lines:?}"
+    );
     assert!(lines[0].ends_with(" root)"), "{lines:?}");
     assert_eq!(lines[1], "Did you mean: app/Models/User.php");
     // elgépelt fájlnév ugyanabban a mappában
@@ -266,7 +293,10 @@ fn no_such_method_gets_a_did_you_mean_line() {
     assert_eq!(lines.len(), 2, "{lines:?}");
     assert!(lines[0].starts_with("No such method: "), "{lines:?}");
     assert!(lines[0].contains("User.php::fnd"), "{lines:?}");
-    assert!(lines[0].ends_with("(see --format outline for the file's full list)"), "{lines:?}");
+    assert!(
+        lines[0].ends_with("(see --format outline for the file's full list)"),
+        "{lines:?}"
+    );
     assert_eq!(lines[1], "Did you mean: find");
     // kis-/nagybetű-eltérés és előtag
     let (_, lines) = project.fail(&["show", "app/Models/User.php::Save"], "en");
@@ -316,11 +346,21 @@ fn unknown_category_is_a_usage_error_listing_the_known_ones() {
     assert!(lines[1].contains("model_use"), "{lines:?}");
     // a lista egyik tagja ismeretlen: a hiba azt nevezi meg
     let (code, lines) = project.fail(
-        &["show", "app", "--category", "model_use,bogus", "--format", "json"],
+        &[
+            "show",
+            "app",
+            "--category",
+            "model_use,bogus",
+            "--format",
+            "json",
+        ],
         "en",
     );
     assert_eq!(code, 2);
-    assert!(lines[0].starts_with("Unknown category: bogus (known: "), "{lines:?}");
+    assert!(
+        lines[0].starts_with("Unknown category: bogus (known: "),
+        "{lines:?}"
+    );
     // magyarul
     let (_, lines) = project.fail(&["show", "app", "--category", "bogus_use"], "hu");
     assert!(
@@ -340,19 +380,35 @@ fn locate_without_a_match_suggests_other_ways_to_ask() {
     assert!(out.contains("no match in the project map"), "{out}");
     assert!(out.contains("no match: zzzunknownzzz\n"), "{out}");
     let tip = out.lines().find(|l| l.starts_with("💡 ")).unwrap_or("");
-    for needle in ["part of the name", "camelCase", "snake_case", "singular", "visszatérítés → refund", "--strings"] {
+    for needle in [
+        "part of the name",
+        "camelCase",
+        "snake_case",
+        "singular",
+        "visszatérítés → refund",
+        "--strings",
+    ] {
         assert!(tip.contains(needle), "{needle}: {out}");
     }
     // egy találatos és egy találat nélküli kifejezés: a találat nélkülihez szól a tipp
     let partial = project.ok(&["locate", "User", "zzzunknownzzz"], "en");
     assert!(partial.contains("1. "), "{partial}");
-    assert!(partial.contains("no match: zzzunknownzzz\n💡 "), "{partial}");
+    assert!(
+        partial.contains("no match: zzzunknownzzz\n💡 "),
+        "{partial}"
+    );
     // minden kifejezés talál: nincs tipp
     let found = project.ok(&["locate", "User"], "en");
-    assert!(!found.contains("💡") && !found.contains("no match"), "{found}");
+    assert!(
+        !found.contains("💡") && !found.contains("no match"),
+        "{found}"
+    );
     // magyarul, és a gráf nélküli út is azonos
     let hu = project.ok(&["locate", "zzzunknownzzz"], "hu");
-    assert!(hu.contains("nincs találat: zzzunknownzzz\n💡 próbáld a név egy részét"), "{hu}");
+    assert!(
+        hu.contains("nincs találat: zzzunknownzzz\n💡 próbáld a név egy részét"),
+        "{hu}"
+    );
     let with = project.command(&["locate", "zzzunknownzzz"], "en", true);
     let without = project.command(&["locate", "zzzunknownzzz"], "en", false);
     assert_eq!(with.stdout, without.stdout);
@@ -370,13 +426,21 @@ fn strings_without_a_match_explains_the_matching_rule() {
     for fragment in ["hello", "HELLO WORLD", "lo wo"] {
         let found = project.ok(&["show", "app", "--strings", fragment], "en");
         assert!(found.contains("Hello World"), "{fragment}: {found}");
-        assert!(!found.contains("💡") && !found.contains("(no matches)"), "{found}");
+        assert!(
+            !found.contains("💡") && !found.contains("(no matches)"),
+            "{found}"
+        );
     }
     // a hosszabb, el nem találó szöveg ugyanazt a tippet adja, a rövidebb töredék pedig találatot
     let miss = project.ok(&["show", "app", "--strings", "hello world!"], "en");
     assert!(miss.starts_with("(no matches)\n💡 "), "{miss}");
     let hu = project.ok(&["show", "app", "--strings", "nothing-like-this"], "hu");
-    assert!(hu.starts_with("(nincs találat)\n💡 az illesztés a string-literál kis-/nagybetű-független részlete"), "{hu}");
+    assert!(
+        hu.starts_with(
+            "(nincs találat)\n💡 az illesztés a string-literál kis-/nagybetű-független részlete"
+        ),
+        "{hu}"
+    );
     // a --const üzenete változatlan
     let constants = project.ok(&["show", "app", "--const", "NOTHING_LIKE_THIS"], "en");
     assert_eq!(constants, "(no matches)\n");
@@ -398,12 +462,18 @@ fn depth_tells_a_missing_target_from_an_uncalled_one() {
         "en",
     );
     let first = level1(&missing);
-    assert!(first.starts_with("== level 1 — directly calls: /Usr::find/\n"), "{missing}");
+    assert!(
+        first.starts_with("== level 1 — directly calls: /Usr::find/\n"),
+        "{missing}"
+    );
     assert!(
         first.contains("  (no method named Usr::find in the project map — check the spelling)\n"),
         "{missing}"
     );
-    assert!(first.contains("  💡 did you mean: User::find\n"), "{missing}");
+    assert!(
+        first.contains("  💡 did you mean: User::find\n"),
+        "{missing}"
+    );
     assert!(!first.contains("no more callers"), "{missing}");
     assert!(missing.contains("== level 2"), "{missing}");
 
@@ -417,14 +487,27 @@ fn depth_tells_a_missing_target_from_an_uncalled_one() {
         first.contains("  (Orphan::lonely exists but nothing calls it in the project — it may be an entry point, an event/route handler or called dynamically)\n"),
         "{orphan}"
     );
-    assert!(!first.contains("no method named") && !first.contains("no more callers"), "{orphan}");
+    assert!(
+        !first.contains("no method named") && !first.contains("no more callers"),
+        "{orphan}"
+    );
 
     // név szerinti minta: a név kerül az üzenetbe
     let by_name = project.same_with_and_without_graph(
-        &["show", "app", "--grep", r"(^|::|\.|->)lonely$", "--depth", "2"],
+        &[
+            "show",
+            "app",
+            "--grep",
+            r"(^|::|\.|->)lonely$",
+            "--depth",
+            "2",
+        ],
         "en",
     );
-    assert!(by_name.contains("  (lonely exists but nothing calls it in the project"), "{by_name}");
+    assert!(
+        by_name.contains("  (lonely exists but nothing calls it in the project"),
+        "{by_name}"
+    );
 
     // máshol hívják (a vizsgált mappában nem): a gyökérből kell keresni
     let elsewhere = project.same_with_and_without_graph(
@@ -442,19 +525,38 @@ fn depth_tells_a_missing_target_from_an_uncalled_one() {
         "en",
     );
     assert!(hit.contains("UserController::show()"), "{hit}");
-    for text in ["no method named", "exists but nothing calls", "did you mean", "not called from this path"] {
+    for text in [
+        "no method named",
+        "exists but nothing calls",
+        "did you mean",
+        "not called from this path",
+    ] {
         assert!(!hit.contains(text), "{text}\n{hit}");
     }
 
     // magyarul
-    let hu = project.ok(&["show", "app", "--grep", "Usr::find", "--depth", "2"], "hu");
+    let hu = project.ok(
+        &["show", "app", "--grep", "Usr::find", "--depth", "2"],
+        "hu",
+    );
     assert!(
-        hu.contains("  (nincs Usr::find nevű metódus a projekt-térképen — ellenőrizd a helyesírást)\n"),
+        hu.contains(
+            "  (nincs Usr::find nevű metódus a projekt-térképen — ellenőrizd a helyesírást)\n"
+        ),
         "{hu}"
     );
-    assert!(hu.contains("  💡 esetleg erre gondoltál: User::find\n"), "{hu}");
-    let hu = project.ok(&["show", "app", "--grep", "Orphan::lonely", "--depth", "2"], "hu");
-    assert!(hu.contains("  (Orphan::lonely létezik, de a projektben semmi sem hívja"), "{hu}");
+    assert!(
+        hu.contains("  💡 esetleg erre gondoltál: User::find\n"),
+        "{hu}"
+    );
+    let hu = project.ok(
+        &["show", "app", "--grep", "Orphan::lonely", "--depth", "2"],
+        "hu",
+    );
+    assert!(
+        hu.contains("  (Orphan::lonely létezik, de a projektben semmi sem hívja"),
+        "{hu}"
+    );
 }
 
 #[test]
@@ -472,7 +574,17 @@ fn machine_formats_and_next_lines_carry_no_hint() {
         }
     }
     // üres gépi kimenet (nincs dynamic_call): továbbra is tiszta JSON, tipp nélkül
-    let empty = project.ok(&["show", "app", "--format", "json", "--category", "dynamic_call"], "en");
+    let empty = project.ok(
+        &[
+            "show",
+            "app",
+            "--format",
+            "json",
+            "--category",
+            "dynamic_call",
+        ],
+        "en",
+    );
     serde_json::from_str::<serde_json::Value>(&empty).expect("valid JSON");
     assert!(!empty.contains("💡") && !empty.contains("ℹ"), "{empty}");
     // a stats-ban a kategória-számláló nem tartalmaz tipp-sort
@@ -481,5 +593,9 @@ fn machine_formats_and_next_lines_carry_no_hint() {
     // a hívók gépi (JSONL) parancsa nulla találatnál üres marad
     let callers = project.command(&["callers", "Usr::find"], "en", true);
     assert!(callers.status.success());
-    assert!(callers.stdout.is_empty(), "{}", String::from_utf8_lossy(&callers.stdout));
+    assert!(
+        callers.stdout.is_empty(),
+        "{}",
+        String::from_utf8_lossy(&callers.stdout)
+    );
 }

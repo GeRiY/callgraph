@@ -49,7 +49,10 @@ fn edit_distance_counts_insert_delete_and_replace() {
     assert_eq!(edit_distance("é", "e"), 1);
     assert_eq!(edit_distance("árvíz", "arviz"), 2);
     // szimmetrikus
-    assert_eq!(edit_distance("sunday", "saturday"), edit_distance("saturday", "sunday"));
+    assert_eq!(
+        edit_distance("sunday", "saturday"),
+        edit_distance("saturday", "sunday")
+    );
 }
 
 #[test]
@@ -58,30 +61,52 @@ fn closest_orders_case_then_distance_then_prefix() {
     let found = closest_names("find", names, 10);
     // a teljesen azonos kulcs kimarad; előbb a csak betűnagyságban eltérő, majd távolság (azonos távolságnál a
     // kisebb hosszkülönbség), végül az előtag-egyezés
-    assert_eq!(found, strings(&["Find", "fine", "fnd", "finder", "findOrFail"]));
+    assert_eq!(
+        found,
+        strings(&["Find", "fine", "fnd", "finder", "findOrFail"])
+    );
     // a limit levág
-    assert_eq!(closest_names("find", names, 3), strings(&["Find", "fine", "fnd"]));
+    assert_eq!(
+        closest_names("find", names, 3),
+        strings(&["Find", "fine", "fnd"])
+    );
     assert!(closest_names("find", names, 0).is_empty());
 }
 
 #[test]
 fn closest_is_stricter_for_short_names() {
     // legfeljebb 3 karakternél a megengedett távolság 1
-    assert_eq!(closest_names("id", ["ids", "ix", "name", "idle"], 5), strings(&["ix", "ids"]));
+    assert_eq!(
+        closest_names("id", ["ids", "ix", "name", "idle"], 5),
+        strings(&["ix", "ids"])
+    );
     assert!(closest_names("id", ["xyz"], 5).is_empty());
     // az előtag-egyezéshez legalább 3 karakteres rövidebb oldal kell
     assert!(closest_names("fi", ["find"], 5).is_empty());
-    assert_eq!(closest_names("fin", ["finalize"], 5), strings(&["finalize"]));
+    assert_eq!(
+        closest_names("fin", ["finalize"], 5),
+        strings(&["finalize"])
+    );
     // fordítva is: a kért név hosszabb, a létező az előtagja
-    assert_eq!(closest_names("getUserName", ["getUser"], 5), strings(&["getUser"]));
+    assert_eq!(
+        closest_names("getUserName", ["getUser"], 5),
+        strings(&["getUser"])
+    );
     assert!(closest_names("completelyDifferent", ["find", "get"], 5).is_empty());
 }
 
 #[test]
 fn closest_shows_the_display_form_and_removes_duplicates() {
-    let items = [("find", "User::find"), ("find", "Post::find"), ("fnd", "User::find")];
+    let items = [
+        ("find", "User::find"),
+        ("find", "Post::find"),
+        ("fnd", "User::find"),
+    ];
     // a kulcsot hasonlítja, a kiírt alakot adja; a kétszer szereplő kiírt alak egyszer
-    assert_eq!(closest("finde", items, 5), strings(&["Post::find", "User::find"]));
+    assert_eq!(
+        closest("finde", items, 5),
+        strings(&["Post::find", "User::find"])
+    );
 }
 
 #[test]
@@ -102,11 +127,27 @@ fn plain_symbol_extracts_an_identifier_or_gives_up() {
     assert_eq!(plain_symbol(r"(^|::|\.|->)find$").as_deref(), Some("find"));
     assert_eq!(plain_symbol("^User::find$").as_deref(), Some("User::find"));
     assert_eq!(plain_symbol("  find ").as_deref(), Some("find"));
-    assert_eq!(plain_symbol(r"Order\.refund").as_deref(), Some("Order::refund"));
-    assert_eq!(plain_symbol(r"App\\Models\\User::find").as_deref(), Some("User::find"));
+    assert_eq!(
+        plain_symbol(r"Order\.refund").as_deref(),
+        Some("Order::refund")
+    );
+    assert_eq!(
+        plain_symbol(r"App\\Models\\User::find").as_deref(),
+        Some("User::find")
+    );
     assert_eq!(plain_symbol("User->find").as_deref(), Some("User::find"));
     // bármi, ami valódi reguláris kifejezés: nem azonosító
-    for pattern in ["", "   ", "foo(bar|baz)", "user.*", "[a-z]+", "a|b", "x{2}", r"(^|::|\.|->)", "get?"] {
+    for pattern in [
+        "",
+        "   ",
+        "foo(bar|baz)",
+        "user.*",
+        "[a-z]+",
+        "a|b",
+        "x{2}",
+        r"(^|::|\.|->)",
+        "get?",
+    ] {
         assert_eq!(plain_symbol(pattern), None, "{pattern:?}");
     }
 }
@@ -140,7 +181,11 @@ fn catalog_collects_definitions_and_suggests_in_order() {
     assert_eq!(catalog.suggest("Pst"), strings(&["Post"]));
     assert_eq!(catalog.suggest("publsh"), strings(&["Post::publish"]));
     // a létező pontos név nem javaslat önmaga
-    assert!(!catalog.suggest("User::find").contains(&"User::find".to_owned()));
+    assert!(
+        !catalog
+            .suggest("User::find")
+            .contains(&"User::find".to_owned())
+    );
     assert!(catalog.suggest("zzzzzzzz").is_empty());
 }
 
@@ -161,14 +206,32 @@ fn catalog_limits_suggestions_to_three() {
 fn presence_tells_missing_from_defined_from_called() {
     let defined = definitions();
     let regex = |pattern: &str| crate::query::filter::pattern_regex(pattern).unwrap();
-    assert_eq!(defined.presence(&regex("User::find")), Presence::DefinedOnly);
-    assert_eq!(defined.presence(&regex(r"(^|::|\.|->)find$")), Presence::DefinedOnly);
+    assert_eq!(
+        defined.presence(&regex("User::find")),
+        Presence::DefinedOnly
+    );
+    assert_eq!(
+        defined.presence(&regex(r"(^|::|\.|->)find$")),
+        Presence::DefinedOnly
+    );
     assert_eq!(defined.presence(&regex("^Post$")), Presence::DefinedOnly);
     assert_eq!(defined.presence(&regex("Usr::find")), Presence::Missing);
-    assert_eq!(defined.presence(&regex("nothing_like_this")), Presence::Missing);
-    let with_caller = Catalog::from_graphs([&graph("src/Models.php", DEFINITIONS), &graph("src/caller.php", CALLER)]);
-    assert_eq!(with_caller.presence(&regex("strlen")), Presence::CalledElsewhere);
-    assert_eq!(with_caller.presence(&regex("User::find")), Presence::DefinedOnly);
+    assert_eq!(
+        defined.presence(&regex("nothing_like_this")),
+        Presence::Missing
+    );
+    let with_caller = Catalog::from_graphs([
+        &graph("src/Models.php", DEFINITIONS),
+        &graph("src/caller.php", CALLER),
+    ]);
+    assert_eq!(
+        with_caller.presence(&regex("strlen")),
+        Presence::CalledElsewhere
+    );
+    assert_eq!(
+        with_caller.presence(&regex("User::find")),
+        Presence::DefinedOnly
+    );
     // az üres katalógus semmit sem ismer
     assert_eq!(Catalog::default().presence(&regex("x")), Presence::Missing);
 }
@@ -177,20 +240,41 @@ fn presence_tells_missing_from_defined_from_called() {
 fn empty_grep_explains_the_pattern_and_names_the_next_step() {
     let catalog = definitions();
     let (en, hu) = both(|lang| empty_grep(lang, "Usr::find", &catalog));
-    assert!(en.starts_with("ℹ no call target matches Usr::find\n"), "{en}");
+    assert!(
+        en.starts_with("ℹ no call target matches Usr::find\n"),
+        "{en}"
+    );
     assert!(en.contains("regular expression on the call TARGET"), "{en}");
     assert!(en.contains("(^|::|\\.|->)name$"), "{en}");
     assert!(en.contains("--guess"), "{en}");
-    assert!(en.contains("Type::method finds only the resolved calls"), "{en}");
-    assert!(en.contains("💡 by name only: '(^|::|\\.|->)find$'\n"), "{en}");
+    assert!(
+        en.contains("Type::method finds only the resolved calls"),
+        "{en}"
+    );
+    assert!(
+        en.contains("💡 by name only: '(^|::|\\.|->)find$'\n"),
+        "{en}"
+    );
     assert!(en.ends_with("💡 did you mean: User::find\n"), "{en}");
-    assert!(hu.starts_with("ℹ egyetlen hívás-cél sem illeszkedik a mintára: Usr::find\n"), "{hu}");
+    assert!(
+        hu.starts_with("ℹ egyetlen hívás-cél sem illeszkedik a mintára: Usr::find\n"),
+        "{hu}"
+    );
     assert!(hu.contains("reguláris kifejezés a hívás CÉLJÁRA"), "{hu}");
-    assert!(hu.contains("csak név szerint: '(^|::|\\.|->)find$'"), "{hu}");
-    assert!(hu.ends_with("💡 esetleg erre gondoltál: User::find\n"), "{hu}");
+    assert!(
+        hu.contains("csak név szerint: '(^|::|\\.|->)find$'"),
+        "{hu}"
+    );
+    assert!(
+        hu.ends_with("💡 esetleg erre gondoltál: User::find\n"),
+        "{hu}"
+    );
     // a generikus törzs-logika tipp nincs benne
     for text in [&en, &hu] {
-        assert!(!text.contains("body logic") && !text.contains("törzs-logik"), "{text}");
+        assert!(
+            !text.contains("body logic") && !text.contains("törzs-logik"),
+            "{text}"
+        );
     }
 }
 
@@ -211,7 +295,10 @@ fn empty_grep_skips_what_does_not_apply() {
     assert!(!nothing.contains("did you mean"), "{nothing}");
     // nem név szerinti, de egyszerű azonosító: a név szerinti minta más, ezért ajánlja
     let plain = empty_grep(Lang::En, "zork", &catalog);
-    assert!(plain.contains("by name only: '(^|::|\\.|->)zork$'"), "{plain}");
+    assert!(
+        plain.contains("by name only: '(^|::|\\.|->)zork$'"),
+        "{plain}"
+    );
 }
 
 #[test]
@@ -228,20 +315,29 @@ fn no_caller_distinguishes_missing_defined_and_called_elsewhere() {
     );
     // nincs hasonló név: csak az első sor
     let lone = no_caller(Lang::En, "zork", Presence::Missing, &catalog);
-    assert_eq!(lone, "  (no method named zork in the project map — check the spelling)\n");
+    assert_eq!(
+        lone,
+        "  (no method named zork in the project map — check the spelling)\n"
+    );
     // név szerinti mintából a név kerül az üzenetbe
     let named = no_caller(Lang::En, r"(^|::|\.|->)zork$", Presence::Missing, &catalog);
     assert!(named.contains("no method named zork in"), "{named}");
     // összetett minta: a minta maga
     let complex = no_caller(Lang::En, "zork(a|b)", Presence::Missing, &catalog);
-    assert!(complex.contains("no method named zork(a|b) in"), "{complex}");
+    assert!(
+        complex.contains("no method named zork(a|b) in"),
+        "{complex}"
+    );
 
     let (en, hu) = both(|lang| no_caller(lang, "User::find", Presence::DefinedOnly, &catalog));
     assert_eq!(
         en,
         "  (User::find exists but nothing calls it in the project — it may be an entry point, an event/route handler or called dynamically)\n"
     );
-    assert!(hu.starts_with("  (User::find létezik, de a projektben semmi sem hívja"), "{hu}");
+    assert!(
+        hu.starts_with("  (User::find létezik, de a projektben semmi sem hívja"),
+        "{hu}"
+    );
     assert!(hu.contains("dinamikusan hívják"), "{hu}");
 
     let (en, hu) = both(|lang| no_caller(lang, "User::find", Presence::CalledElsewhere, &catalog));
@@ -258,7 +354,10 @@ fn no_caller_distinguishes_missing_defined_and_called_elsewhere() {
 fn did_you_mean_line_has_no_trailing_newline_and_is_empty_without_suggestions() {
     let list = strings(&["a", "b"]);
     assert_eq!(did_you_mean(Lang::En, &list), "Did you mean: a, b");
-    assert_eq!(did_you_mean(Lang::Hu, &list), "Esetleg erre gondoltál: a, b");
+    assert_eq!(
+        did_you_mean(Lang::Hu, &list),
+        "Esetleg erre gondoltál: a, b"
+    );
     assert_eq!(did_you_mean(Lang::En, &[]), "");
     assert_eq!(did_you_mean(Lang::Hu, &[]), "");
 }
@@ -293,19 +392,35 @@ fn similar_paths_puts_the_same_file_name_elsewhere_first() {
     // mappa elgépelése
     assert_eq!(similar_paths("app/Model", &known), strings(&["app/Models"]));
     // kis-/nagybetű eltérés
-    assert_eq!(similar_paths("app/Models/user.php", &known).first().map(String::as_str), Some("app/Models/User.php"));
+    assert_eq!(
+        similar_paths("app/Models/user.php", &known)
+            .first()
+            .map(String::as_str),
+        Some("app/Models/User.php")
+    );
     // Windows-os elválasztó és záró perjel
-    assert_eq!(similar_paths("app\\Model\\", &known), strings(&["app/Models"]));
+    assert_eq!(
+        similar_paths("app\\Model\\", &known),
+        strings(&["app/Models"])
+    );
     // nincs hasonló
     assert!(similar_paths("zzz/qqq.php", &known).is_empty());
     assert!(similar_paths("", &known).is_empty());
     // a létező útvonal nem javasolja önmagát
-    assert!(!similar_paths("app/Models/User.php", &known).contains(&"app/Models/User.php".to_owned()));
+    assert!(
+        !similar_paths("app/Models/User.php", &known).contains(&"app/Models/User.php".to_owned())
+    );
 }
 
 #[test]
 fn similar_paths_gives_at_most_three() {
-    let known = strings(&["a/User.php", "b/User.php", "c/User.php", "d/User.php", "e/User.php"]);
+    let known = strings(&[
+        "a/User.php",
+        "b/User.php",
+        "c/User.php",
+        "d/User.php",
+        "e/User.php",
+    ]);
     assert_eq!(similar_paths("x/User.php", &known).len(), MAX_SUGGESTIONS);
     // az azonos nevűek után a közeli nevek is elférnek, ha van hely
     let mixed = strings(&["a/User.php", "app/Uzer.php", "app/Usar.php", "app/Usor.php"]);
@@ -328,7 +443,10 @@ fn unknown_category_lists_the_known_names_and_a_close_one() {
     );
     // nincs hasonló: egyetlen sor, mint a layer-hibánál
     let lone = unknown_category(Lang::En, "zzzzzz", &known);
-    assert_eq!(lone, "Unknown category: zzzzzz (known: external_call, model_use, orm_relation)");
+    assert_eq!(
+        lone,
+        "Unknown category: zzzzzz (known: external_call, model_use, orm_relation)"
+    );
     assert_eq!(lone.lines().count(), 1);
 }
 
@@ -344,9 +462,18 @@ fn fixed_texts_follow_the_language_with_the_same_shape() {
     let (en, hu) = both(|lang| locate_no_match(lang).to_owned());
     assert_eq!(en.lines().count(), 1);
     assert!(en.starts_with("💡 ") && hu.starts_with("💡 "));
-    for needle in ["camelCase", "snake_case", "singular", "visszatérítés → refund", "--strings"] {
+    for needle in [
+        "camelCase",
+        "snake_case",
+        "singular",
+        "visszatérítés → refund",
+        "--strings",
+    ] {
         assert!(en.contains(needle), "{en}");
     }
-    assert!(hu.contains("visszatérítés → refund") && hu.contains("--strings"), "{hu}");
+    assert!(
+        hu.contains("visszatérítés → refund") && hu.contains("--strings"),
+        "{hu}"
+    );
     assert!(en.contains("(\"…\")") && hu.contains("(\"…\")"));
 }

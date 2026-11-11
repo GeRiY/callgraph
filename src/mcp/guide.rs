@@ -213,9 +213,15 @@ mod tests {
             ] {
                 assert!(recipes.contains(tool), "{lang:?}: {tool}\n{recipes}");
             }
-            assert!(!recipes.contains("--"), "{lang:?}: CLI flag left\n{recipes}");
+            assert!(
+                !recipes.contains("--"),
+                "{lang:?}: CLI flag left\n{recipes}"
+            );
             assert!(!recipes.contains("bash "), "{lang:?}: shell command left");
-            assert!(recipes.contains("Grep"), "{lang:?}: exact text goes to Grep");
+            assert!(
+                recipes.contains("Grep"),
+                "{lang:?}: exact text goes to Grep"
+            );
         }
     }
 
