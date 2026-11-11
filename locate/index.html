@@ -108,6 +108,14 @@
     method you need → <code>--grep</code> to find its callers.</p>
 </section>
 
+<section id="nomatch" aria-labelledby="h-nomatch">
+  <h2 id="h-nomatch">When nothing matches</h2>
+  <p>An empty result is no longer silent: <code>locate</code> says there was no match and suggests the next step &mdash; try one part of the name, give a non-English word as its English code name, or search the text itself with <code>--strings</code>.</p>
+<pre class="code out"><code>locate: 1 terms · no match in the project map
+no match: zzzqq
+💡 try one part of the name (a camelCase / snake_case piece, singular form); give a non-English word as its English code name (visszatérítés → refund); for UI text quote the phrase ("…") or use `show &lt;dir&gt; --strings`</code></pre>
+</section>
+
 <section id="mcp" aria-labelledby="h-mcp">
   <h2 id="h-mcp">Over MCP</h2>
   <p>The <code>locate</code> tool takes <code>terms</code> (a string or a list), an optional <code>project</code> alias

@@ -148,6 +148,20 @@ bash ~/.claude/skills/callgraph/callgraph.sh --project shop app --const STATUS_A
     is listázza, <code>[re-export]</code> jelöléssel.</p>
 </section>
 
+<section id="dynamic" aria-labelledby="h-dynamic">
+  <h2 id="h-dynamic">Dinamikus hívások: jelölve, nem találgatva</h2>
+  <p>A futásidőben eldőlő célú hívás (<code>$job-&gt;$method()</code>, <code>new $class</code>, <code>app($var)</code>) eddig hiányzott az outline-ból, így a gráf ott is teljesnek látszott, ahol nem az. Mostantól a lista végén szerepel <code>dynamic_call</code> néven, a hívott kifejezéssel.</p>
+  <p>Jelölés, nem hívó-él: a <code>--grep</code>, a <code>--depth</code> és a <code>locate</code> figyelmen kívül hagyja, a <code>--depth</code> pedig megmondja, hány hívó tartalmaz ilyet, hogy kézzel átnézhesd. A literál esetek (pl. <code>app(Foo::class)</code>) közönséges hívások maradnak, a <code>Closure</code> / <code>callable</code> típusú callback-paraméterek pedig nem számítanak. Szűrés: <code>--category dynamic_call</code>.</p>
+<pre class="code"><code>bash ~/.claude/skills/callgraph/callgraph.sh --project shop app/Dispatcher.php</code></pre>
+  <p class="label">Kimenet (rövidítve)</p>
+<pre class="code out"><code>FILE  /srv/shop/app/Dispatcher.php  NS:App
+
+class Dispatcher  L4-12
+  handle()  L6-11
+    external_call     prepare
+    dynamic_call      $job-&gt;$method, new $class</code></pre>
+</section>
+
 <section id="limits" aria-labelledby="h-limits">
   <h2 id="h-limits">Korlátok</h2>
   <p>Ez statikus elemzés: a dinamikus hívások (<code>$this-&gt;$method()</code>), a magic metódusok és a futásidőben

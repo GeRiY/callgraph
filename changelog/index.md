@@ -8,6 +8,18 @@ Every release with its date, newest first: what was added, changed and fixed. Do
 
 [Install the latest version](https://callgraph.eu/#install)[Latest release on GitHub](https://github.com/GeRiY/callgraph/releases/latest)
 
+## v0.9.0 — 2026-11-11
+
+[Release notes and downloads on GitHub](https://github.com/GeRiY/callgraph/releases/tag/v0.9.0)
+
+### Added
+
+- **`dynamic_call` marker:** calls whose target is decided at runtime used to be missing from the outline, so the graph looked complete where it was not. They are now listed (last, after the other categories) with the called expression as the target — PHP: `$obj->$m()`, `$obj->{$expr}()`, `$class::$m()`, `$fn()`, `new $class`, `call_user_func($x)`, `app($var)` / `resolve($var)` / `$this->app->make($var)`; JS / TS / Vue: `obj[expr]()`, `new (expr)()`, `import(expr)`, `require(expr)`; Python: `getattr(obj, name)()`, `globals()[name]()`, `importlib.import_module(name)`, `eval` / `exec`. Literal cases (`obj['x']()`, `app(Foo::class)`, `getattr(obj, 'x')()`) stay ordinary. It is a marker, not a caller edge: `--grep`, `--depth` and `locate` ignore it; `--depth` adds a line telling how many of the callers contain dynamic calls ("check them by hand"). In PHP, callback parameters typed `Closure` / `callable` and local closures (`$f = fn …`) do not count as dynamic calls, and `($this->invokable)()` on a class-typed property is a plain `Type::__invoke` call. Filter with `--category dynamic_call`. Rust, Swift and Go: not yet.
+
+- **Recovery hints:** an empty or wrong result now tells the next step instead of staying silent. `--grep` with no match explains that the pattern is a regular expression on the call target, suggests the name-only pattern (`(^|::|\.|->)name$`, `--guess`) and `did you mean: User::find`; `Not found: <path>` and `No such method` add a second `Did you mean: …` line (up to 3 similar paths / method names); `--depth` says whether the target does not exist or exists but nothing calls it; `--strings` with no match explains the matching rule; `locate` with no match suggests name parts, English code names and `--strings`. An unknown `--category` is now an error listing the known categories (`Unknown category: … (known: …)`) instead of an empty result. The hints appear in the text output only; json, mermaid, dot, stats and the `next` suggestions are unchanged.
+
+- **Recipes in the skill:** a short "Recipes — task → call sequence" section (bug fix, who calls this, unfamiliar project, where is this text) in the skill instructions, and the same in 3 lines in the MCP instructions.
+
 ## v0.8.0 — 2026-11-11
 
 [Release notes and downloads on GitHub](https://github.com/GeRiY/callgraph/releases/tag/v0.8.0)

@@ -149,6 +149,20 @@ bash ~/.claude/skills/callgraph/callgraph.sh --project shop app --const STATUS_A
     marked <code>[re-export]</code>.</p>
 </section>
 
+<section id="dynamic" aria-labelledby="h-dynamic">
+  <h2 id="h-dynamic">Dynamic calls: marked, not guessed</h2>
+  <p>A call whose target is decided at run time (<code>$job-&gt;$method()</code>, <code>new $class</code>, <code>app($var)</code>) used to be missing from the outline, so the graph looked complete where it was not. Now it is listed last, as <code>dynamic_call</code>, with the called expression.</p>
+  <p>It is a marker, not a caller edge: <code>--grep</code>, <code>--depth</code> and <code>locate</code> ignore it, and <code>--depth</code> tells how many callers contain such a call, so you check them by hand. Literal cases such as <code>app(Foo::class)</code> stay ordinary calls, and <code>Closure</code> / <code>callable</code> callback parameters do not count. Filter with <code>--category dynamic_call</code>.</p>
+<pre class="code"><code>bash ~/.claude/skills/callgraph/callgraph.sh --project shop app/Dispatcher.php</code></pre>
+  <p class="label">Output (shortened)</p>
+<pre class="code out"><code>FILE  /srv/shop/app/Dispatcher.php  NS:App
+
+class Dispatcher  L4-12
+  handle()  L6-11
+    external_call     prepare
+    dynamic_call      $job-&gt;$method, new $class</code></pre>
+</section>
+
 <section id="limits" aria-labelledby="h-limits">
   <h2 id="h-limits">Limits</h2>
   <p>This is static analysis: dynamic calls (<code>$this-&gt;$method()</code>), magic methods and class names assembled at

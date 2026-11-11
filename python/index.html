@@ -133,6 +133,19 @@ bash $CG --project myapp &lt;folder&gt; --grep '(^|::|\.|-&gt;)helper$' --depth 
     <code>helper</code>, whatever the receiver. Each match shows the call's own source line.</p>
 </section>
 
+<section id="dynamic" aria-labelledby="h-dynamic">
+  <h2 id="h-dynamic">Dynamic calls: marked, not guessed</h2>
+  <p>A call whose target is decided at run time (<code>getattr(obj, name)()</code>, <code>globals()[name]()</code>, <code>importlib.import_module(name)</code>, <code>eval</code> / <code>exec</code>) is listed in the outline as <code>dynamic_call</code>, with the called expression, instead of being silently missing.</p>
+  <p>It is a marker, not a caller edge: <code>--grep</code>, <code>--depth</code> and <code>locate</code> ignore it, and <code>--depth</code> tells how many callers contain such a call. Literal cases such as <code>getattr(obj, 'x')()</code> stay ordinary calls. Filter with <code>--category dynamic_call</code>.</p>
+<pre class="code"><code>bash ~/.claude/skills/callgraph/callgraph.sh --project app a.py</code></pre>
+  <p class="label">Output (shortened)</p>
+<pre class="code out"><code>module a.py  L1-10
+  run()  L3-10
+    external_call     obj.plain
+    native_python     eval, getattr, globals, importlib.import_module
+    dynamic_call      eval("1+1"), getattr(obj, name), globals()[name], importlib.import_module(mod)</code></pre>
+</section>
+
 <section id="limits" aria-labelledby="h-limits">
   <h2 id="h-limits">Limits</h2>
   <p>This is the first phase of Python support.</p>

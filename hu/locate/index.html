@@ -108,6 +108,14 @@
     szükséges metódusra → <code>--grep</code> a hívóihoz.</p>
 </section>
 
+<section id="nomatch" aria-labelledby="h-nomatch">
+  <h2 id="h-nomatch">Ha nincs találat</h2>
+  <p>Az üres eredmény már nem néma: a <code>locate</code> jelzi, hogy nincs találat, és megmondja a következő lépést &mdash; próbáld a név egy részét, a nem angol szót add meg angol kódnévként, vagy keresd magát a szöveget a <code>--strings</code>-szel.</p>
+<pre class="code out"><code>locate: 1 kifejezés · nincs találat a projekt-térképen
+nincs találat: zzzqq
+💡 próbáld a név egy részét (egy camelCase / snake_case darab, egyes szám); a nem angol szót add meg angol kódnévként (visszatérítés → refund); felületi szöveghez idézd a kifejezést ("…") vagy használd: `show &lt;mappa&gt; --strings`</code></pre>
+</section>
+
 <section id="mcp" aria-labelledby="h-mcp">
   <h2 id="h-mcp">MCP-n át</h2>
   <p>A <code>locate</code> eszköz a <code>terms</code> paramétert (egy string vagy lista), egy opcionális

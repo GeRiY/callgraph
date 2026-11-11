@@ -118,6 +118,19 @@ bash $CG --project myapp resources/js --grep 'api.fetch'              # object-l
     <code>T</code> — the call stays unresolved; search those by name: <code>--grep '(^|::|\.|->)find$'</code>.</p>
 </section>
 
+<section id="dynamic" aria-labelledby="h-dynamic">
+  <h2 id="h-dynamic">Dynamic calls: marked, not guessed</h2>
+  <p>A call whose target is decided at run time (<code>obj[key]()</code>, <code>import(expr)</code>, <code>require(expr)</code>, <code>new (expr)()</code>) is listed in the outline as <code>dynamic_call</code>, with the called expression, instead of being silently missing.</p>
+  <p>It is a marker, not a caller edge: <code>--grep</code>, <code>--depth</code> and <code>locate</code> ignore it, and <code>--depth</code> tells how many callers contain such a call. Literal cases such as <code>obj['x']()</code> stay ordinary calls. Filter with <code>--category dynamic_call</code>.</p>
+<pre class="code"><code>bash ~/.claude/skills/callgraph/callgraph.sh --project web src/b.ts</code></pre>
+  <p class="label">Output (shortened)</p>
+<pre class="code out"><code>module b  L1-8
+  go()  L1-7
+    external_call     [], plain
+    native_js         require
+    dynamic_call      import(m), o[k], require(m)</code></pre>
+</section>
+
 <section id="limits" aria-labelledby="h-limits">
   <h2 id="h-limits">Limits</h2>
   <ul>

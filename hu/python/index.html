@@ -133,6 +133,19 @@ bash $CG --project myapp &lt;mappa&gt; --grep '(^|::|\.|-&gt;)helper$' --depth 2
     <code>helper</code> minden hívását megtalálja, bármi a fogadó. Minden találat a hívás saját forrássorát is mutatja.</p>
 </section>
 
+<section id="dynamic" aria-labelledby="h-dynamic">
+  <h2 id="h-dynamic">Dinamikus hívások: jelölve, nem találgatva</h2>
+  <p>A futásidőben eldőlő célú hívás (<code>getattr(obj, name)()</code>, <code>globals()[name]()</code>, <code>importlib.import_module(name)</code>, <code>eval</code> / <code>exec</code>) mostantól <code>dynamic_call</code> néven szerepel az outline-ban, a hívott kifejezéssel, nem hiányzik némán.</p>
+  <p>Jelölés, nem hívó-él: a <code>--grep</code>, a <code>--depth</code> és a <code>locate</code> figyelmen kívül hagyja, a <code>--depth</code> pedig megmondja, hány hívó tartalmaz ilyet. A literál esetek (pl. <code>getattr(obj, 'x')()</code>) közönséges hívások maradnak. Szűrés: <code>--category dynamic_call</code>.</p>
+<pre class="code"><code>bash ~/.claude/skills/callgraph/callgraph.sh --project app a.py</code></pre>
+  <p class="label">Kimenet (rövidítve)</p>
+<pre class="code out"><code>module a.py  L1-10
+  run()  L3-10
+    external_call     obj.plain
+    native_python     eval, getattr, globals, importlib.import_module
+    dynamic_call      eval("1+1"), getattr(obj, name), globals()[name], importlib.import_module(mod)</code></pre>
+</section>
+
 <section id="limits" aria-labelledby="h-limits">
   <h2 id="h-limits">Korlátok</h2>
   <p>Ez a Python-támogatás első fázisa.</p>
