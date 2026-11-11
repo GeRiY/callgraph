@@ -8,6 +8,14 @@ Every release with its date, newest first: what was added, changed and fixed. Do
 
 [Install the latest version](https://callgraph.eu/#install)[Latest release on GitHub](https://github.com/GeRiY/callgraph/releases/latest)
 
+## v0.6.1 — 2026-11-11
+
+[Release notes and downloads on GitHub](https://github.com/GeRiY/callgraph/releases/tag/v0.6.1)
+
+### Fixed
+
+- **Files that are not UTF-8 (e.g. ISO-8859-2 / Latin-2) no longer give an empty result:** `--lines` and `--body` / the MCP `method_body` printed nothing at all for a file with accented text in another encoding (even in a single comment), with no message. The lines are now printed, with the bytes that are not valid UTF-8 shown as `�`; the line numbers stay correct.
+
 ## v0.6.0 — 2026-11-10
 
 [Release notes and downloads on GitHub](https://github.com/GeRiY/callgraph/releases/tag/v0.6.0)

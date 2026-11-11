@@ -5,9 +5,18 @@
   <link rel="self" type="application/atom+xml" href="https://callgraph.eu/changelog/feed.xml"/>
   <link rel="alternate" type="text/html" href="https://callgraph.eu/changelog/"/>
   <id>https://callgraph.eu/changelog/</id>
-  <updated>2026-11-10T00:00:00Z</updated>
+  <updated>2026-11-11T00:00:00Z</updated>
   <author><name>Gergő Makra</name></author>
   <icon>https://callgraph.eu/assets/favicon.svg</icon>
+  <entry>
+    <title>callgraph v0.6.1</title>
+    <link rel="alternate" type="text/html" href="https://callgraph.eu/changelog/#v0.6.1"/>
+    <link rel="related" type="text/html" href="https://github.com/GeRiY/callgraph/releases/tag/v0.6.1"/>
+    <id>https://github.com/GeRiY/callgraph/releases/tag/v0.6.1</id>
+    <updated>2026-11-11T00:00:00Z</updated>
+    <published>2026-11-11T00:00:00Z</published>
+    <content type="html">&lt;h3&gt;Fixed&lt;/h3&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;Files that are not UTF-8 (e.g. ISO-8859-2 / Latin-2) no longer give an empty result:&lt;/b&gt; &lt;code&gt;--lines&lt;/code&gt; and &lt;code&gt;--body&lt;/code&gt; / the MCP &lt;code&gt;method_body&lt;/code&gt; printed nothing at all for a file with accented text in another encoding (even in a single comment), with no message. The lines are now printed, with the bytes that are not valid UTF-8 shown as &lt;code&gt;�&lt;/code&gt;; the line numbers stay correct.&lt;/li&gt;&lt;/ul&gt;</content>
+  </entry>
   <entry>
     <title>callgraph v0.6.0</title>
     <link rel="alternate" type="text/html" href="https://callgraph.eu/changelog/#v0.6.0"/>

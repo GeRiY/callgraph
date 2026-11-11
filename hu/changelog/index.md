@@ -8,6 +8,14 @@ Minden kiadás dátummal, a legújabb elöl: mi új, mi változott és mi javult
 
 [A legújabb verzió telepítése](https://callgraph.eu/hu/#install)[Legfrissebb kiadás a GitHubon](https://github.com/GeRiY/callgraph/releases/latest)
 
+## v0.6.1 — 2026-11-11
+
+[Kiadási jegyzet és letöltések a GitHubon](https://github.com/GeRiY/callgraph/releases/tag/v0.6.1)
+
+### Javítás
+
+- **A nem UTF-8 (pl. ISO-8859-2 / Latin-2) fájlok már nem adnak üres eredményt:** a `--lines` és a `--body` / az MCP `method_body` egy más kódolású, ékezetes szöveget tartalmazó fájlnál (akár egyetlen kommentben) semmit nem írt ki, üzenet nélkül. Most kiírja a sorokat, az érvénytelen UTF-8 bájtokat `�`-ként mutatva; a sorszámok helyesek maradnak.
+
 ## v0.6.0 — 2026-11-10
 
 [Kiadási jegyzet és letöltések a GitHubon](https://github.com/GeRiY/callgraph/releases/tag/v0.6.0)
