@@ -6,6 +6,12 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ## [Unreleased]
 
+### Javítás
+- **A nem UTF-8 (pl. ISO-8859-2 / Latin-2) fájlok már nem adnak üres eredményt:** a `--lines` és a `--body` /
+  az MCP `method_body` egy más kódolású, ékezetes szöveget tartalmazó fájlnál (akár egyetlen kommentben) semmit
+  nem írt ki, üzenet nélkül. Most kiírja a sorokat, az érvénytelen UTF-8 bájtokat `�`-ként mutatva; a sorszámok
+  helyesek maradnak.
+
 ## [0.6.0] — 2026-11-10
 
 ### Új

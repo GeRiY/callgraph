@@ -3,7 +3,7 @@
 use crate::query::QueryResult;
 
 pub(super) fn source_lines(row: &QueryResult) -> Vec<String> {
-    std::fs::read_to_string(&row.graph.file)
+    crate::io::read_source_lossy(std::path::Path::new(&row.graph.file))
         .map(|text| text.lines().map(str::to_owned).collect())
         .unwrap_or_default()
 }

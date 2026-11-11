@@ -5,6 +5,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+### Fixed
+- **Files that are not UTF-8 (e.g. ISO-8859-2 / Latin-2) no longer give an empty result:** `--lines` and `--body` /
+  the MCP `method_body` printed nothing at all for a file with accented text in another encoding (even in a single
+  comment), with no message. The lines are now printed, with the bytes that are not valid UTF-8 shown as `�`; the
+  line numbers stay correct.
+
 ## [0.6.0] — 2026-11-10
 
 ### Added
