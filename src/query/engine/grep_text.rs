@@ -3,6 +3,7 @@
 //! hatókör minden fájlja bejárva — a kimenet mindkét úton bájtra azonos.
 
 use super::{QueryEngine, QueryResult};
+use crate::query::hint::{self, Catalog};
 use crate::error::Result;
 use crate::graph::ProjectGraph;
 use crate::i18n::Lang;
@@ -44,6 +45,10 @@ impl QueryEngine {
             }
         }
         if depth <= 1 {
+            // nulla találat: a generikus „törzs-logika” tipp helyett a helyreállító üzenet
+            if rows.is_empty() {
+                return Ok(hint::empty_grep(lang, pattern, &self.take_scope_catalog()));
+            }
             let layers = self.layers.as_ref().filter(|scope| scope.by_layer());
             return Ok(grep_flat(rows, &source, lang, full, limit, layers, &marks));
         }
@@ -72,6 +77,17 @@ impl QueryEngine {
                     source.remember(&caller.file, snippets);
                 }
             }
+            // az 1. szinten nincs hívó: létezik-e a cél (a teljes projekt gráfjából)
+            let no_caller = if rows.is_empty() {
+                let catalog = Catalog::from_graphs(
+                    files
+                        .iter()
+                        .filter_map(|file| graph.slim_graph(&file.to_string_lossy())),
+                );
+                no_caller_hint(lang, pattern, &catalog)
+            } else {
+                String::new()
+            };
             return Ok(render_depth(DepthView {
                 rows,
                 pattern,
@@ -84,6 +100,7 @@ impl QueryEngine {
                 lang,
                 layers: self.layers.as_ref().filter(|scope| scope.by_layer()),
                 marks: &marks,
+                no_caller: &no_caller,
             }));
         }
         // gráf nélkül: a lekérdezés teljes hatókörének minden fájlja (nem csak az 1. szint fájljainak mappái)
@@ -93,6 +110,12 @@ impl QueryEngine {
         }
         let index = CallerIndex::build(all.iter().map(|(path, graph)| (path.as_str(), graph)));
         let (callers, skipped) = index.parents_of_with_skips(&direct, depth, guess);
+        let no_caller = if rows.is_empty() {
+            let catalog = Catalog::from_graphs(all.iter().map(|(_, graph)| graph));
+            no_caller_hint(lang, pattern, &catalog)
+        } else {
+            String::new()
+        };
         Ok(render_depth(DepthView {
             rows,
             pattern,
@@ -105,8 +128,16 @@ impl QueryEngine {
             lang,
             layers: self.layers.as_ref().filter(|scope| scope.by_layer()),
             marks: &marks,
+            no_caller: &no_caller,
         }))
     }
+}
+
+/// A `--depth` 1. szintjének üzenete, ha nincs hívó: létezik-e a cél (a minta a teljes katalógusban), és mire hasonlít.
+fn no_caller_hint(lang: Lang, pattern: &str, catalog: &Catalog) -> String {
+    let presence = crate::query::filter::pattern_regex(pattern)
+        .map_or(hint::Presence::Missing, |regex| catalog.presence(&regex));
+    hint::no_caller(lang, pattern, presence, catalog)
 }
 
 /// Egy hívó metódus sortartománya (a projekt-gráf szimbólumaiból, vagy a bejárt gráfokból).
@@ -170,6 +201,8 @@ struct DepthView<'a> {
     layers: Option<&'a LayerScope>,
     /// A jegyzet-jelölők (a hívó-sorok végén `  📝 N`).
     marks: &'a NoteMarks,
+    /// Az 1. szint „nincs hívó” sora(i): a cél létezésének megállapítása; üres = a szokásos „nincs további hívó”.
+    no_caller: &'a str,
 }
 
 /// A `--by-layer` csoport-fejléce egy sorban (`behúzás` + `[service]  3 calls` + újsor).
@@ -281,6 +314,7 @@ fn render_depth(view: DepthView<'_>) -> String {
         lang,
         layers,
         marks,
+        no_caller,
     } = view;
     let mut output = String::new();
     for level in 1..=depth {
@@ -406,7 +440,11 @@ fn render_depth(view: DepthView<'_>) -> String {
         if (level == 1 && direct.is_empty())
             || (level > 1 && !callers.iter().any(|row| row.level == level))
         {
-            output.push_str(t!("  (no more callers)\n", "  (nincs további hívó)\n"));
+            if level == 1 && !no_caller.is_empty() {
+                output.push_str(no_caller);
+            } else {
+                output.push_str(t!("  (no more callers)\n", "  (nincs további hívó)\n"));
+            }
         }
         if level > 1
             && !guess

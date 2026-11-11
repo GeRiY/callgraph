@@ -78,6 +78,10 @@ impl Command for ShowCommand {
             Ok(value) => value,
             Err(error) => return Self::report(_err, error),
         };
+        // ismeretlen `--category`: hiba az ismert nevekkel (nem csendes üres kimenet)
+        if let Some(error) = self.unknown_category() {
+            return Self::report(_err, error);
+        }
         // minden lekérdezés a perzisztens projekt-gráfból olvas (crate::graph: a pack a fájlonkénti cache is)
         let engine = QueryEngine::new(self.project.as_deref(), self.label.clone())
             .use_project_graph(true)
@@ -198,6 +202,22 @@ impl Command for ShowCommand {
 }
 
 impl ShowCommand {
+    /// A `--category` első ismeretlen neve hibaként (`Unknown category: … (known: …)`); az üres tagok (`a,,b`) kimaradnak.
+    fn unknown_category(&self) -> Option<crate::error::CallgraphError> {
+        let unknown = self
+            .category
+            .as_deref()?
+            .iter()
+            .find(|name| !name.is_empty() && !crate::model::KNOWN_CATEGORIES.contains(&name.as_str()))?;
+        Some(crate::error::CallgraphError::Usage(
+            crate::query::hint::unknown_category(
+                crate::i18n::lang(),
+                unknown,
+                &crate::model::KNOWN_CATEGORIES,
+            ),
+        ))
+    }
+
     fn render(&self, rows: &[crate::query::QueryResult]) -> Result<String> {
         if self.body {
             return Ok(FormatterRegistry::format_body(rows, self.body_mode));

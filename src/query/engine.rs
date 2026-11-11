@@ -7,6 +7,7 @@ mod layer;
 mod loader;
 
 use super::filter::{FilterChain, pattern_regex, receiver_target};
+use super::hint::{self, Catalog};
 use super::selector::SelectorSet;
 use crate::analysis::Analyzer;
 use crate::error::{CallgraphError, Result};
@@ -68,6 +69,9 @@ pub struct QueryEngine {
     /// A lekérdezés során beolvasott, szintaktikai hibás fájlok (gyökérhez relatív út, az első hiba sora), a
     /// beolvasás sorrendjében — a szűrés (`--grep`) előtt gyűjtve, a kimenet záró `⚠` sorához (`parse_issues`).
     parse_issues: std::sync::Mutex<Vec<(String, u32)>>,
+    /// A `--grep` nulla találatánál: a lekérdezett hatókör nevei (definíciók, hívás-célok) a „erre gondoltál”
+    /// javaslathoz; találatnál üres marad (`query_filtered` tölti, `grep_text` veszi ki).
+    scope_catalog: std::sync::Mutex<Option<Catalog>>,
 }
 
 impl QueryEngine {
@@ -94,6 +98,7 @@ impl QueryEngine {
             slim: false,
             layers: None,
             parse_issues: std::sync::Mutex::new(Vec::new()),
+            scope_catalog: std::sync::Mutex::new(None),
         }
     }
     /// A sorok a projekt-gráf szűkített tényeiből jöjjenek (`facts.bin`: egyetlen fájl a teljes hatókörre) — a
@@ -200,7 +205,25 @@ impl QueryEngine {
                         " — megjegyzés: a fájlban szintaktikai hiba van itt: L{}, a térkép hiányos lehet; olvasd közvetlenül a fájlt",
                         error.line
                     )).unwrap_or_default();
-                    return Err(CallgraphError::Usage(format!("{message}{hint}")));
+                    // a fájl valódi metódusnevei közül a hasonlók (elgépelés, kis-/nagybetű, előtag)
+                    let mut seen = std::collections::BTreeSet::new();
+                    let real: Vec<&str> = graph
+                        .methods
+                        .iter()
+                        .map(|m| m.name.as_str())
+                        .filter(|name| seen.insert(*name))
+                        .collect();
+                    // a `Típus.metódus` (objektum-literál) nevek pontos része is számít: `(utolsó tag, teljes név)`
+                    let pairs = real.iter().flat_map(|name| {
+                        let last = name.rsplit_once('.').map_or(*name, |(_, last)| last);
+                        [(*name, *name), (last, *name)]
+                    });
+                    let found = hint::closest(missing, pairs, hint::MAX_SUGGESTIONS);
+                    let suggestion = match hint::did_you_mean(crate::i18n::lang(), &found) {
+                        line if line.is_empty() => line,
+                        line => format!("\n{line}"),
+                    };
+                    return Err(CallgraphError::Usage(format!("{message}{hint}{suggestion}")));
                 }
                 Ok(found)
             }).transpose()?;
@@ -233,36 +256,52 @@ impl QueryEngine {
         };
         let chain = FilterChain::new(pattern, categories, via.as_ref().map(|(_, v)| v.clone()))
             .map_err(invalid)?;
-        Ok(rows
-            .into_iter()
-            .filter_map(|mut row| {
-                row.graph = chain.apply(&row.graph)?;
-                row.methods = None;
-                if let Some((regex, matcher)) = &via {
-                    row.via = row
-                        .graph
-                        .calls
-                        .iter()
-                        .filter_map(|call| {
-                            // a saját példányon át hívott (`$this->m()`) a hívó típusán: `Ns\Osztály::m`
-                            let target = receiver_target(&row.graph, call).unwrap_or_else(|| {
-                                call.resolved.as_deref().unwrap_or(&call.target).to_owned()
-                            });
-                            if regex.is_match(&target) {
-                                return None;
-                            }
-                            let via = matcher.via(&target)?.to_owned();
-                            Some(ViaCall {
-                                line: call.line,
-                                target,
-                                via,
-                            })
+        let mut kept_rows = Vec::new();
+        for row in &rows {
+            let Some(graph) = chain.apply(&row.graph) else {
+                continue;
+            };
+            let mut kept = QueryResult::new(graph, None);
+            kept.notes.clone_from(&row.notes);
+            if let Some((regex, matcher)) = &via {
+                kept.via = kept
+                    .graph
+                    .calls
+                    .iter()
+                    .filter_map(|call| {
+                        // a saját példányon át hívott (`$this->m()`) a hívó típusán: `Ns\Osztály::m`
+                        let target = receiver_target(&kept.graph, call).unwrap_or_else(|| {
+                            call.resolved.as_deref().unwrap_or(&call.target).to_owned()
+                        });
+                        if regex.is_match(&target) {
+                            return None;
+                        }
+                        let via = matcher.via(&target)?.to_owned();
+                        Some(ViaCall {
+                            line: call.line,
+                            target,
+                            via,
                         })
-                        .collect();
-                }
-                Some(row)
-            })
-            .collect())
+                    })
+                    .collect();
+            }
+            kept_rows.push(kept);
+        }
+        // nulla találat: a hatókör nevei a „erre gondoltál” javaslathoz (a szűrés előtti gráfokból)
+        if kept_rows.is_empty() && pattern.is_some() {
+            let catalog = Catalog::from_graphs(rows.iter().map(|row| &row.graph));
+            *self.scope_catalog.lock().unwrap_or_else(|e| e.into_inner()) = Some(catalog);
+        }
+        Ok(kept_rows)
+    }
+
+    /// A `query_filtered` által nulla találatnál eltett névlista (egyszer vehető ki).
+    pub(super) fn take_scope_catalog(&self) -> Catalog {
+        self.scope_catalog
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .take()
+            .unwrap_or_default()
     }
 
     /// A szöveges kimenet útvonalai a projekt-gyökérhez relatívan: ha az abszolút gyökér legalább kétszer
@@ -329,13 +368,43 @@ impl QueryEngine {
         }
         Ok(result)
     }
-    /// A „nincs ilyen fájl/mappa” hiba (a `Not found: ` / `Nem található: ` előtagot a CLI hibaosztályozója figyeli).
+    /// A „nincs ilyen fájl/mappa” hiba (a `Not found: ` / `Nem található: ` előtagot a CLI hibaosztályozója figyeli);
+    /// a második sor a hasonló útvonalakat javasolja (a projekt kódfájljaiból és mappáiból).
     fn not_found(&self, abs: &Path) -> CallgraphError {
         let (path, label) = (abs.display(), &self.label);
-        CallgraphError::Usage(tf!(
+        let mut message = tf!(
             "Not found: {path} (relative to the --project {label} root)",
             "Nem található: {path} (--project {label} gyökeréhez képest)"
-        ))
+        );
+        let line = hint::did_you_mean(crate::i18n::lang(), &self.similar_paths(abs));
+        if !line.is_empty() {
+            message.push('\n');
+            message.push_str(&line);
+        }
+        CallgraphError::Usage(message)
+    }
+
+    /// A hiányzó útvonalhoz hasonló, létező útvonalak (gyökérhez relatívan, `/`-jellel): a hatókör kódfájljai és
+    /// azok mappái. Csak a hibaágon fut, ezért nem gyorsítótárazott bejárás.
+    fn similar_paths(&self, abs: &Path) -> Vec<String> {
+        let relative = |path: &Path| {
+            path.strip_prefix(&self.root)
+                .unwrap_or(path)
+                .to_string_lossy()
+                .replace('\\', "/")
+        };
+        let mut known = std::collections::BTreeSet::new();
+        for file in self.walk(std::slice::from_ref(&self.root)) {
+            let file = relative(&file);
+            let mut dir = file.as_str();
+            while let Some((parent, _)) = dir.rsplit_once('/') {
+                known.insert(parent.to_owned());
+                dir = parent;
+            }
+            known.insert(file);
+        }
+        let known: Vec<String> = known.into_iter().collect();
+        hint::similar_paths(&relative(abs), &known)
     }
 }
 

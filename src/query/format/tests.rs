@@ -128,12 +128,16 @@ fn procedural_outline_follows_the_language() {
 #[test]
 fn empty_results_follow_the_language() {
     let rows = [row("src/Shop.php", CLASS)];
-    for name in ["strings", "const"] {
-        assert_eq!(
-            both(name, &rows),
-            ("(no matches)\n".into(), "(nincs találat)\n".into())
-        );
-    }
+    assert_eq!(
+        both("const", &rows),
+        ("(no matches)\n".into(), "(nincs találat)\n".into())
+    );
+    // a `--strings` nulla találatánál a „nincs találat” után az illesztési szabály és a következő lépés is áll
+    let (en, hu) = both("strings", &rows);
+    assert!(en.starts_with("(no matches)\n💡 "), "{en}");
+    assert!(en.contains("case-insensitive substring"), "{en}");
+    assert!(hu.starts_with("(nincs találat)\n💡 "), "{hu}");
+    assert!(hu.contains("kis-/nagybetű-független részlete"), "{hu}");
     let script = [row("src/plain.php", "<?php\necho 1;\n")];
     let (en, hu) = both("flow", &script);
     assert!(
