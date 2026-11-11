@@ -142,13 +142,14 @@ impl<'a, 'arena> Walker<'a, 'arena, State> for Collector<'_, '_> {
     }
     fn walk_in_function_call(&self, n: &FunctionCall<'arena>, s: &mut State) {
         if let Expression::Identifier(i) = super::strip(n.function) {
-            let x = self.push(
-                s,
-                n,
-                "func_call",
-                super::lossy(i.value()).trim_start_matches('\\').into(),
-            );
-            s.calls[x].args = self.args(&n.argument_list)
+            let name: String = super::lossy(i.value()).trim_start_matches('\\').into();
+            let x = self.push(s, n, "func_call", name.clone());
+            s.calls[x].args = self.args(&n.argument_list);
+            // `call_user_func($x)`, `app($var)`… — a hívás marad, mellé a dinamikus jelölés
+            self.dynamic_named_function(s, n, &name);
+        } else {
+            // `$fn(...)`, `$handlers['k'](...)`: változó / kifejezés a hívott
+            self.dynamic_callee(s, n);
         }
     }
     fn walk_in_method_call(&self, n: &MethodCall<'arena>, s: &mut State) {
@@ -171,7 +172,12 @@ impl<'a, 'arena> Walker<'a, 'arena, State> for Collector<'_, '_> {
             if let Some(ty) = self.set_receiver_type(s, n.object) {
                 s.calls[x].resolved = Some(format!("{ty}::{}", super::lossy(m.value)));
             }
-            s.calls[x].args = self.args(&n.argument_list)
+            s.calls[x].args = self.args(&n.argument_list);
+            self.dynamic_container_make(s, n, n.object, m.value, &n.argument_list);
+        } else {
+            // `$obj->$m()`, `$obj->{$expr}()`: a metódusnév futásidőben dől el
+            let text = self.span_text(n.object, &n.method);
+            self.push_dynamic(s, n, &text);
         }
     }
     /// Első osztályú callable (`$this->m(...)`): a referencia sima `method_call`-ként rögzíti, argumentumok nélkül.
@@ -190,6 +196,9 @@ impl<'a, 'arena> Walker<'a, 'arena, State> for Collector<'_, '_> {
             if let Some(ty) = self.set_receiver_type(s, n.object) {
                 s.calls[x].resolved = Some(format!("{ty}::{}", super::lossy(m.value)));
             }
+        } else {
+            let text = self.span_text(n.object, &n.method);
+            self.push_dynamic(s, n, &text);
         }
     }
     fn walk_in_null_safe_method_call(&self, n: &NullSafeMethodCall<'arena>, s: &mut State) {
@@ -213,14 +222,20 @@ impl<'a, 'arena> Walker<'a, 'arena, State> for Collector<'_, '_> {
                 s.calls[x].resolved = Some(format!("{ty}::{}", super::lossy(m.value)));
             }
             s.calls[x].args = self.args(&n.argument_list)
+        } else {
+            let text = self.span_text(n.object, &n.method);
+            self.push_dynamic(s, n, &text);
         }
     }
     fn walk_in_static_method_call(&self, n: &StaticMethodCall<'arena>, s: &mut State) {
+        // `Foo::$m()`, `$class::{$expr}()`: a metódusnév futásidőben dől el — nem `Foo::<dynamic>` hívás-él
+        let ClassLikeMemberSelector::Identifier(name) = &n.method else {
+            let text = self.span_text(n.class, &n.method);
+            self.push_dynamic(s, n, &text);
+            return;
+        };
         if let Some(c) = self.class(n.class) {
-            let m = match &n.method {
-                ClassLikeMemberSelector::Identifier(x) => super::lossy(x.value),
-                _ => "<dynamic>".into(),
-            };
+            let m = super::lossy(name.value);
             let x = self.push(s, n, "static_call", format!("{c}::{m}"));
             s.calls[x].resolved = Some(format!("{}::{m}", s.resolver.resolve_class(&c)));
             s.calls[x].args = self.args(&n.argument_list)
@@ -230,6 +245,9 @@ impl<'a, 'arena> Walker<'a, 'arena, State> for Collector<'_, '_> {
         if let Some(c) = self.class(n.class) {
             let x = self.push(s, n, "new", c.clone());
             s.calls[x].resolved = Some(s.resolver.resolve_class(&c))
+        } else {
+            // `new $class(...)`, `new $obj->prop(...)`: az osztály futásidőben dől el
+            self.dynamic_new(s, n);
         }
     }
     fn walk_in_class_constant_access(&self, n: &ClassConstantAccess<'arena>, s: &mut State) {

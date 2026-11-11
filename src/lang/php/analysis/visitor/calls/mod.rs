@@ -1,7 +1,10 @@
 //! Hívások gyűjtése és kategorizálása.
 
+mod dynamic;
 mod helpers;
 mod state;
+#[cfg(test)]
+mod tests;
 mod walker;
 
 use super::FileVisitor;
