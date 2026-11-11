@@ -160,8 +160,23 @@ mod tests {
 
     fn graph(calls: Vec<Call>) -> FileGraph {
         FileGraph {
+            file: "a.php".into(),
+            module: None,
+            framework: None,
+            namespace: None,
+            imports: crate::model::Imports::default(),
+            containers: Vec::new(),
+            properties: Vec::new(),
+            constants: Vec::new(),
+            methods: Vec::new(),
             calls,
-            ..FileGraph::default()
+            comments: Vec::new(),
+            control_flow: Vec::new(),
+            strings: Vec::new(),
+            writes: Vec::new(),
+            sfc: None,
+            binary: false,
+            parse_errors: Vec::new(),
         }
     }
 
