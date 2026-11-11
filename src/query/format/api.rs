@@ -180,6 +180,7 @@ fn write_container(
             let notes =
                 crate::notes::method_count(&row.notes, method.container.as_deref(), &method.name);
             out.push_str(&crate::notes::mark(notes));
+            out.push_str(&super::signature::doc_types_suffix(method));
             out.push('\n');
             if let Some(doc) = &method.doc {
                 writeln!(out, "      {doc}").unwrap();

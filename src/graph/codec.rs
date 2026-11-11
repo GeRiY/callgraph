@@ -24,7 +24,7 @@ use crate::model::{
 };
 
 /// A tárolt szerkezet verziója; ha változik, a régi tároló csendben újraépül.
-pub(crate) const FORMAT_VERSION: u32 = 3;
+pub(crate) const FORMAT_VERSION: u32 = 4;
 
 /// A keretezett fájlok eleje.
 const MAGIC: &[u8; 4] = b"CGB1";
@@ -64,6 +64,7 @@ pub(crate) struct ManifestEntry {
     pub path: String,
     pub mtime: u64,
     pub size: u64,
+    pub ctime: u64,
     pub offset: u64,
     pub len: u32,
 }
@@ -74,6 +75,7 @@ struct Record {
     path: String,
     mtime: u64,
     size: u64,
+    ctime: u64,
     graph: StoredGraph,
     snippets: Vec<(u32, String)>,
 }
@@ -175,6 +177,7 @@ pub(crate) fn encode_record(path: &str, stamp: FileStamp, facts: &FileFacts) -> 
         path: path.to_owned(),
         mtime: stamp.mtime,
         size: stamp.size,
+        ctime: stamp.ctime,
         graph: StoredGraph::from(&facts.graph),
         snippets: facts.snippets.clone(),
     })
@@ -186,6 +189,7 @@ pub(crate) fn decode_record(bytes: &[u8]) -> Option<(String, FileStamp, FileFact
     let stamp = FileStamp {
         mtime: record.mtime,
         size: record.size,
+        ctime: record.ctime,
     };
     let facts = FileFacts {
         graph: FileGraph::from(record.graph),

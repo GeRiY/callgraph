@@ -290,3 +290,5 @@ The code before and after the broken part is still mapped (JS / TS / Vue, Rust: 
 class or item on); only the broken part is missing. The exit code stays 0; in CI add `--strict` (or set
 `CALLGRAPH_STRICT=1`): `show`, `locate` and `profile` then exit with code 3 when a file they read has a syntax error,
 with the same output.
+
+`--signatures` (or `CALLGRAPH_SIGNATURES=1`) prints the signature (params, return type) on the outline method lines.

@@ -135,6 +135,8 @@ mappához írd így: `build/` vagy `/build`.
   add hozzá a `--strict` kapcsolót (vagy `CALLGRAPH_STRICT=1`): a `show`, a `locate` és a `profile` ilyenkor 3-as
   kóddal lép ki, ha egy beolvasott fájl szintaktikai hibás, a kimenet ugyanaz.
 
+A `--signatures` (vagy `CALLGRAPH_SIGNATURES=1`) az outline metódussorában a szignatúrát (paraméterek, visszatérési típus) is kiírja.
+
 ## Gyors kezdés
 
 ```bash

@@ -216,11 +216,15 @@ pub(super) fn method_line(s: &mut String, m: &Method) {
         writeln!(s, "  {indent}{hashes} {}  L{}-{end}", m.name, m.line).unwrap();
         return;
     }
+    // `--signatures`: a hívható tagnál `name(params): ret` a `name()` helyett (ha nincs adat, ugyanaz marad)
+    let label = if crate::cli::signatures::enabled() && !parens(m).is_empty() {
+        super::signature::signature(m)
+    } else {
+        format!("{}{}", m.name, parens(m))
+    };
     writeln!(
         s,
-        "  {}{}  L{}-{}{}{}",
-        m.name,
-        parens(m),
+        "  {label}  L{}-{}{}{}",
         m.line,
         m.end_line.unwrap_or(m.line),
         if m.is_static { " [static]" } else { "" },

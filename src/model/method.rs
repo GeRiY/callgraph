@@ -20,6 +20,9 @@ pub struct Method {
     pub params: Vec<String>,
     #[serde(rename = "returnType")]
     pub return_type: Option<String>,
+    /// A docblock `@return` / `@param` típusa, ha pontosabb a deklaráltnál (PHP); lásd `doc_types_for`.
+    #[serde(rename = "docTypes", default, skip_serializing_if = "Option::is_none")]
+    pub doc_types: Option<String>,
     pub doc: Option<String>,
     pub body: Option<String>,
 }

@@ -59,6 +59,7 @@ impl FileVisitor for StructureVisitor {
                     kind: Some("macro_rules".to_owned()),
                     params: Vec::new(),
                     return_type: None,
+                    doc_types: None,
                     doc: doc_of(&item.attrs),
                     body: None,
                 });
@@ -126,6 +127,7 @@ fn method(parsed: &ParsedFile<'_>, f: &FnScope<'_>) -> Method {
             ReturnType::Default => None,
             ReturnType::Type(_, ty) => Some(parsed.short(&**ty, 80)),
         },
+        doc_types: None,
         doc: doc_of(f.attrs),
         body: None,
     }

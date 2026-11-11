@@ -120,6 +120,7 @@ fn method(container: Option<&str>, name: &str, line: u32, end: u32) -> Method {
         kind: None,
         params: Vec::new(),
         return_type: None,
+        doc_types: None,
         doc: None,
         body: None,
     }

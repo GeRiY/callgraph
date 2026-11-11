@@ -5,6 +5,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+### Added
+- **Signatures in outlines:** `--signatures` (or `CALLGRAPH_SIGNATURES=1`) prints the compact signature on the method
+  line of the outline and the `--grep` caller outlines: `updateOrders(array $ids, bool $notify = false): array  L4-9`
+  (where the language provides params / return type). `--format api` now also shows TS / Vue return types, and for PHP
+  a more specific DocBlock type (`@return array{updated:int}`, `list<int>`, `@param` shapes), at most 80 characters.
+
+### Changed
+- **Non-UTF-8 sources are decoded, not replaced with `�`:** ISO-8859-2, windows-1250 and ISO-8859-1/windows-1252
+  files are detected and read properly (display, outline, `locate`, `--strings`); garbage still falls back to `�`.
+- **Stronger change detection (Linux / macOS):** the freshness stamp also includes the inode change time, so a
+  same-size edit with a restored mtime is noticed. The stored graph is rebuilt once, quietly.
+
 ## [0.6.1] — 2026-11-11
 
 ### Fixed

@@ -26,6 +26,12 @@ fn main() -> ExitCode {
             std::env::set_var(cli::strict::STRICT_ENV, "1");
         }
     }
+    if cli::signatures::take_signatures(&mut args) {
+        // SAFETY: mint fent — egyszálú pont; az outline-formázó ebből tudja, hogy a szignatúrákat kell kiírni
+        unsafe {
+            std::env::set_var(cli::signatures::SIGNATURES_ENV, "1");
+        }
+    }
     if callgraph::next::take_next(&mut args) {
         // SAFETY: mint fent — egyszálú pont; a javaslat-sor (és a `callgraph mcp --next`) ebből tudja, hogy be van
         // kapcsolva

@@ -158,6 +158,7 @@ fn pseudo(container: &str, name: &str, kind: &str, line: u32, end: u32) -> Metho
         is_abstract: false,
         params: Vec::new(),
         return_type: None,
+        doc_types: None,
         doc: None,
         body: None,
         kind: Some(kind.to_string()),

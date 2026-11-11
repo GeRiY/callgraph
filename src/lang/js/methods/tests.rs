@@ -107,3 +107,29 @@ fn plain_export_default_object_is_not_options_api() {
     assert_eq!(names(&m), ["fetch", "helpers.fmt"]);
     assert_eq!(m[0].1, "method");
 }
+
+#[test]
+fn ts_return_type_is_captured() {
+    let src = "export function f(a: number): Promise<string[]> { return g(); }\nexport const h = (x: string): boolean => true;\n";
+    let alloc = Allocator::default();
+    let p = Path::new("/p/r.ts");
+    let parsed = parse_program(&alloc, src, source_type_for(p, None));
+    let lines = LineIndex::new(src);
+    let ctx = PassContext {
+        path: p,
+        source: src,
+        lines: &lines,
+        setup: false,
+    };
+    let mut out = JsAnalysis::new("/p/r.ts");
+    MethodsPass.run(&ctx, &parsed.program, &mut out);
+    let got: Vec<(String, Option<String>)> = out
+        .builder
+        .build()
+        .methods
+        .into_iter()
+        .map(|m| (m.name, m.return_type))
+        .collect();
+    assert!(got.contains(&("f".into(), Some("Promise<string[]>".into()))), "{got:?}");
+    assert!(got.contains(&("h".into(), Some("boolean".into()))), "{got:?}");
+}

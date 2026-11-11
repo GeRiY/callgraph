@@ -40,7 +40,7 @@ impl SourceLines {
         let mut files = self.files.borrow_mut();
         let lines = files.entry(file.to_owned()).or_insert_with(|| {
             std::fs::read(file).ok().map(|bytes| {
-                String::from_utf8_lossy(&bytes)
+                crate::io::decode_source(&bytes)
                     .lines()
                     .map(str::to_owned)
                     .collect()
@@ -80,7 +80,7 @@ pub(crate) fn call_snippets(
     let Ok(bytes) = std::fs::read(path) else {
         return Vec::new();
     };
-    let text = String::from_utf8_lossy(&bytes);
+    let text = crate::io::decode_source(&bytes);
     let source: Vec<&str> = text.lines().collect();
     wanted
         .into_iter()

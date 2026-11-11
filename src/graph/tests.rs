@@ -104,7 +104,11 @@ fn stored_graphs_round_trip_exactly() {
             snippets: vec![(1, "x".to_owned())],
             graph,
         };
-        let stamp = FileStamp { mtime: 7, size: 9 };
+        let stamp = FileStamp {
+            mtime: 7,
+            size: 9,
+            ctime: 5,
+        };
         let bytes = codec::encode_record(&key(&file), stamp, &facts).unwrap();
         let (path, stored, back) = codec::decode_record(&bytes).unwrap();
         assert_eq!((path, stored), (key(&file), stamp));
@@ -604,4 +608,28 @@ fn real_watcher_refreshes_a_written_file() {
         );
         std::thread::sleep(Duration::from_millis(50));
     }
+}
+
+/// Azonos méret + visszaállított mtime mellett is észrevehető a tartalomváltozás (unixon a ctime miatt).
+#[cfg(unix)]
+#[test]
+fn restored_mtime_with_same_size_still_changes_stamp() {
+    let dir = std::env::temp_dir().join(format!("callgraph-stamp-{}", std::process::id()));
+    fs::create_dir_all(&dir).unwrap();
+    let file = dir.join("a.php");
+    fs::write(&file, "<?php // aaaa\n").unwrap();
+    let modified = fs::metadata(&file).unwrap().modified().unwrap();
+    let before = FileStamp::of(&file);
+    std::thread::sleep(Duration::from_millis(20));
+    fs::write(&file, "<?php // bbbb\n").unwrap();
+    fs::File::options()
+        .write(true)
+        .open(&file)
+        .unwrap()
+        .set_modified(modified)
+        .unwrap();
+    let after = FileStamp::of(&file);
+    assert_eq!((before.mtime, before.size), (after.mtime, after.size));
+    assert_ne!(before, after);
+    let _ = fs::remove_dir_all(dir);
 }
