@@ -105,6 +105,9 @@ pub(crate) fn is_test_path(path: &str) -> bool {
         || name.ends_with("test.php")
         || name.ends_with("_test.rs")
         || name.ends_with("tests.swift")
+        || (name.starts_with("test_") && name.ends_with(".py"))
+        || name.ends_with("_test.py")
+        || name == "conftest.py"
 }
 
 /// Rangsor: a pontszám a kifejezések ritkaságával súlyozva (IDF: `1 + ln(fájlok / a kifejezésre illő fájlok)`,

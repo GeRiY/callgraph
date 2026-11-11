@@ -192,7 +192,7 @@ impl CallgraphServer {
     }
 
     #[tool(
-        description = "The full callgraph manual (the skill's SKILL.md in the configured language): every query with CLI examples, JS/TS/Vue, Rust and Swift specifics, formats, limits. Call it once when the server instructions are not enough; the CLI flags map to these tools (see its MCP section)."
+        description = "The full callgraph manual (the skill's SKILL.md in the configured language): every query with CLI examples, JS/TS/Vue, Rust, Swift and Python specifics, formats, limits. Call it once when the server instructions are not enough; the CLI flags map to these tools (see its MCP section)."
     )]
     async fn guide(&self) -> CallToolResult {
         let started = Instant::now();

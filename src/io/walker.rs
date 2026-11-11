@@ -75,6 +75,10 @@ fn default_skip_dirs() -> Vec<String> {
         "tmp",
         ".idea",
         ".junie",
+        "__pycache__",
+        "venv",
+        ".venv",
+        "site-packages",
     ]
     .map(String::from)
     .to_vec()

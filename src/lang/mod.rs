@@ -10,6 +10,7 @@ pub mod json;
 mod language;
 pub mod markdown;
 pub mod php;
+pub mod python;
 mod registry;
 pub mod rs;
 pub mod scss;

@@ -1,0 +1,48 @@
+//! Ismert nevek (adatfájl): a Python beépített függvényei és kivételei, a beépített típusok gyakori metódusai,
+//! a standard könyvtár (stdlib) moduljai, valamint a felismert webes keretrendszerek.
+
+/// Beépített függvények, típusok és kivételek (a puszta hívásuk `native_python`).
+pub(crate) const BUILTINS: &[&str] = &[
+    "abs", "aiter", "all", "anext", "any", "ascii", "bin", "bool", "breakpoint", "bytearray", "bytes",
+    "callable", "chr", "classmethod", "compile", "complex", "delattr", "dict", "dir", "divmod",
+    "enumerate", "eval", "exec", "filter", "float", "format", "frozenset", "getattr", "globals",
+    "hasattr", "hash", "help", "hex", "id", "input", "int", "isinstance", "issubclass", "iter", "len",
+    "list", "locals", "map", "max", "memoryview", "min", "next", "object", "oct", "open", "ord", "pow",
+    "print", "property", "range", "repr", "reversed", "round", "set", "setattr", "slice", "sorted",
+    "staticmethod", "str", "sum", "super", "tuple", "type", "vars", "zip", "Exception", "BaseException",
+    "ValueError", "TypeError", "KeyError", "IndexError", "AttributeError", "RuntimeError", "OSError",
+    "IOError", "ImportError", "StopIteration", "NotImplementedError", "AssertionError", "ZeroDivisionError",
+    "FileNotFoundError", "PermissionError", "TimeoutError", "KeyboardInterrupt", "SystemExit",
+    "LookupError", "ArithmeticError", "UnicodeDecodeError", "UnicodeEncodeError",
+];
+
+/// A beépített típusok (str, list, dict, set, file…) gyakori metódusai: bármilyen fogadón `native_python`.
+pub(crate) const NATIVE_METHODS: &[&str] = &[
+    "add", "append", "capitalize", "clear", "close", "copy", "count", "decode", "difference", "discard",
+    "encode", "endswith", "extend", "find", "format", "get", "index", "insert", "intersection", "isdigit",
+    "items", "join", "keys", "lower", "lstrip", "pop", "popitem", "read", "readline", "readlines",
+    "remove", "replace", "reverse", "rstrip", "setdefault", "sort", "split", "splitlines", "startswith",
+    "strip", "title", "union", "update", "upper", "values", "write", "writelines",
+];
+
+/// A standard könyvtár gyakori moduljai (a `modul.függvény()` hívás `native_python`).
+pub(crate) const STDLIB_MODULES: &[&str] = &[
+    "abc", "argparse", "asyncio", "base64", "collections", "contextlib", "copy", "csv", "dataclasses",
+    "datetime", "decimal", "enum", "functools", "glob", "hashlib", "heapq", "http", "importlib", "inspect",
+    "io", "itertools", "json", "logging", "math", "multiprocessing", "operator", "os", "pathlib", "pickle",
+    "platform", "queue", "random", "re", "shutil", "signal", "socket", "sqlite3", "string", "struct",
+    "subprocess", "sys", "tempfile", "textwrap", "threading", "time", "traceback", "types", "typing",
+    "unittest", "urllib", "uuid", "warnings", "weakref", "zipfile",
+];
+
+/// Webes keretrendszerek: (import gyökérmodul, `framework` mező).
+pub(crate) const FRAMEWORKS: &[(&str, &str)] = &[
+    ("django", "django"),
+    ("flask", "flask"),
+    ("fastapi", "fastapi"),
+];
+
+/// A név szerepel-e a (rendezetlen) táblában.
+pub(crate) fn is_in(table: &[&str], name: &str) -> bool {
+    table.contains(&name)
+}

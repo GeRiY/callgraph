@@ -5,6 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+### Added
+- **Python (phase 1):** `.py` / `.pyi` files in the map (tree-sitter): classes with bases and decorators, functions,
+  methods (`async`, `@staticmethod`, `@classmethod`, `@property`), constants, `__all__`, docstrings, signatures
+  (`--signatures`, `--format api`), imports, categorized calls (`native_python`, `internal_helper`, `static_call`,
+  `external_call`), strings, syntax errors, Django / Flask / FastAPI detection. `venv`, `.venv`, `site-packages` and
+  `__pycache__` are skipped by default.
+
 ## [0.7.0] — 2026-11-11
 
 ### Added

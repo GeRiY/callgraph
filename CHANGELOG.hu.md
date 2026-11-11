@@ -6,6 +6,13 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ## [Unreleased]
 
+### Új
+- **Python (1. fázis):** `.py` / `.pyi` fájlok a térképben (tree-sitter): osztályok ősökkel és dekorátorokkal,
+  függvények, metódusok (`async`, `@staticmethod`, `@classmethod`, `@property`), konstansok, `__all__`, docstringek,
+  szignatúrák (`--signatures`, `--format api`), importok, kategorizált hívások (`native_python`, `internal_helper`,
+  `static_call`, `external_call`), stringek, szintaktikai hibák, Django / Flask / FastAPI felismerés. A `venv`,
+  `.venv`, `site-packages` és `__pycache__` mappák alapból kimaradnak.
+
 ## [0.7.0] — 2026-11-11
 
 ### Új
