@@ -137,3 +137,58 @@ impl FilterChain {
         Some(filtered)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn call(category: &str, kind: &str, target: &str) -> Call {
+        Call {
+            container: Some("A".into()),
+            caller: Some("f".into()),
+            line: 3,
+            end_line: None,
+            kind: kind.into(),
+            target: target.into(),
+            resolved: None,
+            on: None,
+            category: category.into(),
+            args: None,
+            handler: None,
+        }
+    }
+
+    fn graph(calls: Vec<Call>) -> FileGraph {
+        FileGraph {
+            calls,
+            ..FileGraph::default()
+        }
+    }
+
+    #[test]
+    fn grep_pattern_never_matches_a_dynamic_marker() {
+        let g = graph(vec![
+            call("dynamic_call", "dynamic", "$this->$joinMethod"),
+            call("internal_helper", "method_call", "joinMethod"),
+        ]);
+        let chain = FilterChain::new(Some("joinMethod"), None, None).unwrap();
+        let kept = chain.apply(&g).expect("the ordinary call matches");
+        assert_eq!(kept.calls.len(), 1);
+        assert_eq!(kept.calls[0].category, "internal_helper");
+        // csak a jelölés van: a minta semmit sem talál
+        let only = graph(vec![call("dynamic_call", "dynamic", "$this->$joinMethod")]);
+        assert!(chain.apply(&only).is_none());
+    }
+
+    #[test]
+    fn category_filter_still_selects_the_markers() {
+        let g = graph(vec![
+            call("dynamic_call", "dynamic", "$fn"),
+            call("internal_helper", "method_call", "run"),
+        ]);
+        let chain = FilterChain::new(None, Some(&["dynamic_call".to_string()]), None).unwrap();
+        let kept = chain.apply(&g).expect("the marker is selected");
+        assert_eq!(kept.calls.len(), 1);
+        assert_eq!(kept.calls[0].target, "$fn");
+    }
+}

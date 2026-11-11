@@ -139,3 +139,20 @@ fn representative_rules_cover_the_category_chain() {
         );
     }
 }
+
+#[test]
+fn dynamic_kind_is_dynamic_call_whatever_the_target_looks_like() {
+    let generic = &GenericStrategy;
+    for (target, on, this) in [
+        ("$this->$m", Some("this"), true),
+        ("strlen", None, false),
+        ("Foo::$m", None, false),
+    ] {
+        let info = call(target, "dynamic", None, None, on, false, this, generic);
+        assert_eq!(
+            CategoryChain::with_defaults().categorize(&info),
+            "dynamic_call",
+            "{target}"
+        );
+    }
+}

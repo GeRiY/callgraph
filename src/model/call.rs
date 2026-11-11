@@ -52,3 +52,51 @@ impl Call {
         format!("{cut}…")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn call(category: &str, target: &str) -> Call {
+        Call {
+            container: None,
+            caller: None,
+            line: 1,
+            end_line: None,
+            kind: "x".into(),
+            target: target.into(),
+            resolved: None,
+            on: None,
+            category: category.into(),
+            args: None,
+            handler: None,
+        }
+    }
+
+    #[test]
+    fn dynamic_target_is_one_line_and_at_most_60_chars() {
+        assert_eq!(Call::dynamic_target("$this->$m"), "$this->$m");
+        assert_eq!(Call::dynamic_target("$obj\n    ->{$expr}"), "$obj ->{$expr}");
+        let exactly = "a".repeat(60);
+        assert_eq!(Call::dynamic_target(&exactly), exactly);
+        let long = "b".repeat(61);
+        let cut = Call::dynamic_target(&long);
+        assert_eq!(cut.chars().count(), 60);
+        assert!(cut.ends_with('…'));
+        // a többbájtos karakter nem vágódik félbe
+        let accents = "é".repeat(80);
+        assert_eq!(Call::dynamic_target(&accents).chars().count(), 60);
+    }
+
+    #[test]
+    fn dynamic_category_sorts_last_and_is_detected() {
+        assert!(call(DYNAMIC_CALL, "x").is_dynamic());
+        assert!(!call("external_call", "x").is_dynamic());
+        let mut cats = vec!["internal_helper", DYNAMIC_CALL, "external_call", "zzz_last"];
+        cats.sort_by_key(|c| category_rank(c));
+        assert_eq!(
+            cats,
+            vec!["internal_helper", "external_call", "zzz_last", DYNAMIC_CALL]
+        );
+    }
+}
