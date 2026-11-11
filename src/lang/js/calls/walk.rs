@@ -2,7 +2,8 @@
 
 use oxc_ast::ast::{
     Argument, ArrowFunctionExpression, BindingPattern, CallExpression, Class, Expression, Function,
-    ImportExpression, NewExpression, Program, VariableDeclarator,
+    ImportExpression, JSXElementName, JSXMemberExpression, JSXMemberExpressionObject,
+    JSXOpeningElement, NewExpression, Program, VariableDeclarator,
 };
 use oxc_ast_visit::{Visit, walk};
 use oxc_span::GetSpan;
@@ -111,6 +112,48 @@ impl<'s> Walker<'s> {
             r.category = ty.category;
         }
         r
+    }
+
+    /// Egy JSX-elem neve mint komponens-használat; a kisbetűs (`<div>`), a névtér-es (`<a:b>`) és a `this` nem az.
+    /// Importált névnél a feloldás ugyanaz, mint a függvényhívásnál (`<import>::<név>`), fájlon belüli
+    /// komponensnél `internal_helper`; egyébként (globális, ismeretlen) feloldatlan `component_use`.
+    fn jsx_callee(&self, name: &JSXElementName<'_>) -> Option<Callee> {
+        let (root, rest) = match name {
+            JSXElementName::IdentifierReference(i) => {
+                let nm = i.name.as_str();
+                if !nm.starts_with(|c: char| c.is_ascii_uppercase()) {
+                    return None;
+                }
+                (nm.to_string(), Vec::new())
+            }
+            JSXElementName::MemberExpression(m) => jsx_member_chain(m)?,
+            _ => return None,
+        };
+        let target = std::iter::once(root.as_str())
+            .chain(rest.iter().map(String::as_str))
+            .collect::<Vec<_>>()
+            .join(".");
+        let (resolved, category) = if rest.is_empty() && self.scope.names.contains(&root) {
+            (None, "internal_helper")
+        } else if let Some(b) = self.scope.bindings.get(&root) {
+            let resolved = if rest.is_empty() {
+                b.resolved.clone()
+            } else {
+                format!("{}.{}", b.resolved, rest.join("."))
+            };
+            (Some(resolved), "component_use")
+        } else if self.scope.local_fns.contains(&root) || self.scope.names.contains(&root) {
+            (None, "internal_helper")
+        } else {
+            (None, "component_use")
+        };
+        Some(Callee {
+            on: (!rest.is_empty()).then(|| root.clone()),
+            target,
+            resolved,
+            category,
+            kind: "component",
+        })
     }
 
     fn src(&self, a: &Argument<'_>) -> String {
@@ -262,6 +305,17 @@ fn is_dynamic_new_callee(callee: &Expression<'_>) -> bool {
     }
 }
 
+/// `<A.B.C>` -> (`A`, `["B", "C"]`); a `this.X` gyökerű név nem komponens-hivatkozás.
+fn jsx_member_chain(m: &JSXMemberExpression<'_>) -> Option<(String, Vec<String>)> {
+    let (root, mut parts) = match &m.object {
+        JSXMemberExpressionObject::IdentifierReference(i) => (i.name.to_string(), Vec::new()),
+        JSXMemberExpressionObject::MemberExpression(inner) => jsx_member_chain(inner)?,
+        JSXMemberExpressionObject::ThisExpression(_) => return None,
+    };
+    parts.push(m.property.name.to_string());
+    Some((root, parts))
+}
+
 /// Zárójel és TS non-null (`x!`) nélkül.
 fn strip_ts<'b, 'a>(mut e: &'b Expression<'a>) -> &'b Expression<'a> {
     loop {
@@ -335,6 +389,13 @@ impl<'a> Visit<'a> for Walker<'_> {
             }
         }
         walk::walk_call_expression(self, it);
+    }
+
+    fn visit_jsx_opening_element(&mut self, it: &JSXOpeningElement<'a>) {
+        if let Some(r) = self.jsx_callee(&it.name) {
+            self.record(it.span.start, r, &[]);
+        }
+        walk::walk_jsx_opening_element(self, it);
     }
 
     fn visit_new_expression(&mut self, it: &NewExpression<'a>) {
