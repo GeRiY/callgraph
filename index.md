@@ -1,14 +1,14 @@
-> Show AI agents a file's structure, call graph and callers without reading it. PHP, JS/TS, Vue, Rust, Swift. Free, MIT, one binary: CLI or MCP server.
+> Show AI agents a file's structure, call graph and callers without reading it. PHP, JS/TS, Vue, Rust, Swift, Python, Go. Free, MIT, one binary: CLI or MCP server.
 
 Source: https://callgraph.eu/
 
-[v0.7.0 — what's new →](https://callgraph.eu/changelog/)
+[v0.8.0 — what's new →](https://callgraph.eu/changelog/)
 
 # Understand code without reading it.
 
 **callgraph** is a token-efficient code map for AI coding agents. It shows the structure, a categorized call graph, single method bodies, *“who calls this?”* and impact analysis — in a few dozen lines instead of whole files.
 
-[Install in one line](https://callgraph.eu/#install) [Download v0.7.0](https://github.com/GeRiY/callgraph/releases/latest) [View on GitHub](https://github.com/GeRiY/callgraph)
+[Install in one line](https://callgraph.eu/#install) [Download v0.8.0](https://github.com/GeRiY/callgraph/releases/latest) [View on GitHub](https://github.com/GeRiY/callgraph)
 
 ```
 $ callgraph.sh --project shop app/Models/Order.php
@@ -99,6 +99,8 @@ One shared output format for every language.
 | [Vue](https://callgraph.eu/typescript/) | `.vue` | props, emits, setup, template components and handlers, computed, watch, hooks |
 | [Rust](https://callgraph.eu/rust/) | `.rs` | modules, structs, enums, traits, impl blocks, functions, use trees, macro calls, framework detection (axum, actix-web, tokio…) |
 | [Swift / SwiftUI](https://callgraph.eu/swift/) | `.swift` | classes, structs, protocols, actors, extensions, View components, property wrappers, SwiftUI views and modifiers |
+| [Python](https://callgraph.eu/python/) | `.py .pyi` | classes with bases and decorators, functions, methods, signatures, imports, Django / Flask / FastAPI detection |
+| [Go](https://callgraph.eu/go/) | `.go` | structs, interfaces, receiver methods, generics, signatures with several return values, Gin / Echo / Chi / gRPC / GORM detection |
 | CSS / SCSS | `.css .scss` | rule blocks, mixins, functions, variables, imports |
 | JSON / Markdown | `.json .md` | key paths; heading sections and links |
 
@@ -300,6 +302,18 @@ View types as components, property wrappers, SwiftUI views and modifiers.
 
 ](https://callgraph.eu/swift/) [
 
+### Python
+
+Classes, decorators, signatures, Django / Flask / FastAPI detection.
+
+](https://callgraph.eu/python/) [
+
+### Go
+
+Structs, interfaces, receiver methods, several return values.
+
+](https://callgraph.eu/go/) [
+
 ### locate
 
 The few files worth opening first for a task, each with the reason.
@@ -352,7 +366,7 @@ A command-line code map for AI coding agents. It parses a file or folder and ans
 
 ### Which languages are supported?
 
-PHP (with Laravel and Yii awareness), JavaScript, TypeScript, Vue single-file components, Rust, Swift and SwiftUI, CSS, SCSS, JSON and Markdown. See the [PHP](https://callgraph.eu/php/), [Rust](https://callgraph.eu/rust/), [TypeScript / Vue](https://callgraph.eu/typescript/) and [Swift](https://callgraph.eu/swift/) pages.
+PHP (with Laravel and Yii awareness), JavaScript, TypeScript, Vue single-file components, Rust, Swift and SwiftUI, Python, Go, CSS, SCSS, JSON and Markdown. See the [PHP](https://callgraph.eu/php/), [Rust](https://callgraph.eu/rust/), [TypeScript / Vue](https://callgraph.eu/typescript/) [Swift](https://callgraph.eu/swift/), [Python](https://callgraph.eu/python/) and [Go](https://callgraph.eu/go/) pages.
 
 ### Do I need PHP, Node or Rust installed?
 

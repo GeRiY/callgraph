@@ -97,6 +97,38 @@
     <priority>0.7</priority>
   </url>
   <url>
+    <loc>https://callgraph.eu/python/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://callgraph.eu/python/"/>
+    <xhtml:link rel="alternate" hreflang="hu" href="https://callgraph.eu/hu/python/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://callgraph.eu/python/"/>
+    <lastmod>2026-11-11</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://callgraph.eu/hu/python/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://callgraph.eu/python/"/>
+    <xhtml:link rel="alternate" hreflang="hu" href="https://callgraph.eu/hu/python/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://callgraph.eu/python/"/>
+    <lastmod>2026-11-11</lastmod>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://callgraph.eu/go/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://callgraph.eu/go/"/>
+    <xhtml:link rel="alternate" hreflang="hu" href="https://callgraph.eu/hu/go/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://callgraph.eu/go/"/>
+    <lastmod>2026-11-11</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://callgraph.eu/hu/go/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://callgraph.eu/go/"/>
+    <xhtml:link rel="alternate" hreflang="hu" href="https://callgraph.eu/hu/go/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://callgraph.eu/go/"/>
+    <lastmod>2026-11-11</lastmod>
+    <priority>0.7</priority>
+  </url>
+  <url>
     <loc>https://callgraph.eu/locate/</loc>
     <xhtml:link rel="alternate" hreflang="en" href="https://callgraph.eu/locate/"/>
     <xhtml:link rel="alternate" hreflang="hu" href="https://callgraph.eu/hu/locate/"/>

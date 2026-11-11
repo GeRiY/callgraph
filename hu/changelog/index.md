@@ -8,6 +8,18 @@ Minden kiadás dátummal, a legújabb elöl: mi új, mi változott és mi javult
 
 [A legújabb verzió telepítése](https://callgraph.eu/hu/#install)[Legfrissebb kiadás a GitHubon](https://github.com/GeRiY/callgraph/releases/latest)
 
+## v0.8.0 — 2026-11-11
+
+[Kiadási jegyzet és letöltések a GitHubon](https://github.com/GeRiY/callgraph/releases/tag/v0.8.0)
+
+### Új
+
+- **`--help` a binárisban:** a `callgraph --help`, `-h` és `help` a teljes, naprakész súgót írja ki (angolul vagy magyarul) — ugyanazt a szöveget, mint a `callgraph.sh --help`; most már a Python, a Go, a `--signatures`, a `protect` és a környezeti változók is benne vannak.
+
+- **Python (1. fázis):** `.py` / `.pyi` fájlok a térképben: osztályok ősökkel és dekorátorokkal, függvények, metódusok (`async`, `@staticmethod`, `@classmethod`, `@property`), konstansok, `__all__`, docstringek, szignatúrák (`--signatures`, `--format api`), importok, kategorizált hívások (`native_python`, `internal_helper`, `static_call`, `external_call`), stringek, szintaktikai hibák, Django / Flask / FastAPI felismerés. A `venv`, `.venv`, `site-packages` és `__pycache__` mappák alapból kimaradnak.
+
+- **Go (1. fázis):** `.go` fájlok a térképben: structok (mezők property-ként, beágyazott típusok), interfészek, típus-aliasok és definiált típusok, függvények és receiveres metódusok (akkor is, ha a típus másik fájlban van), generikusok, `const` / `var`, importok (alias, blank, dot), több visszatérési értékű szignatúrák (`--signatures`, `--format api`), kategorizált hívások (`native_go`, `internal_helper`, `static_call`, `instantiation`, `external_call`; a `go` / `defer` is), stringek, doc-kommentek, nagybetűs név = public, szintaktikai hibák, Gin / Echo / Fiber / Chi / gRPC / GORM felismerés. A `testdata` alapból kimarad (a `vendor` eddig is); a `_test.go` fájlok a `locate`-ben tesztnek számítanak.
+
 ## v0.7.0 — 2026-11-11
 
 [Kiadási jegyzet és letöltések a GitHubon](https://github.com/GeRiY/callgraph/releases/tag/v0.7.0)

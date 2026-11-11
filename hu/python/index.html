@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Python call graph AI agenteknek — callgraph</title>
+<meta name="description" content="Python-térkép: osztályok ősökkel és dekorátorokkal, függvények és metódusok, szignatúrák, importok, kategorizált hívások, Django / Flask / FastAPI felismerés.">
+<link rel="canonical" href="https://callgraph.eu/hu/python/">
+<link rel="alternate" hreflang="en" href="https://callgraph.eu/python/">
+<link rel="alternate" hreflang="hu" href="https://callgraph.eu/hu/python/">
+<link rel="alternate" hreflang="x-default" href="https://callgraph.eu/python/">
+<meta name="author" content="Makra Gergő">
+<meta name="robots" content="index,follow">
+<meta name="theme-color" content="#0c152a">
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/style.css">
+<script>document.documentElement.className += ' js';</script>
+<link rel="alternate" type="text/markdown" href="/hu/python/index.md" title="Az oldal Markdown-változata">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="callgraph">
+<meta property="og:title" content="Python call graph AI agenteknek — callgraph">
+<meta property="og:description" content="Python-térkép: osztályok ősökkel és dekorátorokkal, függvények és metódusok, szignatúrák, importok, kategorizált hívások, Django / Flask / FastAPI felismerés.">
+<meta property="og:url" content="https://callgraph.eu/hu/python/">
+<meta property="og:image" content="https://callgraph.eu/assets/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="callgraph terminál-kimenet: osztály-outline sortartománnyal és kategorizált hívásokkal">
+<meta property="og:locale" content="hu_HU">
+<meta property="og:locale:alternate" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Python call graph AI agenteknek — callgraph">
+<meta name="twitter:description" content="Python-térkép: osztályok ősökkel és dekorátorokkal, függvények és metódusok, szignatúrák, importok, kategorizált hívások, Django / Flask / FastAPI felismerés.">
+<meta name="twitter:image" content="https://callgraph.eu/assets/og-image.png">
+<script type="application/ld+json">
+{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Kezdőlap", "item": "https://callgraph.eu/hu/"}, {"@type": "ListItem", "position": 2, "name": "Python", "item": "https://callgraph.eu/hu/python/"}]}
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Ugrás a tartalomra</a>
+<div class="wrap">
+<header class="top">
+  <a class="brand" href="/hu/"><img src="/assets/favicon.svg" alt="" width="32" height="32">callgraph</a>
+  <nav class="links" aria-label="Fő navigáció">
+    <details class="menu"><summary>Használat</summary><div class="menu-list"><a href="/hu/#usage">Minden parancs</a><a href="/hu/locate/">locate</a><a href="/hu/profile/">Profil</a></div></details>
+    <details class="menu"><summary class="current">Nyelvek</summary><div class="menu-list"><a href="/hu/php/">PHP</a><a href="/hu/rust/">Rust</a><a href="/hu/typescript/">TS / Vue</a><a href="/hu/swift/">Swift</a><a href="/hu/python/" aria-current="page">Python</a><a href="/hu/go/">Go</a><a href="/hu/#languages">Minden nyelv</a></div></details>
+    <a href="/hu/mcp/">MCP</a>
+    <a href="/hu/changelog/">Változásnapló</a>
+    <a href="https://github.com/GeRiY/callgraph">GitHub</a>
+    <a class="lang" href="/python/" hreflang="en" lang="en">English</a>
+  </nav>
+</header>
+<main id="main">
+<nav class="crumbs" aria-label="Morzsamenü"><ol><li><a href="/hu/">Kezdőlap</a></li><li aria-current="page">Python</li></ol></nav>
+<section class="hero page" aria-labelledby="title">
+  <div>
+    <h1 id="title">Python call graph AI agenteknek</h1>
+    <p class="lead">A callgraph a <a href="https://github.com/tree-sitter/tree-sitter-python">tree-sitter-python</a>-nal
+      elemzi a <code>.py</code> és <code>.pyi</code> fájlokat, és megmutatja az agentnek az osztályokat, függvényeket és
+      metódusokat sortartománnyal, a szignatúrákat és minden hívást kategóriánként.</p>
+    <div class="cta">
+      <a class="btn primary" href="/hu/#install">Telepítés</a>
+      <a class="btn" href="/hu/mcp/">Használat MCP-n át</a>
+    </div>
+  </div>
+</section>
+
+<section id="extracts" aria-labelledby="h-extracts">
+  <h2 id="h-extracts">Mit nyer ki a callgraph a Python-kódból</h2>
+  <ul>
+    <li>Minden fájl kap egy <code>&lt;fájl&gt;.py</code> <code>module</code> containert a modul-szintű függvényeivel és
+      konstansaival; a modul-docstring a doksija.</li>
+    <li>Osztályok az ősökkel (<code>extends</code>) és dekorátorokkal (<code>uses @dataclass</code>); a beágyazott osztályok
+      <code>Külső.Belső</code> néven; a sortartomány az első dekorátortól indul. <code>ABC</code> ős esetén az osztály absztrakt.</li>
+    <li>Függvények és metódusok: <code>def</code> és <code>async def</code>, <code>@staticmethod</code>,
+      <code>@classmethod</code>, <code>@property</code> (a <code>@cached_property</code> és a setterek is),
+      <code>@abstractmethod</code>. A vezető aláhúzás privátot jelent. A törzs első string-literálja a docstring.</li>
+    <li>Szignatúrák alapértékkel és annotációval: <code>add(n: int): int</code> (<code>--signatures</code>,
+      <code>--format api</code>); a <code>self</code> és a <code>cls</code> kimarad.</li>
+    <li>Konstansok: <code>NAGYBETŰS</code> nevek, minden annotált értékadás és az <code>__all__</code>; az osztály-attribútumok
+      property-ként, a típussal az annotációból vagy az értékből.</li>
+    <li>Importok minden alakban, a relatívak is (<code>from .m import x</code>), függvényen belül és
+      <code>try</code> / <code>if</code> alatt is.</li>
+    <li>String-literálok (az f-stringek statikus részei) és szintaktikai hibák: a nem parse-olható fájl is megmutat mindent
+      a hibás sor előtt és után, plusz egy figyelmeztetést.</li>
+  </ul>
+  <p>A <code>django</code>-t, <code>flask</code>-et vagy <code>fastapi</code>-t importáló fájl az adott keretrendszerrel van jelölve.
+    A <code>__pycache__</code>, <code>venv</code>, <code>.venv</code> és <code>site-packages</code> alapból kimarad.</p>
+</section>
+
+<section id="categories" aria-labelledby="h-categories">
+  <h2 id="h-categories">Hívás-kategóriák</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th scope="col">Kategória</th><th scope="col">Mikor</th></tr></thead>
+    <tbody>
+      <tr><td><code>internal_helper</code></td><td>ugyanabban a fájlban definiált függvény, vagy <code>self.f()</code> / <code>cls.f()</code> a fájlbeli metódusra</td></tr>
+      <tr><td><code>instantiation</code></td><td>nagybetűs puszta név, <code>Foo()</code></td></tr>
+      <tr><td><code>static_call</code></td><td><code>Osztály.metódus()</code> a fájlban definiált osztályon</td></tr>
+      <tr><td><code>native_python</code></td><td>beépített függvények, stdlib-modulok és gyakori beépített metódusok: <code>len</code>, <code>os.path.join</code>, <code>append</code>…</td></tr>
+      <tr><td><code>external_call</code></td><td>importált nem-stdlib csomag, <code>super().x()</code>, vagy olyan fogadó, amit a callgraph nem tud megnevezni</td></tr>
+      <tr><td><code>global_helper</code></td><td>ismeretlen puszta név, valószínűleg <code>*</code>-gal importált vagy máshol definiált</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="commands" aria-labelledby="h-commands">
+  <h2 id="h-commands">Parancsok</h2>
+<pre class="code"><code>CG=~/.claude/skills/callgraph/callgraph.sh
+bash $CG --project myapp &lt;út/a&gt;/cart.py                  # outline: osztályok, függvények, property-k, hívások
+bash $CG --project myapp &lt;út/a&gt;/cart.py --signatures     # a szignatúra minden metódus-soron
+bash $CG --project myapp &lt;út/a&gt;/cart.py::add --body      # csak az a metódus, sorszámozva
+bash $CG --project myapp &lt;út/a&gt;/cart.py --format api     # csak a publikus felület</code></pre>
+  <p class="label">Az outline kimenete egy kis fájlra</p>
+<pre class="code out"><code>FILE  pkg/cart.py
+
+module cart.py  L1-11
+  constants (1):
+    MAX = 3
+  __module__()  L2-2
+  helper(n)  L10-11
+
+class Cart uses @dataclass  L4-8
+  properties (1):
+    int $total
+  add(n: int): int  L7-8
+    internal_helper   helper</code></pre>
+</section>
+
+<section id="callers" aria-labelledby="h-callers">
+  <h2 id="h-callers">Ki hívja ezt a Python-függvényt?</h2>
+<pre class="code"><code>bash $CG --project myapp &lt;mappa&gt; --grep '(^|::|\.|-&gt;)helper$'      # a név minden hívása
+bash $CG --project myapp &lt;mappa&gt; --grep '(^|::|\.|-&gt;)helper$' --depth 2</code></pre>
+  <p>Pythonban a callgraph nem old fel típusokat, ezért név szerint keress: a minta a
+    <code>helper</code> minden hívását megtalálja, bármi a fogadó. Minden találat a hívás saját forrássorát is mutatja.</p>
+</section>
+
+<section id="limits" aria-labelledby="h-limits">
+  <h2 id="h-limits">Korlátok</h2>
+  <p>Ez a Python-támogatás első fázisa.</p>
+  <ul>
+    <li>Nincs típus-feloldás: a <code>self.repo.save()</code> fogadója <code>self</code> marad, és az importált modult nem oldja
+      fel fájlra.</li>
+    <li>A keretrendszer-felismerés csak a fájl importjait nézi; még nincsenek Django URL- / modell-nézetek, sem Flask /
+      FastAPI route-nézetek, és nincsenek <code>--format flow</code> ágak.</li>
+    <li>A beágyazott függvény és a lambda nem külön elem: a hívásai a külső függvényhez tartoznak.</li>
+    <li>A beépített metódusok listája név szerinti: egy saját <code>append</code> is <code>native_python</code>.</li>
+  </ul>
+</section>
+
+<section id="related" aria-labelledby="h-related">
+  <h2 id="h-related">Kapcsolódó oldalak</h2>
+  <div class="grid">
+    <a class="card" href="/hu/locate/"><h3>locate</h3><p>Rangsorolt fájlok a feladat kezdéséhez.</p></a>
+    <a class="card" href="/hu/profile/"><h3>Projekt-profil</h3><p>Hogyan épül fel egy ismeretlen projekt, kb. 15 sorban.</p></a>
+    <a class="card" href="/hu/mcp/"><h3>MCP-szerver</h3><p>Ugyanezek a lekérdezések bármely MCP-kliensben.</p></a>
+    <a class="card" href="/hu/go/"><h3>Go</h3><p>Structok, interfészek és receiveres metódusok.</p></a>
+  </div>
+</section>
+</main>
+
+<footer>
+  <nav class="foot" aria-label="Oldalak"><a href="/hu/">Kezdőlap</a> · <a href="/hu/mcp/">MCP</a> · <a href="/hu/php/">PHP</a> · <a href="/hu/rust/">Rust</a> · <a href="/hu/typescript/">TypeScript / Vue</a> · <a href="/hu/swift/">Swift</a> · <a href="/hu/python/">Python</a> · <a href="/hu/go/">Go</a> · <a href="/hu/locate/">locate</a> · <a href="/hu/profile/">Profil</a> · <a href="/hu/changelog/">Változásnapló</a></nav>
+  <div>callgraph · készítette: <a href="https://www.linkedin.com/in/gergomakra/" rel="author me">Makra Gergő</a> · MIT licenc · <a href="https://github.com/GeRiY/callgraph">GitHub</a> · <a href="https://github.com/GeRiY/callgraph/releases/latest">Kiadások</a> · <a href="/python/" hreflang="en" lang="en">English</a></div>
+  <div class="sub">Adatvédelem: nincs cookie. Az oldalmegtekintéseket napi számként rögzítjük (oldal, hivatkozó oldal, letöltés-kattintás) — IP-cím és azonosító nélkül. Adatkezelő: Makra Gergő, mgeri1993@gmail.com.</div>
+</footer>
+</div>
+<script>
+// nyelv-menü: kívül kattintásra / Escape-re bezárul (JS nélkül is működik)
+document.addEventListener('click', function (e) {
+  document.querySelectorAll('details.menu[open]').forEach(function (d) { if (!d.contains(e.target)) d.open = false; });
+});
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape') return;
+  document.querySelectorAll('details.menu[open]').forEach(function (d) { d.open = false; d.querySelector('summary').focus(); });
+});
+</script>
+<script>
+(function(){try{var u="https://telemetry.callgraph.eu/hit",r="";
+try{var h=new URL(document.referrer).hostname;if(h&&h.indexOf("callgraph.eu")<0)r=h.toLowerCase()}catch(e){}
+try{var q=new URLSearchParams(location.search),t=q.get("ref")||q.get("utm_source");if(t)r=t.toLowerCase().replace(/[^a-z0-9.-]/g,"").slice(0,64)}catch(e){}
+function s(e){var d=JSON.stringify({p:location.pathname.toLowerCase().slice(0,80),r:r,e:e});
+if(navigator.sendBeacon)navigator.sendBeacon(u,d);else fetch(u,{method:"POST",body:d,keepalive:true,mode:"no-cors"})}
+s("view");document.addEventListener("click",function(ev){var a=ev.target.closest&&ev.target.closest("a");
+if(a&&/github\.com\/GeRiY\/callgraph\/releases/.test(a.href))s("download")})}catch(e){}})();
+</script>
+<script>
+// másoló gomb a parancs- és konfig-blokkokon (JS nélkül a blokk ugyanúgy olvasható)
+if (navigator.clipboard) document.querySelectorAll('pre.code:not(.out)').forEach(function (pre) {
+  var wrap = document.createElement('div'); wrap.className = 'copywrap';
+  pre.parentNode.insertBefore(wrap, pre); wrap.appendChild(pre);
+  var b = document.createElement('button'); b.type = 'button'; b.className = 'copy';
+  b.textContent = "M\u00e1sol\u00e1s"; b.setAttribute('aria-label', "K\u00f3d m\u00e1sol\u00e1sa a v\u00e1g\u00f3lapra"); wrap.appendChild(b);
+  b.addEventListener('click', function () {
+    navigator.clipboard.writeText(pre.innerText.replace(/\n$/, '')).then(function () {
+      b.textContent = "M\u00e1solva"; setTimeout(function () { b.textContent = "M\u00e1sol\u00e1s"; }, 1600);
+    });
+  });
+});
+</script>
+</body>
+</html>

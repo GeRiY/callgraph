@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Python call graph for AI agents — callgraph</title>
+<meta name="description" content="Map Python code: classes with bases and decorators, functions and methods, signatures, imports, categorized calls, Django / Flask / FastAPI detection.">
+<link rel="canonical" href="https://callgraph.eu/python/">
+<link rel="alternate" hreflang="en" href="https://callgraph.eu/python/">
+<link rel="alternate" hreflang="hu" href="https://callgraph.eu/hu/python/">
+<link rel="alternate" hreflang="x-default" href="https://callgraph.eu/python/">
+<meta name="author" content="Gergő Makra">
+<meta name="robots" content="index,follow">
+<meta name="theme-color" content="#0c152a">
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/style.css">
+<script>document.documentElement.className += ' js';</script>
+<link rel="alternate" type="text/markdown" href="/python/index.md" title="Markdown version of this page">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="callgraph">
+<meta property="og:title" content="Python call graph for AI agents — callgraph">
+<meta property="og:description" content="Map Python code: classes with bases and decorators, functions and methods, signatures, imports, categorized calls, Django / Flask / FastAPI detection.">
+<meta property="og:url" content="https://callgraph.eu/python/">
+<meta property="og:image" content="https://callgraph.eu/assets/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="callgraph terminal output: class outline with line ranges and categorized calls">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="hu_HU">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Python call graph for AI agents — callgraph">
+<meta name="twitter:description" content="Map Python code: classes with bases and decorators, functions and methods, signatures, imports, categorized calls, Django / Flask / FastAPI detection.">
+<meta name="twitter:image" content="https://callgraph.eu/assets/og-image.png">
+<script type="application/ld+json">
+{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://callgraph.eu/"}, {"@type": "ListItem", "position": 2, "name": "Python", "item": "https://callgraph.eu/python/"}]}
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="wrap">
+<header class="top">
+  <a class="brand" href="/"><img src="/assets/favicon.svg" alt="" width="32" height="32">callgraph</a>
+  <nav class="links" aria-label="Main">
+    <details class="menu"><summary>Usage</summary><div class="menu-list"><a href="/#usage">All commands</a><a href="/locate/">locate</a><a href="/profile/">Profile</a></div></details>
+    <details class="menu"><summary class="current">Languages</summary><div class="menu-list"><a href="/php/">PHP</a><a href="/rust/">Rust</a><a href="/typescript/">TS / Vue</a><a href="/swift/">Swift</a><a href="/python/" aria-current="page">Python</a><a href="/go/">Go</a><a href="/#languages">All languages</a></div></details>
+    <a href="/mcp/">MCP</a>
+    <a href="/changelog/">Changelog</a>
+    <a href="https://github.com/GeRiY/callgraph">GitHub</a>
+    <a class="lang" href="/hu/python/" hreflang="hu" lang="hu">Magyar</a>
+  </nav>
+</header>
+<main id="main">
+<nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="/">Home</a></li><li aria-current="page">Python</li></ol></nav>
+<section class="hero page" aria-labelledby="title">
+  <div>
+    <h1 id="title">Python call graph for AI agents</h1>
+    <p class="lead">callgraph parses <code>.py</code> and <code>.pyi</code> files with
+      <a href="https://github.com/tree-sitter/tree-sitter-python">tree-sitter-python</a> and shows your agent classes,
+      functions and methods with line ranges, signatures, and every call by category.</p>
+    <div class="cta">
+      <a class="btn primary" href="/#install">Install</a>
+      <a class="btn" href="/mcp/">Use it over MCP</a>
+    </div>
+  </div>
+</section>
+
+<section id="extracts" aria-labelledby="h-extracts">
+  <h2 id="h-extracts">What callgraph extracts from Python</h2>
+  <ul>
+    <li>Every file gets a <code>&lt;file&gt;.py</code> <code>module</code> container with its module-level functions and
+      constants; the module docstring is its doc.</li>
+    <li>Classes with their bases (<code>extends</code>) and decorators (<code>uses @dataclass</code>); nested classes as
+      <code>Outer.Inner</code>; the line range starts at the first decorator. An <code>ABC</code> base marks the class abstract.</li>
+    <li>Functions and methods: <code>def</code> and <code>async def</code>, <code>@staticmethod</code>,
+      <code>@classmethod</code>, <code>@property</code> (also <code>@cached_property</code> and setters),
+      <code>@abstractmethod</code>. A leading underscore means private. The first string literal of the body is the docstring.</li>
+    <li>Signatures with defaults and annotations: <code>add(n: int): int</code> (<code>--signatures</code>,
+      <code>--format api</code>); <code>self</code> and <code>cls</code> are left out.</li>
+    <li>Constants: <code>UPPER_CASE</code> names, every annotated assignment and <code>__all__</code>; class attributes as
+      properties, with the type from the annotation or the value.</li>
+    <li>Imports in all forms, relative ones too (<code>from .m import x</code>), also inside functions and
+      <code>try</code> / <code>if</code> blocks.</li>
+    <li>String literals (the static parts of f-strings) and syntax errors: a file that does not parse still shows
+      everything before and after the broken line, plus a warning.</li>
+  </ul>
+  <p>A file that imports <code>django</code>, <code>flask</code> or <code>fastapi</code> is marked with that framework.
+    <code>__pycache__</code>, <code>venv</code>, <code>.venv</code> and <code>site-packages</code> are skipped by default.</p>
+</section>
+
+<section id="categories" aria-labelledby="h-categories">
+  <h2 id="h-categories">Call categories</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th scope="col">Category</th><th scope="col">When</th></tr></thead>
+    <tbody>
+      <tr><td><code>internal_helper</code></td><td>a function defined in the same file, or <code>self.f()</code> / <code>cls.f()</code> on a method of the same file</td></tr>
+      <tr><td><code>instantiation</code></td><td>a capitalised bare name, <code>Foo()</code></td></tr>
+      <tr><td><code>static_call</code></td><td><code>Class.method()</code> on a class defined in the same file</td></tr>
+      <tr><td><code>native_python</code></td><td>builtins, standard-library modules and common builtin methods: <code>len</code>, <code>os.path.join</code>, <code>append</code>…</td></tr>
+      <tr><td><code>external_call</code></td><td>an imported non-stdlib package, <code>super().x()</code>, or a receiver callgraph cannot name</td></tr>
+      <tr><td><code>global_helper</code></td><td>an unknown bare name, probably imported with <code>*</code> or defined elsewhere</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="commands" aria-labelledby="h-commands">
+  <h2 id="h-commands">Commands</h2>
+<pre class="code"><code>CG=~/.claude/skills/callgraph/callgraph.sh
+bash $CG --project myapp &lt;path/to&gt;/cart.py                  # outline: classes, functions, properties, calls
+bash $CG --project myapp &lt;path/to&gt;/cart.py --signatures     # with the signature on each method line
+bash $CG --project myapp &lt;path/to&gt;/cart.py::add --body      # just that method, line-numbered
+bash $CG --project myapp &lt;path/to&gt;/cart.py --format api     # the public surface only</code></pre>
+  <p class="label">Output of the outline for a small file</p>
+<pre class="code out"><code>FILE  pkg/cart.py
+
+module cart.py  L1-11
+  constants (1):
+    MAX = 3
+  __module__()  L2-2
+  helper(n)  L10-11
+
+class Cart uses @dataclass  L4-8
+  properties (1):
+    int $total
+  add(n: int): int  L7-8
+    internal_helper   helper</code></pre>
+</section>
+
+<section id="callers" aria-labelledby="h-callers">
+  <h2 id="h-callers">Who calls this Python function?</h2>
+<pre class="code"><code>bash $CG --project myapp &lt;folder&gt; --grep '(^|::|\.|-&gt;)helper$'      # every call of the name
+bash $CG --project myapp &lt;folder&gt; --grep '(^|::|\.|-&gt;)helper$' --depth 2</code></pre>
+  <p>Python has no type resolution in callgraph, so search by name: the pattern finds every call of
+    <code>helper</code>, whatever the receiver. Each match shows the call's own source line.</p>
+</section>
+
+<section id="limits" aria-labelledby="h-limits">
+  <h2 id="h-limits">Limits</h2>
+  <p>This is the first phase of Python support.</p>
+  <ul>
+    <li>No type resolution: the receiver of <code>self.repo.save()</code> stays <code>self</code>, and an imported module is
+      not resolved to a file.</li>
+    <li>Framework detection looks at the imports of the file only; there are no Django URL / model views or Flask /
+      FastAPI route views yet, and no <code>--format flow</code> branches.</li>
+    <li>A nested function or lambda is not a separate item: its calls belong to the outer function.</li>
+    <li>The builtin-method list is by name: your own <code>append</code> is also <code>native_python</code>.</li>
+  </ul>
+</section>
+
+<section id="related" aria-labelledby="h-related">
+  <h2 id="h-related">Related</h2>
+  <div class="grid">
+    <a class="card" href="/locate/"><h3>locate</h3><p>Ranked files to start a task with.</p></a>
+    <a class="card" href="/profile/"><h3>Project profile</h3><p>How an unfamiliar project is built, in about 15 lines.</p></a>
+    <a class="card" href="/mcp/"><h3>MCP server</h3><p>The same queries in any MCP client.</p></a>
+    <a class="card" href="/go/"><h3>Go</h3><p>Structs, interfaces and receiver methods.</p></a>
+  </div>
+</section>
+</main>
+
+<footer>
+  <nav class="foot" aria-label="Pages"><a href="/">Home</a> · <a href="/mcp/">MCP</a> · <a href="/php/">PHP</a> · <a href="/rust/">Rust</a> · <a href="/typescript/">TypeScript / Vue</a> · <a href="/swift/">Swift</a> · <a href="/python/">Python</a> · <a href="/go/">Go</a> · <a href="/locate/">locate</a> · <a href="/profile/">Profile</a> · <a href="/changelog/">Changelog</a></nav>
+  <div>callgraph · made by <a href="https://www.linkedin.com/in/gergomakra/" rel="author me">Gergő Makra</a> · MIT license · <a href="https://github.com/GeRiY/callgraph">GitHub</a> · <a href="https://github.com/GeRiY/callgraph/releases/latest">Releases</a> · <a href="/hu/python/" hreflang="hu" lang="hu">Magyar</a></div>
+  <div class="sub">Privacy: no cookies. Page views are counted per day (page, referring site, download clicks) — no IP address, no identifiers. Controller: Makra Gergő, mgeri1993@gmail.com.</div>
+</footer>
+</div>
+<script>
+// nyelv-menü: kívül kattintásra / Escape-re bezárul (JS nélkül is működik)
+document.addEventListener('click', function (e) {
+  document.querySelectorAll('details.menu[open]').forEach(function (d) { if (!d.contains(e.target)) d.open = false; });
+});
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape') return;
+  document.querySelectorAll('details.menu[open]').forEach(function (d) { d.open = false; d.querySelector('summary').focus(); });
+});
+</script>
+<script>
+(function(){try{var u="https://telemetry.callgraph.eu/hit",r="";
+try{var h=new URL(document.referrer).hostname;if(h&&h.indexOf("callgraph.eu")<0)r=h.toLowerCase()}catch(e){}
+try{var q=new URLSearchParams(location.search),t=q.get("ref")||q.get("utm_source");if(t)r=t.toLowerCase().replace(/[^a-z0-9.-]/g,"").slice(0,64)}catch(e){}
+function s(e){var d=JSON.stringify({p:location.pathname.toLowerCase().slice(0,80),r:r,e:e});
+if(navigator.sendBeacon)navigator.sendBeacon(u,d);else fetch(u,{method:"POST",body:d,keepalive:true,mode:"no-cors"})}
+s("view");document.addEventListener("click",function(ev){var a=ev.target.closest&&ev.target.closest("a");
+if(a&&/github\.com\/GeRiY\/callgraph\/releases/.test(a.href))s("download")})}catch(e){}})();
+</script>
+<script>
+// másoló gomb a parancs- és konfig-blokkokon (JS nélkül a blokk ugyanúgy olvasható)
+if (navigator.clipboard) document.querySelectorAll('pre.code:not(.out)').forEach(function (pre) {
+  var wrap = document.createElement('div'); wrap.className = 'copywrap';
+  pre.parentNode.insertBefore(wrap, pre); wrap.appendChild(pre);
+  var b = document.createElement('button'); b.type = 'button'; b.className = 'copy';
+  b.textContent = "Copy"; b.setAttribute('aria-label', "Copy code to clipboard"); wrap.appendChild(b);
+  b.addEventListener('click', function () {
+    navigator.clipboard.writeText(pre.innerText.replace(/\n$/, '')).then(function () {
+      b.textContent = "Copied"; setTimeout(function () { b.textContent = "Copy"; }, 1600);
+    });
+  });
+});
+</script>
+</body>
+</html>

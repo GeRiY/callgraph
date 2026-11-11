@@ -43,7 +43,7 @@
   <a class="brand" href="/hu/"><img src="/assets/favicon.svg" alt="" width="32" height="32">callgraph</a>
   <nav class="links" aria-label="Fő navigáció">
     <details class="menu"><summary>Használat</summary><div class="menu-list"><a href="/hu/#usage">Minden parancs</a><a href="/hu/locate/">locate</a><a href="/hu/profile/">Profil</a></div></details>
-    <details class="menu"><summary>Nyelvek</summary><div class="menu-list"><a href="/hu/php/">PHP</a><a href="/hu/rust/">Rust</a><a href="/hu/typescript/">TS / Vue</a><a href="/hu/swift/">Swift</a><a href="/hu/#languages">Minden nyelv</a></div></details>
+    <details class="menu"><summary>Nyelvek</summary><div class="menu-list"><a href="/hu/php/">PHP</a><a href="/hu/rust/">Rust</a><a href="/hu/typescript/">TS / Vue</a><a href="/hu/swift/">Swift</a><a href="/hu/python/">Python</a><a href="/hu/go/">Go</a><a href="/hu/#languages">Minden nyelv</a></div></details>
     <a href="/hu/mcp/">MCP</a>
     <a href="/hu/changelog/" aria-current="page">Változásnapló</a>
     <a href="https://github.com/GeRiY/callgraph">GitHub</a>
@@ -57,7 +57,13 @@
 <p class="lead">Minden kiadás dátummal, a legújabb elöl: mi új, mi változott és mi javult. A verziók letöltései és ellenőrzőösszegei a <a href="https://github.com/GeRiY/callgraph/releases">GitHub kiadási oldalán</a> vannak.</p>
 <div class="cta"><a class="btn primary" href="/hu/#install">A legújabb verzió telepítése</a><a class="btn" href="https://github.com/GeRiY/callgraph/releases/latest">Legfrissebb kiadás a GitHubon</a></div>
 </div></section>
-<nav class="toc" aria-label="Kiadások"><ul><li><a href="#v0.7.0">v0.7.0</a></li><li><a href="#v0.6.1">v0.6.1</a></li><li><a href="#v0.6.0">v0.6.0</a></li><li><a href="#v0.5.3">v0.5.3</a></li><li><a href="#v0.5.2">v0.5.2</a></li><li><a href="#v0.5.1">v0.5.1</a></li><li><a href="#v0.5.0">v0.5.0</a></li><li><a href="#v0.4.0">v0.4.0</a></li><li><a href="#v0.3.0">v0.3.0</a></li><li><a href="#v0.2.0">v0.2.0</a></li><li><a href="#v0.1.0">v0.1.0</a></li></ul></nav>
+<nav class="toc" aria-label="Kiadások"><ul><li><a href="#v0.8.0">v0.8.0</a></li><li><a href="#v0.7.0">v0.7.0</a></li><li><a href="#v0.6.1">v0.6.1</a></li><li><a href="#v0.6.0">v0.6.0</a></li><li><a href="#v0.5.3">v0.5.3</a></li><li><a href="#v0.5.2">v0.5.2</a></li><li><a href="#v0.5.1">v0.5.1</a></li><li><a href="#v0.5.0">v0.5.0</a></li><li><a href="#v0.4.0">v0.4.0</a></li><li><a href="#v0.3.0">v0.3.0</a></li><li><a href="#v0.2.0">v0.2.0</a></li><li><a href="#v0.1.0">v0.1.0</a></li></ul></nav>
+<section id="v0.8.0" class="release" aria-labelledby="h-v0.8.0">
+<h2 id="h-v0.8.0">v0.8.0 <span class="date">— <time datetime="2026-11-11">2026-11-11</time></span></h2>
+<p class="sub"><a href="https://github.com/GeRiY/callgraph/releases/tag/v0.8.0">Kiadási jegyzet és letöltések a GitHubon</a></p>
+<h3>Új</h3>
+<ul><li><b><code>--help</code> a binárisban:</b> a <code>callgraph --help</code>, <code>-h</code> és <code>help</code> a teljes, naprakész súgót írja ki (angolul vagy magyarul) — ugyanazt a szöveget, mint a <code>callgraph.sh --help</code>; most már a Python, a Go, a <code>--signatures</code>, a <code>protect</code> és a környezeti változók is benne vannak.</li><li><b>Python (1. fázis):</b> <code>.py</code> / <code>.pyi</code> fájlok a térképben: osztályok ősökkel és dekorátorokkal, függvények, metódusok (<code>async</code>, <code>@staticmethod</code>, <code>@classmethod</code>, <code>@property</code>), konstansok, <code>__all__</code>, docstringek, szignatúrák (<code>--signatures</code>, <code>--format api</code>), importok, kategorizált hívások (<code>native_python</code>, <code>internal_helper</code>, <code>static_call</code>, <code>external_call</code>), stringek, szintaktikai hibák, Django / Flask / FastAPI felismerés. A <code>venv</code>, <code>.venv</code>, <code>site-packages</code> és <code>__pycache__</code> mappák alapból kimaradnak.</li><li><b>Go (1. fázis):</b> <code>.go</code> fájlok a térképben: structok (mezők property-ként, beágyazott típusok), interfészek, típus-aliasok és definiált típusok, függvények és receiveres metódusok (akkor is, ha a típus másik fájlban van), generikusok, <code>const</code> / <code>var</code>, importok (alias, blank, dot), több visszatérési értékű szignatúrák (<code>--signatures</code>, <code>--format api</code>), kategorizált hívások (<code>native_go</code>, <code>internal_helper</code>, <code>static_call</code>, <code>instantiation</code>, <code>external_call</code>; a <code>go</code> / <code>defer</code> is), stringek, doc-kommentek, nagybetűs név = public, szintaktikai hibák, Gin / Echo / Fiber / Chi / gRPC / GORM felismerés. A <code>testdata</code> alapból kimarad (a <code>vendor</code> eddig is); a <code>_test.go</code> fájlok a <code>locate</code>-ben tesztnek számítanak.</li></ul>
+</section>
 <section id="v0.7.0" class="release" aria-labelledby="h-v0.7.0">
 <h2 id="h-v0.7.0">v0.7.0 <span class="date">— <time datetime="2026-11-11">2026-11-11</time></span></h2>
 <p class="sub"><a href="https://github.com/GeRiY/callgraph/releases/tag/v0.7.0">Kiadási jegyzet és letöltések a GitHubon</a></p>
@@ -161,7 +167,7 @@
 </main>
 
 <footer>
-  <nav class="foot" aria-label="Oldalak"><a href="/hu/">Kezdőlap</a> · <a href="/hu/mcp/">MCP</a> · <a href="/hu/php/">PHP</a> · <a href="/hu/rust/">Rust</a> · <a href="/hu/typescript/">TypeScript / Vue</a> · <a href="/hu/swift/">Swift</a> · <a href="/hu/locate/">locate</a> · <a href="/hu/profile/">Profil</a> · <a href="/hu/changelog/">Változásnapló</a></nav>
+  <nav class="foot" aria-label="Oldalak"><a href="/hu/">Kezdőlap</a> · <a href="/hu/mcp/">MCP</a> · <a href="/hu/php/">PHP</a> · <a href="/hu/rust/">Rust</a> · <a href="/hu/typescript/">TypeScript / Vue</a> · <a href="/hu/swift/">Swift</a> · <a href="/hu/python/">Python</a> · <a href="/hu/go/">Go</a> · <a href="/hu/locate/">locate</a> · <a href="/hu/profile/">Profil</a> · <a href="/hu/changelog/">Változásnapló</a></nav>
   <div>callgraph · készítette: <a href="https://www.linkedin.com/in/gergomakra/" rel="author me">Makra Gergő</a> · MIT licenc · <a href="https://github.com/GeRiY/callgraph">GitHub</a> · <a href="https://github.com/GeRiY/callgraph/releases/latest">Kiadások</a> · <a href="/changelog/" hreflang="en" lang="en">English</a></div>
   <div class="sub">Adatvédelem: nincs cookie. Az oldalmegtekintéseket napi számként rögzítjük (oldal, hivatkozó oldal, letöltés-kattintás) — IP-cím és azonosító nélkül. Adatkezelő: Makra Gergő, mgeri1993@gmail.com.</div>
 </footer>

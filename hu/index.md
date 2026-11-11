@@ -1,14 +1,14 @@
-> Szerkezet, hívás-gráf és hívók AI agenteknek a fájl beolvasása nélkül. PHP, JS/TS, Vue, Rust, Swift. Ingyenes, MIT, egy bináris: CLI vagy MCP-szerver.
+> Szerkezet, hívás-gráf és hívók AI agenteknek a fájl beolvasása nélkül. PHP, JS/TS, Vue, Rust, Swift, Python, Go. Ingyenes, MIT, egy bináris: CLI vagy MCP-szerver.
 
 Source: https://callgraph.eu/hu/
 
-[v0.7.0 — újdonságok →](https://callgraph.eu/hu/changelog/)
+[v0.8.0 — újdonságok →](https://callgraph.eu/hu/changelog/)
 
 # Értsd meg a kódot, olvasás nélkül.
 
 A **callgraph** token-hatékony kód-térkép AI kódoló agenteknek. Megmutatja a szerkezetet, a kategorizált hívás-gráfot, egy-egy metódus törzsét, hogy *„ki hívja?”*, és a hatáselemzést — pár tucat sorban, a teljes fájlok helyett.
 
-[Telepítés egy sorral](https://callgraph.eu/hu/#install) [Letöltés: v0.7.0](https://github.com/GeRiY/callgraph/releases/latest) [Megnézem a GitHubon](https://github.com/GeRiY/callgraph)
+[Telepítés egy sorral](https://callgraph.eu/hu/#install) [Letöltés: v0.8.0](https://github.com/GeRiY/callgraph/releases/latest) [Megnézem a GitHubon](https://github.com/GeRiY/callgraph)
 
 ```
 $ callgraph.sh --project shop app/Models/Order.php
@@ -99,6 +99,8 @@ Minden nyelvnek ugyanaz a kimeneti formája.
 | [Vue](https://callgraph.eu/hu/typescript/) | `.vue` | props, emits, setup, template-komponensek és eseménykezelők, computed, watch, hookok |
 | [Rust](https://callgraph.eu/hu/rust/) | `.rs` | modulok, structok, enumok, traitek, impl-blokkok, függvények, use-fák, makróhívások, framework-felismerés (axum, actix-web, tokio…) |
 | [Swift / SwiftUI](https://callgraph.eu/hu/swift/) | `.swift` | osztályok, structok, protokollok, actorok, extensionök, View-komponensek, property wrapperek, SwiftUI view-k és modifierek |
+| [Python](https://callgraph.eu/hu/python/) | `.py .pyi` | osztályok ősökkel és dekorátorokkal, függvények, metódusok, szignatúrák, importok, Django / Flask / FastAPI felismerés |
+| [Go](https://callgraph.eu/hu/go/) | `.go` | structok, interfészek, receiveres metódusok, generikusok, több visszatérési értékű szignatúrák, Gin / Echo / Chi / gRPC / GORM felismerés |
 | CSS / SCSS | `.css .scss` | szabály-blokkok, mixinek, függvények, változók, importok |
 | JSON / Markdown | `.json .md` | kulcs-útvonalak; címsor-szakaszok és linkek |
 
@@ -300,6 +302,18 @@ View-típusok komponensként, property wrapperek, SwiftUI view-k és modifierek.
 
 ](https://callgraph.eu/hu/swift/) [
 
+### Python
+
+Osztályok, dekorátorok, szignatúrák, Django / Flask / FastAPI felismerés.
+
+](https://callgraph.eu/hu/python/) [
+
+### Go
+
+Structok, interfészek, receiveres metódusok, több visszatérési érték.
+
+](https://callgraph.eu/hu/go/) [
+
 ### locate
 
 Az a pár fájl, amit egy feladatnál először érdemes megnyitni, indoklással.
@@ -352,7 +366,7 @@ Parancssori kód-térkép AI kódoló agenteknek. Elemzi a fájlt vagy mappát, 
 
 ### Milyen nyelveket támogat?
 
-PHP (Laravel- és Yii-ismerettel), JavaScript, TypeScript, Vue single-file komponensek, Rust, Swift és SwiftUI, CSS, SCSS, JSON és Markdown. Részletek: [PHP](https://callgraph.eu/hu/php/), [Rust](https://callgraph.eu/hu/rust/), [TypeScript / Vue](https://callgraph.eu/hu/typescript/), [Swift](https://callgraph.eu/hu/swift/).
+PHP (Laravel- és Yii-ismerettel), JavaScript, TypeScript, Vue single-file komponensek, Rust, Swift és SwiftUI, Python, Go, CSS, SCSS, JSON és Markdown. Részletek: [PHP](https://callgraph.eu/hu/php/), [Rust](https://callgraph.eu/hu/rust/), [TypeScript / Vue](https://callgraph.eu/hu/typescript/), [Swift](https://callgraph.eu/hu/swift/), [Python](https://callgraph.eu/hu/python/), [Go](https://callgraph.eu/hu/go/).
 
 ### Kell hozzá PHP, Node vagy Rust?
 

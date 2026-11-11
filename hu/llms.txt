@@ -1,6 +1,6 @@
 # callgraph
 
-> Token-hatékony kód-térkép AI kódoló agenteknek: szerkezet, kategorizált hívás-gráf, metódus-törzs, „ki hívja?” és hatáselemzés az AST-ből, a teljes fájlok beolvasása nélkül. PHP, JavaScript / TypeScript, Vue, Rust, Swift / SwiftUI, CSS / SCSS, JSON, Markdown. Egyetlen statikus bináris (MIT): parancssorból, Claude Code skillként vagy helyi MCP-szerverként (`callgraph mcp`). Legújabb kiadás: v0.7.0.
+> Token-hatékony kód-térkép AI kódoló agenteknek: szerkezet, kategorizált hívás-gráf, metódus-törzs, „ki hívja?” és hatáselemzés az AST-ből, a teljes fájlok beolvasása nélkül. PHP, JavaScript / TypeScript, Vue, Rust, Swift / SwiftUI, Python, Go, CSS / SCSS, JSON, Markdown. Egyetlen statikus bináris (MIT): parancssorból, Claude Code skillként vagy helyi MCP-szerverként (`callgraph mcp`). Legújabb kiadás: v0.8.0.
 
 Telepítés (macOS / Linux):
 
@@ -16,12 +16,14 @@ claude mcp add -s user callgraph -- ~/.claude/skills/callgraph/bin/$(uname -s | 
 
 ## Oldalak
 
-- [Kezdőlap](https://callgraph.eu/hu/index.md): Szerkezet, hívás-gráf és hívók AI agenteknek a fájl beolvasása nélkül. PHP, JS/TS, Vue, Rust, Swift. Ingyenes, MIT, egy bináris: CLI vagy MCP-szerver.
+- [Kezdőlap](https://callgraph.eu/hu/index.md): Szerkezet, hívás-gráf és hívók AI agenteknek a fájl beolvasása nélkül. PHP, JS/TS, Vue, Rust, Swift, Python, Go. Ingyenes, MIT, egy bináris: CLI vagy MCP-szerver.
 - [MCP-szerver](https://callgraph.eu/hu/mcp/index.md): A callgraph helyi MCP-szerverként: beállítás Claude Code-hoz, Claude Desktophoz, Cursorhoz és VS Code-hoz, --auto-update, a tíz eszköz, hibakeresés.
 - [PHP](https://callgraph.eu/hu/php/index.md): PHP-osztályok, metódusok és kategorizált hívások, minden hívó és Laravel / Yii nézetek (routes, validation, events) a fájlok beolvasása nélkül.
 - [Rust](https://callgraph.eu/hu/rust/index.md): Rust-crate-ek térképe AI agenteknek: structok, traitek, impl-blokkok, use-fák, makróhívások, framework a Cargo.toml-ból, és hogy ki mit hív.
 - [TypeScript / Vue](https://callgraph.eu/hu/typescript/index.md): JS, TS és Vue SFC outline: importok alias-feloldással, props, emits, setup, template-komponensek, típusos fogadón át hívott metódusok és hívóik.
 - [Swift / SwiftUI](https://callgraph.eu/hu/swift/index.md): Swift és SwiftUI térkép: View-típusok komponensként, body és computed property-k, property wrapperek, SwiftUI view-k és modifierek kategóriaként.
+- [Python](https://callgraph.eu/hu/python/index.md): Python-térkép: osztályok ősökkel és dekorátorokkal, függvények és metódusok, szignatúrák, importok, kategorizált hívások, Django / Flask / FastAPI felismerés.
+- [Go](https://callgraph.eu/hu/go/index.md): Go-térkép: structok, interfészek, receiveres metódusok, generikusok, több visszatérési értékű szignatúrák, kategorizált hívások, Gin / Echo / Chi / gRPC / GORM felismerés.
 - [locate](https://callgraph.eu/hu/locate/index.md): A callgraph locate egy hívásban kapja a feladat neveit és fogalmait, és rangsorolja a először megnyitandó fájlokat, indoklással. Mikor jobb a grep.
 - [Projekt-profil](https://callgraph.eu/hu/profile/index.md): A callgraph profile kb. 15 sorban leírja az ismeretlen projektet: architektúra, rétegek és mappák, minták, hívásirány. Hozzá a --layer szűrők.
 - [Változásnapló](https://callgraph.eu/hu/changelog/index.md): Minden callgraph-kiadás dátummal: mi új, mi változott és mi javult, közérthetően. Atom-feed is van; a letöltések a GitHub kiadási oldalán.

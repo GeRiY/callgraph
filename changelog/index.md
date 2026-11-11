@@ -8,6 +8,18 @@ Every release with its date, newest first: what was added, changed and fixed. Do
 
 [Install the latest version](https://callgraph.eu/#install)[Latest release on GitHub](https://github.com/GeRiY/callgraph/releases/latest)
 
+## v0.8.0 — 2026-11-11
+
+[Release notes and downloads on GitHub](https://github.com/GeRiY/callgraph/releases/tag/v0.8.0)
+
+### Added
+
+- **`--help` in the binary:** `callgraph --help`, `-h` and `help` print the full, current help (English or Hungarian) — the same text as `callgraph.sh --help`, now also mentioning Python, Go, `--signatures`, `protect` and the environment variables.
+
+- **Python (phase 1):** `.py` / `.pyi` files in the map: classes with bases and decorators, functions, methods (`async`, `@staticmethod`, `@classmethod`, `@property`), constants, `__all__`, docstrings, signatures (`--signatures`, `--format api`), imports, categorized calls (`native_python`, `internal_helper`, `static_call`, `external_call`), strings, syntax errors, Django / Flask / FastAPI detection. `venv`, `.venv`, `site-packages` and `__pycache__` are skipped by default.
+
+- **Go (phase 1):** `.go` files in the map: structs (fields as properties, embedded types), interfaces, type aliases and defined types, functions and methods with receivers (also when the type is declared in another file), generics, `const` / `var`, imports (alias, blank, dot), signatures with several return values (`--signatures`, `--format api`), categorized calls (`native_go`, `internal_helper`, `static_call`, `instantiation`, `external_call`; `go` / `defer` included), strings, doc comments, exported (capitalised) = public, syntax errors, Gin / Echo / Fiber / Chi / gRPC / GORM detection. `testdata` is skipped by default (`vendor` already was); `_test.go` files rank as tests in `locate`.
+
 ## v0.7.0 — 2026-11-11
 
 [Release notes and downloads on GitHub](https://github.com/GeRiY/callgraph/releases/tag/v0.7.0)
