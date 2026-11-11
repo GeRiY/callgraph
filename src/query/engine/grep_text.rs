@@ -3,7 +3,6 @@
 //! hatókör minden fájlja bejárva — a kimenet mindkét úton bájtra azonos.
 
 use super::{QueryEngine, QueryResult};
-use crate::query::hint::{self, Catalog};
 use crate::error::Result;
 use crate::graph::ProjectGraph;
 use crate::i18n::Lang;
@@ -12,6 +11,7 @@ use crate::model::FileGraph;
 use crate::notes::{NoteMarks, strip_mark};
 use crate::profile::{Count, LayerRun, LayerScope, group_header};
 use crate::query::format::{call_lines, grep_outline, method_calls};
+use crate::query::hint::{self, Catalog};
 use crate::query::snippet::{self, SourceLines};
 use crate::{t, tf};
 use std::fmt::Write as _;
