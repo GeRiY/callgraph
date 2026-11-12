@@ -6,6 +6,8 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ## [Unreleased]
 
+## [0.9.2] — 2026-11-12
+
 ### Javítás
 - **JS / TS literál kulcsú computed hívás célpontja:** az `o['x']()`, `o["x"]()` és ``o[`x`]()`` ugyanazt a célpontot
   kapja, mint az `o.x()` (a régi `[]` cél megszűnt); az `o[k]()` `dynamic_call` marad, a szám kulcs (`a[0]()`) már nem ad `[]`-t.
@@ -548,7 +550,8 @@ Első kiadás.
 - Beépített frissítés: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Előre fordított csomagok macOS-re (arm64, x86_64), Linuxra (x86_64, ARM64, statikus musl) és Windowsra.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.9.1...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.9.2...develop
+[0.9.2]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.2
 [0.9.1]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.1
 [0.9.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.0
 [0.8.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.8.0

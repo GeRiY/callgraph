@@ -5,6 +5,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+## [0.9.2] — 2026-11-12
+
 ### Fixed
 - **JS / TS literal computed call target:** `o['x']()`, `o["x"]()` and ``o[`x`]()`` now get the same target as
   `o.x()` (the old `[]` target is gone); `o[k]()` stays a `dynamic_call`, a numeric key (`a[0]()`) no longer yields `[]`.
@@ -513,7 +515,8 @@ First release.
 - Built-in update: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Prebuilt packages for macOS (arm64, x86_64), Linux (x86_64, ARM64, static musl) and Windows.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.9.1...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.9.2...develop
+[0.9.2]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.2
 [0.9.1]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.1
 [0.9.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.0
 [0.8.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.8.0
