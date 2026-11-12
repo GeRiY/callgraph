@@ -19,7 +19,7 @@
 
 <div align="center">
 
-[![M8ven Score](https://m8ven.ai/badge/mcp/geriy-callgraph-96dgjx?v=dd506132eff002dd067b90a1092601d3)](https://m8ven.ai/mcp/geriy-callgraph-96dgjx?s=readme)
+[![M8ven Score](https://m8ven.ai/badge/mcp/geriy-callgraph-96dgjx?v=dd506132eff002dd067b90a1092601d3)](https://m8ven.ai/mcp/geriy-callgraph-96dgjx?s=readme) [![M8ven Live](https://m8ven.ai/badge/mcp/geriy-callgraph-96dgjx?variant=verified)](https://m8ven.ai/mcp/geriy-callgraph-96dgjx?s=readme)
 
 </div>
 
