@@ -57,7 +57,17 @@
 <p class="lead">Minden kiadás dátummal, a legújabb elöl: mi új, mi változott és mi javult. A verziók letöltései és ellenőrzőösszegei a <a href="https://github.com/GeRiY/callgraph/releases">GitHub kiadási oldalán</a> vannak.</p>
 <div class="cta"><a class="btn primary" href="/hu/#install">A legújabb verzió telepítése</a><a class="btn" href="https://github.com/GeRiY/callgraph/releases/latest">Legfrissebb kiadás a GitHubon</a></div>
 </div></section>
-<nav class="toc" aria-label="Kiadások"><ul><li><a href="#v0.9.3">v0.9.3</a></li><li><a href="#v0.9.2">v0.9.2</a></li><li><a href="#v0.9.1">v0.9.1</a></li><li><a href="#v0.9.0">v0.9.0</a></li><li><a href="#v0.8.0">v0.8.0</a></li><li><a href="#v0.7.0">v0.7.0</a></li><li><a href="#v0.6.1">v0.6.1</a></li><li><a href="#v0.6.0">v0.6.0</a></li><li><a href="#v0.5.3">v0.5.3</a></li><li><a href="#v0.5.2">v0.5.2</a></li><li><a href="#v0.5.1">v0.5.1</a></li><li><a href="#v0.5.0">v0.5.0</a></li><li><a href="#v0.4.0">v0.4.0</a></li><li><a href="#v0.3.0">v0.3.0</a></li><li><a href="#v0.2.0">v0.2.0</a></li><li><a href="#v0.1.0">v0.1.0</a></li></ul></nav>
+<nav class="toc" aria-label="Kiadások"><ul><li><a href="#v0.9.4">v0.9.4</a></li><li><a href="#v0.9.3">v0.9.3</a></li><li><a href="#v0.9.2">v0.9.2</a></li><li><a href="#v0.9.1">v0.9.1</a></li><li><a href="#v0.9.0">v0.9.0</a></li><li><a href="#v0.8.0">v0.8.0</a></li><li><a href="#v0.7.0">v0.7.0</a></li><li><a href="#v0.6.1">v0.6.1</a></li><li><a href="#v0.6.0">v0.6.0</a></li><li><a href="#v0.5.3">v0.5.3</a></li><li><a href="#v0.5.2">v0.5.2</a></li><li><a href="#v0.5.1">v0.5.1</a></li><li><a href="#v0.5.0">v0.5.0</a></li><li><a href="#v0.4.0">v0.4.0</a></li><li><a href="#v0.3.0">v0.3.0</a></li><li><a href="#v0.2.0">v0.2.0</a></li><li><a href="#v0.1.0">v0.1.0</a></li></ul></nav>
+<section id="v0.9.4" class="release" aria-labelledby="h-v0.9.4">
+<h2 id="h-v0.9.4">v0.9.4 <span class="date">— <time datetime="2026-11-12">2026-11-12</time></span></h2>
+<p class="sub"><a href="https://github.com/GeRiY/callgraph/releases/tag/v0.9.4">Kiadási jegyzet és letöltések a GitHubon</a></p>
+<h3>Új</h3>
+<ul><li><p><strong>Ellenőrzés a session elején</strong> (opcionális <code>SessionStart</code> hook, <code>callgraph.sh hook install-session</code>; a telepítő rákérdez): új session elején szól, ha egy ajánlott beállítás ki van kapcsolva (frissítő hook, MCP <code>--auto-update</code>-tel, a használati számok megosztása) vagy újabb verzió van, és az agent megkérdez, mielőtt bármit módosítana. Tételenként legfeljebb 2 naponta és 3-szor; <code>hook never &lt;tétel&gt;</code>, <code>CALLGRAPH_RECOMMEND=0</code>.</p></li><li><p><strong>MCP Registry</strong>: minden kiadás mellé <code>callgraph.mcpb</code> is készül (MCPB-csomag mind az öt platform binárisával), és felkerül a hivatalos MCP Registry-be <code>io.github.GeRiY/callgraph</code> néven, így az MCPB-t ismerő kliensek (pl. Claude Desktop) egy lépésben, Rust nélkül telepíthetik az MCP szervert.</p></li></ul>
+<h3>Változás</h3>
+<ul><li>A frissítés-ellenőrzés és a letöltés az <code>update.callgraph.eu</code>-n át megy (tartalék: GitHub); névtelen napi használat-számlálás — lásd a README „Névtelen napi számlálás” részét.</li></ul>
+<h3>Javítás</h3>
+<ul><li>A kiadási zipekben a bináris és a szkriptek megtartják a futtatási jogot, így a kézzel kicsomagolt csomag is <code>chmod +x</code> nélkül indul (a telepítő eddig is beállította).</li></ul>
+</section>
 <section id="v0.9.3" class="release" aria-labelledby="h-v0.9.3">
 <h2 id="h-v0.9.3">v0.9.3 <span class="date">— <time datetime="2026-11-12">2026-11-12</time></span></h2>
 <p class="sub"><a href="https://github.com/GeRiY/callgraph/releases/tag/v0.9.3">Kiadási jegyzet és letöltések a GitHubon</a></p>
@@ -199,7 +209,7 @@
 <footer>
   <nav class="foot" aria-label="Oldalak"><a href="/hu/">Kezdőlap</a> · <a href="/hu/mcp/">MCP</a> · <a href="/hu/php/">PHP</a> · <a href="/hu/rust/">Rust</a> · <a href="/hu/typescript/">TypeScript / Vue</a> · <a href="/hu/swift/">Swift</a> · <a href="/hu/python/">Python</a> · <a href="/hu/go/">Go</a> · <a href="/hu/locate/">locate</a> · <a href="/hu/profile/">Profil</a> · <a href="/hu/changelog/">Változásnapló</a></nav>
   <div>callgraph · készítette: <a href="https://www.linkedin.com/in/gergomakra/" rel="author me">Makra Gergő</a> · MIT licenc · <a href="https://github.com/GeRiY/callgraph">GitHub</a> · <a href="https://github.com/GeRiY/callgraph/releases/latest">Kiadások</a> · <a href="/changelog/" hreflang="en" lang="en">English</a></div>
-  <div class="sub">Adatvédelem: nincs cookie. Az oldalmegtekintéseket napi számként rögzítjük (oldal, hivatkozó oldal, letöltés-kattintás) — IP-cím és azonosító nélkül. Adatkezelő: Makra Gergő, mgeri1993@gmail.com.</div>
+  <div class="sub">Adatvédelem: nincs cookie. Az oldalmegtekintéseket napi számként rögzítjük (oldal, hivatkozó oldal, letöltés-kattintás) — IP-cím és azonosító nélkül. A callgraph eszköz naponta egy névtelen jelzést küld (verzió, platform, három igen/nem jelző; azonosító és IP nélkül; kikapcsolás: CALLGRAPH_COUNT=0 vagy DO_NOT_TRACK=1). Adatkezelő: Makra Gergő, mgeri1993@gmail.com.</div>
 </footer>
 </div>
 <script>

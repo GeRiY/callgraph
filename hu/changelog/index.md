@@ -8,6 +8,28 @@ Minden kiadás dátummal, a legújabb elöl: mi új, mi változott és mi javult
 
 [A legújabb verzió telepítése](https://callgraph.eu/hu/#install)[Legfrissebb kiadás a GitHubon](https://github.com/GeRiY/callgraph/releases/latest)
 
+## v0.9.4 — 2026-11-12
+
+[Kiadási jegyzet és letöltések a GitHubon](https://github.com/GeRiY/callgraph/releases/tag/v0.9.4)
+
+### Új
+
+
+- **Ellenőrzés a session elején** (opcionális `SessionStart` hook, `callgraph.sh hook install-session`; a telepítő rákérdez): új session elején szól, ha egy ajánlott beállítás ki van kapcsolva (frissítő hook, MCP `--auto-update`-tel, a használati számok megosztása) vagy újabb verzió van, és az agent megkérdez, mielőtt bármit módosítana. Tételenként legfeljebb 2 naponta és 3-szor; `hook never <tétel>`, `CALLGRAPH_RECOMMEND=0`.
+
+
+- **MCP Registry**: minden kiadás mellé `callgraph.mcpb` is készül (MCPB-csomag mind az öt platform binárisával), és felkerül a hivatalos MCP Registry-be `io.github.GeRiY/callgraph` néven, így az MCPB-t ismerő kliensek (pl. Claude Desktop) egy lépésben, Rust nélkül telepíthetik az MCP szervert.
+
+### Változás
+
+
+- A frissítés-ellenőrzés és a letöltés az `update.callgraph.eu`-n át megy (tartalék: GitHub); névtelen napi használat-számlálás — lásd a README „Névtelen napi számlálás” részét.
+
+### Javítás
+
+
+- A kiadási zipekben a bináris és a szkriptek megtartják a futtatási jogot, így a kézzel kicsomagolt csomag is `chmod +x` nélkül indul (a telepítő eddig is beállította).
+
 ## v0.9.3 — 2026-11-12
 
 [Kiadási jegyzet és letöltések a GitHubon](https://github.com/GeRiY/callgraph/releases/tag/v0.9.3)

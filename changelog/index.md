@@ -8,6 +8,28 @@ Every release with its date, newest first: what was added, changed and fixed. Do
 
 [Install the latest version](https://callgraph.eu/#install)[Latest release on GitHub](https://github.com/GeRiY/callgraph/releases/latest)
 
+## v0.9.4 — 2026-11-12
+
+[Release notes and downloads on GitHub](https://github.com/GeRiY/callgraph/releases/tag/v0.9.4)
+
+### Added
+
+
+- **Session-start check** (optional `SessionStart` hook, `callgraph.sh hook install-session`; the installer asks): at the start of a new session it tells you when a recommended setting is off (refresh hook, MCP with `--auto-update`, opting in to shared usage counts) or a newer version is out, and your agent asks you before changing anything. At most every 2 days and 3 times per item; `hook never <item>`, `CALLGRAPH_RECOMMEND=0`.
+
+
+- **MCP Registry**: each release now ships `callgraph.mcpb` (an MCPB bundle with the binaries for all five platforms) and publishes it to the official MCP Registry as `io.github.GeRiY/callgraph`, so MCPB-aware clients (e.g. Claude Desktop) can install the MCP server in one step, without a Rust toolchain.
+
+### Changed
+
+
+- Update checks and downloads go through `update.callgraph.eu` (falls back to GitHub); anonymous daily usage count — see "Anonymous daily count" in the README.
+
+### Fixed
+
+
+- The release zips now keep the executable bit on the binary and scripts, so a manually unpacked package runs without `chmod +x` (the installer already set it).
+
 ## v0.9.3 — 2026-11-12
 
 [Release notes and downloads on GitHub](https://github.com/GeRiY/callgraph/releases/tag/v0.9.3)

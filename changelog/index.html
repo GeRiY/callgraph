@@ -57,7 +57,17 @@
 <p class="lead">Every release with its date, newest first: what was added, changed and fixed. Downloads and checksums for each version are on the <a href="https://github.com/GeRiY/callgraph/releases">GitHub releases page</a>.</p>
 <div class="cta"><a class="btn primary" href="/#install">Install the latest version</a><a class="btn" href="https://github.com/GeRiY/callgraph/releases/latest">Latest release on GitHub</a></div>
 </div></section>
-<nav class="toc" aria-label="Releases"><ul><li><a href="#v0.9.3">v0.9.3</a></li><li><a href="#v0.9.2">v0.9.2</a></li><li><a href="#v0.9.1">v0.9.1</a></li><li><a href="#v0.9.0">v0.9.0</a></li><li><a href="#v0.8.0">v0.8.0</a></li><li><a href="#v0.7.0">v0.7.0</a></li><li><a href="#v0.6.1">v0.6.1</a></li><li><a href="#v0.6.0">v0.6.0</a></li><li><a href="#v0.5.3">v0.5.3</a></li><li><a href="#v0.5.2">v0.5.2</a></li><li><a href="#v0.5.1">v0.5.1</a></li><li><a href="#v0.5.0">v0.5.0</a></li><li><a href="#v0.4.0">v0.4.0</a></li><li><a href="#v0.3.0">v0.3.0</a></li><li><a href="#v0.2.0">v0.2.0</a></li><li><a href="#v0.1.0">v0.1.0</a></li></ul></nav>
+<nav class="toc" aria-label="Releases"><ul><li><a href="#v0.9.4">v0.9.4</a></li><li><a href="#v0.9.3">v0.9.3</a></li><li><a href="#v0.9.2">v0.9.2</a></li><li><a href="#v0.9.1">v0.9.1</a></li><li><a href="#v0.9.0">v0.9.0</a></li><li><a href="#v0.8.0">v0.8.0</a></li><li><a href="#v0.7.0">v0.7.0</a></li><li><a href="#v0.6.1">v0.6.1</a></li><li><a href="#v0.6.0">v0.6.0</a></li><li><a href="#v0.5.3">v0.5.3</a></li><li><a href="#v0.5.2">v0.5.2</a></li><li><a href="#v0.5.1">v0.5.1</a></li><li><a href="#v0.5.0">v0.5.0</a></li><li><a href="#v0.4.0">v0.4.0</a></li><li><a href="#v0.3.0">v0.3.0</a></li><li><a href="#v0.2.0">v0.2.0</a></li><li><a href="#v0.1.0">v0.1.0</a></li></ul></nav>
+<section id="v0.9.4" class="release" aria-labelledby="h-v0.9.4">
+<h2 id="h-v0.9.4">v0.9.4 <span class="date">— <time datetime="2026-11-12">2026-11-12</time></span></h2>
+<p class="sub"><a href="https://github.com/GeRiY/callgraph/releases/tag/v0.9.4">Release notes and downloads on GitHub</a></p>
+<h3>Added</h3>
+<ul><li><p><strong>Session-start check</strong> (optional <code>SessionStart</code> hook, <code>callgraph.sh hook install-session</code>; the installer asks): at the start of a new session it tells you when a recommended setting is off (refresh hook, MCP with <code>--auto-update</code>, opting in to shared usage counts) or a newer version is out, and your agent asks you before changing anything. At most every 2 days and 3 times per item; <code>hook never &lt;item&gt;</code>, <code>CALLGRAPH_RECOMMEND=0</code>.</p></li><li><p><strong>MCP Registry</strong>: each release now ships <code>callgraph.mcpb</code> (an MCPB bundle with the binaries for all five platforms) and publishes it to the official MCP Registry as <code>io.github.GeRiY/callgraph</code>, so MCPB-aware clients (e.g. Claude Desktop) can install the MCP server in one step, without a Rust toolchain.</p></li></ul>
+<h3>Changed</h3>
+<ul><li>Update checks and downloads go through <code>update.callgraph.eu</code> (falls back to GitHub); anonymous daily usage count — see "Anonymous daily count" in the README.</li></ul>
+<h3>Fixed</h3>
+<ul><li>The release zips now keep the executable bit on the binary and scripts, so a manually unpacked package runs without <code>chmod +x</code> (the installer already set it).</li></ul>
+</section>
 <section id="v0.9.3" class="release" aria-labelledby="h-v0.9.3">
 <h2 id="h-v0.9.3">v0.9.3 <span class="date">— <time datetime="2026-11-12">2026-11-12</time></span></h2>
 <p class="sub"><a href="https://github.com/GeRiY/callgraph/releases/tag/v0.9.3">Release notes and downloads on GitHub</a></p>
@@ -199,7 +209,7 @@
 <footer>
   <nav class="foot" aria-label="Pages"><a href="/">Home</a> · <a href="/mcp/">MCP</a> · <a href="/php/">PHP</a> · <a href="/rust/">Rust</a> · <a href="/typescript/">TypeScript / Vue</a> · <a href="/swift/">Swift</a> · <a href="/python/">Python</a> · <a href="/go/">Go</a> · <a href="/locate/">locate</a> · <a href="/profile/">Profile</a> · <a href="/changelog/">Changelog</a></nav>
   <div>callgraph · made by <a href="https://www.linkedin.com/in/gergomakra/" rel="author me">Gergő Makra</a> · MIT license · <a href="https://github.com/GeRiY/callgraph">GitHub</a> · <a href="https://github.com/GeRiY/callgraph/releases/latest">Releases</a> · <a href="/hu/changelog/" hreflang="hu" lang="hu">Magyar</a></div>
-  <div class="sub">Privacy: no cookies. Page views are counted per day (page, referring site, download clicks) — no IP address, no identifiers. Controller: Makra Gergő, mgeri1993@gmail.com.</div>
+  <div class="sub">Privacy: no cookies. Page views are counted per day (page, referring site, download clicks) — no IP address, no identifiers. The callgraph tool sends one anonymous count a day (version, platform, three yes/no flags; no ID, no IP stored; off: CALLGRAPH_COUNT=0 or DO_NOT_TRACK=1). Controller: Makra Gergő, mgeri1993@gmail.com.</div>
 </footer>
 </div>
 <script>

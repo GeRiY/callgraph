@@ -9,6 +9,15 @@
   <author><name>Gergő Makra</name></author>
   <icon>https://callgraph.eu/assets/favicon.svg</icon>
   <entry>
+    <title>callgraph v0.9.4</title>
+    <link rel="alternate" type="text/html" href="https://callgraph.eu/changelog/#v0.9.4"/>
+    <link rel="related" type="text/html" href="https://github.com/GeRiY/callgraph/releases/tag/v0.9.4"/>
+    <id>https://github.com/GeRiY/callgraph/releases/tag/v0.9.4</id>
+    <updated>2026-11-12T00:00:00Z</updated>
+    <published>2026-11-12T00:00:00Z</published>
+    <content type="html">&lt;h3&gt;Added&lt;/h3&gt;&lt;ul&gt;&lt;li&gt;&lt;p&gt;&lt;strong&gt;Session-start check&lt;/strong&gt; (optional &lt;code&gt;SessionStart&lt;/code&gt; hook, &lt;code&gt;callgraph.sh hook install-session&lt;/code&gt;; the installer asks): at the start of a new session it tells you when a recommended setting is off (refresh hook, MCP with &lt;code&gt;--auto-update&lt;/code&gt;, opting in to shared usage counts) or a newer version is out, and your agent asks you before changing anything. At most every 2 days and 3 times per item; &lt;code&gt;hook never &amp;lt;item&amp;gt;&lt;/code&gt;, &lt;code&gt;CALLGRAPH_RECOMMEND=0&lt;/code&gt;.&lt;/p&gt;&lt;/li&gt;&lt;li&gt;&lt;p&gt;&lt;strong&gt;MCP Registry&lt;/strong&gt;: each release now ships &lt;code&gt;callgraph.mcpb&lt;/code&gt; (an MCPB bundle with the binaries for all five platforms) and publishes it to the official MCP Registry as &lt;code&gt;io.github.GeRiY/callgraph&lt;/code&gt;, so MCPB-aware clients (e.g. Claude Desktop) can install the MCP server in one step, without a Rust toolchain.&lt;/p&gt;&lt;/li&gt;&lt;/ul&gt;&lt;h3&gt;Changed&lt;/h3&gt;&lt;ul&gt;&lt;li&gt;Update checks and downloads go through &lt;code&gt;update.callgraph.eu&lt;/code&gt; (falls back to GitHub); anonymous daily usage count — see "Anonymous daily count" in the README.&lt;/li&gt;&lt;/ul&gt;&lt;h3&gt;Fixed&lt;/h3&gt;&lt;ul&gt;&lt;li&gt;The release zips now keep the executable bit on the binary and scripts, so a manually unpacked package runs without &lt;code&gt;chmod +x&lt;/code&gt; (the installer already set it).&lt;/li&gt;&lt;/ul&gt;</content>
+  </entry>
+  <entry>
     <title>callgraph v0.9.3</title>
     <link rel="alternate" type="text/html" href="https://callgraph.eu/changelog/#v0.9.3"/>
     <link rel="related" type="text/html" href="https://github.com/GeRiY/callgraph/releases/tag/v0.9.3"/>

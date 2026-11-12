@@ -2,13 +2,13 @@
 
 Source: https://callgraph.eu/
 
-[v0.9.3 — what's new →](https://callgraph.eu/changelog/)
+[v0.9.4 — what's new →](https://callgraph.eu/changelog/)
 
 # Understand code without reading it.
 
 **callgraph** is a token-efficient code map for AI coding agents. It shows the structure, a categorized call graph, single method bodies, *“who calls this?”* and impact analysis — in a few dozen lines instead of whole files.
 
-[Install in one line](https://callgraph.eu/#install) [Download v0.9.3](https://github.com/GeRiY/callgraph/releases/latest) [View on GitHub](https://github.com/GeRiY/callgraph)
+[Install in one line](https://callgraph.eu/#install) [Download v0.9.4](https://github.com/GeRiY/callgraph/releases/latest) [View on GitHub](https://github.com/GeRiY/callgraph)
 
 ```
 $ callgraph.sh --project shop app/Models/Order.php
@@ -112,7 +112,7 @@ The package contains the Claude Code skill and the binary for your platform. Onl
 
 ```
 p="$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)" && t="$(mktemp -d)" \
-  && curl -fsSL -o "$t/cg.zip" "https://github.com/GeRiY/callgraph/releases/latest/download/callgraph-$p.zip" \
+  && curl -fsSL -o "$t/cg.zip" "https://update.callgraph.eu/v1/download/latest/callgraph-$p.zip?k=install" \
   && mkdir -p ~/.claude/skills && unzip -qo "$t/cg.zip" -d ~/.claude/skills \
   && bash ~/.claude/skills/callgraph/install.sh && rm -rf "$t"
 ```

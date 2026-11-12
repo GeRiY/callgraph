@@ -1,11 +1,11 @@
 # callgraph
 
-> Token-hatékony kód-térkép AI kódoló agenteknek: szerkezet, kategorizált hívás-gráf, metódus-törzs, „ki hívja?” és hatáselemzés az AST-ből, a teljes fájlok beolvasása nélkül. PHP, JavaScript / TypeScript, Vue, Rust, Swift / SwiftUI, Python, Go, CSS / SCSS, JSON, Markdown, HTML. Egyetlen statikus bináris (MIT): parancssorból, Claude Code skillként vagy helyi MCP-szerverként (`callgraph mcp`). Legújabb kiadás: v0.9.3.
+> Token-hatékony kód-térkép AI kódoló agenteknek: szerkezet, kategorizált hívás-gráf, metódus-törzs, „ki hívja?” és hatáselemzés az AST-ből, a teljes fájlok beolvasása nélkül. PHP, JavaScript / TypeScript, Vue, Rust, Swift / SwiftUI, Python, Go, CSS / SCSS, JSON, Markdown, HTML. Egyetlen statikus bináris (MIT): parancssorból, Claude Code skillként vagy helyi MCP-szerverként (`callgraph mcp`). Legújabb kiadás: v0.9.4.
 
 Telepítés (macOS / Linux):
 
 ```bash
-p="$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)" && t="$(mktemp -d)" && curl -fsSL -o "$t/cg.zip" "https://github.com/GeRiY/callgraph/releases/latest/download/callgraph-$p.zip" && mkdir -p ~/.claude/skills && unzip -qo "$t/cg.zip" -d ~/.claude/skills && bash ~/.claude/skills/callgraph/install.sh && rm -rf "$t"
+p="$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)" && t="$(mktemp -d)" && curl -fsSL -o "$t/cg.zip" "https://update.callgraph.eu/v1/download/latest/callgraph-$p.zip?k=install" && mkdir -p ~/.claude/skills && unzip -qo "$t/cg.zip" -d ~/.claude/skills && bash ~/.claude/skills/callgraph/install.sh && rm -rf "$t"
 ```
 
 MCP-szerver a Claude Code-ban (macOS / Linux):

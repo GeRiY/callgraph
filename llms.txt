@@ -1,11 +1,11 @@
 # callgraph
 
-> A token-efficient code map for AI coding agents: structure, categorized call graph, method bodies, "who calls this?" and impact analysis from the AST, without reading whole files. PHP, JavaScript / TypeScript, Vue, Rust, Swift / SwiftUI, Python, Go, CSS / SCSS, JSON, Markdown, HTML. One static binary (MIT), used as a CLI, a Claude Code skill or a local MCP server (`callgraph mcp`). Latest release: v0.9.3.
+> A token-efficient code map for AI coding agents: structure, categorized call graph, method bodies, "who calls this?" and impact analysis from the AST, without reading whole files. PHP, JavaScript / TypeScript, Vue, Rust, Swift / SwiftUI, Python, Go, CSS / SCSS, JSON, Markdown, HTML. One static binary (MIT), used as a CLI, a Claude Code skill or a local MCP server (`callgraph mcp`). Latest release: v0.9.4.
 
 Install (macOS / Linux):
 
 ```bash
-p="$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)" && t="$(mktemp -d)" && curl -fsSL -o "$t/cg.zip" "https://github.com/GeRiY/callgraph/releases/latest/download/callgraph-$p.zip" && mkdir -p ~/.claude/skills && unzip -qo "$t/cg.zip" -d ~/.claude/skills && bash ~/.claude/skills/callgraph/install.sh && rm -rf "$t"
+p="$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)" && t="$(mktemp -d)" && curl -fsSL -o "$t/cg.zip" "https://update.callgraph.eu/v1/download/latest/callgraph-$p.zip?k=install" && mkdir -p ~/.claude/skills && unzip -qo "$t/cg.zip" -d ~/.claude/skills && bash ~/.claude/skills/callgraph/install.sh && rm -rf "$t"
 ```
 
 MCP server in Claude Code (macOS / Linux):
