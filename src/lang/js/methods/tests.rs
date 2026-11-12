@@ -75,6 +75,43 @@ fn class_methods_and_container() {
 }
 
 #[test]
+fn class_fields_and_parameter_properties_become_properties() {
+    use crate::core::SourceFile;
+    use crate::lang::Language;
+    use crate::lang::js::JsFrontend;
+    let src = "export class Cart {\n  private itemCount: number = 0;\n  static readonly LIMIT = 5;\n  #secretToken = '';\n  run = () => 1;\n  constructor(private readonly repo: Repo, plain: string) {}\n}\n";
+    let file = SourceFile::new("/p/Cart.ts", src.as_bytes().to_vec(), None);
+    let graph = JsFrontend::with_defaults().analyze(&file).unwrap().graph;
+    let got: Vec<String> = graph
+        .properties
+        .iter()
+        .map(|p| {
+            format!(
+                "{} {} {} {:?} static={} readonly={} {:?}",
+                p.name, p.line, p.visibility, p.type_hint, p.is_static, p.readonly, p.container
+            )
+        })
+        .collect();
+    assert_eq!(
+        got,
+        [
+            "itemCount 2 private Some(\"number\") static=false readonly=false Some(\"Cart\")",
+            "LIMIT 3 public None static=true readonly=true Some(\"Cart\")",
+            "#secretToken 4 private None static=false readonly=false Some(\"Cart\")",
+            "repo 6 private Some(\"Repo\") static=false readonly=true Some(\"Cart\")",
+        ]
+    );
+    // a függvény-értékű mező metódus marad, a sima constructor-paraméter nem property
+    assert!(graph.methods.iter().any(|m| m.name == "run"));
+    assert!(
+        !graph
+            .properties
+            .iter()
+            .any(|p| p.name == "plain" || p.name == "run")
+    );
+}
+
+#[test]
 fn pseudo_method_only_with_top_level_call() {
     let with = methods("/p/S.vue", "const a = ref(0)\n", true);
     assert_eq!(names(&with), ["setup"]);

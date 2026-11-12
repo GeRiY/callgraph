@@ -7,7 +7,7 @@ description: Token-efficient mapping of a PHP / Rust / JS / TS / Vue / Swift / P
 # callgraph — code map without Read
 
 `bash <skill>/callgraph.sh …` (`<skill>` is this skill's directory, e.g. `~/.claude/skills/callgraph`).
-For every target (PHP, Rust, JS / TS / Vue, Swift / SwiftUI, Python, Go, CSS / SCSS, JSON, MD) the native `callgraph` binary (`callgraph show`) does the work; the output has a common
+For every target (PHP, Rust, JS / TS / Vue, Swift / SwiftUI, Python, Go, CSS / SCSS, JSON, MD, HTML) the native `callgraph` binary (`callgraph show`) does the work; the output has a common
 structure: container (class / component / module) → methods with line ranges → calls by category.
 
 ## Step 0 — register the project (once per project)
@@ -26,8 +26,8 @@ folder, absolute or relative) works without registering. Without `--project` the
 **Which tool for what:** plain text search (an exact string, log message, config value) → Grep, it is the best at
 that; "where do I start with this task?" → `locate`; definitions, structure, callers, impact → callgraph (outline,
 `--body`, `--grep`, `--depth`).
-**The first call of a task:** give `locate` the names and domain terms of the task in ONE call: function, class and
-file names, columns, routes, translation keys, and for a non-English domain word its English code name too (e.g.
+**The first call of a task:** give `locate` the names and domain terms of the task in ONE call: function, class,
+property and file names, columns, routes, translation keys, and for a non-English domain word its English code name too (e.g.
 visszatérítés → `refund`). It answers from the project map without reading files: the top 5 files (`--all`: every
 match), each with its reasons (exact definition, file name, name part, string, call, `callers: N`). Continue on
 those files with the outline / `--body` / `--grep`.
@@ -39,7 +39,9 @@ Special terms: a quoted phrase with spaces (`"Szervező további eseményei"`) i
 string literals (UI labels, translations), never split into words; `route::events.show` finds the route definition
 (`->name('events.show')` in `routes/*.php`, ranked first) and its `route()` / `to_route()` / `redirect()->route()`
 calls in PHP and JS / TS / Vue; `--orange-500` is a CSS custom property, not a flag. Files with an exact definition or
-file name rank before files that only match strings (translations, build output).
+file name rank before files that only match strings (translations, build output). A name that joins several terms
+(`toggleFavorite` for `toggle favorite`, `PodcastEpisodeController` for `podcast episode`) ranks high even when each
+term alone is too general; definitions in type declarations (`.d.ts`) weigh less than real ones.
 
 ```bash
 bash <skill>/callgraph.sh locate RefundController processRefund refund payment_status checkout.vue --project myapp   # where to start: ranked files + reasons
@@ -88,6 +90,9 @@ type is unknown, inherited or comes from a trait. `Type::method` finds only the 
 calls through its interface / parent / trait), so it can miss callers; use it to narrow a noisy common name
 (`save`, `find`, `get`).
 <!-- /mcp -->
+PHP receiver types come from `new Foo()`, `Foo::create()`, typed parameters / properties and the Laravel container:
+`$x = app(Foo::class)` (also `resolve()`, `app()->make()`, `$this->app->make()`, `App::make()`) and the chained
+`app(Foo::class)->bar()` resolve to `Foo::bar`; a string id (`app('foo')`) does not.
 
 <!-- mcp:output -->
 **Reading search output** (`--grep`, `--depth`, `--strings`, `--const`, directories):

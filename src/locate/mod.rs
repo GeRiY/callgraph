@@ -83,7 +83,9 @@ impl Locator {
                                 notes.insert(rel.clone(), n);
                             }
                         }
-                        FileMatch::new(rel, hits)
+                        // a több kifejezést egyesítő azonosító (erős jel a rangsorban)
+                        let multi = matcher.multi_terms(&hits);
+                        FileMatch::new(rel, hits).map(|file| file.with_multi(multi))
                     })
                     .collect();
                 // a teszt-felismerés a gyökérhez relatív úton (a gyökér útja maga ne számítson)

@@ -1,5 +1,5 @@
 callgraph.sh — thin wrapper over callgraph (Rust); compact, token-efficient PHP / JS / TS / Vue file context for agents,
-(callgraph parses PHP, .vue/.js/.ts files and CSS/SCSS/JSON/MD into one schema;
+(callgraph parses PHP, .vue/.js/.ts files and CSS/SCSS/JSON/MD/HTML into one schema;
  on Vue: props, emits (emit:<name>), template (components, event handlers), setup, hooks;
  searchable keys: route::<name>, i18n::<key>, vue::emit:<name>, <file>::<export>)
 WITHOUT reading the file (methods + call graph, categorized).
@@ -80,7 +80,7 @@ Excluded files: built-in folders (vendor, node_modules, …), minified / bundled
   CALLGRAPH_GITIGNORE=0 (MCP server, hook): the .gitignore files are not applied (.callgraphignore still is).
   "protect <pattern>" in .callgraphignore: the file stays in the map (outline, grep, locate) but is marked 🔒 —
   a hint for the agent not to edit it (migrations, generated code); the source can still be read.
-Supported files: PHP, JS, TS, Vue, Rust, Swift, Python (.py, .pyi), Go (.go) + CSS/SCSS, JSON, Markdown.
+Supported files: PHP, JS, TS, Vue, Rust, Swift, Python (.py, .pyi), Go (.go) + CSS/SCSS, JSON, Markdown, HTML (.html, .htm).
   --signatures (show): parameter and return types next to each method (also in --format api; TS/Vue return types,
   PHP DocBlock @param / @return, Python annotations, Go types).
   --help / -h / help: this text. Environment: CALLGRAPH_LANG, CALLGRAPH_STATS=0, CALLGRAPH_TELEMETRY=0,

@@ -59,8 +59,9 @@ impl FileFacts {
     /// A `facts.bin` szűkített rekordja — minden, amit a teljes hatókörű lekérdezések olvasnak: a hívó-index és a
     /// típus-hierarchia (névtér, konténerek, metódusok, hívások), a `--grep` outline (ugyanezek + a vezérlési ágak; a
     /// `--grep` szűrő a property-ket, konstansokat és kommenteket úgyis eldobja), a `--strings` (string-literálok), a
-    /// `--const` (konstans-definíciók és `const_fetch` hívások), és a hívás-sorok. Kimarad: property-k, kommentek,
-    /// írások, importok, SFC, a hívás-argumentumok, a metódus-doc és -törzs. Ha e lekérdezések egy itt kiürített
+    /// `--const` (konstans-definíciók és `const_fetch` hívások), a `locate` (a property-k is: definícióként
+    /// kereshetők, a doc-juk nélkül), és a hívás-sorok. Kimarad: kommentek, írások, importok, SFC, a
+    /// hívás-argumentumok, a property- és metódus-doc, a metódus-törzs. Ha e lekérdezések egy itt kiürített
     /// mezőt kezdenének olvasni, a gráf–bejárás összevető teszt (`tests/project_graph.rs`) eltérést jelez.
     pub(crate) fn slim(&self) -> Self {
         let source = &self.graph;
@@ -71,7 +72,14 @@ impl FileFacts {
             namespace: source.namespace.clone(),
             imports: crate::model::Imports::default(),
             containers: source.containers.clone(),
-            properties: Vec::new(),
+            properties: source
+                .properties
+                .iter()
+                .map(|property| crate::model::Property {
+                    doc: None,
+                    ..property.clone()
+                })
+                .collect(),
             constants: source.constants.clone(),
             methods: source
                 .methods

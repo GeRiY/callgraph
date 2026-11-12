@@ -342,3 +342,76 @@ fn works_at_top_level() {
         ("$fn", Some("__top__"))
     );
 }
+
+/// A `bar` hívások feloldott céljai, sorrendben (feloldatlan: `-`).
+fn resolved_bars(body: &str) -> Vec<String> {
+    let src = format!(
+        "<?php\nnamespace App\\Http;\n\nuse App\\Services\\Foo;\n\nclass C {{\n  function f($id, $factory) {{\n{body}\n  }}\n}}\n"
+    );
+    full(&src)
+        .into_iter()
+        .filter(|c| c.target == "bar")
+        .map(|c| c.resolved.unwrap_or_else(|| "-".into()))
+        .collect()
+}
+
+#[test]
+fn container_resolved_variables_carry_the_class_type() {
+    let foo = "App\\Services\\Foo::bar".to_string();
+    for body in [
+        "$x = app(Foo::class); $x->bar();",
+        "$x = resolve(Foo::class); $x->bar();",
+        "$x = \\app(Foo::class); $x->bar();",
+        "$x = app(Foo::class, ['id' => $id]); $x->bar();",
+        "$x = app()->make(Foo::class); $x->bar();",
+        "$x = $this->app->make(Foo::class); $x->bar();",
+        "$x = \\App::make(Foo::class); $x->bar();",
+        "$x = \\Illuminate\\Support\\Facades\\App::make(Foo::class); $x->bar();",
+        "app(Foo::class)->bar();",
+        "resolve(Foo::class)->bar();",
+    ] {
+        assert_eq!(resolved_bars(body), vec![foo.clone()], "{body}");
+    }
+    // a névtér szerint (import nélkül) és teljes névvel is
+    assert_eq!(
+        resolved_bars("$x = app(Bar::class); $x->bar();"),
+        vec!["App\\Http\\Bar::bar".to_string()]
+    );
+    assert_eq!(
+        resolved_bars("$x = app(\\Other\\Baz::class); $x->bar();"),
+        vec!["Other\\Baz::bar".to_string()]
+    );
+    // importált homlokzat
+    let src = "<?php\nnamespace App;\n\nuse Illuminate\\Support\\Facades\\App;\nuse App\\Services\\Foo;\n\nclass C {\n  function f() {\n    $x = App::make(Foo::class);\n    $x->bar();\n  }\n}\n";
+    let all = full(src);
+    assert!(
+        all.iter()
+            .any(|c| c.target == "bar" && c.resolved.as_deref() == Some("App\\Services\\Foo::bar")),
+        "{all:?}"
+    );
+}
+
+#[test]
+fn container_lookups_without_a_class_constant_give_no_type() {
+    for body in [
+        // sztring: egy kötés neve, nem osztály
+        "$x = app('Foo'); $x->bar();",
+        "$x = resolve('foo.service'); $x->bar();",
+        "app('Foo')->bar();",
+        // változó / nem `::class` argumentum
+        "$x = app($id); $x->bar();",
+        "$x = app(Foo::NAME); $x->bar();",
+        "$x = app(); $x->bar();",
+        "$x = app(...$id); $x->bar();",
+        // más függvény / más fogadó `make`-je
+        "$x = other(Foo::class); $x->bar();",
+        "$x = $factory->make(Foo::class); $x->bar();",
+    ] {
+        assert_eq!(resolved_bars(body), vec!["-".to_string()], "{body}");
+    }
+    // a később felülírt változó: a `new`-val azonos szabály (az utolsó típusos értékadás számít)
+    assert_eq!(
+        resolved_bars("$x = app(Foo::class); $x = new \\Other\\Baz(); $x->bar();"),
+        vec!["Other\\Baz::bar".to_string()]
+    );
+}

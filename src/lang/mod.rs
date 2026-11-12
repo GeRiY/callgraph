@@ -6,6 +6,7 @@ mod document;
 pub mod filetype;
 mod frontend;
 pub mod go;
+pub mod html;
 pub mod js;
 pub mod json;
 mod language;

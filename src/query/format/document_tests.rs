@@ -1,4 +1,5 @@
-//! A nem-kód fájlok outline-ja: a Markdown-címsor a szintje szerint behúzva, `#`-jelekkel; a CSS / SCSS szabály és
+//! A nem-kód fájlok outline-ja: a Markdown- / HTML-címsor a szintje szerint behúzva, `#`-jelekkel (a HTML `<title>`
+//! `<title> …` alakban); a CSS / SCSS szabály és
 //! at-szabály `()` nélkül (a mixin / function marad hívható); a JSON-kulcs a rövid értékével.
 
 use super::FormatterRegistry;
@@ -104,4 +105,26 @@ fn json_keys_show_short_scalar_values() {
     ] {
         assert!(out.contains(line), "{line:?}\n{out}");
     }
+}
+
+#[test]
+fn html_title_and_headings_are_outlined_like_markdown() {
+    let source = "<html><head>
+<title>Design doc</title>
+</head><body>
+<h1>Overview</h1>
+<p>text</p>
+<h2>Goals</h2>
+<h2>Risks</h2>
+</body></html>
+";
+    let expected = "document design.html  L1-8
+  <title> Design doc  L2-2
+  # Overview  L4-8
+    ## Goals  L6-6
+    ## Risks  L7-8
+";
+    let out = outline("docs/design.html", source);
+    assert!(out.contains(expected), "{out}");
+    assert!(!out.contains("()"), "{out}");
 }

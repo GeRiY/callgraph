@@ -11,7 +11,7 @@ pub enum LanguageRole {
     Backend,
     /// Kliensoldali nyelv (később JS / TS / Vue).
     Frontend,
-    /// Dokumentum- / adatformátum (JSON, Markdown, később YAML, TOML).
+    /// Dokumentum- / adatformátum (JSON, Markdown, HTML, később YAML, TOML).
     Document,
 }
 

@@ -41,6 +41,10 @@ impl JsPass for MethodsPass {
         for method in std::mem::take(&mut c.methods) {
             out.builder.method(method);
         }
+        // az osztálymezők (a `locate` property-definícióként is megtalálja őket)
+        for property in std::mem::take(&mut c.properties) {
+            out.builder.property(property);
+        }
     }
 }
 

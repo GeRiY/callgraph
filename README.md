@@ -94,6 +94,7 @@ Per-language guides with examples: [PHP](https://callgraph.eu/php/) · [Rust](ht
 | Go | `.go` | packages, structs (fields as properties, embedded types), interfaces, type aliases, functions and methods with receivers and signatures (several return values, generics), `const` / `var`, imports (alias, blank, dot), calls (`native_go`, `internal_helper`, …), `go` / `defer`, exported (capitalised) = public; `vendor` / `testdata` skipped, `_test.go` ranked as tests |
 | CSS / SCSS | `.css` `.scss` | rule blocks and at-rules (`@media`, `@layer`, Tailwind v4 `@theme` / `@utility` / `@source` …), mixins, functions, variables, `@use` / `@import` |
 | JSON / Markdown | `.json` `.md` | key paths with their short values (`package.json::scripts --body` prints one key); heading sections by level, and links |
+| HTML | `.html` `.htm` | `<title>` and `<h1>`–`<h6>` heading sections by level; visible text and `title` / `alt` / `placeholder` / `aria-label` / `value` attributes for `--strings` (`<script>` / `<style>` skipped); links |
 
 ### Which files are processed
 

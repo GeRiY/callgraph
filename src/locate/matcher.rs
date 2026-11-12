@@ -4,14 +4,14 @@
 //! egyenlő string-literálra (a `routes/*.php` fájlban definíció: `->name('név')`) és a `route::név` hívásra.
 
 use super::callers::{CallerCounts, Callers};
-use super::terms::{Term, TermKind, split_member, words};
+use super::terms::{Term, TermKind, same_word, short_name, split_member, words};
 use crate::model::FileGraph;
 
 /// Az egyezés fajtája, a legerősebbtől a leggyengébbig (a sorrend a rangsor és a kiírás sorrendje is).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum Kind {
-    /// A konténer (osztály, struct, komponens, modul), metódus / függvény vagy konstans neve maga a kifejezés; a
-    /// `route::név` kifejezésnél az útvonal definíciója (`routes/*.php`: `->name('név')`).
+    /// A konténer (osztály, struct, komponens, modul), metódus / függvény, konstans vagy property / mező neve maga a
+    /// kifejezés; a `route::név` kifejezésnél az útvonal definíciója (`routes/*.php`: `->name('név')`).
     Definition,
     /// A fájl neve a kifejezés (kiterjesztéssel vagy anélkül), vagy az út vége (`pages/checkout.vue`).
     FileName,
@@ -41,6 +41,12 @@ pub(crate) enum Symbol {
         callers: Callers,
     },
     Constant {
+        name: String,
+        line: u32,
+    },
+    /// Property / mező (PHP-ban `$`-jellel: `$fillable`).
+    Property {
+        container: Option<String>,
         name: String,
         line: u32,
     },
@@ -79,7 +85,7 @@ impl<'a> Matcher<'a> {
         Self { terms, callers }
     }
 
-    /// A fájl összes egyezése. `rel`: a gyökérhez relatív út; `code`: kódfájl-e. A dokumentum / adat (md, json) a
+    /// A fájl összes egyezése. `rel`: a gyökérhez relatív út; `code`: kódfájl-e. A dokumentum / adat (md, html, json) a
     /// fájlnevével, a JSON még a kulcsával is illeszthető — de csak pontosan (a teljes kulcs-út vagy az utolsó
     /// tagja, `laravel-vite-plugin`, `scripts.build`): a címsorok és a név-részletek zajt adnának.
     pub(crate) fn file_hits(&self, rel: &str, graph: &FileGraph, code: bool) -> Vec<Hit> {
@@ -87,12 +93,61 @@ impl<'a> Matcher<'a> {
         self.file_name(rel, code, &mut hits);
         if code {
             self.definitions(graph, &mut hits);
+            self.properties(rel, graph, &mut hits);
             self.strings(rel, graph, &mut hits);
             self.calls(graph, &mut hits);
         } else {
             self.document_keys(graph, &mut hits);
         }
         hits
+    }
+
+    /// A legtöbb kifejezést egyesítő azonosító (definíció neve vagy fájlnév) független kifejezéseinek száma a fájl
+    /// egyezéseiből: `toggleFavorite` a `toggle` + `favorite` kifejezésekre 2. A string-literál és a hívás nem
+    /// számít (csak a fájlban definiált név és a fájl neve).
+    pub(crate) fn multi_terms(&self, hits: &[Hit]) -> usize {
+        let mut groups: Vec<(&Symbol, Vec<usize>)> = Vec::new();
+        for hit in hits.iter().filter(|hit| identifier_hit(hit)) {
+            match groups.iter().position(|(symbol, _)| *symbol == &hit.symbol) {
+                Some(at) => {
+                    let terms = &mut groups[at].1;
+                    if !terms.contains(&hit.term) {
+                        terms.push(hit.term);
+                    }
+                }
+                None => groups.push((&hit.symbol, vec![hit.term])),
+            }
+        }
+        groups
+            .iter()
+            .map(|(_, terms)| self.independent(terms))
+            .max()
+            .unwrap_or(0)
+    }
+
+    /// A független kifejezések száma: amelyiknek minden szavát egy másik kifejezés szavai lefedik (`refund` a
+    /// `RefundController` mellett; az azonos szavú `favorite` / `favorites` párból a későbbi), nem számít külön.
+    fn independent(&self, terms: &[usize]) -> usize {
+        terms
+            .iter()
+            .filter(|&&a| {
+                !terms
+                    .iter()
+                    .any(|&b| b != a && self.covers(b, a) && (b < a || !self.covers(a, b)))
+            })
+            .count()
+    }
+
+    /// Az `outer` kifejezés szavai között megvan-e az `inner` minden szava (egyes / többes szám tűréssel).
+    fn covers(&self, outer: usize, inner: usize) -> bool {
+        let (Some(outer), Some(inner)) = (self.terms.get(outer), self.terms.get(inner)) else {
+            return false;
+        };
+        !inner.words.is_empty()
+            && inner
+                .words
+                .iter()
+                .all(|w| outer.words.iter().any(|x| same_word(x, w)))
     }
 
     /// A JSON-kulcsok (`kind: key`) pontos egyezése: a teljes kulcs-út vagy az utolsó tagja.
@@ -165,6 +220,52 @@ impl<'a> Matcher<'a> {
                 line: k.line,
             };
             self.name_hits(&k.name, k.container.as_deref(), symbol, hits);
+        }
+    }
+
+    /// Property-k / mezők (PHP property és promoted constructor property, TS/JS class field, Rust struct field,
+    /// Swift / Python / Go property, Vue prop): a név pontosan (a `$` / `#` jel nélkül is: `fillable` = `$fillable`,
+    /// vagy `Típus::$név`) definíció, a szavai között név-részlet.
+    fn properties(&self, rel: &str, graph: &FileGraph, hits: &mut Vec<Hit>) {
+        let php = rel.to_ascii_lowercase().ends_with(".php");
+        for p in &graph.properties {
+            let bare = p.name.trim_start_matches(['$', '#']);
+            if bare.is_empty() {
+                continue;
+            }
+            let lower = bare.to_lowercase();
+            let owner = p.container.as_deref().map(str::to_lowercase);
+            // a kiírt név: PHP-ban `$`-jellel, ahogy a forrásban áll
+            let shown = if php {
+                format!("${bare}")
+            } else {
+                p.name.clone()
+            };
+            let mut name_words: Option<Vec<String>> = None;
+            for (i, term) in self.terms.iter().enumerate() {
+                if !term.is_plain() {
+                    continue;
+                }
+                let member = term.member.as_ref().is_some_and(|(want_owner, want_name)| {
+                    want_name.trim_start_matches(['$', '#']) == lower
+                        && owner
+                            .as_deref()
+                            .is_some_and(|o| short_name(o) == want_owner)
+                });
+                let kind = if term.lower.trim_start_matches(['$', '#']) == lower || member {
+                    Kind::Definition
+                } else if term.matches_words(name_words.get_or_insert_with(|| words(bare))) {
+                    Kind::NamePart
+                } else {
+                    continue;
+                };
+                let symbol = Symbol::Property {
+                    container: p.container.clone(),
+                    name: shown.clone(),
+                    line: p.line,
+                };
+                Self::push(hits, i, kind, symbol);
+            }
         }
     }
 
@@ -277,6 +378,22 @@ impl<'a> Matcher<'a> {
             }
         }
     }
+}
+
+/// Azonosító-egyezés-e: egy definíció neve vagy a fájlnév illik a kifejezésre (pontosan vagy név-részletként). A
+/// property / mező nem számít: a sok modellben ismétlődő mező (`user_id`) ne emelje a fájlt a pontos szintre.
+fn identifier_hit(hit: &Hit) -> bool {
+    let kind = matches!(hit.kind, Kind::Definition | Kind::FileName | Kind::NamePart);
+    let symbol = match hit.symbol {
+        Symbol::File
+        | Symbol::Container { .. }
+        | Symbol::Method { .. }
+        | Symbol::Constant { .. } => true,
+        Symbol::Property { .. } | Symbol::Key { .. } | Symbol::Str { .. } | Symbol::Call { .. } => {
+            false
+        }
+    };
+    kind && symbol
 }
 
 /// Útvonal-definíciós fájl-e: PHP-fájl a `routes/` mappában (Laravel: `routes/web.php`, `routes/api.php`; a

@@ -1,13 +1,14 @@
 //! A top-level utasítások metódusai: függvény, `const x = fn`, wrapper, hook, osztály.
 
 use oxc_ast::ast::{
-    Argument, ClassElement, Declaration, Expression, ObjectExpression, ObjectPropertyKind,
-    PropertyKey, Statement, VariableDeclaration,
+    Argument, BindingPattern, ClassElement, Declaration, Expression, FormalParameter,
+    MethodDefinitionKind, ObjectExpression, ObjectPropertyKind, PropertyDefinition, PropertyKey,
+    Statement, TSAccessibility, TSTypeAnnotation, VariableDeclaration,
 };
 use oxc_span::{GetSpan, Span};
 
 use super::collector::{Collector, FnRef, Opts};
-use crate::model::Container;
+use crate::model::{Container, Property};
 
 const FN_WRAPPERS: [&str; 6] = [
     "computed",
@@ -164,6 +165,11 @@ impl Collector<'_> {
         for el in &c.body.body {
             match el {
                 ClassElement::MethodDefinition(m) if m.value.body.is_some() => {
+                    if m.kind == MethodDefinitionKind::Constructor {
+                        for param in &m.value.params.items {
+                            self.parameter_property(&id.name, param);
+                        }
+                    }
                     if let Some(k) = key_name(&m.key) {
                         let o = Opts {
                             container: Some(&id.name),
@@ -184,10 +190,77 @@ impl Collector<'_> {
                             kind: "method",
                         };
                         self.add(&k, f, p.span, o);
+                    } else if f.is_none() {
+                        self.field(&id.name, p);
                     }
                 }
                 _ => {}
             }
         }
+    }
+
+    /// Egy nem függvény-értékű osztálymező (`count = 0`, `private repo: Repo`, `#secret`) a `properties` közé.
+    fn field(&mut self, class: &str, p: &PropertyDefinition<'_>) {
+        let name = match &p.key {
+            PropertyKey::PrivateIdentifier(i) => format!("#{}", i.name),
+            key => match key_name(key) {
+                Some(name) => name,
+                None => return,
+            },
+        };
+        let visibility = match p.accessibility {
+            Some(TSAccessibility::Private) => "private",
+            Some(TSAccessibility::Protected) => "protected",
+            _ if name.starts_with('#') => "private",
+            _ => "public",
+        };
+        let type_hint = self.type_text(p.type_annotation.as_deref());
+        self.properties.push(Property {
+            container: Some(class.to_owned()),
+            name,
+            line: self.line(p.span.start),
+            type_hint,
+            visibility: visibility.into(),
+            is_static: p.r#static,
+            readonly: p.readonly,
+            doc: None,
+            js: false,
+        });
+    }
+
+    /// A TS constructor parameter property (`constructor(private repo: Repo)`): a láthatósággal vagy `readonly`-val
+    /// jelölt paraméter egyben osztálymező.
+    fn parameter_property(&mut self, class: &str, param: &FormalParameter<'_>) {
+        if param.accessibility.is_none() && !param.readonly {
+            return;
+        }
+        let BindingPattern::BindingIdentifier(id) = &param.pattern else {
+            return;
+        };
+        let visibility = match param.accessibility {
+            Some(TSAccessibility::Private) => "private",
+            Some(TSAccessibility::Protected) => "protected",
+            _ => "public",
+        };
+        let type_hint = self.type_text(param.type_annotation.as_deref());
+        self.properties.push(Property {
+            container: Some(class.to_owned()),
+            name: id.name.to_string(),
+            line: self.line(param.span.start),
+            type_hint,
+            visibility: visibility.into(),
+            is_static: false,
+            readonly: param.readonly,
+            doc: None,
+            js: false,
+        });
+    }
+
+    /// A TS típus-annotáció szövege (a `:` nélkül, rövidítve).
+    fn type_text(&self, annotation: Option<&TSTypeAnnotation<'_>>) -> Option<String> {
+        annotation.map(|a| {
+            let span = a.type_annotation.span();
+            self.docs.src_of(span.start, span.end, 60)
+        })
     }
 }
