@@ -34,6 +34,47 @@ A `.vue` file is a `component`. Its "methods" are what an agent needs to navigat
 
 Calls carry categories such as `vue_api`, `composable_use`, `component_use`, `vue_emit`, `inertia`, `i18n_helper`, `route_helper` (Ziggy), `http_call` (axios), `module_use` and `package_use`.
 
+The `--format api` view lists the component's `props:` (name, type, `[required]`) and `emits:`:
+
+```
+component Comp  L1-7
+
+  props (1):
+    title: string [required]
+
+  emits (1):
+    save
+```
+
+## JSX and component use
+
+Plain `.js` / `.mjs` / `.cjs`, `.jsx` and `.tsx` files are mapped together with their JSX, so a React file never ends in a syntax error and an empty outline. (`.ts` stays non-JSX, where `<T>x` is a type assertion.)
+
+A capitalized JSX element (`<Button />`, `<Button>…</Button>`, `<Ui.Button />`) counts as a call of category `component_use`, resolved through the import like an ordinary function call. Lowercase elements such as `<div>` and fragments are not calls. So "who uses this component?" is answered by `--grep` and, for the whole chain, `--depth`:
+
+```
+bash ~/.claude/skills/callgraph/callgraph.sh --project web src --grep 'Button$'
+```
+
+Output (shortened)
+
+```
+FILE  App.jsx
+
+module App  L1-4
+  App()  L3-3
+    component_use     Button::Button
+    L3 │ export function App() { return <div><Button label="x" /></div>; }
+
+---
+FILE  Page.tsx
+
+module Page  L1-3
+  Page()  L2-2
+    component_use     Button::Button
+    L2 │ export function Page() { return <section><Button label="a" /></section>; }
+```
+
 ## Who uses this function, component or key?
 
 The same `--grep` switch understands frontend-specific keys:

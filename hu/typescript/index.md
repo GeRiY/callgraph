@@ -34,6 +34,47 @@ A `.vue` fájl egy `component`. A „metódusai” azok, amik alapján egy agent
 
 A hívások kategóriái között van a `vue_api`, `composable_use`, `component_use`, `vue_emit`, `inertia`, `i18n_helper`, `route_helper` (Ziggy), `http_call` (axios), `module_use` és a `package_use`.
 
+Az `--format api` nézet a komponens `props:` (név, típus, `[required]`) és `emits:` listáját is kiírja:
+
+```
+component Comp  L1-7
+
+  props (1):
+    title: string [required]
+
+  emits (1):
+    save
+```
+
+## JSX és komponens-használat
+
+A sima `.js` / `.mjs` / `.cjs`, a `.jsx` és a `.tsx` fájlok a JSX-szel együtt kerülnek a térképre, így egy React-fájl nem végződik szintaktikai hibában és üres outline-ban. (A `.ts` nem JSX, ott a `<T>x` típus-állítás.)
+
+A nagybetűs JSX-elem (`<Button />`, `<Button>…</Button>`, `<Ui.Button />`) `component_use` kategóriájú hívásnak számít, és az importból úgy oldódik fel, mint a közönséges függvényhívás. A kisbetűs elemek (pl. `<div>`) és a fragmentek nem hívások. Így a „ki használja ezt a komponenst?” kérdésre a `--grep`, a teljes láncra pedig a `--depth` felel:
+
+```
+bash ~/.claude/skills/callgraph/callgraph.sh --project web src --grep 'Button$'
+```
+
+Kimenet (rövidítve)
+
+```
+FILE  App.jsx
+
+module App  L1-4
+  App()  L3-3
+    component_use     Button::Button
+    L3 │ export function App() { return <div><Button label="x" /></div>; }
+
+---
+FILE  Page.tsx
+
+module Page  L1-3
+  Page()  L2-2
+    component_use     Button::Button
+    L2 │ export function Page() { return <section><Button label="a" /></section>; }
+```
+
 ## Ki használja ezt a függvényt, komponenst vagy kulcsot?
 
 Ugyanaz a `--grep` kapcsoló frontend-specifikus kulcsokat is ért:

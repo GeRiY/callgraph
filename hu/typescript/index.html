@@ -87,9 +87,39 @@
       composable belső függvényei (<code>useX.belso</code>), és az Options API <code>methods</code> / <code>computed.x</code> elemei.</li>
     <li>A props property-ként, az emitek <code>emit:&lt;név&gt;</code> alakban látszanak.</li>
   </ul>
+  <p>Az <code>--format api</code> nézet a komponens <code>props:</code> (név, típus, <code>[required]</code>) és <code>emits:</code> listáját is kiírja:</p>
+<pre class="code out"><code>component Comp  L1-7
+
+  props (1):
+    title: string [required]
+
+  emits (1):
+    save</code></pre>
   <p>A hívások kategóriái között van a <code>vue_api</code>, <code>composable_use</code>, <code>component_use</code>,
     <code>vue_emit</code>, <code>inertia</code>, <code>i18n_helper</code>, <code>route_helper</code> (Ziggy),
     <code>http_call</code> (axios), <code>module_use</code> és a <code>package_use</code>.</p>
+</section>
+
+<section id="jsx" aria-labelledby="h-jsx">
+  <h2 id="h-jsx">JSX és komponens-használat</h2>
+  <p>A sima <code>.js</code> / <code>.mjs</code> / <code>.cjs</code>, a <code>.jsx</code> és a <code>.tsx</code> fájlok a JSX-szel együtt kerülnek a térképre, így egy React-fájl nem végződik szintaktikai hibában és üres outline-ban. (A <code>.ts</code> nem JSX, ott a <code>&lt;T&gt;x</code> típus-állítás.)</p>
+  <p>A nagybetűs JSX-elem (<code>&lt;Button /&gt;</code>, <code>&lt;Button&gt;…&lt;/Button&gt;</code>, <code>&lt;Ui.Button /&gt;</code>) <code>component_use</code> kategóriájú hívásnak számít, és az importból úgy oldódik fel, mint a közönséges függvényhívás. A kisbetűs elemek (pl. <code>&lt;div&gt;</code>) és a fragmentek nem hívások. Így a „ki használja ezt a komponenst?” kérdésre a <code>--grep</code>, a teljes láncra pedig a <code>--depth</code> felel:</p>
+<pre class="code"><code>bash ~/.claude/skills/callgraph/callgraph.sh --project web src --grep 'Button$'</code></pre>
+  <p class="label">Kimenet (rövidítve)</p>
+<pre class="code out"><code>FILE  App.jsx
+
+module App  L1-4
+  App()  L3-3
+    component_use     Button::Button
+    L3 │ export function App() { return &lt;div&gt;&lt;Button label="x" /&gt;&lt;/div&gt;; }
+
+---
+FILE  Page.tsx
+
+module Page  L1-3
+  Page()  L2-2
+    component_use     Button::Button
+    L2 │ export function Page() { return &lt;section&gt;&lt;Button label="a" /&gt;&lt;/section&gt;; }</code></pre>
 </section>
 
 <section id="callers" aria-labelledby="h-callers">

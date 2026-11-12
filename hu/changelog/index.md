@@ -8,6 +8,26 @@ Minden kiadás dátummal, a legújabb elöl: mi új, mi változott és mi javult
 
 [A legújabb verzió telepítése](https://callgraph.eu/hu/#install)[Legfrissebb kiadás a GitHubon](https://github.com/GeRiY/callgraph/releases/latest)
 
+## v0.9.1 — 2026-11-11
+
+[Kiadási jegyzet és letöltések a GitHubon](https://github.com/GeRiY/callgraph/releases/tag/v0.9.1)
+
+### Új
+
+- **A JSX komponens-használat hívás:** a nagybetűs JSX-elem (`<Button />`, `<Button>…</Button>`, `<Ui.Button />`) `.tsx` / `.jsx` / `.js` fájlban `component_use` hívás (ugyanaz a kategória, mint a Vue-ban), az importból úgy oldódik fel, mint a közönséges függvényhívás, így a `--grep 'Button$'` és a `--depth` megtalálja a komponens használóit; a fájlon belül definiált komponens `internal_helper`. A `<div>` és a többi kisbetűs elem, valamint a fragment nem hívás.
+
+- **Vue `--format api`:** kiírja a komponens `props:` (név, ismert típus, `[required]`) és `emits:` listáját.
+
+### Javítás
+
+- **JSX a sima `.js` / `.mjs` / `.cjs` fájlban** már nem ad `syntax error: Unexpected JSX expression` hibát és üres outline-t: ezeket a fájlokat JSX-képesként parse-oljuk (mint a CRA / babel / vite projektek). A `.ts` nem JSX (ott a `<T>x` típus-állítás).
+
+- **Névterű `--grep` minta** (`App\Svc\Real::m`): az azonosító-karakter után álló, nagybetű előtti egyetlen `\` névtér-elválasztó, nem regex-escape (a `\S`, `\R`, `\B` eddig csendben rosszul egyezett vagy hibát adott); a `\.`, `\d`, `\w`, `\b` és a kétszerezett `\\` változatlan. A még mindig hibás minta mellé 💡 sor kerül a kétszerezésről. Ugyanez a `--depth`-re és a `callers`-re is.
+
+- **`--layer` / `--layers` / `--by-layer` útvonal nélkül** a projekt gyökerén fut (mint a `profile`), nem a használati sort írja ki.
+
+- **A `protect` 🔒 jelölés** a `--format summary`-ban (és a `stats` fejlécében) is látszik; a json, mermaid és dot változatlan.
+
 ## v0.9.0 — 2026-11-11
 
 [Kiadási jegyzet és letöltések a GitHubon](https://github.com/GeRiY/callgraph/releases/tag/v0.9.0)
