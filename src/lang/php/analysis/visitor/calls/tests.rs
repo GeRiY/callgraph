@@ -385,8 +385,8 @@ fn container_resolved_variables_carry_the_class_type() {
     let src = "<?php\nnamespace App;\n\nuse Illuminate\\Support\\Facades\\App;\nuse App\\Services\\Foo;\n\nclass C {\n  function f() {\n    $x = App::make(Foo::class);\n    $x->bar();\n  }\n}\n";
     let all = full(src);
     assert!(
-        all.iter().any(|c| c.target == "bar"
-            && c.resolved.as_deref() == Some("App\\Services\\Foo::bar")),
+        all.iter()
+            .any(|c| c.target == "bar" && c.resolved.as_deref() == Some("App\\Services\\Foo::bar")),
         "{all:?}"
     );
 }

@@ -519,7 +519,9 @@ fn an_identifier_joining_terms_counts_its_independent_terms() {
     // külön azonosítókban, illetve stringben a kifejezések nem egyesülnek
     let mut model = graph("app/Models/Podcast.php");
     model.containers.push(container("Podcast", 3, 30));
-    model.methods.push(method(Some("Podcast"), "episodes", 5, 8));
+    model
+        .methods
+        .push(method(Some("Podcast"), "episodes", 5, 8));
     model.strings.push(StringLit {
         container: Some("Podcast".into()),
         caller: None,

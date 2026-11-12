@@ -210,7 +210,9 @@ fn an_identifier_joining_several_terms_ranks_first_even_for_general_terms() {
     for i in 0..31 {
         files.push((
             format!("app/Lists/List{i}.php"),
-            format!("<?php\nfunction list{i}()\n{{\n    return 'favorite toggle podcast episode';\n}}\n"),
+            format!(
+                "<?php\nfunction list{i}()\n{{\n    return 'favorite toggle podcast episode';\n}}\n"
+            ),
         ));
     }
     let refs: Vec<(&str, &str)> = files
@@ -241,7 +243,9 @@ fn an_identifier_joining_several_terms_ranks_first_even_for_general_terms() {
     assert!(out.contains("toggleFavorite()"), "{out}");
     // a túl általános jelzés megmarad
     assert!(
-        out.contains("too general (matched in more than 30 files): favorite, podcast, episode, toggle"),
+        out.contains(
+            "too general (matched in more than 30 files): favorite, podcast, episode, toggle"
+        ),
         "{out}"
     );
 }
