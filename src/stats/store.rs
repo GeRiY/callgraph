@@ -3,6 +3,11 @@
 //! nem lassítja érdemben és nem rontja el. Két párhuzamos folyamat elveszíthet egy-egy növelést (az utolsó írás
 //! nyer) — ez elfogadott; folyamaton belül (MCP-szerver, párhuzamos eszköz-hívások) egy zár sorba rendezi az írást.
 //! Legfeljebb ~90 nap marad meg: egy új hónap első írásakor a régebbi havi fájlok törlődnek.
+//!
+//! Naponként a parancsok mellett az átmenet-élek (`edges`: melyik parancs után melyik jött, a viszony és a szünet
+//! sávja; `session.rs`) és a lezárt munkamenetek sávjai (`sessions`) is itt vannak — ezek is csak rögzített nevek
+//! és sávok. Egy mért hívás (`record_call`) a munkamenet-állapotot (`session.json`) és a helyi eseménynaplót
+//! (`events/`) is lépteti, ugyanazon zár alatt.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -10,9 +15,12 @@ use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
 
-use super::buckets::{LatencyBucket, RankBucket, SizeBucket};
+use super::buckets::{InputBucket, LatencyBucket, RankBucket, SizeBucket};
 use super::day::Day;
 use super::event::{Client, CommandKind, ErrorKind, Event, Outcome};
+use super::events::{EventLine, append as append_event, rfc3339_ms};
+use super::session::{SESSION_FILE, SessionState, Sessions, Visit, add_edge, rep_band};
+use super::target::Call;
 
 /// Ennyi napnál régebbi adat nem marad meg.
 pub(crate) const RETENTION_DAYS: u32 = 90;
@@ -48,13 +56,19 @@ pub(crate) struct Counters {
     /// Hányszor futtatták egy javaslatát (`next rN k`).
     #[serde(skip_serializing_if = "is_zero")]
     pub(crate) next_used: u64,
+    /// A célfájl méretének sávjai (`InputBucket::LABELS`; fájl-cél nélküli hívás nem számít).
+    #[serde(skip_serializing_if = "all_zero")]
+    pub(crate) in_size: [u64; InputBucket::COUNT],
+    /// A célfájl nyelve (rögzített lista, `target::language`) → hívások.
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub(crate) lang: BTreeMap<String, u64>,
 }
 
 fn is_zero(n: &u64) -> bool {
     *n == 0
 }
 
-fn all_zero(values: &[u64; RankBucket::COUNT]) -> bool {
+fn all_zero<const N: usize>(values: &[u64; N]) -> bool {
     values.iter().all(|n| *n == 0)
 }
 
@@ -73,6 +87,16 @@ impl Counters {
         }
     }
 
+    /// A hívás céljának nyelve és mérete (csak fájl-célnál).
+    pub(crate) fn add_target(&mut self, lang: Option<&str>, input: Option<InputBucket>) {
+        if let Some(lang) = lang {
+            *self.lang.entry(lang.to_owned()).or_default() += 1;
+        }
+        if let Some(input) = input {
+            self.in_size[input.index()] += 1;
+        }
+    }
+
     /// Egy másik számláló hozzáadása (napok összegzése).
     pub(crate) fn merge(&mut self, other: &Self) {
         self.calls += other.calls;
@@ -88,6 +112,10 @@ impl Counters {
         add_arrays(&mut self.hits, &other.hits);
         self.next_shown += other.next_shown;
         self.next_used += other.next_used;
+        add_arrays(&mut self.in_size, &other.in_size);
+        for (lang, n) in &other.lang {
+            *self.lang.entry(lang.clone()).or_default() += n;
+        }
     }
 
     /// A hibák száma.
@@ -122,6 +150,13 @@ fn add_arrays<const N: usize>(into: &mut [u64; N], from: &[u64; N]) {
 pub(crate) struct MonthFile {
     pub(crate) v: u32,
     pub(crate) days: BTreeMap<Day, BTreeMap<CommandKind, Counters>>,
+    /// Nap → átmenet-él kulcsa (`{előző}[!]>{ez}|{rel}|{szünet}`, `session.rs`) → darab; legfeljebb 500 kulcs
+    /// naponként, a többi `other`. A régebbi (v0.9.4-es) fájlokban nincs: üres.
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub(crate) edges: BTreeMap<Day, BTreeMap<String, u64>>,
+    /// Nap → a lezárt munkamenetek sávjai (az utolsó hívásuk napjára számítva).
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub(crate) sessions: BTreeMap<Day, Sessions>,
 }
 
 impl Default for MonthFile {
@@ -129,6 +164,8 @@ impl Default for MonthFile {
         Self {
             v: FORMAT,
             days: BTreeMap::new(),
+            edges: BTreeMap::new(),
+            sessions: BTreeMap::new(),
         }
     }
 }
@@ -199,7 +236,9 @@ impl StatsStore {
         self.dir.join(format!("{}.json", day.month_key()))
     }
 
-    /// Egy hívás rögzítése az adott napra; minden hibát elnyel.
+    /// Csak a napi számlálók egy hívásra az adott napra (munkamenet és eseménynapló nélkül; a tesztek
+    /// adat-feltöltése). Minden hibát elnyel.
+    #[cfg(test)]
     pub(crate) fn record(&self, day: Day, event: &Event) {
         self.update(day, |file| {
             file.counters(day, event.command).add_event(event);
@@ -238,12 +277,85 @@ impl StatsStore {
         });
     }
 
+    /// Egy mért hívás: a napi számlálók (a cél nyelvével és méretével), a munkamenet léptetése (`session.json`), az
+    /// átmenet-él, egy lezárult előző munkamenet sávjai és vég-éle, és egy sor a helyi eseménynaplóba. Minden
+    /// hibát elnyel.
+    pub(crate) fn record_call(&self, call: &Call) {
+        let _guard = WRITE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        if std::fs::create_dir_all(&self.dir).is_err() {
+            return;
+        }
+        let day = Day::from_secs(call.end_ms / 1000);
+        let start_ms = call.end_ms.saturating_sub(call.ms);
+        let session_path = self.dir.join(SESSION_FILE);
+        let mut state = SessionState::load(&session_path);
+        let key = state.key_bytes();
+        let keys = call.target.as_ref().map(|t| t.keys(&key));
+        let error = match call.event.outcome {
+            Outcome::Ok => None,
+            Outcome::Error(kind) => Some(kind),
+        };
+        let step = state.advance(Visit {
+            start_ms,
+            end_ms: call.end_ms,
+            day,
+            command: call.event.command,
+            failed: error.is_some(),
+            keys,
+        });
+        let _ = write_atomic(&session_path, &state.to_json());
+        let target = call.target.as_ref();
+        append_event(
+            &self.dir,
+            day,
+            &EventLine {
+                t0: rfc3339_ms(start_ms),
+                ms: call.ms,
+                cmd: call.event.command,
+                via: call.event.client,
+                ok: error.is_none(),
+                err: error,
+                lang: target.and_then(|t| t.lang).map(str::to_owned),
+                input: target.and_then(|t| t.input).map(|b| b.label().to_owned()),
+                out: call.event.size.label().to_owned(),
+                rel: step.rel,
+                rep: step.rep.map(|n| rep_band(n).to_owned()),
+                sess: step.sess,
+                seq: step.seq,
+            },
+        );
+        // a lezárult munkamenet az utolsó hívásának napjára számít (csak ha annak a hónapnak még van fájlja)
+        if let Some(closed) = &step.closed {
+            let same_month = closed.day.month_start() == day.month_start();
+            self.update_locked(closed.day, same_month, |file| {
+                add_edge(
+                    file.edges.entry(closed.day).or_default(),
+                    &closed.end_edge(),
+                );
+                file.sessions.entry(closed.day).or_default().add(closed);
+            });
+        }
+        self.update_locked(day, true, |file| {
+            let counters = file.counters(day, call.event.command);
+            counters.add_event(&call.event);
+            if let Some(target) = target {
+                counters.add_target(target.lang, target.input);
+            }
+            add_edge(file.edges.entry(day).or_default(), &step.edge);
+        });
+    }
+
     /// Olvasás → módosítás → atomikus írás; egy új hónap első írásakor a lejárt hónapok törlése.
     fn update(&self, day: Day, change: impl FnOnce(&mut MonthFile)) {
         let _guard = WRITE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        self.update_locked(day, true, change);
+    }
+
+    /// Mint az `update`, a zár már a hívónál; `create: false` = nem létező havi fájlt nem hoz létre.
+    fn update_locked(&self, day: Day, create: bool, change: impl FnOnce(&mut MonthFile)) {
         let path = self.month_file(day);
         let new_month = !path.is_file();
-        if new_month && std::fs::create_dir_all(&self.dir).is_err() {
+        if new_month && (!create || std::fs::create_dir_all(&self.dir).is_err()) {
             return;
         }
         let mut file = MonthFile::load(&path);
@@ -273,6 +385,30 @@ impl StatsStore {
             .days
             .remove(&day)
             .unwrap_or_default()
+    }
+
+    /// Egy nap átmenet-élei és lezárt munkamenetei (üres / `None`, ha nincs adat).
+    pub(crate) fn day_flow(&self, day: Day) -> (BTreeMap<String, u64>, Option<Sessions>) {
+        let mut file = MonthFile::load(&self.month_file(day));
+        let edges = file.edges.remove(&day).unwrap_or_default();
+        let sessions = file.sessions.remove(&day).filter(|s| !s.is_empty());
+        (edges, sessions)
+    }
+
+    /// Az átmenet-élek összege a `from..=to` napokra.
+    pub(crate) fn edge_totals(&self, from: Day, to: Day) -> BTreeMap<String, u64> {
+        let mut totals = BTreeMap::new();
+        let mut month = from.month_start();
+        while month <= to {
+            let file = MonthFile::load(&self.month_file(month));
+            for edges in file.edges.range(from..=to).map(|(_, edges)| edges) {
+                for (key, n) in edges {
+                    *totals.entry(key.clone()).or_default() += n;
+                }
+            }
+            month = month.next_month_start();
+        }
+        totals
     }
 
     /// Az összesítés a `from..=to` napokra.

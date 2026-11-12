@@ -28,3 +28,4 @@
 /skill/feedback.jsonl
 /skill/lang
 /skill/update-check.json
+__pycache__/

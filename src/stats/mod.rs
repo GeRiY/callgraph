@@ -9,18 +9,33 @@
 //!
 //! Tárolás: `<skill>/stats/YYYY-MM.json` (`store.rs`), ~90 napig. Kikapcsolva: `CALLGRAPH_STATS=0|off|false`,
 //! `CI`, és skill-telepítésen kívül (`policy.rs`); a `CALLGRAPH_STATS_DIR` kifejezetten bekapcsol egy mappába.
+//!
+//! A napi összesítőben naponként a parancs-sorrend is ott van (`edges`: melyik parancs után melyik jött, a cél
+//! viszonya — ugyanaz a fájl / mappa / projekt — és a szünet sávja), a lezárt munkamenetek sávjai (`sessions`), és
+//! parancsonként a célfájl nyelve (rögzített lista) és méret-sávja — ezek is csak nevek és sávok.
+//!
+//! CSAK helyben, soha nem megy el: az eseménynapló (`events/YYYY-MM-DD.jsonl`, 14 nap, `events.rs`: hívásonként
+//! egy sor, nevek nélkül) és a munkamenet-állapot (`session.json`, `session.rs`). Utakból származó adat egyedül
+//! az utóbbiban van: kulcsolt hash (HMAC-SHA256 egy telepítésenkénti véletlen kulccsal, ami szintén nem hagyja el a
+//! gépet), kizárólag a `rel` / `rep` jelzők kiszámításához.
 
 mod buckets;
 mod cli_probe;
 mod day;
 mod event;
+mod events;
+mod hmac;
 mod locate_hits;
 mod mcp_probe;
 mod policy;
 mod report;
+mod session;
 mod store;
+mod target;
 pub(crate) mod telemetry;
 
+#[cfg(test)]
+mod flow_tests;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
@@ -32,11 +47,11 @@ pub(crate) use day::Day;
 pub(crate) use event::{CommandKind, truncated};
 pub(crate) use mcp_probe::{McpStats, ToolCall};
 pub(crate) use policy::StatsEnv;
-pub(crate) use report::render;
+pub(crate) use report::{render, render_events};
 pub(crate) use store::StatsStore;
 
 use buckets::RankBucket;
-use event::Event;
+use target::Call;
 
 use crate::skill::SkillHome;
 
@@ -88,13 +103,12 @@ impl Recorder {
         self.store.is_some()
     }
 
-    /// Egy hívás rögzítése a mai (UTC) napra; minden hibát elnyel.
-    pub(crate) fn record(&self, event: &Event) {
+    /// Egy mért hívás rögzítése (napi számlálók, munkamenet, átmenet-él, helyi eseménynapló); minden hibát elnyel.
+    pub(crate) fn record_call(&self, call: &Call) {
         if let Some(store) = &self.store {
-            store.record(Day::today(), event);
+            store.record_call(call);
         }
     }
-
     /// Az egyszeri tájékoztatás szövege, ha ezen a gépen most rögzítünk először (a jelzőfájl most jött létre).
     pub(crate) fn first_notice(&self) -> Option<String> {
         let store = self.store.as_ref()?;

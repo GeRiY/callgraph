@@ -52,6 +52,11 @@ impl Day {
         Self(self.0 - i64::from(n))
     }
 
+    /// `n` nappal később.
+    pub(crate) fn plus(self, n: u32) -> Self {
+        Self(self.0 + i64::from(n))
+    }
+
     /// A hónap első napja.
     pub(crate) fn month_start(self) -> Self {
         let (y, m, _) = self.ymd();

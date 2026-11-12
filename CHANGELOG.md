@@ -5,6 +5,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+### Added
+
+- **Local command log**: `callgraph stats --events [--days N]` lists your recent calls (command, client, outcome,
+  timing and size bands, how it relates to the previous call) and the most common command transitions. The log stays
+  on this machine (14 days) and contains no names, paths or code.
+
+### Changed
+
+- **Opt-in telemetry (schema 2)**: if you turned telemetry on, the daily counts now also include command-order
+  counts (which command followed which, and timing bands) and session-length bands — still no names, paths or code.
+  You are told once; `callgraph.sh telemetry preview` shows exactly what would be sent.
+- The session-start check may suggest sharing usage counts up to 10 times (every 2 days), never after you said no.
+
 ## [0.9.4] — 2026-11-12
 
 ### Added

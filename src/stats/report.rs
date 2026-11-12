@@ -8,7 +8,8 @@ use std::path::Path;
 use super::buckets::{LatencyBucket, RankBucket, SizeBucket};
 use super::day::Day;
 use super::event::{Client, CommandKind};
-use super::store::{Counters, Totals};
+use super::events::{EVENT_DAYS, EVENTS_DIR, EventLine, read as read_events};
+use super::store::{Counters, StatsStore, Totals};
 
 /// A riport a `today`-jel végződő `days` napra (a `totals` erre az időszakra összegzett), a mappa, és hogy most
 /// mérünk-e.
@@ -181,4 +182,85 @@ fn footer(dir: &Path, enabled: bool) -> String {
         ));
     }
     text
+}
+
+/// A `stats --events` legfeljebb ennyi (legújabb) eseményt ír ki.
+pub(crate) const MAX_EVENT_LINES: usize = 300;
+/// A „leggyakoribb átmenetek” listájának hossza.
+const TOP_EDGES: usize = 10;
+
+/// `callgraph stats --events`: a helyi eseménynapló a `today`-jel végződő `days` napról (legújabb a végén,
+/// tömören, eseményenként egy sor), és a napi élekből a leggyakoribb átmenetek.
+pub(crate) fn render_events(store: &StatsStore, today: Day, days: u32) -> String {
+    let days = days.clamp(1, EVENT_DAYS);
+    let from = today.minus(days - 1);
+    let events = read_events(store.dir(), from, today);
+    let mut out = crate::tf!(
+        "callgraph stats --events · last {days} days ({from} – {today}, UTC) · {} events (local only, never sent)\n",
+        "callgraph stats --events · az elmúlt {days} nap ({from} – {today}, UTC) · {} esemény (csak helyben, soha nem megy el)\n",
+        events.len()
+    );
+    let skipped = events.len().saturating_sub(MAX_EVENT_LINES);
+    if skipped > 0 {
+        out.push_str(&crate::tf!(
+            "(the oldest {skipped} not shown)\n",
+            "(a legrégebbi {skipped} nincs kiírva)\n"
+        ));
+    }
+    if !events.is_empty() {
+        out.push_str(crate::t!(
+            "time (UTC) · session#call · via · command · result · ms · output · lang · input · relation · repeat\n",
+            "idő (UTC) · munkamenet#hívás · kliens · parancs · eredmény · ms · kimenet · nyelv · bemenet · viszony · ismétlés\n"
+        ));
+    }
+    for line in &events[skipped..] {
+        out.push_str(&event_row(line));
+    }
+    let edges = store.edge_totals(from, today);
+    let mut top: Vec<(&String, &u64)> = edges.iter().collect();
+    top.sort_by(|a, b| b.1.cmp(a.1).then(a.0.cmp(b.0)));
+    if !top.is_empty() {
+        out.push_str(crate::t!(
+            "top transitions (previous>next|relation|gap, ! = previous failed):\n",
+            "leggyakoribb átmenetek (előző>következő|viszony|szünet, ! = az előző hibás volt):\n"
+        ));
+        for (key, n) in top.into_iter().take(TOP_EDGES) {
+            let _ = writeln!(out, "  {n:>5}  {key}");
+        }
+    }
+    let dir = store.dir().join(EVENTS_DIR);
+    out.push_str(&crate::tf!(
+        "Log: {} (kept {EVENT_DAYS} days, no paths or names; never sent)\n",
+        "Napló: {} ({EVENT_DAYS} napig marad, út és név nélkül; soha nem megy el)\n",
+        dir.display()
+    ));
+    out
+}
+
+/// Egy esemény egy sorban.
+fn event_row(line: &EventLine) -> String {
+    let dash = |v: &Option<String>| v.clone().unwrap_or_else(|| "-".to_owned());
+    let result = match line.err {
+        None if line.ok => "ok".to_owned(),
+        None => "err".to_owned(),
+        Some(kind) => serde_json::to_string(&kind)
+            .unwrap_or_default()
+            .trim_matches('"')
+            .to_owned(),
+    };
+    format!(
+        "{}  s{}#{:<3} {:<4} {:<15} {:<11} {:>6}  {:<7} {:<5} {:<7} {:<13} {}\n",
+        line.t0,
+        line.sess,
+        line.seq,
+        line.via.name(),
+        line.cmd.name(),
+        result,
+        line.ms,
+        line.out,
+        dash(&line.lang),
+        dash(&line.input),
+        line.rel.name(),
+        dash(&line.rep)
+    )
 }

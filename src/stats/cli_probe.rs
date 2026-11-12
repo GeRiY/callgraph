@@ -10,6 +10,8 @@ use std::time::Instant;
 use super::Recorder;
 use super::buckets::{LatencyBucket, SizeBucket};
 use super::event::{Client, CommandKind, ErrorKind, Event, Outcome, truncated};
+use super::events::now_ms;
+use super::target::{Call, cli_target};
 use crate::error::{CallgraphError, Result};
 use crate::skill::SkillHome;
 
@@ -38,6 +40,8 @@ pub struct CliProbe {
     target: Option<(CommandKind, Client)>,
     started: Instant,
     recorder: Recorder,
+    /// A nyers argumentumok (csak a hívás céljának megkereséséhez a végén, `target::cli_target`; nem tárolódik).
+    args: Vec<String>,
 }
 
 impl CliProbe {
@@ -52,6 +56,11 @@ impl CliProbe {
         Self {
             target,
             started,
+            args: if recorder.enabled() {
+                args.to_vec()
+            } else {
+                Vec::new()
+            },
             recorder,
         }
     }
@@ -106,23 +115,34 @@ impl CliProbe {
         if !self.recorder.enabled() {
             return;
         }
+        let telemetry = super::telemetry::Telemetry::from_env(&SkillHome::from_env());
         // egyszer gépenként, csak a parancssorban (a hook háttérfolyamatának nincs terminálja)
-        if client == Client::Cli
-            && let Some(notice) = self.recorder.first_notice()
-        {
-            eprintln!("{notice}");
+        if client == Client::Cli {
+            if let Some(notice) = self.recorder.first_notice() {
+                eprintln!("{notice}");
+            }
+            // a már bekapcsolt telemetriánál egyszer: mostantól a parancs-sorrend számai is mennek
+            if let Some(notice) = telemetry.order_notice() {
+                eprintln!("{notice}");
+            }
         }
-        self.recorder.record(&Event {
-            command,
-            client,
-            outcome,
-            latency: LatencyBucket::from_millis(self.started.elapsed().as_millis()),
-            size: SizeBucket::from_chars(chars),
-            truncated,
+        let elapsed = self.started.elapsed().as_millis();
+        let cwd = std::env::current_dir().unwrap_or_default();
+        self.recorder.record_call(&Call {
+            event: Event {
+                command,
+                client,
+                outcome,
+                latency: LatencyBucket::from_millis(elapsed),
+                size: SizeBucket::from_chars(chars),
+                truncated,
+            },
+            end_ms: now_ms(),
+            ms: u64::try_from(elapsed).unwrap_or(u64::MAX),
+            target: cli_target(command, &self.args, &cwd),
         });
         // opt-in beküldés a normál futásokra ráülve (bekapcsolva és esedékesen: leválasztott háttérfolyamat)
-        super::telemetry::Telemetry::from_env(&SkillHome::from_env())
-            .maybe_spawn(super::telemetry::now_secs());
+        telemetry.maybe_spawn(super::telemetry::now_secs());
     }
 }
 

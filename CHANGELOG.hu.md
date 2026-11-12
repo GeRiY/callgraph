@@ -6,6 +6,20 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ## [Unreleased]
 
+### Új
+
+- **Helyi parancsnapló**: a `callgraph stats --events [--days N]` kilistázza a legutóbbi hívásaidat (parancs, kliens,
+  eredmény, idő- és méretsáv, hogyan viszonyul az előző híváshoz) és a leggyakoribb parancs-átmeneteket. A napló ezen a
+  gépen marad (14 nap), és nincs benne név, útvonal vagy kód.
+
+### Változott
+
+- **Opt-in telemetria (schema 2)**: ha bekapcsoltad a telemetriát, a napi számokban mostantól a parancsok sorrendjének
+  számai (melyik után melyik jött, időzítési sávok) és a munkamenet-hossz sávjai is benne vannak — név, útvonal és kód
+  továbbra sem. Egyszer szólunk róla; a `callgraph.sh telemetry preview` pontosan megmutatja, mi menne el.
+- Az indításkori ellenőrzés legfeljebb 10-szer (2 naponta) javasolja a használati számok megosztását, nemleges válasz
+  után soha.
+
 ## [0.9.4] — 2026-11-12
 
 ### Új

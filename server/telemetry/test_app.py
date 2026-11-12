@@ -264,5 +264,82 @@ class Counting(unittest.TestCase):
         self.assertEqual(self.q("SELECT SUM(count) FROM updates")[0][0], 2)
 
 
+class SchemaTwo(unittest.TestCase):
+    """schema 2 (v0.9.5): command-order edges and session bands next to the counters."""
+
+    @classmethod
+    def setUpClass(cls):
+        app.db().close()
+        cls.srv = ThreadingHTTPServer(("127.0.0.1", 0), app.Handler)
+        cls.url = "http://127.0.0.1:%d/v1" % cls.srv.server_address[1]
+        threading.Thread(target=cls.srv.serve_forever, daemon=True).start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.srv.shutdown()
+
+    def setUp(self):
+        app._hits.clear()
+
+    def post(self, body):
+        req = urllib.request.Request(self.url, data=json.dumps(body).encode(), headers={"Content-Type": "application/json"})
+        try:
+            return urllib.request.urlopen(req, timeout=5).status
+        except urllib.error.HTTPError as e:
+            return e.code
+
+    def v2(self, batch, edges=None, sessions=None):
+        body = payload(batch=batch)
+        body["schema"] = 2
+        body["days"][0]["edges"] = edges if edges is not None else {
+            "start>locate|none|-": 2, "locate>outline|same_project|<5s": 3,
+            "search!>search|same_project|5-60s": 1, "outline>end|none|-": 2, "other": 4}
+        body["days"][0]["sessions"] = sessions if sessions is not None else {
+            "count": 2, "len": [0, 2, 0, 0, 0], "dur": [1, 1, 0, 0], "rep_max": [2, 0, 0]}
+        return body
+
+    def q(self, sql):
+        con = sqlite3.connect(app.DB_PATH)
+        try:
+            return con.execute(sql).fetchall()
+        finally:
+            con.close()
+
+    def test_edges_and_sessions_are_stored_once_per_batch(self):
+        con = sqlite3.connect(app.DB_PATH); con.executescript("DELETE FROM edges; DELETE FROM session_stats;"); con.commit(); con.close()
+        self.assertEqual(self.post(self.v2("b2b2-1")), 204)
+        self.assertEqual(self.post(self.v2("b2b2-1")), 204)  # same batch again: nothing doubles
+        rows = dict(((src, dst, err, rel, gap), n) for src, dst, err, rel, gap, n in
+                    self.q("SELECT src, dst, err, rel, gap, count FROM edges"))
+        self.assertEqual(rows[("locate", "outline", 0, "same_project", "<5s")], 3)
+        self.assertEqual(rows[("search", "search", 1, "same_project", "5-60s")], 1)
+        self.assertEqual(rows[("start", "locate", 0, "none", "-")], 2)
+        self.assertEqual(rows[("other", "other", 0, "-", "-")], 4)
+        self.assertEqual(self.q("SELECT count, len FROM session_stats"), [(2, "[0, 2, 0, 0, 0]")])
+        self.assertEqual(self.post(self.v2("b2b2-2")), 204)  # another batch of the same day adds up
+        self.assertEqual(self.q("SELECT count FROM edges WHERE src='locate' AND dst='outline'"), [(6,)])
+
+    def test_rejects_names_paths_and_bad_shapes(self):
+        bad_edges = [
+            {"locate>/home/user/app.php|same_file|<5s": 1},
+            {"locate>outline|same_file|forever": 1},
+            {"locate>outline|my_project|<5s": 1},
+            {"Locate>outline|none|-": 1},
+            {"locate>outline|none|-": -1},
+            {"locate>outline|none|-": True},
+            {f"locate>c{i}|none|-": 1 for i in range(app.MAX_EDGES + 1)},
+        ]
+        for edges in bad_edges:
+            self.assertEqual(self.post(self.v2("cccc-1", edges=edges)), 422, str(edges)[:80])
+        for sessions in [{"count": 1, "len": [1, 2]}, {"count": -1}, {"count": 1, "names": [1]}]:
+            self.assertEqual(self.post(self.v2("cccc-2", sessions=sessions)), 422, sessions)
+        v1 = payload(batch="cccc-3")
+        v1["days"][0]["edges"] = {"start>locate|none|-": 1}
+        self.assertEqual(self.post(v1), 422)  # schema 1 cannot carry edges
+
+    def test_schema_one_still_accepted(self):
+        self.assertEqual(self.post(payload(batch="dddd-0001")), 204)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=1)

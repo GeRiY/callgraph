@@ -26,6 +26,7 @@ fn commands() -> Commands {
         hook_install: "\"/s/bin/linux-x86_64/callgraph\" hook install".into(),
         mcp_register: "claude mcp add -s user callgraph -- \"/s/bin/linux-x86_64/callgraph\" mcp --auto-update".into(),
         telemetry_on: "bash /s/callgraph.sh telemetry on".into(),
+        telemetry_preview: "bash /s/callgraph.sh telemetry preview".into(),
     }
 }
 
@@ -41,7 +42,7 @@ fn nothing_to_say_prints_nothing() {
 fn shows_every_needed_item_then_waits_two_days_and_stops_after_three() {
     let mut state = State::default();
     let mut shown_days = Vec::new();
-    for day in 100..120 {
+    for day in 100..106 {
         let (items, next) = decide(&state, &facts(), day);
         if !items.is_empty() {
             assert_eq!(items, vec![Item::Hook, Item::Mcp, Item::Telemetry]);
@@ -50,6 +51,63 @@ fn shows_every_needed_item_then_waits_two_days_and_stops_after_three() {
         state = next;
     }
     assert_eq!(shown_days, vec![100, 102, 104]);
+}
+
+/// Tételenkénti korlát: a hook és az MCP 3-szor, a telemetria 10-szer (mindegyik 2 naponta legfeljebb egyszer).
+#[test]
+fn per_item_limits_telemetry_up_to_ten_times_others_three() {
+    assert_eq!(Item::Hook.max_shown(), 3);
+    assert_eq!(Item::Mcp.max_shown(), 3);
+    assert_eq!(Item::Telemetry.max_shown(), 10);
+    let mut state = State::default();
+    let mut shown: std::collections::BTreeMap<&str, Vec<i64>> = Default::default();
+    for day in 100..140 {
+        let (items, next) = decide(&state, &facts(), day);
+        for item in items {
+            shown.entry(item.key()).or_default().push(day);
+        }
+        state = next;
+    }
+    assert_eq!(shown["hook"], vec![100, 102, 104]);
+    assert_eq!(shown["mcp"], vec![100, 102, 104]);
+    assert_eq!(
+        shown["telemetry"],
+        (0..10).map(|n| 100 + 2 * n).collect::<Vec<i64>>()
+    );
+}
+
+/// A telemetria csak nyitott döntésnél jelenik meg (nem döntött / „most nem”); Never / Off után a hívó
+/// `telemetry_open: false`-t ad, és akkor sem, ha a számláló még nem fogyott el.
+#[test]
+fn telemetry_is_offered_only_while_the_decision_is_open() {
+    let mut closed = facts();
+    closed.telemetry_open = false;
+    let (items, _) = decide(&State::default(), &closed, 100);
+    assert_eq!(items, vec![Item::Hook, Item::Mcp]);
+    let mut state = State::default();
+    state.never(Item::Telemetry);
+    assert!(!decide(&state, &facts(), 100).0.contains(&Item::Telemetry));
+}
+
+#[test]
+fn telemetry_text_explains_the_benefit_and_links_the_preview() {
+    let out = render(&[Item::Telemetry], &facts(), &commands()).unwrap();
+    let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+    let message = v["systemMessage"].as_str().unwrap();
+    assert!(message.contains('⭐'), "{message}");
+    assert!(
+        message.contains("bash /s/callgraph.sh telemetry preview"),
+        "{message}"
+    );
+    assert!(
+        message.contains("bash /s/callgraph.sh telemetry on"),
+        "{message}"
+    );
+    let lang = crate::i18n::lang();
+    assert!(
+        message.contains(lang.pick("locate ranking", "locate rangsorát")),
+        "{message}"
+    );
 }
 
 #[test]

@@ -90,11 +90,16 @@ fn records_cli_runs_and_reports_them() {
     let first = run(&root, &skill, dir, &["stats"]);
     assert!(first.status.success(), "{first:?}");
 
+    // a havi fájl `YYYY-MM.json` (mellette a helyi `session.json` és az `events/` napló)
     let files: Vec<_> = std::fs::read_dir(&stats)
         .unwrap()
         .filter(|e| {
-            e.as_ref()
-                .is_ok_and(|e| e.file_name().to_string_lossy().ends_with(".json"))
+            e.as_ref().is_ok_and(|e| {
+                let name = e.file_name().to_string_lossy().into_owned();
+                name.len() == "2026-11.json".len()
+                    && name.ends_with(".json")
+                    && name.as_bytes()[4] == b'-'
+            })
         })
         .collect();
     assert_eq!(files.len(), 1, "one month file");
@@ -103,6 +108,26 @@ fn records_cli_runs_and_reports_them() {
     for secret in ["/", "Order", "Missing", "processRefund", "refund\""] {
         assert!(!text.contains(secret), "{secret}: {text}");
     }
+    // a parancs-sorrend is rögzült: a `show` után a hibás `show`, utána a `locate`
+    assert!(text.contains("\"edges\""), "{text}");
+    assert!(text.contains("show!>locate|"), "{text}");
+    // a helyi eseménynapló: hívásonként egy sor, út és név nélkül; a munkamenet-állapotban csak hash-ek
+    let log_dir = stats.join("events");
+    let logs: Vec<_> = std::fs::read_dir(&log_dir).unwrap().collect();
+    assert_eq!(logs.len(), 1, "one event file");
+    let log = std::fs::read_to_string(logs[0].as_ref().unwrap().path()).unwrap();
+    assert_eq!(log.lines().count(), 3, "{log}");
+    let session = std::fs::read_to_string(stats.join("session.json")).unwrap();
+    for secret in ["/", "Order", "Missing", "processRefund", "refund\""] {
+        assert!(!log.contains(secret), "{secret}: {log}");
+        assert!(!session.contains(secret), "{secret}: {session}");
+    }
+    assert!(log.contains("\"lang\":\"php\""), "{log}");
+    let events = run(&root, &skill, dir, &["stats", "--events"]);
+    assert!(events.status.success(), "{events:?}");
+    let events = String::from_utf8_lossy(&events.stdout);
+    assert!(events.contains("3 events"), "{events}");
+    assert!(events.contains("top transitions"), "{events}");
 
     let report = run(&root, &skill, dir, &["stats", "--days", "3"]);
     assert!(report.status.success(), "{report:?}");

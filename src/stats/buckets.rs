@@ -59,6 +59,10 @@ impl SizeBucket {
     pub(crate) fn index(self) -> usize {
         self as usize
     }
+
+    pub(crate) fn label(self) -> &'static str {
+        Self::LABELS[self.index()]
+    }
 }
 
 /// A `locate` után megnyitott fájl helye a rangsorban: 1., 2–5., 6+., vagy nem volt a listán.
@@ -84,5 +88,37 @@ impl RankBucket {
 
     pub(crate) fn index(self) -> usize {
         self as usize
+    }
+}
+
+/// A célfájl (bemenet) méretének sávja bájtban: <10k, 10–50k, 50–200k, 200k+ (k = 1000 bájt).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum InputBucket {
+    Under10K,
+    To50K,
+    To200K,
+    Over200K,
+}
+
+impl InputBucket {
+    pub(crate) const COUNT: usize = 4;
+    pub(crate) const LABELS: [&str; Self::COUNT] = ["<10k", "10-50k", "50-200k", "200k+"];
+
+    /// A fájl bájtméretéből; a határ a felső sávba tartozik (10 000 bájt → 10–50k).
+    pub(crate) fn from_bytes(bytes: u64) -> Self {
+        match bytes {
+            0..10_000 => Self::Under10K,
+            10_000..50_000 => Self::To50K,
+            50_000..200_000 => Self::To200K,
+            _ => Self::Over200K,
+        }
+    }
+
+    pub(crate) fn index(self) -> usize {
+        self as usize
+    }
+
+    pub(crate) fn label(self) -> &'static str {
+        Self::LABELS[self.index()]
     }
 }
