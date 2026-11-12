@@ -4,6 +4,7 @@ use std::path::Path;
 
 use super::css::CssFrontend;
 use super::go::GoFrontend;
+use super::html::HtmlDocument;
 use super::js::JsFrontend;
 use super::json::JsonDocument;
 use super::markdown::MdDocument;
@@ -28,7 +29,7 @@ impl LanguageRegistry {
         Self::default()
     }
 
-    /// Az alapértelmezett összeállítás: backend `PhpBackend`, `RustBackend`; frontend `CssFrontend`, `ScssFrontend`, `JsFrontend`, `SwiftFrontend`, `PythonFrontend`, `GoFrontend`; dokumentum `JsonDocument`, `MdDocument`.
+    /// Az alapértelmezett összeállítás: backend `PhpBackend`, `RustBackend`; frontend `CssFrontend`, `ScssFrontend`, `JsFrontend`, `SwiftFrontend`, `PythonFrontend`, `GoFrontend`; dokumentum `JsonDocument`, `MdDocument`, `HtmlDocument`.
     pub fn with_defaults() -> Self {
         let mut registry = Self::new();
         registry.register_backend(Box::new(PhpBackend::with_defaults()));
@@ -41,6 +42,7 @@ impl LanguageRegistry {
         registry.register_frontend(Box::new(GoFrontend::with_defaults()));
         registry.register_document(Box::new(JsonDocument));
         registry.register_document(Box::new(MdDocument));
+        registry.register_document(Box::new(HtmlDocument));
         registry
     }
 
@@ -161,13 +163,13 @@ mod tests {
     }
 
     #[test]
-    fn defaults_register_php_json_markdown() {
+    fn defaults_register_php_json_markdown_html() {
         let r = LanguageRegistry::with_defaults();
         assert_eq!(
             r.extensions(),
             vec![
                 "php", "rs", "css", "scss", "js", "mjs", "cjs", "ts", "tsx", "jsx", "vue", "swift",
-                "py", "pyi", "go", "json", "md"
+                "py", "pyi", "go", "json", "md", "html", "htm"
             ]
         );
         let php = r.for_path(Path::new("src/A.php")).unwrap();
@@ -176,6 +178,10 @@ mod tests {
         assert_eq!((json.id(), json.role()), ("json", LanguageRole::Document));
         let md = r.for_path(Path::new("docs/README.md")).unwrap();
         assert_eq!((md.id(), md.role()), ("markdown", LanguageRole::Document));
+        for path in ["docs/design.html", "docs/OLD.HTM"] {
+            let html = r.for_path(Path::new(path)).unwrap();
+            assert_eq!((html.id(), html.role()), ("html", LanguageRole::Document));
+        }
     }
 
     #[test]

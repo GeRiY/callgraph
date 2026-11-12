@@ -201,14 +201,21 @@ fn heading_level(m: &Method) -> Option<usize> {
     (1..=6).contains(&level).then_some(level)
 }
 
-/// A tag neve után `()`, ha hívható; a CSS-szabály / at-szabály, a JSON-kulcs és a Markdown-címsor nem az.
+/// A tag neve után `()`, ha hívható; a CSS-szabály / at-szabály, a JSON-kulcs, a Markdown- / HTML-címsor és a
+/// HTML `<title>` nem az.
 pub(super) fn parens(m: &Method) -> &'static str {
-    let plain =
-        matches!(m.kind.as_deref(), Some("rule" | "at-rule" | "key")) || heading_level(m).is_some();
+    let plain = matches!(m.kind.as_deref(), Some("rule" | "at-rule" | "key" | "title"))
+        || heading_level(m).is_some();
     if plain { "" } else { "()" }
 }
 
 pub(super) fn method_line(s: &mut String, m: &Method) {
+    // a HTML `<title>`: a címsorok előtt, saját jelöléssel (`<title> Tervdokumentum  L4-4`)
+    if m.kind.as_deref() == Some(crate::lang::html::TITLE_KIND) {
+        let end = m.end_line.unwrap_or(m.line);
+        writeln!(s, "  <title> {}  L{}-{end}", m.name, m.line).unwrap();
+        return;
+    }
     // a címsor a szintje szerint behúzva, `#`-jelekkel (`## Docker / build`)
     if let Some(level) = heading_level(m) {
         let indent = "  ".repeat(level - 1);

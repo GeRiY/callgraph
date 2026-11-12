@@ -1,4 +1,4 @@
-//! `LanguageDocument`: dokumentum- / adatformátum (JSON, Markdown, YAML…).
+//! `LanguageDocument`: dokumentum- / adatformátum (JSON, Markdown, HTML, YAML…).
 
 use std::path::{Path, PathBuf};
 
