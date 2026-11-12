@@ -147,6 +147,8 @@ jobs:
         run: |
           for d in dist/pkg/callgraph-*; do
             n="$(basename "$d")"
+            # az upload-artifact elveszíti a futtatási jogot: kézi kicsomagolásnál is induljon (az install.sh is beállítja)
+            chmod +x "$d"/callgraph/*.sh "$d"/callgraph/bin/*/callgraph 2>/dev/null || true
             (cd "$d" && zip -qr "../../$n.zip" callgraph)
           done
           ls -l dist/*.zip

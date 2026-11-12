@@ -12,6 +12,11 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   binárisával), és felkerül a hivatalos MCP Registry-be `io.github.GeRiY/callgraph` néven, így az MCPB-t ismerő
   kliensek (pl. Claude Desktop) egy lépésben, Rust nélkül telepíthetik az MCP szervert.
 
+### Javítás
+
+- A kiadási zipekben a bináris és a szkriptek megtartják a futtatási jogot, így a kézzel kicsomagolt csomag
+  is `chmod +x` nélkül indul (a telepítő eddig is beállította).
+
 ## [0.9.3] — 2026-11-12
 
 ### Új
