@@ -5,6 +5,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+### Added
+- **HTML files (`.html`, `.htm`):** handled as documents like Markdown — the outline lists the `<title>` and the
+  `<h1>`–`<h6>` headings by level with line ranges, `--lines` works, and `--strings` searches the visible text and
+  the `title` / `alt` / `placeholder` / `aria-label` / `value` attributes (`<script>`, `<style>` and comments are
+  skipped). Broken or unclosed HTML does not stop the analysis.
+- **`locate` finds properties and fields:** PHP properties (also `protected $fillable` and promoted constructor
+  properties), TS / JS class fields and parameter properties, Rust struct fields, and Swift / Python / Go properties
+  are definitions (`property $fillable  L12  ← "fillable" (exact property)`; `fillable`, `$fillable` and
+  `Invoice::$fillable` all match); part of the name is a name-part match. A property defined in many files (like
+  `$fillable` in every model) does not push the exact class or a rarer term's files down.
+
 ### Changed
 - **`locate` ranks names that join several terms first:** a definition or file name containing two or more of the
   searched terms (`toggleFavorite` for `toggle favorite`, `PodcastEpisodeController` for `podcast episode`) gets a

@@ -6,7 +6,7 @@ description: PHP / Rust / JS / TS / Vue / Swift / Python / Go kódbázis token-h
 # callgraph — kód-térkép Read nélkül
 
 `bash <skill>/callgraph.sh …` (a `<skill>` ennek a skillnek a mappája, pl. `~/.claude/skills/callgraph`).
-Minden célra (PHP, Rust, JS / TS / Vue, Swift / SwiftUI, Python, Go, CSS / SCSS, JSON, MD) a natív `callgraph` bináris (`callgraph show`) dolgozik; a kimenet közös
+Minden célra (PHP, Rust, JS / TS / Vue, Swift / SwiftUI, Python, Go, CSS / SCSS, JSON, MD, HTML) a natív `callgraph` bináris (`callgraph show`) dolgozik; a kimenet közös
 szerkezetű: container (osztály / komponens / modul) → metódusok sortartománnyal → hívások kategóriánként.
 
 ## 0. lépés — projekt regisztrálása (egyszer, projektenként)
@@ -25,8 +25,8 @@ abszolút vagy relatív) regisztráció nélkül is működik. `--project` nélk
 **Melyik eszköz mire:** sima szövegkeresés (pontos szöveg, log-üzenet, konfig-érték) → Grep, arra az a legjobb;
 „honnan induljak ezzel a feladattal?” → `locate`; definíciók, szerkezet, hívók, hatás → callgraph (outline,
 `--body`, `--grep`, `--depth`).
-**A feladat első hívása:** add át a `locate`-nek a feladat neveit és fogalmait EGY hívásban: függvény-, osztály- és
-fájlneveket, oszlopokat, útvonalakat, fordítási kulcsokat, a nem angol domain-szavaknak pedig az angol
+**A feladat első hívása:** add át a `locate`-nek a feladat neveit és fogalmait EGY hívásban: függvény-, osztály-,
+property- és fájlneveket, oszlopokat, útvonalakat, fordítási kulcsokat, a nem angol domain-szavaknak pedig az angol
 kódnév-megfelelőjét is (pl. visszatérítés → `refund`). A projekt-térképből válaszol, fájl-olvasás nélkül: az első 5
 fájl (`--all`: minden találat), mindegyik az indoklásával (pontos definíció, fájlnév, név-részlet, string, hívás,
 `hívók: N`). Ezekkel a fájlokkal folytasd: outline / `--body` / `--grep`.

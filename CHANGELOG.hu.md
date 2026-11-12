@@ -6,6 +6,17 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ## [Unreleased]
 
+### Új
+- **HTML-fájlok (`.html`, `.htm`):** dokumentumként, a Markdownhoz hasonlóan — az outline a `<title>`-t és a
+  `<h1>`–`<h6>` címsorokat mutatja szintenként, sortartománnyal, a `--lines` működik, a `--strings` pedig a látható
+  szövegben és a `title` / `alt` / `placeholder` / `aria-label` / `value` attribútumokban keres (a `<script>`, a
+  `<style>` és a komment kimarad). A hibás vagy nem zárt HTML nem akasztja meg az elemzést.
+- **A `locate` megtalálja a property-ket és mezőket:** a PHP property (a `protected $fillable` és a promoted
+  constructor property is), a TS / JS class field és parameter property, a Rust struct-mező és a Swift / Python / Go
+  property definíció (`property $fillable  L12  ← "fillable" (exact property)`; a `fillable`, a `$fillable` és az
+  `Invoice::$fillable` is illik rá); a név része név-részlet. A sok fájlban definiált property (pl. a `$fillable`
+  minden modellben) nem szorítja hátrébb a pontos osztályt és a ritkább kifejezés fájljait.
+
 ### Változás
 - **A `locate` elöl hozza a több kifejezést egyesítő neveket:** ha egy definíció vagy fájlnév a keresett kifejezések
   közül kettőt vagy többet tartalmaz (`toggleFavorite` a `toggle favorite`-ra, `PodcastEpisodeController` a

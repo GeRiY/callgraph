@@ -7,7 +7,7 @@ description: Token-efficient mapping of a PHP / Rust / JS / TS / Vue / Swift / P
 # callgraph — code map without Read
 
 `bash <skill>/callgraph.sh …` (`<skill>` is this skill's directory, e.g. `~/.claude/skills/callgraph`).
-For every target (PHP, Rust, JS / TS / Vue, Swift / SwiftUI, Python, Go, CSS / SCSS, JSON, MD) the native `callgraph` binary (`callgraph show`) does the work; the output has a common
+For every target (PHP, Rust, JS / TS / Vue, Swift / SwiftUI, Python, Go, CSS / SCSS, JSON, MD, HTML) the native `callgraph` binary (`callgraph show`) does the work; the output has a common
 structure: container (class / component / module) → methods with line ranges → calls by category.
 
 ## Step 0 — register the project (once per project)
@@ -26,8 +26,8 @@ folder, absolute or relative) works without registering. Without `--project` the
 **Which tool for what:** plain text search (an exact string, log message, config value) → Grep, it is the best at
 that; "where do I start with this task?" → `locate`; definitions, structure, callers, impact → callgraph (outline,
 `--body`, `--grep`, `--depth`).
-**The first call of a task:** give `locate` the names and domain terms of the task in ONE call: function, class and
-file names, columns, routes, translation keys, and for a non-English domain word its English code name too (e.g.
+**The first call of a task:** give `locate` the names and domain terms of the task in ONE call: function, class,
+property and file names, columns, routes, translation keys, and for a non-English domain word its English code name too (e.g.
 visszatérítés → `refund`). It answers from the project map without reading files: the top 5 files (`--all`: every
 match), each with its reasons (exact definition, file name, name part, string, call, `callers: N`). Continue on
 those files with the outline / `--body` / `--grep`.

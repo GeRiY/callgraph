@@ -94,6 +94,7 @@ Nyelvenkénti útmutatók példákkal: [PHP](https://callgraph.eu/hu/php/) · [R
 | Go | `.go` | csomagok, structok (mezők property-ként, beágyazott típusok), interfészek, típus-aliasok, függvények és receiveres metódusok szignatúrával (több visszatérési érték, generikusok), `const` / `var`, importok (alias, blank, dot), hívások (`native_go`, `internal_helper`, …), `go` / `defer`, nagybetűs név = public; a `vendor` / `testdata` kimarad, a `_test.go` tesztnek számít |
 | CSS / SCSS | `.css` `.scss` | szabály-blokkok és at-szabályok (`@media`, `@layer`, Tailwind v4 `@theme` / `@utility` / `@source` …), mixinek, függvények, változók, `@use` / `@import` |
 | JSON / Markdown | `.json` `.md` | kulcs-útvonalak a rövid értékükkel (`package.json::scripts --body` egy kulcsot ír ki); címsor-szakaszok szintenként, és linkek |
+| HTML | `.html` `.htm` | `<title>` és `<h1>`–`<h6>` címsor-szakaszok szintenként; a látható szöveg és a `title` / `alt` / `placeholder` / `aria-label` / `value` attribútum a `--strings`-hez (a `<script>` / `<style>` kimarad); linkek |
 
 ### Mely fájlokat dolgozza fel
 
