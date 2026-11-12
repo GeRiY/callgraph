@@ -6,6 +6,8 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ## [Unreleased]
 
+## [0.9.3] — 2026-11-12
+
 ### Új
 - **HTML-fájlok (`.html`, `.htm`):** dokumentumként, a Markdownhoz hasonlóan — az outline a `<title>`-t és a
   `<h1>`–`<h6>` címsorokat mutatja szintenként, sortartománnyal, a `--lines` működik, a `--strings` pedig a látható
@@ -575,7 +577,8 @@ Első kiadás.
 - Beépített frissítés: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Előre fordított csomagok macOS-re (arm64, x86_64), Linuxra (x86_64, ARM64, statikus musl) és Windowsra.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.9.2...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.9.3...develop
+[0.9.3]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.3
 [0.9.2]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.2
 [0.9.1]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.1
 [0.9.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.0

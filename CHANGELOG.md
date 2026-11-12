@@ -5,6 +5,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+## [0.9.3] — 2026-11-12
+
 ### Added
 - **HTML files (`.html`, `.htm`):** handled as documents like Markdown — the outline lists the `<title>` and the
   `<h1>`–`<h6>` headings by level with line ranges, `--lines` works, and `--strings` searches the visible text and
@@ -540,7 +542,8 @@ First release.
 - Built-in update: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Prebuilt packages for macOS (arm64, x86_64), Linux (x86_64, ARM64, static musl) and Windows.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.9.2...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.9.3...develop
+[0.9.3]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.3
 [0.9.2]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.2
 [0.9.1]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.1
 [0.9.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.0
