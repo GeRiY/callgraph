@@ -498,3 +498,125 @@ fn exact_matches_rank_before_files_matching_more_terms_by_strings() {
         ["lang/l0.php", "lang/l1.php", "lang/l2.php", "lang/l3.php"]
     );
 }
+
+#[test]
+fn an_identifier_joining_terms_counts_its_independent_terms() {
+    let terms = Term::parse_all(&["favorite", "podcast", "episode", "toggle", "favorites"]);
+    let callers = CallerCounts::build(std::iter::empty::<&FileGraph>());
+    let matcher = Matcher::new(&terms, &callers);
+    // `toggleFavorite`: toggle + favorite (a `favorites` ugyanaz a szó, nem számít külön)
+    let mut service = graph("app/Services/FavoriteService.php");
+    service.containers.push(container("FavoriteService", 3, 30));
+    service
+        .methods
+        .push(method(Some("FavoriteService"), "toggleFavorite", 5, 20));
+    let hits = matcher.file_hits("app/Services/FavoriteService.php", &service, true);
+    assert_eq!(matcher.multi_terms(&hits), 2, "{hits:?}");
+    // a fájlnév is egyesíthet: `PodcastEpisodeController`
+    let controller = graph("app/Http/PodcastEpisodeController.php");
+    let hits = matcher.file_hits("app/Http/PodcastEpisodeController.php", &controller, true);
+    assert_eq!(matcher.multi_terms(&hits), 2, "{hits:?}");
+    // külön azonosítókban, illetve stringben a kifejezések nem egyesülnek
+    let mut model = graph("app/Models/Podcast.php");
+    model.containers.push(container("Podcast", 3, 30));
+    model.methods.push(method(Some("Podcast"), "episodes", 5, 8));
+    model.strings.push(StringLit {
+        container: Some("Podcast".into()),
+        caller: None,
+        line: 9,
+        end_line: None,
+        value: "favorite toggle".into(),
+    });
+    let hits = matcher.file_hits("app/Models/Podcast.php", &model, true);
+    assert_eq!(matcher.multi_terms(&hits), 1, "{hits:?}");
+    // a bővebb kifejezés lefedi a szűkebbet: `RefundController` + `refund` egy kifejezésnyi
+    let terms = Term::parse_all(&["RefundController", "refund"]);
+    let matcher = Matcher::new(&terms, &callers);
+    let mut refund = graph("app/Http/RefundController.php");
+    refund.containers.push(container("RefundController", 3, 30));
+    let hits = matcher.file_hits("app/Http/RefundController.php", &refund, true);
+    assert_eq!(matcher.multi_terms(&hits), 1, "{hits:?}");
+}
+
+fn symbol_hit(term: usize, kind: Kind, name: &str) -> Hit {
+    Hit {
+        term,
+        kind,
+        symbol: Symbol::Container {
+            kind: "class".into(),
+            name: name.into(),
+            line: 1,
+            end: 9,
+        },
+    }
+}
+
+#[test]
+fn a_multi_term_identifier_ranks_before_declarations_and_single_exact_terms() {
+    let declaration_hits = vec![
+        symbol_hit(0, Kind::Definition, "Favorite"),
+        symbol_hit(1, Kind::Definition, "Podcast"),
+        symbol_hit(2, Kind::Definition, "Episode"),
+    ];
+    let mut files = vec![
+        FileMatch::new("resources/js/types.d.ts".into(), declaration_hits).unwrap(),
+        FileMatch::new(
+            "app/Models/Podcast.php".into(),
+            vec![
+                symbol_hit(1, Kind::Definition, "Podcast"),
+                hit(0, Kind::StringLit),
+            ],
+        )
+        .unwrap(),
+        FileMatch::new(
+            "app/Services/FavoriteService.php".into(),
+            vec![
+                symbol_hit(0, Kind::NamePart, "toggleFavorite"),
+                symbol_hit(3, Kind::NamePart, "toggleFavorite"),
+            ],
+        )
+        .unwrap()
+        .with_multi(2),
+    ];
+    for n in 0..10 {
+        files.push(
+            FileMatch::new(
+                format!("app/Other{n}.php"),
+                vec![hit(0, Kind::StringLit), hit(3, Kind::StringLit)],
+            )
+            .unwrap(),
+        );
+    }
+    let ranked = rank(files, super::rank::is_test_path);
+    let order: Vec<&str> = ranked.iter().map(|f| f.path.as_str()).collect();
+    assert_eq!(order[0], "app/Services/FavoriteService.php", "{order:?}");
+    assert_eq!(order[1], "app/Models/Podcast.php", "{order:?}");
+    // a deklarációs fájl definíciói nem emelik a pontos szintre
+    let at = |path: &str| order.iter().position(|p| *p == path).unwrap();
+    assert!(at("resources/js/types.d.ts") > 1, "{order:?}");
+    // a több kifejezés többet ér: három kifejezés > kettő
+    let two = FileMatch::new("a.php".into(), vec![hit(0, Kind::NamePart)])
+        .unwrap()
+        .with_multi(2);
+    let three = FileMatch::new("b.php".into(), vec![hit(0, Kind::NamePart)])
+        .unwrap()
+        .with_multi(3);
+    let ranked = rank(vec![two, three], super::rank::is_test_path);
+    assert_eq!(ranked[0].path, "b.php");
+}
+
+#[test]
+fn declaration_paths_are_recognised() {
+    use super::rank::is_declaration_path;
+    for path in [
+        "resources/js/types.d.ts",
+        "src\\Global.D.TS",
+        "x.d.mts",
+        "stubs/a.pyi",
+    ] {
+        assert!(is_declaration_path(path), "{path}");
+    }
+    for path in ["src/types.ts", "src/d.ts.vue", "app.py"] {
+        assert!(!is_declaration_path(path), "{path}");
+    }
+}

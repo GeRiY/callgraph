@@ -4,7 +4,7 @@
 //! egyenlő string-literálra (a `routes/*.php` fájlban definíció: `->name('név')`) és a `route::név` hívásra.
 
 use super::callers::{CallerCounts, Callers};
-use super::terms::{Term, TermKind, split_member, words};
+use super::terms::{Term, TermKind, same_word, split_member, words};
 use crate::model::FileGraph;
 
 /// Az egyezés fajtája, a legerősebbtől a leggyengébbig (a sorrend a rangsor és a kiírás sorrendje is).
@@ -93,6 +93,54 @@ impl<'a> Matcher<'a> {
             self.document_keys(graph, &mut hits);
         }
         hits
+    }
+
+    /// A legtöbb kifejezést egyesítő azonosító (definíció neve vagy fájlnév) független kifejezéseinek száma a fájl
+    /// egyezéseiből: `toggleFavorite` a `toggle` + `favorite` kifejezésekre 2. A string-literál és a hívás nem
+    /// számít (csak a fájlban definiált név és a fájl neve).
+    pub(crate) fn multi_terms(&self, hits: &[Hit]) -> usize {
+        let mut groups: Vec<(&Symbol, Vec<usize>)> = Vec::new();
+        for hit in hits.iter().filter(|hit| identifier_hit(hit)) {
+            match groups.iter().position(|(symbol, _)| *symbol == &hit.symbol) {
+                Some(at) => {
+                    let terms = &mut groups[at].1;
+                    if !terms.contains(&hit.term) {
+                        terms.push(hit.term);
+                    }
+                }
+                None => groups.push((&hit.symbol, vec![hit.term])),
+            }
+        }
+        groups
+            .iter()
+            .map(|(_, terms)| self.independent(terms))
+            .max()
+            .unwrap_or(0)
+    }
+
+    /// A független kifejezések száma: amelyiknek minden szavát egy másik kifejezés szavai lefedik (`refund` a
+    /// `RefundController` mellett; az azonos szavú `favorite` / `favorites` párból a későbbi), nem számít külön.
+    fn independent(&self, terms: &[usize]) -> usize {
+        terms
+            .iter()
+            .filter(|&&a| {
+                !terms
+                    .iter()
+                    .any(|&b| b != a && self.covers(b, a) && (b < a || !self.covers(a, b)))
+            })
+            .count()
+    }
+
+    /// Az `outer` kifejezés szavai között megvan-e az `inner` minden szava (egyes / többes szám tűréssel).
+    fn covers(&self, outer: usize, inner: usize) -> bool {
+        let (Some(outer), Some(inner)) = (self.terms.get(outer), self.terms.get(inner)) else {
+            return false;
+        };
+        !inner.words.is_empty()
+            && inner
+                .words
+                .iter()
+                .all(|w| outer.words.iter().any(|x| same_word(x, w)))
     }
 
     /// A JSON-kulcsok (`kind: key`) pontos egyezése: a teljes kulcs-út vagy az utolsó tagja.
@@ -277,6 +325,19 @@ impl<'a> Matcher<'a> {
             }
         }
     }
+}
+
+/// Azonosító-egyezés-e: egy definíció neve vagy a fájlnév illik a kifejezésre (pontosan vagy név-részletként).
+fn identifier_hit(hit: &Hit) -> bool {
+    let kind = matches!(hit.kind, Kind::Definition | Kind::FileName | Kind::NamePart);
+    let symbol = match hit.symbol {
+        Symbol::File
+        | Symbol::Container { .. }
+        | Symbol::Method { .. }
+        | Symbol::Constant { .. } => true,
+        Symbol::Key { .. } | Symbol::Str { .. } | Symbol::Call { .. } => false,
+    };
+    kind && symbol
 }
 
 /// Útvonal-definíciós fájl-e: PHP-fájl a `routes/` mappában (Laravel: `routes/web.php`, `routes/api.php`; a

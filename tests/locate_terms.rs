@@ -175,3 +175,73 @@ fn a_css_custom_property_is_a_term_not_a_flag() {
         assert_root_line(&project, &out);
     }
 }
+
+#[test]
+fn an_identifier_joining_several_terms_ranks_first_even_for_general_terms() {
+    // a koel-eset kicsiben: a `toggleFavorite` és a `PodcastEpisodeController` több kifejezést egyesít; a
+    // típusdeklaráció (`.d.ts`) és az egy-egy kifejezést definícióval / szövegben tartalmazó fájlok hátrébb
+    let mut files: Vec<(String, String)> = vec![
+        (
+            "app/Services/FavoriteService.php".into(),
+            "<?php\nnamespace App\\Services;\n\nclass FavoriteService\n{\n    public function toggleFavorite(int $id): bool\n    {\n        return true;\n    }\n}\n".into(),
+        ),
+        (
+            "app/Http/Controllers/PodcastEpisodeController.php".into(),
+            "<?php\nnamespace App\\Http\\Controllers;\n\nclass PodcastEpisodeController\n{\n    public function index(): array\n    {\n        return [];\n    }\n}\n".into(),
+        ),
+        (
+            "app/Models/Podcast.php".into(),
+            "<?php\nnamespace App\\Models;\n\nclass Podcast\n{\n    public function episodes(): array\n    {\n        return ['favorite'];\n    }\n}\n".into(),
+        ),
+        (
+            "resources/js/types.d.ts".into(),
+            "interface Favorite {\n  id: number\n}\n\ninterface Podcast {\n  title: string\n}\n\ninterface Episode {\n  title: string\n}\n".into(),
+        ),
+        (
+            "resources/js/services/queue.ts".into(),
+            "export function toggle(): string {\n  return 'episode_image' + 'podcast_author'\n}\n".into(),
+        ),
+        (
+            "resources/js/components/ActionMenu.vue".into(),
+            "<template>\n  <button @click=\"toggle\">x</button>\n</template>\n\n<script setup lang=\"ts\">\nfunction toggle() {\n  return 'favorite' + 'podcast_author'\n}\n</script>\n".into(),
+        ),
+    ];
+    // sok fájl a szövegben: mind a négy kifejezés túl általános
+    for i in 0..31 {
+        files.push((
+            format!("app/Lists/List{i}.php"),
+            format!("<?php\nfunction list{i}()\n{{\n    return 'favorite toggle podcast episode';\n}}\n"),
+        ));
+    }
+    let refs: Vec<(&str, &str)> = files
+        .iter()
+        .map(|(rel, text)| (rel.as_str(), text.as_str()))
+        .collect();
+    let project = Project::new(&refs);
+    let out = project.locate(&["favorite", "podcast", "episode", "toggle", "--all"]);
+    let files = ranked(&out);
+    let at = |path: &str| {
+        files
+            .iter()
+            .position(|p| p == path)
+            .unwrap_or_else(|| panic!("{path}: {out}"))
+    };
+    let favorite = at("app/Services/FavoriteService.php");
+    let episodes = at("app/Http/Controllers/PodcastEpisodeController.php");
+    assert!(favorite < 2 && episodes < 2, "{out}");
+    for later in [
+        "resources/js/types.d.ts",
+        "resources/js/services/queue.ts",
+        "resources/js/components/ActionMenu.vue",
+        "app/Models/Podcast.php",
+        "app/Lists/List0.php",
+    ] {
+        assert!(at(later) > favorite.max(episodes), "{later}: {out}");
+    }
+    assert!(out.contains("toggleFavorite()"), "{out}");
+    // a túl általános jelzés megmarad
+    assert!(
+        out.contains("too general (matched in more than 30 files): favorite, podcast, episode, toggle"),
+        "{out}"
+    );
+}
