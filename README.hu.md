@@ -404,6 +404,16 @@ Claude által szerkesztett fájlt a háttérben frissít; egyetlen bejegyzést v
 többit megtartja, és előtte `settings.json.bak` mentést ír. Eltávolítás:
 `bash ~/.claude/skills/callgraph/callgraph.sh hook uninstall`. Részletek: [`docs/PROJECT-GRAPH.md`](docs/PROJECT-GRAPH.md).
 
+### Ellenőrzés a session elején (opcionális hook)
+
+A `bash install.sh` egyszer rákérdez (alapból igen; nem interaktívan: `--session-hook`), hogy felvegyen-e egy Claude
+Code `SessionStart` hookot (`callgraph.sh hook install-session`). Új session elején hálózat nélkül megnézi, ki van-e
+kapcsolva egy ajánlott beállítás — a fenti frissítő hook, az MCP-szerver `--auto-update`-tel, a használati számok
+megosztása —, vagy van-e újabb callgraph; ha igen, egy rövid sort mutat, és megkéri az agentet, hogy kérdezzen meg.
+Az igened nélkül semmi nem változik; a telemetriát csak te kapcsolhatod be, terminálban. Egy tétel legfeljebb 2
+naponta és összesen 3-szor; a `callgraph.sh hook never hook|mcp|telemetry` egyet (a `hook reset [tétel]` visszahozza),
+a `CALLGRAPH_RECOMMEND=0` mindet elhallgattatja; CI-ban soha. Eltávolítás: `callgraph.sh hook uninstall`.
+
 ### Helyi használati statisztika
 
 A callgraph a gépeden egy kis használati összesítőt vezet: melyik parancs vagy MCP-eszköz hányszor futott, volt-e
@@ -426,8 +436,8 @@ terminálban y/N megerősítést kér (agent nem tud rá válaszolni). A `teleme
 ami elmenne, a `telemetry status` az állapotot mutatja, a `telemetry off` leállítja. **Mi megy el:** a fenti számok a
 lezárt napokra (út, fájl-, szimbólum- és projektnév, keresési kifejezés és kód nélkül), legfeljebb az utolsó 7 napra, a
 callgraph verziója, az operációs rendszer / architektúra, naponta egy véletlen kötegazonosító és a séma verziója —
-naponta egyszer, a háttérben, ide: `https://telemetry.callgraph.eu/v1`. CI-ben, `CALLGRAPH_STATS=0` vagy
-`CALLGRAPH_TELEMETRY=0` (végleges tiltás) mellett soha. Adatkezelő: Makra Gergő (mgeri1993@gmail.com); a nyers napi
+naponta egyszer, a háttérben, ide: `https://telemetry.callgraph.eu/v1`. CI-ben, `CALLGRAPH_STATS=0`, `DO_NOT_TRACK=1`
+vagy `CALLGRAPH_TELEMETRY=0` (végleges tiltás) mellett soha. A `telemetry reset` újra döntetlenre állítja (kikapcsolva). Adatkezelő: Makra Gergő (mgeri1993@gmail.com); a nyers napi
 adatok 90 napig maradnak meg, utána csak havi összesítők. A telepítő egyszer rákérdez (Igen / Most nem / Soha),
 interaktív terminálban; „Most nem” után a `stats` kb. két hét múlva még egyszer emlékeztet, és nagyon ritkán az agent
 is kérést kaphat, hogy szóljon neked.

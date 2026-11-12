@@ -12,6 +12,8 @@ pub enum TelemetryAction {
     Off,
     Status,
     Preview,
+    /// Vissza a „még nem döntött” állapotba (be nem kapcsol).
+    Reset,
     /// Belső: a leválasztott háttér-beküldés.
     Send,
     /// Belső: a telepítés / frissítés végi kérdés (csak interaktív terminálban, ha még nem döntött).
@@ -20,8 +22,8 @@ pub enum TelemetryAction {
 
 fn telemetry_usage() -> String {
     crate::t!(
-        "callgraph telemetry status|preview|on|off  (opt-in sending of the local usage counts; only the user can turn it on)",
-        "callgraph telemetry status|preview|on|off  (a helyi használati számok opt-in beküldése; csak a felhasználó kapcsolhatja be)"
+        "callgraph telemetry status|preview|on|off|reset  (opt-in sending of the local usage counts; only the user can turn it on; reset = undecided again)",
+        "callgraph telemetry status|preview|on|off|reset  (a helyi használati számok opt-in beküldése; csak a felhasználó kapcsolhatja be; reset = újra döntetlen)"
     )
     .to_owned()
 }
@@ -35,6 +37,7 @@ pub(crate) fn parse_telemetry(args: &[String]) -> Result<CliArgs> {
             "off" => TelemetryAction::Off,
             "status" => TelemetryAction::Status,
             "preview" => TelemetryAction::Preview,
+            "reset" => TelemetryAction::Reset,
             "send" => TelemetryAction::Send,
             "ask" => TelemetryAction::Ask,
             _ => return Err(CallgraphError::Usage(telemetry_usage())),

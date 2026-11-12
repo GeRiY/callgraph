@@ -10,7 +10,8 @@
 //! - Beküldés (`send.rs`): a normál futásokra ráülve (CLI, MCP indulás + óránként), ha be van kapcsolva, az utolsó
 //!   sikeres beküldés > 24 órája volt és van lezárt, be nem küldött nap → leválasztott háttérfolyamat
 //!   (`callgraph telemetry send`), 5 s időkorlát, zárfájl; a napok csak HTTP 2xx után számítanak beküldöttnek.
-//! - Soha: CI-ban, `CALLGRAPH_STATS=0` mellett, `CALLGRAPH_TELEMETRY=0` (kemény tiltás) mellett, kikapcsolt állapotban.
+//! - Soha: CI-ban, `CALLGRAPH_STATS=0` mellett, `CALLGRAPH_TELEMETRY=0` vagy `DO_NOT_TRACK=1` (kemény tiltás)
+//!   mellett, kikapcsolt állapotban.
 
 mod consent;
 mod payload;
@@ -66,12 +67,14 @@ impl TelemetryEnv {
     pub(crate) fn from_process() -> Self {
         Self {
             stats: StatsEnv::from_process(),
+            // a DO_NOT_TRACK=1 (bármely nem üres, nem `0` érték) ugyanúgy mindent leállít
             killed: std::env::var(KILL_ENV).is_ok_and(|v| {
                 matches!(
                     v.trim().to_ascii_lowercase().as_str(),
                     "0" | "off" | "false" | "no"
                 )
-            }),
+            }) || std::env::var("DO_NOT_TRACK")
+                .is_ok_and(|v| !v.trim().is_empty() && v.trim() != "0"),
             url: std::env::var(URL_ENV)
                 .ok()
                 .filter(|u| !u.trim().is_empty())
@@ -227,6 +230,19 @@ impl Telemetry {
     pub(crate) fn decide(&self, choice: Choice, now: u64) -> std::io::Result<()> {
         let mut consent = self.consent();
         consent.decide(choice, now);
+        self.save(&consent)
+    }
+
+    /// Vissza a „még nem döntött” állapotba: a beküldés ki, a döntés és a kérdezés-számlálók törölve (bekapcsolni
+    /// továbbra is csak a `telemetry on` tud, terminálban).
+    pub(crate) fn reset(&self) -> std::io::Result<()> {
+        let mut consent = self.consent();
+        consent.enabled = false;
+        consent.choice = None;
+        consent.decided_at = None;
+        consent.asked_count = 0;
+        consent.hint_count = 0;
+        consent.hint_at = None;
         self.save(&consent)
     }
 }

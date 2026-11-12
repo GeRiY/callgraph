@@ -18,14 +18,39 @@ use crate::error::{CallgraphError, Result};
 pub(crate) const HOOK_EVENT: &str = "PostToolUse";
 /// A fájlt író eszközök (a NotebookEdit kimarad: a `.ipynb` nem elemzett nyelv, a hook úgyis semmit sem tenne).
 pub(crate) const HOOK_MATCHER: &str = "Edit|Write|MultiEdit";
-/// A saját hook-parancs azonosító része.
-const MARKER: &str = "hook post-edit";
 /// A hook időkorlátja másodpercben (a parancs azonnal kilép, a frissítés leválasztva fut).
 const TIMEOUT_SECS: u64 = 10;
+
+/// Egy saját hook leírása: esemény, matcher és a parancs azonosító része.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct HookSpec {
+    pub(crate) event: &'static str,
+    pub(crate) matcher: &'static str,
+    pub(crate) marker: &'static str,
+}
+
+/// A fájl-írás utáni háttér-frissítés hookja.
+pub(crate) const POST_EDIT: HookSpec = HookSpec {
+    event: HOOK_EVENT,
+    matcher: HOOK_MATCHER,
+    marker: "hook post-edit",
+};
+
+/// A session-indítási hook (ajánlott beállítások és frissítés-értesítés; csak új sessionnél).
+pub(crate) const SESSION_START: HookSpec = HookSpec {
+    event: "SessionStart",
+    matcher: "startup",
+    marker: "hook session-start",
+};
 
 /// A hook parancssora a bináris útjával: idézőjelben (szóköz az útban), Windowson `/` elválasztóval és a `\\?\`
 /// előtag nélkül (a Claude Code a hookot burokban futtatja).
 pub(crate) fn hook_command(exe: &Path) -> String {
+    hook_command_for(exe, &POST_EDIT)
+}
+
+/// Mint a `hook_command`, a megadott hookhoz.
+pub(crate) fn hook_command_for(exe: &Path, spec: &HookSpec) -> String {
     let text = exe.to_string_lossy();
     let text = crate::query::strip_verbatim(&text);
     let text = if cfg!(windows) {
@@ -42,7 +67,7 @@ pub(crate) fn hook_command(exe: &Path) -> String {
         quoted.push(ch);
     }
     quoted.push('"');
-    format!("{quoted} {MARKER}")
+    format!("{quoted} {}", spec.marker)
 }
 
 /// A beállítások szövege JSON-objektumként (üres szöveg = `{}`); hibás JSON / nem objektum: használati hiba (a
@@ -65,14 +90,18 @@ fn invalid(file: &Path, en: &str, hu: &str) -> CallgraphError {
     ))
 }
 
-fn is_ours(hook: &Value) -> bool {
+fn is_ours(hook: &Value, spec: &HookSpec) -> bool {
     hook.get("command")
         .and_then(Value::as_str)
-        .is_some_and(|command| command.contains(MARKER) && command.contains("callgraph"))
+        .is_some_and(|command| command.contains(spec.marker) && command.contains("callgraph"))
 }
 
-/// A `PostToolUse` csoportjai (ha vannak); hibás szerkezet (nem objektum / tömb): hiba.
-fn groups<'a>(map: &'a Map<String, Value>, file: &Path) -> Result<Option<&'a Vec<Value>>> {
+/// Az esemény csoportjai (ha vannak); hibás szerkezet (nem objektum / tömb): hiba.
+fn groups<'a>(
+    map: &'a Map<String, Value>,
+    file: &Path,
+    spec: &HookSpec,
+) -> Result<Option<&'a Vec<Value>>> {
     let Some(hooks) = map.get("hooks") else {
         return Ok(None);
     };
@@ -83,51 +112,62 @@ fn groups<'a>(map: &'a Map<String, Value>, file: &Path) -> Result<Option<&'a Vec
             "a \"hooks\" nem objektum",
         ));
     };
-    match hooks.get(HOOK_EVENT) {
+    match hooks.get(spec.event) {
         None => Ok(None),
         Some(Value::Array(groups)) => Ok(Some(groups)),
         Some(_) => Err(invalid(
             file,
-            "\"hooks.PostToolUse\" is not an array",
-            "a \"hooks.PostToolUse\" nem tömb",
+            &format!("\"hooks.{}\" is not an array", spec.event),
+            &format!("a \"hooks.{}\" nem tömb", spec.event),
         )),
     }
 }
 
 /// Telepítve van-e a saját hook (bármelyik `PostToolUse` csoportban).
 pub(crate) fn is_installed(text: &str, file: &Path) -> Result<bool> {
+    is_installed_for(text, file, &POST_EDIT)
+}
+
+/// Telepítve van-e a megadott saját hook.
+pub(crate) fn is_installed_for(text: &str, file: &Path, spec: &HookSpec) -> Result<bool> {
     let map = parse(text, file)?;
-    Ok(groups(&map, file)?.is_some_and(|groups| {
+    Ok(groups(&map, file, spec)?.is_some_and(|groups| {
         groups.iter().any(|group| {
             group
                 .get("hooks")
                 .and_then(Value::as_array)
-                .is_some_and(|hooks| hooks.iter().any(is_ours))
+                .is_some_and(|hooks| hooks.iter().any(|h| is_ours(h, spec)))
         })
     }))
 }
 
 /// A beállítások a saját hook nélkül (a kiürült csoport, `PostToolUse` és `hooks` is kikerül); `None`, ha nem
 /// volt benne (nincs mit írni).
+#[cfg(test)]
 pub(crate) fn uninstall(text: &str, file: &Path) -> Result<Option<String>> {
+    uninstall_for(text, file, &POST_EDIT)
+}
+
+/// Mint az `uninstall`, a megadott hookra.
+pub(crate) fn uninstall_for(text: &str, file: &Path, spec: &HookSpec) -> Result<Option<String>> {
     let mut map = parse(text, file)?;
-    if !is_installed(text, file)? {
+    if !is_installed_for(text, file, spec)? {
         return Ok(None);
     }
-    strip(&mut map, true);
+    strip(&mut map, true, spec);
     Ok(Some(render(&map)?))
 }
 
 /// A saját hook kivétele a térképből (a `groups` már ellenőrizte a szerkezetet); a kiürült csoport mindig kikerül,
 /// a kiürült `PostToolUse` / `hooks` csak `prune` mellett (telepítéskor a helyükön maradnak).
-fn strip(map: &mut Map<String, Value>, prune: bool) {
+fn strip(map: &mut Map<String, Value>, prune: bool, spec: &HookSpec) {
     let Some(Value::Object(hooks)) = map.get_mut("hooks") else {
         return;
     };
-    if let Some(Value::Array(groups)) = hooks.get_mut(HOOK_EVENT) {
+    if let Some(Value::Array(groups)) = hooks.get_mut(spec.event) {
         for group in groups.iter_mut() {
             if let Some(Value::Array(list)) = group.get_mut("hooks") {
-                list.retain(|hook| !is_ours(hook));
+                list.retain(|hook| !is_ours(hook, spec));
             }
         }
         groups.retain(|group| {
@@ -137,7 +177,7 @@ fn strip(map: &mut Map<String, Value>, prune: bool) {
                 .is_none_or(|list| !list.is_empty())
         });
         if prune && groups.is_empty() {
-            hooks.shift_remove(HOOK_EVENT);
+            hooks.shift_remove(spec.event);
         }
     }
     if prune && hooks.is_empty() {
@@ -148,8 +188,18 @@ fn strip(map: &mut Map<String, Value>, prune: bool) {
 /// A beállítások a saját hookkal (`command`); `None`, ha pontosan ez már benne van (idempotens). Egy régebbi saját
 /// bejegyzés (más bináris-út) helyére kerül; a többi hook és beállítás marad.
 pub(crate) fn install(text: &str, file: &Path, command: &str) -> Result<Option<String>> {
+    install_for(text, file, command, &POST_EDIT)
+}
+
+/// Mint az `install`, a megadott hookkal.
+pub(crate) fn install_for(
+    text: &str,
+    file: &Path,
+    command: &str,
+    spec: &HookSpec,
+) -> Result<Option<String>> {
     let mut map = parse(text, file)?;
-    let current = groups(&map, file)?.is_some_and(|groups| {
+    let current = groups(&map, file, spec)?.is_some_and(|groups| {
         let ours: Vec<(Option<&str>, Option<&str>)> = groups
             .iter()
             .flat_map(|group| {
@@ -159,18 +209,18 @@ pub(crate) fn install(text: &str, file: &Path, command: &str) -> Result<Option<S
                     .and_then(Value::as_array)
                     .into_iter()
                     .flatten()
-                    .filter(|hook| is_ours(hook))
+                    .filter(|hook| is_ours(hook, spec))
                     .map(move |hook| (matcher, hook.get("command").and_then(Value::as_str)))
             })
             .collect();
-        ours == [(Some(HOOK_MATCHER), Some(command))]
+        ours == [(Some(spec.matcher), Some(command))]
     });
     if current {
         return Ok(None);
     }
-    strip(&mut map, false);
+    strip(&mut map, false, spec);
     let entry = json!({
-        "matcher": HOOK_MATCHER,
+        "matcher": spec.matcher,
         "hooks": [{ "type": "command", "command": command, "timeout": TIMEOUT_SECS }],
     });
     let hooks = map
@@ -178,7 +228,7 @@ pub(crate) fn install(text: &str, file: &Path, command: &str) -> Result<Option<S
         .or_insert_with(|| Value::Object(Map::new()));
     if let Value::Object(hooks) = hooks {
         let groups = hooks
-            .entry(HOOK_EVENT)
+            .entry(spec.event)
             .or_insert_with(|| Value::Array(Vec::new()));
         if let Value::Array(groups) = groups {
             groups.push(entry);

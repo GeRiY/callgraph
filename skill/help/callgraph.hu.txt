@@ -160,7 +160,8 @@ Frissítés (a GitHub Releases-ből; a projects.json, a lang, az errors.jsonl, a
   a jelenlegi verzió fut, és egy sor megy a stderr-re. Kapcsoló nélkül a munkamenet első eszköz-eredménye kapja meg a
   „ℹ callgraph X elérhető” sort. Mindkettő csak a skill-mappába ír; CALLGRAPH_UPDATE_CHECK=0: semmi hálózat.
   Névtelen napi számlálás: naponta egyszer, az első használatkor a verzió, a platform és három igen/nem jelző megy a
-  check.callgraph.eu-ra (azonosító és IP nélkül). Kikapcsolás: CALLGRAPH_COUNT=0 vagy DO_NOT_TRACK=1 (a CALLGRAPH_UPDATE_CHECK=0 is).
+  check.callgraph.eu-ra (azonosító és IP nélkül). Kikapcsolás: CALLGRAPH_COUNT=0 vagy DO_NOT_TRACK=1 (a CALLGRAPH_UPDATE_CHECK=0 is);
+  a DO_NOT_TRACK=1 az opt-in telemetriát is leállítja.
 
 Kimenet-korlát: 400 sor fölött a mappás outline summary-ra, az egyfájlos metódus-indexre vált;
 

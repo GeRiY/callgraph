@@ -402,6 +402,17 @@ edits in the background; it adds one entry to `~/.claude/settings.json`, keeps e
 `settings.json.bak` backup first. Remove it with `bash ~/.claude/skills/callgraph/callgraph.sh hook uninstall`.
 Details (Hungarian): [`docs/PROJECT-GRAPH.md`](docs/PROJECT-GRAPH.md).
 
+### Session-start check (optional hook)
+
+`bash install.sh` asks once (default yes; non-interactive: `--session-hook`) whether to add a Claude Code
+`SessionStart` hook (`callgraph.sh hook install-session`). At the start of a new session it checks, offline, whether a
+recommended setting is off — the refresh hook above, the MCP server with `--auto-update`, opting in to the shared
+usage counts — or a newer callgraph is out, and if so shows one short note and asks your agent to ask you. Nothing is
+changed without your yes; telemetry can only be turned on by you in a terminal. Each item at most every 2 days and 3
+times in total; `callgraph.sh hook never hook|mcp|telemetry` silences one (`hook reset [item]` brings it back),
+`CALLGRAPH_RECOMMEND=0` all; never in CI.
+Remove: `callgraph.sh hook uninstall`.
+
 ### Local usage stats
 
 callgraph keeps a small usage summary on your computer: how often each command or MCP tool ran, whether it
@@ -424,8 +435,8 @@ y/N confirmation in a terminal (an agent cannot answer it). `telemetry preview` 
 sent, `telemetry status` shows the state, `telemetry off` stops it. **What is sent:** the closed days' counts from
 above (no paths, file, symbol or project names, no search terms or code), at most the last 7 days, the callgraph
 version, the OS / architecture, a random batch id per day and the schema version — once a day, in the background, to
-`https://telemetry.callgraph.eu/v1`. Never in CI, with `CALLGRAPH_STATS=0` or with
-`CALLGRAPH_TELEMETRY=0` (a hard off switch). Controller: Makra Gergő (mgeri1993@gmail.com); the raw daily records are
+`https://telemetry.callgraph.eu/v1`. Never in CI, with `CALLGRAPH_STATS=0`, with `DO_NOT_TRACK=1` or with
+`CALLGRAPH_TELEMETRY=0` (a hard off switch). `telemetry reset` makes it undecided again (still off). Controller: Makra Gergő (mgeri1993@gmail.com); the raw daily records are
 kept for 90 days, then only monthly totals. The installer asks once (Yes / Not now / Never) in an interactive terminal;
 after "Not now" `stats` reminds you once more about two weeks later, and an agent may very rarely be asked to mention it
 to you.
