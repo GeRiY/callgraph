@@ -17,6 +17,12 @@
   <img alt="platforms" src="https://img.shields.io/badge/platforms-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey">
 </p>
 
+<div align="center">
+
+[![M8ven Score](https://m8ven.ai/badge/mcp/geriy-callgraph-96dgjx?v=dd506132eff002dd067b90a1092601d3)](https://m8ven.ai/mcp/geriy-callgraph-96dgjx?s=readme)
+
+</div>
+
 <p align="center">
   <a href="#quick-start">Quick start</a> ·
   <a href="#installation">Installation</a> ·
