@@ -8,6 +8,24 @@ Every release with its date, newest first: what was added, changed and fixed. Do
 
 [Install the latest version](https://callgraph.eu/#install)[Latest release on GitHub](https://github.com/GeRiY/callgraph/releases/latest)
 
+## v0.9.3 — 2026-11-12
+
+[Release notes and downloads on GitHub](https://github.com/GeRiY/callgraph/releases/tag/v0.9.3)
+
+### Added
+
+- **HTML files (`.html`, `.htm`):** handled as documents like Markdown — the outline lists the `<title>` and the `<h1>`–`<h6>` headings by level with line ranges, `--lines` works, and `--strings` searches the visible text and the `title` / `alt` / `placeholder` / `aria-label` / `value` attributes (`<script>`, `<style>` and comments are skipped). Broken or unclosed HTML does not stop the analysis.
+
+- **`locate` finds properties and fields:** PHP properties (also `protected $fillable` and promoted constructor properties), TS / JS class fields and parameter properties, Rust struct fields, and Swift / Python / Go properties are definitions (`property $fillable  L12  ← "fillable" (exact property)`; `fillable`, `$fillable` and `Invoice::$fillable` all match); part of the name is a name-part match. A property defined in many files (like `$fillable` in every model) does not push the exact class or a rarer term's files down.
+
+### Changed
+
+- **`locate` ranks names that join several terms first:** a definition or file name containing two or more of the searched terms (`toggleFavorite` for `toggle favorite`, `PodcastEpisodeController` for `podcast episode`) gets a large boost that grows with the number of terms, even when each term alone is too general (the "too general" line stays). Definitions in type declaration files (`.d.ts`, `.pyi`) weigh less than real ones and no longer push these files to the top.
+
+### Fixed
+
+- **PHP: receivers from the Laravel container are resolved:** `$x = app(Foo::class)`, `resolve(Foo::class)`, `app()->make(Foo::class)`, `$this->app->make(Foo::class)` and `App::make(Foo::class)` give `$x` the type `Foo` (resolved through `use` and the namespace, like `new Foo()`), and `app(Foo::class)->bar()` / `resolve(Foo::class)->bar()` resolve to `Foo::bar`, so `--grep 'Foo::bar'` finds these callers without `--guess`. A string id (`app('foo')`) stays unresolved.
+
 ## v0.9.2 — 2026-11-12
 
 [Release notes and downloads on GitHub](https://github.com/GeRiY/callgraph/releases/tag/v0.9.2)

@@ -2,13 +2,13 @@
 
 Source: https://callgraph.eu/hu/
 
-[v0.9.2 — újdonságok →](https://callgraph.eu/hu/changelog/)
+[v0.9.3 — újdonságok →](https://callgraph.eu/hu/changelog/)
 
 # Értsd meg a kódot, olvasás nélkül.
 
 A **callgraph** token-hatékony kód-térkép AI kódoló agenteknek. Megmutatja a szerkezetet, a kategorizált hívás-gráfot, egy-egy metódus törzsét, hogy *„ki hívja?”*, és a hatáselemzést — pár tucat sorban, a teljes fájlok helyett.
 
-[Telepítés egy sorral](https://callgraph.eu/hu/#install) [Letöltés: v0.9.2](https://github.com/GeRiY/callgraph/releases/latest) [Megnézem a GitHubon](https://github.com/GeRiY/callgraph)
+[Telepítés egy sorral](https://callgraph.eu/hu/#install) [Letöltés: v0.9.3](https://github.com/GeRiY/callgraph/releases/latest) [Megnézem a GitHubon](https://github.com/GeRiY/callgraph)
 
 ```
 $ callgraph.sh --project shop app/Models/Order.php
@@ -366,7 +366,7 @@ Parancssori kód-térkép AI kódoló agenteknek. Elemzi a fájlt vagy mappát, 
 
 ### Milyen nyelveket támogat?
 
-PHP (Laravel- és Yii-ismerettel), JavaScript, TypeScript, Vue single-file komponensek, Rust, Swift és SwiftUI, Python, Go, CSS, SCSS, JSON és Markdown. Részletek: [PHP](https://callgraph.eu/hu/php/), [Rust](https://callgraph.eu/hu/rust/), [TypeScript / Vue](https://callgraph.eu/hu/typescript/), [Swift](https://callgraph.eu/hu/swift/), [Python](https://callgraph.eu/hu/python/), [Go](https://callgraph.eu/hu/go/).
+PHP (Laravel- és Yii-ismerettel), JavaScript, TypeScript, Vue single-file komponensek, Rust, Swift és SwiftUI, Python, Go, CSS, SCSS, JSON, Markdown és HTML. Részletek: [PHP](https://callgraph.eu/hu/php/), [Rust](https://callgraph.eu/hu/rust/), [TypeScript / Vue](https://callgraph.eu/hu/typescript/), [Swift](https://callgraph.eu/hu/swift/), [Python](https://callgraph.eu/hu/python/), [Go](https://callgraph.eu/hu/go/).
 
 ### Kell hozzá PHP, Node vagy Rust?
 

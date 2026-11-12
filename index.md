@@ -2,13 +2,13 @@
 
 Source: https://callgraph.eu/
 
-[v0.9.2 — what's new →](https://callgraph.eu/changelog/)
+[v0.9.3 — what's new →](https://callgraph.eu/changelog/)
 
 # Understand code without reading it.
 
 **callgraph** is a token-efficient code map for AI coding agents. It shows the structure, a categorized call graph, single method bodies, *“who calls this?”* and impact analysis — in a few dozen lines instead of whole files.
 
-[Install in one line](https://callgraph.eu/#install) [Download v0.9.2](https://github.com/GeRiY/callgraph/releases/latest) [View on GitHub](https://github.com/GeRiY/callgraph)
+[Install in one line](https://callgraph.eu/#install) [Download v0.9.3](https://github.com/GeRiY/callgraph/releases/latest) [View on GitHub](https://github.com/GeRiY/callgraph)
 
 ```
 $ callgraph.sh --project shop app/Models/Order.php
@@ -366,7 +366,7 @@ A command-line code map for AI coding agents. It parses a file or folder and ans
 
 ### Which languages are supported?
 
-PHP (with Laravel and Yii awareness), JavaScript, TypeScript, Vue single-file components, Rust, Swift and SwiftUI, Python, Go, CSS, SCSS, JSON and Markdown. See the [PHP](https://callgraph.eu/php/), [Rust](https://callgraph.eu/rust/), [TypeScript / Vue](https://callgraph.eu/typescript/) [Swift](https://callgraph.eu/swift/), [Python](https://callgraph.eu/python/) and [Go](https://callgraph.eu/go/) pages.
+PHP (with Laravel and Yii awareness), JavaScript, TypeScript, Vue single-file components, Rust, Swift and SwiftUI, Python, Go, CSS, SCSS, JSON, Markdown and HTML. See the [PHP](https://callgraph.eu/php/), [Rust](https://callgraph.eu/rust/), [TypeScript / Vue](https://callgraph.eu/typescript/) [Swift](https://callgraph.eu/swift/), [Python](https://callgraph.eu/python/) and [Go](https://callgraph.eu/go/) pages.
 
 ### Do I need PHP, Node or Rust installed?
 

@@ -8,6 +8,24 @@ Minden kiadás dátummal, a legújabb elöl: mi új, mi változott és mi javult
 
 [A legújabb verzió telepítése](https://callgraph.eu/hu/#install)[Legfrissebb kiadás a GitHubon](https://github.com/GeRiY/callgraph/releases/latest)
 
+## v0.9.3 — 2026-11-12
+
+[Kiadási jegyzet és letöltések a GitHubon](https://github.com/GeRiY/callgraph/releases/tag/v0.9.3)
+
+### Új
+
+- **HTML-fájlok (`.html`, `.htm`):** dokumentumként, a Markdownhoz hasonlóan — az outline a `<title>`-t és a `<h1>`–`<h6>` címsorokat mutatja szintenként, sortartománnyal, a `--lines` működik, a `--strings` pedig a látható szövegben és a `title` / `alt` / `placeholder` / `aria-label` / `value` attribútumokban keres (a `<script>`, a `<style>` és a komment kimarad). A hibás vagy nem zárt HTML nem akasztja meg az elemzést.
+
+- **A `locate` megtalálja a property-ket és mezőket:** a PHP property (a `protected $fillable` és a promoted constructor property is), a TS / JS class field és parameter property, a Rust struct-mező és a Swift / Python / Go property definíció (`property $fillable  L12  ← "fillable" (exact property)`; a `fillable`, a `$fillable` és az `Invoice::$fillable` is illik rá); a név része név-részlet. A sok fájlban definiált property (pl. a `$fillable` minden modellben) nem szorítja hátrébb a pontos osztályt és a ritkább kifejezés fájljait.
+
+### Változás
+
+- **A `locate` elöl hozza a több kifejezést egyesítő neveket:** ha egy definíció vagy fájlnév a keresett kifejezések közül kettőt vagy többet tartalmaz (`toggleFavorite` a `toggle favorite`-ra, `PodcastEpisodeController` a `podcast episode`-ra), nagy, a kifejezések számával növő pontot kap, akkor is, ha a kifejezések külön-külön túl általánosak (a „túl általános” sor megmarad). A típusdeklarációs fájlok (`.d.ts`, `.pyi`) definíciói kevesebbet érnek a valódiaknál, és már nem tolják a lista elejére ezeket a fájlokat.
+
+### Javítás
+
+- **PHP: a Laravel-konténerből kért fogadó feloldása:** a `$x = app(Foo::class)`, `resolve(Foo::class)`, `app()->make(Foo::class)`, `$this->app->make(Foo::class)` és `App::make(Foo::class)` után `$x` típusa `Foo` (a `use` és a névtér szerint feloldva, mint a `new Foo()`-nál), az `app(Foo::class)->bar()` / `resolve(Foo::class)->bar()` pedig `Foo::bar`-ra oldódik, így a `--grep 'Foo::bar'` `--guess` nélkül is megtalálja ezeket a hívókat. A sztring-azonosító (`app('foo')`) feloldatlan marad.
+
 ## v0.9.2 — 2026-11-12
 
 [Kiadási jegyzet és letöltések a GitHubon](https://github.com/GeRiY/callgraph/releases/tag/v0.9.2)

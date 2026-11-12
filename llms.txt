@@ -1,6 +1,6 @@
 # callgraph
 
-> A token-efficient code map for AI coding agents: structure, categorized call graph, method bodies, "who calls this?" and impact analysis from the AST, without reading whole files. PHP, JavaScript / TypeScript, Vue, Rust, Swift / SwiftUI, Python, Go, CSS / SCSS, JSON, Markdown. One static binary (MIT), used as a CLI, a Claude Code skill or a local MCP server (`callgraph mcp`). Latest release: v0.9.2.
+> A token-efficient code map for AI coding agents: structure, categorized call graph, method bodies, "who calls this?" and impact analysis from the AST, without reading whole files. PHP, JavaScript / TypeScript, Vue, Rust, Swift / SwiftUI, Python, Go, CSS / SCSS, JSON, Markdown, HTML. One static binary (MIT), used as a CLI, a Claude Code skill or a local MCP server (`callgraph mcp`). Latest release: v0.9.3.
 
 Install (macOS / Linux):
 
