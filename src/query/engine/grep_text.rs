@@ -46,11 +46,83 @@ impl QueryEngine {
         }
         if depth <= 1 {
             // nulla találat: a generikus „törzs-logika” tipp helyett a helyreállító üzenet
-            if rows.is_empty() {
-                return Ok(hint::empty_grep(lang, pattern, &self.take_scope_catalog()));
+            let base = if rows.is_empty() {
+                hint::empty_grep(lang, pattern, &self.take_scope_catalog())
+            } else {
+                let layers = self.layers.as_ref().filter(|scope| scope.by_layer());
+                grep_flat(rows, &source, lang, full, limit, layers, &marks)
+            };
+            // `Típus::metódus` mintánál a név szerinti (feloldatlan fogadójú) hívók is szóba jönnek
+            let wanted = crate::index::pattern_name(pattern);
+            let whole_project = scope == self.depth_scope().as_slice();
+            if let Some(graph) = project
+                .as_deref_mut()
+                .filter(|_| wanted.is_some() && whole_project)
+            {
+                let files = self.walk(scope);
+                graph.refresh(&files, true, &self.analyzer)?;
+                graph.ensure_callers(&self.analyzer)?;
+                let _ = graph.save();
+                let graph: &ProjectGraph = graph;
+                let name_only = wanted.map_or_else(Vec::new, |name| {
+                    graph.caller_index().name_only_callers(name)
+                });
+                for caller in &name_only {
+                    if let Some(snippets) = graph.snippets(&caller.file) {
+                        source.remember(&caller.file, snippets);
+                    }
+                }
+                return Ok(render_single(SingleView {
+                    rows,
+                    base,
+                    guess,
+                    name_only: &name_only,
+                    ranges: graph,
+                    source: &source,
+                    lang,
+                    marks: &marks,
+                }));
             }
-            let layers = self.layers.as_ref().filter(|scope| scope.by_layer());
-            return Ok(grep_flat(rows, &source, lang, full, limit, layers, &marks));
+            if let Some(graph) = project.as_deref().filter(|_| wanted.is_none()) {
+                return Ok(render_single(SingleView {
+                    rows,
+                    base,
+                    guess,
+                    name_only: &[],
+                    ranges: graph,
+                    source: &source,
+                    lang,
+                    marks: &marks,
+                }));
+            }
+            // gráf nélkül (vagy részhatókörön): a hatókör gráfjai, vagy csak a találat-fájlok
+            let (name_only, owned) = match wanted {
+                Some(name) => {
+                    let all = self.all_graphs(scope)?;
+                    let index =
+                        CallerIndex::build(all.iter().map(|(path, graph)| (path.as_str(), graph)));
+                    (index.name_only_callers(name), all)
+                }
+                None => (
+                    Vec::new(),
+                    rows.iter()
+                        .filter_map(|row| {
+                            let path = row.graph.file.as_str();
+                            Some((path.to_owned(), self.analyze(Path::new(path)).ok()?))
+                        })
+                        .collect::<Vec<_>>(),
+                ),
+            };
+            return Ok(render_single(SingleView {
+                rows,
+                base,
+                guess,
+                name_only: &name_only,
+                ranges: &owned,
+                source: &source,
+                lang,
+                marks: &marks,
+            }));
         }
         let direct = direct_rows(rows);
         let whole_project = scope == self.depth_scope().as_slice();
@@ -450,10 +522,7 @@ fn render_depth(view: DepthView<'_>) -> String {
             && !guess
             && let Some(count) = skipped.get(level - 2).copied().filter(|count| *count > 0)
         {
-            output.push_str(&tf!(
-                "  (+{count} unresolved, name-only matches skipped — --guess shows them)\n",
-                "  (+{count} feloldatlan, csak név szerinti egyezés kihagyva — --guess mutatja)\n"
-            ));
+            output.push_str(&skipped_footer(count));
         }
         // a szint hívó-metódusai közül hánynak van dinamikus (`dynamic_call`) hívása: azok kézzel nézendők
         let mut level_methods: Vec<(&str, Option<&str>, &str)> = if level == 1 {
@@ -480,18 +549,178 @@ fn render_depth(view: DepthView<'_>) -> String {
             .filter(|(file, container, name)| ranges.has_dynamic(file, *container, name))
             .count();
         if dynamic > 0 {
-            output.push_str(&tf!(
-                "  ({dynamic} of these callers contain dynamic calls — check them by hand)\n",
-                "  ({dynamic} hívó dinamikus hívást tartalmaz — kézzel nézd át)\n"
-            ));
+            output.push_str(&dynamic_footer(dynamic));
         }
         output.push('\n');
     }
-    output.push_str(t!(
+    output.push_str(guess_legend());
+    output
+}
+
+/// A kihagyott, csak név szerint illeszkedő hívók lábléc-sora (a mélységi és az egyszintű nézetben azonos).
+fn skipped_footer(count: usize) -> String {
+    tf!(
+        "  (+{count} unresolved, name-only matches skipped — --guess shows them)\n",
+        "  (+{count} feloldatlan, csak név szerinti egyezés kihagyva — --guess mutatja)\n"
+    )
+}
+
+/// A dinamikus hívást tartalmazó hívók lábléc-sora (a mélységi és az egyszintű nézetben azonos).
+fn dynamic_footer(dynamic: usize) -> String {
+    tf!(
+        "  ({dynamic} of these callers contain dynamic calls — check them by hand)\n",
+        "  ({dynamic} hívó dinamikus hívást tartalmaz — kézzel nézd át)\n"
+    )
+}
+
+/// A `?` jelölés magyarázata a kimenet végén.
+fn guess_legend() -> &'static str {
+    t!(
         "💡 \"?\" = unresolved, name-only match (may be wrong). A caller's body: <file>::<method> --body\n",
         "💡 \"?\" = feloldatlan, csak név szerinti egyezés (lehet hamis). Egy hívó törzse: <fájl>::<metódus> --body\n"
-    ));
-    output
+    )
+}
+
+/// Az egyszintű `--grep` bemenete: a megszokott kimenet (`base`), és a név szerinti (feloldatlan) hívók.
+struct SingleView<'a> {
+    rows: &'a [QueryResult],
+    base: String,
+    guess: bool,
+    name_only: &'a [CallerRow],
+    ranges: &'a dyn MethodRanges,
+    source: &'a SourceLines,
+    lang: Lang,
+    marks: &'a NoteMarks,
+}
+
+/// Az egyszintű nézet: `--guess` nélkül a régi kimenet + a két lábléc-sor (ha van mit mondani); `--guess`-szel a
+/// név szerinti hívók is, `?` jelzéssel (mint a mélységi nézetben).
+fn render_single(view: SingleView<'_>) -> String {
+    let SingleView {
+        rows,
+        base,
+        guess,
+        name_only,
+        ranges,
+        source,
+        lang,
+        marks,
+    } = view;
+    // a már (pontosan) találatként látható hívó metódusok nem számítanak újra név szerinti hívónak
+    let shown = |row: &CallerRow| {
+        rows.iter().any(|found| {
+            found.graph.file == row.file
+                && found.graph.calls.iter().any(|call| {
+                    call.container == row.container
+                        && call.caller.as_deref().unwrap_or("__top__") == row.caller
+                })
+        })
+    };
+    let mut extra: Vec<&CallerRow> = name_only.iter().filter(|row| !shown(row)).collect();
+    extra.sort_by(|a, b| {
+        (&a.file, &a.container, &a.caller, a.line).cmp(&(&b.file, &b.container, &b.caller, b.line))
+    });
+    extra.dedup_by(|b, a| a.file == b.file && a.container == b.container && a.caller == b.caller);
+    // a lábléc-sorok: a kihagyott név szerinti hívók, és a dinamikus hívást tartalmazó hívók
+    let mut footer = String::new();
+    if !guess && !extra.is_empty() {
+        footer.push_str(&skipped_footer(extra.len()));
+    }
+    let mut methods: Vec<(&str, Option<&str>, &str)> = rows
+        .iter()
+        .flat_map(|row| {
+            row.graph.methods.iter().map(move |method| {
+                (
+                    row.graph.file.as_str(),
+                    method.container.as_deref(),
+                    method.name.as_str(),
+                )
+            })
+        })
+        .collect();
+    if guess {
+        methods.extend(extra.iter().map(|row| {
+            (
+                row.file.as_str(),
+                row.container.as_deref(),
+                row.caller.as_str(),
+            )
+        }));
+    }
+    methods.sort_unstable();
+    methods.dedup();
+    let dynamic = methods
+        .iter()
+        .filter(|(file, container, name)| ranges.has_dynamic(file, *container, name))
+        .count();
+    if dynamic > 0 {
+        footer.push_str(&dynamic_footer(dynamic));
+    }
+    // `--guess`: a név szerinti hívók, hívónként egy sor (`← cél  ?`) és a hívás sora
+    let mut guessed = String::new();
+    if guess && !extra.is_empty() {
+        guessed.push_str(t!(
+            "== unresolved, name-only matches (may be wrong)\n",
+            "== feloldatlan, csak név szerinti egyezések (lehetnek hamisak)\n"
+        ));
+        for caller in &extra {
+            let range = ranges
+                .range(&caller.file, caller.container.as_deref(), &caller.caller)
+                .unwrap_or((caller.line, caller.line));
+            writeln!(
+                guessed,
+                "  {}  {}::{}()  L{}-{}{}  ← {}  ?",
+                caller.file,
+                caller.container.as_deref().unwrap_or("__top__"),
+                caller.caller,
+                range.0,
+                range.1,
+                marks.caller_mark(
+                    &caller.file,
+                    caller.container.as_deref(),
+                    Some(caller.caller.as_str())
+                ),
+                caller.target
+            )
+            .unwrap();
+            let code = source.get(&caller.file, caller.line);
+            writeln!(
+                guessed,
+                "    {}",
+                snippet::call_line(lang, caller.line, None, code.as_deref())
+            )
+            .unwrap();
+        }
+        guessed.push_str(&footer);
+        guessed.push_str(guess_legend());
+        footer.clear();
+    }
+    if rows.is_empty() {
+        // nincs pontos találat: a név szerintiek (ha vannak) a „nincs találat” tipp helyett, különben a lábléc a tipp elé
+        return if guessed.is_empty() {
+            format!("{footer}{base}")
+        } else {
+            guessed
+        };
+    }
+    // a lábléc-sorok és a `?` szakasz a záró tipp (`---` + `💡 …`) elé kerülnek
+    let add = if guessed.is_empty() {
+        footer
+    } else {
+        format!("\n{guessed}")
+    };
+    match base.rfind("\n---\n💡") {
+        Some(at) if !add.is_empty() => {
+            let mut out = base[..at].to_owned();
+            if !out.ends_with('\n') {
+                out.push('\n');
+            }
+            out.push_str(&add);
+            out.push_str(&base[at..]);
+            out
+        }
+        _ => format!("{base}{add}"),
+    }
 }
 
 /// Egy hívó metódus (konténer, név) hívásai.

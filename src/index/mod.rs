@@ -9,4 +9,4 @@ pub(crate) use hierarchy::{TypeHierarchy, ViaMatcher};
 pub(crate) use hierarchy::normalize as normalize_type;
 pub(crate) use query::CallerIndex;
 pub use query::CallerRow;
-pub(crate) use uncertain::{UNKNOWN_RECEIVER, uncertain_match};
+pub(crate) use uncertain::{UNKNOWN_RECEIVER, pattern_name, uncertain_match};
