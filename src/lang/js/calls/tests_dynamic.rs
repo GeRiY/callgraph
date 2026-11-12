@@ -197,3 +197,56 @@ fn works_in_a_vue_script() {
         "{all:?}"
     );
 }
+
+/// Az `external_call` (nem dinamikus) hívások céljai egy TS függvény törzsében.
+fn external_targets(body: &str) -> Vec<String> {
+    let src = format!("function f(o: any, k: string) {{\n{body}\n}}\n");
+    analyze("/p/x.ts", &src)
+        .into_iter()
+        .filter(|c| c.category == "external_call")
+        .map(|c| c.target)
+        .collect()
+}
+
+#[test]
+fn literal_computed_key_has_the_same_target_as_dot_access() {
+    assert_eq!(external_targets("o.x();"), vec!["x"]);
+    assert_eq!(external_targets("o['x']();"), vec!["x"]);
+    assert_eq!(external_targets("o[\"x\"]();"), vec!["x"]);
+    assert_eq!(external_targets("o[`x`]();"), vec!["x"]);
+    assert_eq!(external_targets("o?.['x']();"), vec!["x"]);
+    assert_eq!(external_targets("o['a']['b']();"), vec!["b"]);
+}
+
+#[test]
+fn literal_computed_key_keeps_the_receiver_and_never_yields_brackets() {
+    let all = analyze("/p/x.ts", "function f(o) { o['x'](); o.plain(); }\n");
+    let calls: Vec<_> = all
+        .iter()
+        .map(|c| (c.target.as_str(), c.on.as_deref(), c.category.as_str()))
+        .collect();
+    assert_eq!(
+        calls,
+        vec![
+            ("x", Some("o"), "external_call"),
+            ("plain", Some("o"), "external_call")
+        ]
+    );
+    for body in ["o['x']();", "o[0]();", "o[k]();", "o[`a${k}`]();"] {
+        let all = analyze("/p/x.ts", &format!("function f(o, k) {{ {body} }}\n"));
+        assert!(all.iter().all(|c| c.target != "[]"), "{body}: {all:?}");
+    }
+}
+
+#[test]
+fn numeric_key_is_not_dynamic_and_not_brackets() {
+    assert_eq!(external_targets("o[0]();"), vec!["0"]);
+    none("o[0]();");
+}
+
+#[test]
+fn non_literal_key_stays_dynamic_only() {
+    assert_eq!(dynamic("obj[k]();"), vec!["obj[k]"]);
+    assert_eq!(external_targets("o[k]();"), Vec::<String>::new());
+    assert_eq!(external_targets("o[`a${k}`]();"), Vec::<String>::new());
+}

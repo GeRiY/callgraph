@@ -149,6 +149,24 @@ pub enum Root<'b> {
     Other,
 }
 
+/// A literál tagelérési kulcs szövege: string, helyettesítés nélküli sablon, szám.
+fn literal_key(e: &Expression<'_>) -> Option<String> {
+    match e.get_inner_expression() {
+        Expression::StringLiteral(s) => Some(s.value.display().to_string()),
+        Expression::NumericLiteral(n) => Some(n.value.to_string()),
+        Expression::TemplateLiteral(t) if t.is_no_substitution_template() => t
+            .quasis
+            .first()
+            .map(|q| {
+                q.value
+                    .cooked
+                    .as_ref()
+                    .map_or_else(|| q.value.raw.to_string(), |c| c.display().to_string())
+            }),
+        _ => None,
+    }
+}
+
 /// `a.b[c].d` -> gyökér + `["b","[]","d"]`.
 pub fn member_root<'a, 'b>(mut e: &'b Expression<'a>) -> (Root<'b>, Vec<String>) {
     let mut parts = Vec::new();
@@ -160,7 +178,9 @@ pub fn member_root<'a, 'b>(mut e: &'b Expression<'a>) -> (Root<'b>, Vec<String>)
                 e = &m.object;
             }
             Expression::ComputedMemberExpression(m) => {
-                parts.push("[]".to_string());
+                // literál kulcs (`o['x']`, ``o[`x`]``, `a[0]`) = a név, mint a `.x`; a nem literál kulcs
+                // (`o[k]`) csak láncközi elem, a hívás célpontjaként a hívásbejáró dinamikusnak jelöli
+                parts.push(literal_key(&m.expression).unwrap_or_else(|| "[]".to_string()));
                 e = &m.object;
             }
             Expression::PrivateFieldExpression(m) => {
