@@ -30,6 +30,17 @@ impl Command for TelemetryCommand {
         match self.action {
             TelemetryAction::Status => write!(out, "{}", telemetry.status(now))?,
             TelemetryAction::Preview => writeln!(out, "{}", telemetry.preview(now))?,
+            TelemetryAction::Reset => {
+                telemetry.reset()?;
+                writeln!(
+                    out,
+                    "{}",
+                    crate::t!(
+                        "telemetry: reset — undecided again, sending is off (turn on: callgraph.sh telemetry on)",
+                        "telemetry: visszaállítva — újra döntetlen, a beküldés ki van kapcsolva (bekapcsolás: callgraph.sh telemetry on)"
+                    )
+                )?;
+            }
             TelemetryAction::Off => {
                 telemetry.decide(Choice::Off, now)?;
                 writeln!(out, "{}", decided_line(Choice::Off))?;

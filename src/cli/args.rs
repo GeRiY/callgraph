@@ -56,8 +56,8 @@ fn refresh_usage() -> &'static str {
 
 fn hook_usage() -> &'static str {
     crate::t!(
-        "callgraph hook install|install-session|uninstall|status [--settings <file>]  (Claude Code hooks: PostToolUse background refresh after Edit / Write / MultiEdit; SessionStart recommended settings and update notice; default settings: ~/.claude/settings.json) | callgraph hook post-edit|session-start  (run by the hooks) | callgraph hook never hook|mcp|telemetry  (stop recommending it)",
-        "callgraph hook install|install-session|uninstall|status [--settings <fájl>]  (Claude Code-hookok: PostToolUse háttér-frissítés Edit / Write / MultiEdit után; SessionStart ajánlott beállítások és frissítés-értesítés; alapértelmezett beállítások: ~/.claude/settings.json) | callgraph hook post-edit|session-start  (a hookok futtatják) | callgraph hook never hook|mcp|telemetry  (többé ne ajánlja)"
+        "callgraph hook install|install-session|uninstall|status [--settings <file>]  (Claude Code hooks: PostToolUse background refresh after Edit / Write / MultiEdit; SessionStart recommended settings and update notice; default settings: ~/.claude/settings.json) | callgraph hook post-edit|session-start  (run by the hooks) | callgraph hook never hook|mcp|telemetry  (stop recommending it) | callgraph hook reset [item]  (recommend again)",
+        "callgraph hook install|install-session|uninstall|status [--settings <fájl>]  (Claude Code-hookok: PostToolUse háttér-frissítés Edit / Write / MultiEdit után; SessionStart ajánlott beállítások és frissítés-értesítés; alapértelmezett beállítások: ~/.claude/settings.json) | callgraph hook post-edit|session-start  (a hookok futtatják) | callgraph hook never hook|mcp|telemetry  (többé ne ajánlja) | callgraph hook reset [tétel]  (újra ajánlja)"
     )
 }
 
@@ -96,6 +96,8 @@ pub enum HookAction {
     InstallSession,
     /// Egy ajánlás végleges elhallgattatása (`hook never hook|mcp|telemetry`).
     Never(String),
+    /// Az ajánlások állapotának visszaállítása (egy tételé, vagy tétel nélkül mindegyiké).
+    Reset(Option<String>),
 }
 
 /// A `note` alparancs művelete (PILOT: jegyzetek fájlhoz / metódushoz).
@@ -597,6 +599,13 @@ impl CliArgs {
                 "never" if action.is_none() && i + 1 < args.len() => {
                     action = Some(HookAction::Never(args[i + 1].clone()));
                     i += 1;
+                }
+                "reset" if action.is_none() => {
+                    let item = args.get(i + 1).filter(|a| !a.starts_with("--")).cloned();
+                    if item.is_some() {
+                        i += 1;
+                    }
+                    action = Some(HookAction::Reset(item));
                 }
                 x if action.is_none() => {
                     action = Some(match x {

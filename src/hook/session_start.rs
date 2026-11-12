@@ -110,6 +110,16 @@ impl State {
     pub(crate) fn never(&mut self, item: Item) {
         self.items.entry(item.key().to_owned()).or_default().never = true;
     }
+
+    /// Egy tétel (vagy `None`: mindegyik) számlálójának törlése: újra ajánlható.
+    pub(crate) fn reset(&mut self, item: Option<Item>) {
+        match item {
+            Some(item) => {
+                self.items.remove(item.key());
+            }
+            None => self.items.clear(),
+        }
+    }
 }
 
 /// Szükséges-e a tétel a gép állapota szerint.

@@ -157,7 +157,8 @@ Update (from GitHub Releases; projects.json, lang, errors.jsonl, feedback.jsonl,
   writes one line to stderr. Without the flag the first tool result of a session gets the "ℹ callgraph X is available"
   line. Both only write into the skill dir; CALLGRAPH_UPDATE_CHECK=0 turns off all network access.
   Anonymous daily count: once a day, on first use, the version, platform and three yes/no flags go to
-  check.callgraph.eu (no ID, no IP stored). Off: CALLGRAPH_COUNT=0 or DO_NOT_TRACK=1 (also with CALLGRAPH_UPDATE_CHECK=0).
+  check.callgraph.eu (no ID, no IP stored). Off: CALLGRAPH_COUNT=0 or DO_NOT_TRACK=1 (also with CALLGRAPH_UPDATE_CHECK=0);
+  DO_NOT_TRACK=1 also stops the opt-in telemetry.
 
 Output limit: above 400 lines the directory outline switches to summary, the single-file one to a method index;
 

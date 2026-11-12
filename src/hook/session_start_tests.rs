@@ -61,6 +61,22 @@ fn never_silences_only_that_item() {
 }
 
 #[test]
+fn reset_brings_an_item_back() {
+    let mut state = State::default();
+    state.never(Item::Hook);
+    assert!(!decide(&state, &facts(), 100).0.contains(&Item::Hook));
+    state.reset(Some(Item::Hook));
+    assert!(decide(&state, &facts(), 100).0.contains(&Item::Hook));
+    state.never(Item::Mcp);
+    state.never(Item::Telemetry);
+    state.reset(None);
+    assert_eq!(
+        decide(&state, &facts(), 100).0,
+        vec![Item::Hook, Item::Mcp, Item::Telemetry]
+    );
+}
+
+#[test]
 fn only_missing_things_are_recommended() {
     let mut f = all_good();
     f.mcp = McpState::WithoutAutoUpdate;

@@ -322,6 +322,38 @@ impl HookCommand {
     }
 }
 
+impl HookCommand {
+    /// Az ajánlások visszaállítása (egy tétel, vagy mindegyik).
+    fn reset(&self, item: Option<&str>, out: &mut dyn Write) -> Result<()> {
+        let item = match item {
+            None => None,
+            Some(text) => Some(Item::parse(text).ok_or_else(|| {
+                crate::error::CallgraphError::Usage(
+                    crate::t!(
+                        "usage: callgraph hook reset [hook|mcp|telemetry]",
+                        "használat: callgraph hook reset [hook|mcp|telemetry]"
+                    )
+                    .into(),
+                )
+            })?),
+        };
+        let file = self.home.dir().join(session::STATE_FILE);
+        let mut state = State::load(&file);
+        state.reset(item);
+        state.save(&file)?;
+        writeln!(
+            out,
+            "{}",
+            crate::tf!(
+                "callgraph will recommend it again when it is off: {}",
+                "a callgraph újra ajánlja, ha ki van kapcsolva: {}",
+                item.map_or("all", Item::key)
+            )
+        )?;
+        Ok(())
+    }
+}
+
 /// A Claude Code felhasználói állapotfájlja (benne a user-scope `mcpServers`): `$CLAUDE_CONFIG_DIR/.claude.json`
 /// › `~/.claude.json`.
 fn claude_json_path() -> Option<PathBuf> {
@@ -354,6 +386,7 @@ impl Command for HookCommand {
             HookAction::SessionStart => self.session_start(out)?,
             HookAction::InstallSession => self.install_session(out)?,
             HookAction::Never(ref item) => self.never(item, out)?,
+            HookAction::Reset(ref item) => self.reset(item.as_deref(), out)?,
         }
         Ok(0)
     }
