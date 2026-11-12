@@ -88,13 +88,7 @@ fn class_fields_and_parameter_properties_become_properties() {
         .map(|p| {
             format!(
                 "{} {} {} {:?} static={} readonly={} {:?}",
-                p.name,
-                p.line,
-                p.visibility,
-                p.type_hint,
-                p.is_static,
-                p.readonly,
-                p.container
+                p.name, p.line, p.visibility, p.type_hint, p.is_static, p.readonly, p.container
             )
         })
         .collect();
@@ -109,7 +103,12 @@ fn class_fields_and_parameter_properties_become_properties() {
     );
     // a függvény-értékű mező metódus marad, a sima constructor-paraméter nem property
     assert!(graph.methods.iter().any(|m| m.name == "run"));
-    assert!(!graph.properties.iter().any(|p| p.name == "plain" || p.name == "run"));
+    assert!(
+        !graph
+            .properties
+            .iter()
+            .any(|p| p.name == "plain" || p.name == "run")
+    );
 }
 
 #[test]

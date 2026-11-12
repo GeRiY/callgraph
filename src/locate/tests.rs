@@ -672,12 +672,22 @@ fn properties_match_by_exact_name_or_name_part() {
             .collect()
     };
     // pontos név: a `$` nélkül, `$`-jellel és `Típus::$név` alakban is; PHP-ban `$`-jellel kiírva
-    let fillable = (Kind::Definition, property_symbol("Invoice", "$fillable", 12));
+    let fillable = (
+        Kind::Definition,
+        property_symbol("Invoice", "$fillable", 12),
+    );
     for term in 0..3 {
-        assert_eq!(found(term), [fillable.clone()], "{term}: {hits:?}");
+        assert_eq!(
+            found(term),
+            std::slice::from_ref(&fillable),
+            "{term}: {hits:?}"
+        );
     }
     // név-részlet: a `guarded` a `guardedColumns` szavai között
-    let guarded = (Kind::NamePart, property_symbol("Invoice", "$guardedColumns", 13));
+    let guarded = (
+        Kind::NamePart,
+        property_symbol("Invoice", "$guardedColumns", 13),
+    );
     assert_eq!(found(3), [guarded]);
     // a szó eleje nem név-részlet, a másik típus tagja nem pontos egyezés
     assert!(found(4).is_empty(), "{hits:?}");
@@ -762,7 +772,10 @@ fn a_property_defined_in_many_files_does_not_bury_other_matches() {
         );
     }
     let ranked = rank(files, super::rank::is_test_path);
-    assert_eq!(ranked[0].path, "app/Http/RefundController.php", "{ranked:?}");
+    assert_eq!(
+        ranked[0].path, "app/Http/RefundController.php",
+        "{ranked:?}"
+    );
 
     // `Invoice fillable`: a pontos osztály-találat a sok modell `$fillable`-je előtt
     let mut files = vec![

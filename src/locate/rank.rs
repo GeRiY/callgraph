@@ -192,9 +192,8 @@ pub(crate) fn rank(mut files: Vec<FileMatch>, is_test: impl Fn(&str) -> bool) ->
             *property_df.entry(term).or_default() += 1;
         }
     }
-    let rare_property = |term: usize| {
-        property_df.get(&term).copied().unwrap_or(0) <= PROPERTY_EXACT_MAX_FILES
-    };
+    let rare_property =
+        |term: usize| property_df.get(&term).copied().unwrap_or(0) <= PROPERTY_EXACT_MAX_FILES;
     let idf_permille = |term: usize| -> u64 {
         let matched = df.get(&term).copied().unwrap_or(1).max(1) as f64;
         ((1.0 + (total / matched).ln()) * 1000.0).round() as u64

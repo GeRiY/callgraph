@@ -121,7 +121,13 @@ impl Language for HtmlDocument {
                 .find(|(_, next, _)| *next <= *level)
                 .map_or(end, |(next, _, _)| next.saturating_sub(1))
                 .max(*first);
-            b.method(Self::section_method(&name, title, *first, section_end, *level));
+            b.method(Self::section_method(
+                &name,
+                title,
+                *first,
+                section_end,
+                *level,
+            ));
         }
         for t in &scan.texts {
             let first = line(t.start);
@@ -235,7 +241,10 @@ mod tests {
         let goal = found("Goal one").unwrap();
         assert_eq!((goal.line, goal.caller.as_deref()), (11, Some("Goals")));
         assert_eq!(found("Tip").unwrap().line, 11);
-        assert_eq!(found("Intro text").unwrap().caller.as_deref(), Some("Overview"));
+        assert_eq!(
+            found("Intro text").unwrap().caller.as_deref(),
+            Some("Overview")
+        );
         assert!(found("Design doc").is_some());
         assert!(
             !graph.strings.iter().any(|s| s.value.contains("needle")),

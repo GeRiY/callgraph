@@ -327,7 +327,11 @@ fn parse_tag(src: &str, start: usize) -> Tag<'_> {
         });
         p = next;
     }
-    Tag { name, attrs, end: p }
+    Tag {
+        name,
+        attrs,
+        end: p,
+    }
 }
 
 /// A `from` pozíciótól az első `>` utáni pozíció (ha nincs, a szöveg vége).

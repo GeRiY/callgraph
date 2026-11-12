@@ -248,7 +248,9 @@ impl<'a> Matcher<'a> {
                 }
                 let member = term.member.as_ref().is_some_and(|(want_owner, want_name)| {
                     want_name.trim_start_matches(['$', '#']) == lower
-                        && owner.as_deref().is_some_and(|o| short_name(o) == want_owner)
+                        && owner
+                            .as_deref()
+                            .is_some_and(|o| short_name(o) == want_owner)
                 });
                 let kind = if term.lower.trim_start_matches(['$', '#']) == lower || member {
                     Kind::Definition
@@ -387,10 +389,9 @@ fn identifier_hit(hit: &Hit) -> bool {
         | Symbol::Container { .. }
         | Symbol::Method { .. }
         | Symbol::Constant { .. } => true,
-        Symbol::Property { .. }
-        | Symbol::Key { .. }
-        | Symbol::Str { .. }
-        | Symbol::Call { .. } => false,
+        Symbol::Property { .. } | Symbol::Key { .. } | Symbol::Str { .. } | Symbol::Call { .. } => {
+            false
+        }
     };
     kind && symbol
 }

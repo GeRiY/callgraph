@@ -104,7 +104,9 @@ fn an_exact_php_property_name_is_a_definition() {
             let out = project.run(&[term, "--all"], graph);
             assert!(!out.contains("no match"), "{graph} {term}: {out}");
             assert!(
-                out.contains(&format!("property $fillable  L6  ← \"{term}\" (exact property)")),
+                out.contains(&format!(
+                    "property $fillable  L6  ← \"{term}\" (exact property)"
+                )),
                 "{graph} {term}: {out}"
             );
             assert!(
@@ -145,15 +147,24 @@ fn typescript_class_fields_are_properties() {
     let project = Project::new();
     for graph in [true, false] {
         for (term, line) in [
-            ("itemCount", "property itemCount  L2  ← \"itemCount\" (exact property)"),
-            ("secretToken", "property #secretToken  L3  ← \"secretToken\" (exact property)"),
+            (
+                "itemCount",
+                "property itemCount  L2  ← \"itemCount\" (exact property)",
+            ),
+            (
+                "secretToken",
+                "property #secretToken  L3  ← \"secretToken\" (exact property)",
+            ),
             (
                 "cartRepository",
                 "property cartRepository  L4  ← \"cartRepository\" (exact property)",
             ),
         ] {
             let out = project.run(&[term], graph);
-            assert!(out.contains("1. resources/js/Cart.ts"), "{graph} {term}: {out}");
+            assert!(
+                out.contains("1. resources/js/Cart.ts"),
+                "{graph} {term}: {out}"
+            );
             assert!(out.contains(line), "{graph} {term}: {out}");
         }
     }
