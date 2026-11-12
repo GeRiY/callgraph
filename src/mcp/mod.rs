@@ -39,7 +39,11 @@ pub(crate) fn serve_stdio(home: SkillHome, auto_update: bool) -> Result<()> {
         // a beküldés-tipp (ritka, a felhasználónak) és az opt-in beküldés óránkénti vizsgálata
         runner = hint::with_hint(runner, &home);
         let stats = crate::stats::McpStats::from_env(&home);
-        let server = server::CallgraphServer::new(runner, stats);
+        let usage = crate::update::usage::UsageCheck::from_env(
+            &home,
+            Box::new(crate::update::usage::ThreadSender),
+        );
+        let server = server::CallgraphServer::new(runner, stats).with_usage(usage);
         let service = server
             .serve(rmcp::transport::stdio())
             .await

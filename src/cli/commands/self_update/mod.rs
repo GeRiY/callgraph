@@ -420,11 +420,19 @@ impl SelfUpdateCommand {
         record_latest(&self.home, now_secs(), latest);
     }
 
+    /// A zip letöltése; ha a saját (számláló) letöltési cím hibázik, közvetlenül a GitHubról próbálja újra.
     fn download(&self, url: &str) -> std::result::Result<Vec<u8>, SkillFailure> {
-        self.env
-            .fetcher
-            .get(url, ASSET_LIMIT)
-            .map_err(|e| fetch_failure(url, e))
+        match self.env.fetcher.get(url, ASSET_LIMIT) {
+            Ok(zip) => Ok(zip),
+            Err(e) => match crate::update::usage::direct_download_url(url) {
+                Some(direct) => self
+                    .env
+                    .fetcher
+                    .get(&direct, ASSET_LIMIT)
+                    .map_err(|e| fetch_failure(&direct, e)),
+                None => Err(fetch_failure(url, e)),
+            },
+        }
     }
 
     fn target(&self) -> std::result::Result<&InstallTarget, SkillFailure> {

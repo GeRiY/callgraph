@@ -1,7 +1,8 @@
 //! Az MCP-szerver (rmcp): tíz, csak olvasó eszköz a meglévő lekérdező-motor fölött. A leírások rövidek (minden
 //! kliensben kontextus-tokenbe kerülnek): mit ad, egy példa, a fő buktató. Az `initialize` útmutatója és a `guide`
 //! eszköz szövege a skill-utasítás forrásából készül (`guide.rs`), így nem csúszik szét a SKILL.md-vel. Minden
-//! eszköz-hívás vége egy helyen megy át (`finish`): ott méri a helyi használati statisztika (`stats::McpStats`).
+//! eszköz-hívás vége egy helyen megy át (`finish`): ott méri a helyi használati statisztika (`stats::McpStats`),
+//! és ott indul a napi névtelen check (`update::usage`).
 
 use std::sync::Arc;
 use std::time::Instant;
@@ -17,12 +18,15 @@ use super::params::{
 use super::request::ShowQuery;
 use super::runner::QueryRunner;
 use crate::stats::{CommandKind, McpStats, ToolCall};
+use crate::update::usage::{UsageCheck, Via};
 
 /// Az MCP-kiszolgáló; a lekérdezéseket a befecskendezett `QueryRunner` futtatja, a hívásokat a `McpStats` méri.
 #[derive(Clone)]
 pub(crate) struct CallgraphServer {
     runner: Arc<dyn QueryRunner>,
     stats: Arc<McpStats>,
+    /// A napi névtelen check (alapból kikapcsolva; a valódi szerver a `with_usage`-dzsel kapcsolja be).
+    usage: Arc<UsageCheck>,
     tool_router: ToolRouter<Self>,
 }
 
@@ -32,8 +36,15 @@ impl CallgraphServer {
         Self {
             runner,
             stats: Arc::new(stats),
+            usage: Arc::new(UsageCheck::disabled()),
             tool_router: Self::tool_router(),
         }
+    }
+
+    /// A napi névtelen check bekapcsolása (a nap első eszközhívásakor, háttérszálon; lásd `update::usage`).
+    pub(crate) fn with_usage(mut self, usage: UsageCheck) -> Self {
+        self.usage = Arc::new(usage);
+        self
     }
 
     /// A lekérdezés a blokkoló szálkészleten fut (elemzés, fájl-I/O), a hiba eszköz-hibaként tér vissza.
@@ -66,6 +77,8 @@ impl CallgraphServer {
     /// Minden eszköz-hívás vége: a helyi mérés (kikapcsolva semmi), majd az eszköz-eredmény.
     fn finish(&self, call: &ToolCall<'_>, result: Result<String, String>) -> CallToolResult {
         self.stats.tool_call(call, &result);
+        self.usage
+            .after_use(crate::update::check::now_secs(), Via::Mcp);
         to_result(result)
     }
 

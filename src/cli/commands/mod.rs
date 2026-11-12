@@ -20,6 +20,7 @@ mod show;
 mod skill_sync;
 mod stats;
 mod telemetry;
+mod usage_check;
 mod version;
 mod wrap;
 
@@ -48,6 +49,7 @@ pub use show::ShowCommand;
 pub use skill_sync::SkillSyncCommand;
 pub use stats::StatsCommand;
 pub use telemetry::TelemetryCommand;
+pub use usage_check::UsageCheckCommand;
 pub use version::VersionCommand;
 pub use wrap::WrapCommand;
 

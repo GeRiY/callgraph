@@ -11,6 +11,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   five platforms) and publishes it to the official MCP Registry as `io.github.GeRiY/callgraph`, so MCPB-aware
   clients (e.g. Claude Desktop) can install the MCP server in one step, without a Rust toolchain.
 
+### Changed
+
+- Update checks and downloads go through `update.callgraph.eu` (falls back to GitHub); anonymous daily
+  usage count — see "Anonymous daily count" in the README.
+
 ### Fixed
 
 - The release zips now keep the executable bit on the binary and scripts, so a manually unpacked

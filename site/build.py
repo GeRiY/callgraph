@@ -142,7 +142,7 @@ FAQ = {
 }
 
 INSTALL_ONELINER = ('p="$(uname -s | tr \'[:upper:]\' \'[:lower:]\')-$(uname -m)" && t="$(mktemp -d)" '
-                    '&& curl -fsSL -o "$t/cg.zip" "https://github.com/GeRiY/callgraph/releases/latest/download/callgraph-$p.zip" '
+                    '&& curl -fsSL -o "$t/cg.zip" "https://update.callgraph.eu/v1/download/latest/callgraph-$p.zip?k=install" '
                     '&& mkdir -p ~/.claude/skills && unzip -qo "$t/cg.zip" -d ~/.claude/skills '
                     '&& bash ~/.claude/skills/callgraph/install.sh && rm -rf "$t"')
 MCP_ADD_UNIX = ("claude mcp add -s user callgraph -- ~/.claude/skills/callgraph/bin/"

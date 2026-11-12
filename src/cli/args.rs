@@ -272,6 +272,7 @@ impl CliArgs {
                     | "set-lang"
                     | "self-update"
                     | "skill-sync"
+                    | "usage-check"
             )
         }) {
             return Ok(Self::Skill {
