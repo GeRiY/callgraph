@@ -136,6 +136,22 @@ impl CallerIndex {
         out
     }
 
+    /// A `név` metódusra csak név szerint illeszkedő hívások: feloldatlan, fogadó-típus nélküli (`open`), nem
+    /// `?::név` célúak (azok a mintára már név szerint illeszkednek). A saját nevű (rekurzív) hívó kimarad.
+    pub(crate) fn name_only_callers(&self, name: &str) -> Vec<CallerRow> {
+        self.edges
+            .iter()
+            .filter(|edge| {
+                edge.guessable
+                    && !is_uncertain(&edge.row.target)
+                    && edge.row.target == edge.lookup
+                    && edge.row.target.eq_ignore_ascii_case(name)
+                    && !edge.row.caller.eq_ignore_ascii_case(name)
+            })
+            .map(|edge| edge.row.clone())
+            .collect()
+    }
+
     pub fn callers(&self, pattern: &str, depth: usize) -> Result<Vec<CallerRow>> {
         self.callers_with_guess(pattern, depth, false)
     }

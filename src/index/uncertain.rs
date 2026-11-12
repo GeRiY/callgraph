@@ -17,7 +17,7 @@ pub(crate) fn bare_name(target: &str) -> &str {
 }
 
 /// A minta utolsó `::` utáni azonosítója (`Store::fetch`, `Store::fetch$`, `Store::fetch\(` → `fetch`).
-fn pattern_name(pattern: &str) -> Option<&str> {
+pub(crate) fn pattern_name(pattern: &str) -> Option<&str> {
     let (_, tail) = pattern.rsplit_once("::")?;
     let tail = tail.trim_end_matches('$');
     let tail = tail.strip_suffix("\\b").unwrap_or(tail);

@@ -6,6 +6,17 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ## [Unreleased]
 
+## [0.9.2] — 2026-11-12
+
+### Javítás
+- **JS / TS literál kulcsú computed hívás célpontja:** az `o['x']()`, `o["x"]()` és ``o[`x`]()`` ugyanazt a célpontot
+  kapja, mint az `o.x()` (a régi `[]` cél megszűnt); az `o[k]()` `dynamic_call` marad, a szám kulcs (`a[0]()`) már nem ad `[]`-t.
+- **`--guess` egyszintű `--grep`-nél:** a `--grep 'Típus::metódus' --guess` (és a `--depth 1 --guess`) a feloldatlan,
+  csak név szerinti hívókat is listázza, `?` jellel, mint a `--depth 2+` nézet.
+- **Láblécek az egyszintű `--grep 'Típus::metódus'`-nál:** a `--depth 2+` nézet két sora (`(+N feloldatlan, csak név
+  szerinti egyezés kihagyva — --guess mutatja)` és `(N hívó dinamikus hívást tartalmaz — kézzel nézd át)`) az egyszintű
+  nézetben is megjelenik, ha van mit mondani.
+
 ## [0.9.1] — 2026-11-11
 
 ### Új
@@ -539,7 +550,8 @@ Első kiadás.
 - Beépített frissítés: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Előre fordított csomagok macOS-re (arm64, x86_64), Linuxra (x86_64, ARM64, statikus musl) és Windowsra.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.9.1...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.9.2...develop
+[0.9.2]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.2
 [0.9.1]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.1
 [0.9.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.0
 [0.8.0]: https://github.com/GeRiY/callgraph/releases/tag/v0.8.0
