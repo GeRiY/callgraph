@@ -5,7 +5,7 @@ use super::matcher::{Hit, Kind, Matcher, Symbol};
 use super::rank::{FileMatch, rank, score};
 use super::reasons::{group, pick};
 use super::terms::{Term, TermKind, same_word, split_member, words};
-use crate::model::{Call, Container, FileGraph, Method, StringLit};
+use crate::model::{Call, Container, FileGraph, Method, Property, StringLit};
 
 fn w(text: &str) -> Vec<String> {
     words(text)
@@ -621,4 +621,193 @@ fn declaration_paths_are_recognised() {
     for path in ["src/types.ts", "src/d.ts.vue", "app.py"] {
         assert!(!is_declaration_path(path), "{path}");
     }
+}
+
+fn property(container: &str, name: &str, line: u32) -> Property {
+    Property {
+        container: Some(container.into()),
+        name: name.into(),
+        line,
+        type_hint: None,
+        visibility: "protected".into(),
+        is_static: false,
+        readonly: false,
+        doc: None,
+        js: false,
+    }
+}
+
+fn property_symbol(container: &str, name: &str, line: u32) -> Symbol {
+    Symbol::Property {
+        container: Some(container.into()),
+        name: name.into(),
+        line,
+    }
+}
+
+#[test]
+fn properties_match_by_exact_name_or_name_part() {
+    let terms = Term::parse_all(&[
+        "fillable",
+        "$fillable",
+        "Invoice::$fillable",
+        "guarded",
+        "fill",
+        "secretToken",
+        "Order::fillable",
+    ]);
+    let callers = CallerCounts::build(std::iter::empty::<&FileGraph>());
+    let matcher = Matcher::new(&terms, &callers);
+    let mut invoice = graph("app/Models/Invoice.php");
+    invoice.containers.push(container("Invoice", 3, 30));
+    invoice.properties.push(property("Invoice", "fillable", 12));
+    invoice
+        .properties
+        .push(property("Invoice", "guardedColumns", 13));
+    let hits = matcher.file_hits("app/Models/Invoice.php", &invoice, true);
+    let found = |term: usize| -> Vec<(Kind, Symbol)> {
+        hits.iter()
+            .filter(|h| h.term == term)
+            .map(|h| (h.kind, h.symbol.clone()))
+            .collect()
+    };
+    // pontos név: a `$` nélkül, `$`-jellel és `Típus::$név` alakban is; PHP-ban `$`-jellel kiírva
+    let fillable = (Kind::Definition, property_symbol("Invoice", "$fillable", 12));
+    for term in 0..3 {
+        assert_eq!(found(term), [fillable.clone()], "{term}: {hits:?}");
+    }
+    // név-részlet: a `guarded` a `guardedColumns` szavai között
+    let guarded = (Kind::NamePart, property_symbol("Invoice", "$guardedColumns", 13));
+    assert_eq!(found(3), [guarded]);
+    // a szó eleje nem név-részlet, a másik típus tagja nem pontos egyezés
+    assert!(found(4).is_empty(), "{hits:?}");
+    assert!(found(6).is_empty(), "{hits:?}");
+    // a property nem egyesít kifejezéseket (nem emel a pontos szintre többkifejezésesként)
+    assert_eq!(matcher.multi_terms(&hits), 0, "{hits:?}");
+
+    // TS private field: a `#` nélkül is pontos, a kiírt név a forrásbeli
+    let mut cart = graph("resources/js/Cart.ts");
+    cart.properties.push(property("Cart", "#secretToken", 4));
+    let hits = matcher.file_hits("resources/js/Cart.ts", &cart, true);
+    let want = Hit {
+        term: 5,
+        kind: Kind::Definition,
+        symbol: property_symbol("Cart", "#secretToken", 4),
+    };
+    assert_eq!(hits, [want]);
+
+    // dokumentumban (md, json) a property nem számít
+    let hits = matcher.file_hits("docs/a.md", &invoice, false);
+    assert!(hits.is_empty(), "{hits:?}");
+}
+
+#[test]
+fn a_property_reason_reads_like_a_constant() {
+    use super::reasons::describe;
+    let terms = Term::parse_all(&["fillable", "guarded"]);
+    let hits = vec![
+        Hit {
+            term: 0,
+            kind: Kind::Definition,
+            symbol: property_symbol("Invoice", "$fillable", 12),
+        },
+        Hit {
+            term: 1,
+            kind: Kind::NamePart,
+            symbol: property_symbol("Invoice", "$guardedColumns", 13),
+        },
+    ];
+    let lines: Vec<String> = group(&hits)
+        .iter()
+        .map(|reason| describe(reason, &terms))
+        .collect();
+    // a címke a kimenet nyelvén (a teszt a környezet nyelvétől függetlenül)
+    let exact = crate::t!("exact property", "pontos property");
+    let part = crate::t!("name part", "név-részlet");
+    assert_eq!(
+        lines,
+        [
+            format!("property $fillable  L12  ← \"fillable\" ({exact})"),
+            format!("property $guardedColumns  L13  ~ \"guarded\" ({part})"),
+        ]
+    );
+}
+
+fn property_hit(term: usize, kind: Kind, name: &str) -> Hit {
+    Hit {
+        term,
+        kind,
+        symbol: property_symbol("Model", name, 5),
+    }
+}
+
+#[test]
+fn a_property_defined_in_many_files_does_not_bury_other_matches() {
+    // `refund status`: a 20 modellben definiált `status` property nem kerül a pontos szintre, így a
+    // `RefundController` (név-részlet, ritka kifejezés) elöl marad
+    let mut files = vec![
+        FileMatch::new(
+            "app/Http/RefundController.php".into(),
+            vec![symbol_hit(0, Kind::NamePart, "RefundController")],
+        )
+        .unwrap(),
+    ];
+    for n in 0..20 {
+        files.push(
+            FileMatch::new(
+                format!("app/Models/M{n}.php"),
+                vec![property_hit(1, Kind::Definition, "$status")],
+            )
+            .unwrap(),
+        );
+    }
+    let ranked = rank(files, super::rank::is_test_path);
+    assert_eq!(ranked[0].path, "app/Http/RefundController.php", "{ranked:?}");
+
+    // `Invoice fillable`: a pontos osztály-találat a sok modell `$fillable`-je előtt
+    let mut files = vec![
+        FileMatch::new(
+            "app/Models/Invoice.php".into(),
+            vec![
+                symbol_hit(0, Kind::Definition, "Invoice"),
+                property_hit(1, Kind::Definition, "$fillable"),
+            ],
+        )
+        .unwrap(),
+    ];
+    for n in 0..20 {
+        files.push(
+            FileMatch::new(
+                format!("app/Models/A{n}.php"),
+                vec![property_hit(1, Kind::Definition, "$fillable")],
+            )
+            .unwrap(),
+        );
+    }
+    let ranked = rank(files, super::rank::is_test_path);
+    assert_eq!(ranked[0].path, "app/Models/Invoice.php", "{ranked:?}");
+}
+
+#[test]
+fn a_rare_property_is_an_exact_match() {
+    // egyetlen fájl definiálja: a pontos szintre kerül a több kifejezésre gyengén illő fájl elé
+    let files = vec![
+        FileMatch::new(
+            "app/Models/Invoice.php".into(),
+            vec![property_hit(0, Kind::Definition, "$paymentGatewayToken")],
+        )
+        .unwrap(),
+        FileMatch::new(
+            "app/Services/Other.php".into(),
+            vec![
+                hit(0, Kind::StringLit),
+                hit(1, Kind::NamePart),
+                hit(2, Kind::NamePart),
+                hit(3, Kind::NamePart),
+            ],
+        )
+        .unwrap(),
+    ];
+    let ranked = rank(files, super::rank::is_test_path);
+    assert_eq!(ranked[0].path, "app/Models/Invoice.php", "{ranked:?}");
 }

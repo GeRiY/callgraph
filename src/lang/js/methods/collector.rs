@@ -9,7 +9,7 @@ use oxc_span::{GetSpan, Span};
 
 use super::docs::Docs;
 use crate::lang::js::lines::LineIndex;
-use crate::model::{Container, Method};
+use crate::model::{Container, Method, Property};
 
 /// Függvény-szerű csomópont (`function` / nyíl).
 #[derive(Clone, Copy)]
@@ -96,6 +96,8 @@ pub struct Collector<'s> {
     pub registered: HashSet<u32>,
     pub methods: Vec<Method>,
     pub containers: Vec<Container>,
+    /// Az osztálymezők (nem függvény-értékű class field, TS constructor parameter property).
+    pub properties: Vec<Property>,
 }
 
 impl<'s> Collector<'s> {
@@ -109,6 +111,7 @@ impl<'s> Collector<'s> {
             registered: HashSet::new(),
             methods: Vec::new(),
             containers: Vec::new(),
+            properties: Vec::new(),
         }
     }
 
