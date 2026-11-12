@@ -6,6 +6,12 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ## [Unreleased]
 
+### Új
+
+- **MCP Registry**: minden kiadás mellé `callgraph.mcpb` is készül (MCPB-csomag mind az öt platform
+  binárisával), és felkerül a hivatalos MCP Registry-be `io.github.GeRiY/callgraph` néven, így az MCPB-t ismerő
+  kliensek (pl. Claude Desktop) egy lépésben, Rust nélkül telepíthetik az MCP szervert.
+
 ## [0.9.3] — 2026-11-12
 
 ### Új

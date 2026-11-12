@@ -5,6 +5,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+### Added
+
+- **MCP Registry**: each release now ships `callgraph.mcpb` (an MCPB bundle with the binaries for all
+  five platforms) and publishes it to the official MCP Registry as `io.github.GeRiY/callgraph`, so MCPB-aware
+  clients (e.g. Claude Desktop) can install the MCP server in one step, without a Rust toolchain.
+
 ## [0.9.3] — 2026-11-12
 
 ### Added
