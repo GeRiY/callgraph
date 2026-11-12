@@ -402,6 +402,16 @@ edits in the background; it adds one entry to `~/.claude/settings.json`, keeps e
 `settings.json.bak` backup first. Remove it with `bash ~/.claude/skills/callgraph/callgraph.sh hook uninstall`.
 Details (Hungarian): [`docs/PROJECT-GRAPH.md`](docs/PROJECT-GRAPH.md).
 
+### Session-start check (optional hook)
+
+`bash install.sh` asks once (default yes; non-interactive: `--session-hook`) whether to add a Claude Code
+`SessionStart` hook (`callgraph.sh hook install-session`). At the start of a new session it checks, offline, whether a
+recommended setting is off — the refresh hook above, the MCP server with `--auto-update`, opting in to the shared
+usage counts — or a newer callgraph is out, and if so shows one short note and asks your agent to ask you. Nothing is
+changed without your yes; telemetry can only be turned on by you in a terminal. Each item at most every 2 days and 3
+times in total; `callgraph.sh hook never hook|mcp|telemetry` silences one, `CALLGRAPH_RECOMMEND=0` all; never in CI.
+Remove: `callgraph.sh hook uninstall`.
+
 ### Local usage stats
 
 callgraph keeps a small usage summary on your computer: how often each command or MCP tool ran, whether it

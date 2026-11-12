@@ -3,16 +3,20 @@
 # (skill-i18n/SKILL.<en|hu>.md), létrehozza az üres projects.json-t.
 # Az elemzést és a projekt- / feedback-kezelést a natív callgraph bináris végzi (bin/<os>-<arch>/callgraph) — PHP, Node és jq nem kell.
 # Az üzenetek nyelve: CALLGRAPH_LANG › a skill-mappa lang fájlja (friss telepítésnél még nincs) › angol.
-# Használat:  bash install.sh [--hooks|--no-hooks] [--mcp|--no-mcp]
+# Használat:  bash install.sh [--hooks|--no-hooks] [--session-hook|--no-session-hook] [--mcp|--no-mcp]
 #   --hooks: a Claude Code-hook (háttér-frissítés fájl-írás után) kérdés nélkül; --no-hooks: kérdés nélkül kihagyja.
+#   --session-hook: a SessionStart hook (ajánlott beállítások, frissítés-értesítés) kérdés nélkül; --no-session-hook: kihagyja.
 #   --mcp: az MCP-szerver (`callgraph mcp`) regisztrálása a Claude Code-ban kérdés nélkül; --no-mcp: kihagyja.
 set -euo pipefail
 HOOKS=""
+SESSION_HOOK=""
 MCP=""
 for arg in "$@"; do
     case "$arg" in
         --hooks) HOOKS=yes ;;
         --no-hooks) HOOKS=no ;;
+        --session-hook) SESSION_HOOK=yes ;;
+        --no-session-hook) SESSION_HOOK=no ;;
         --mcp) MCP=yes ;;
         --no-mcp) MCP=no ;;
     esac
@@ -65,6 +69,25 @@ if [[ -n "$RPG" ]]; then
     else
         msg "Hook skipped — add later: bash callgraph.sh hook install (remove: bash callgraph.sh hook uninstall)" \
             "Hook kihagyva — később: bash callgraph.sh hook install (eltávolítás: bash callgraph.sh hook uninstall)"
+    fi
+    # SessionStart hook: a session elején szól, ha egy ajánlott beállítás ki van kapcsolva, vagy újabb verzió van
+    # (csak kérdez; bármit csak a felhasználó igenje után állít be). Interaktívan rákérdez (alapból igen), nem
+    # interaktívan csak a --session-hook kapcsolóval.
+    want_session="$SESSION_HOOK"
+    if [[ -z "$want_session" && -t 0 && -t 1 ]]; then
+        if [[ "$(ui_lang)" == hu ]]; then
+            printf 'Claude Code-hook a session elején: szóljon, ha egy ajánlott callgraph-beállítás ki van kapcsolva vagy újabb verzió érhető el (csak kérdez, semmit nem állít be magától)? [I/n] '
+        else
+            printf 'Claude Code hook at session start: tell you when a recommended callgraph setting is off or a newer version is out (it only asks, never changes anything by itself)? [Y/n] '
+        fi
+        read -r answer || answer=""
+        case "$answer" in [nN]*) want_session=no ;; *) want_session=yes ;; esac
+    fi
+    if [[ "$want_session" == yes ]]; then
+        "./$RPG" hook install-session || msg "⚠ The session hook was not installed (see above)." "⚠ A session-hook nem települt (lásd fent)."
+    else
+        msg "Session hook skipped — add later: bash callgraph.sh hook install-session" \
+            "Session-hook kihagyva — később: bash callgraph.sh hook install-session"
     fi
 fi
 # MCP-szerver a Claude Code-ban (`claude mcp add -s user callgraph -- <bináris> mcp`): ha a `claude` CLI elérhető,

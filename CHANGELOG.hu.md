@@ -10,6 +10,11 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ### Új
 
+- **Ellenőrzés a session elején** (opcionális `SessionStart` hook, `callgraph.sh hook install-session`; a
+  telepítő rákérdez): új session elején szól, ha egy ajánlott beállítás ki van kapcsolva (frissítő hook, MCP
+  `--auto-update`-tel, a használati számok megosztása) vagy újabb verzió van, és az agent megkérdez, mielőtt
+  bármit módosítana. Tételenként legfeljebb 2 naponta és 3-szor; `hook never <tétel>`, `CALLGRAPH_RECOMMEND=0`.
+
 - **MCP Registry**: minden kiadás mellé `callgraph.mcpb` is készül (MCPB-csomag mind az öt platform
   binárisával), és felkerül a hivatalos MCP Registry-be `io.github.GeRiY/callgraph` néven, így az MCPB-t ismerő
   kliensek (pl. Claude Desktop) egy lépésben, Rust nélkül telepíthetik az MCP szervert.

@@ -404,6 +404,16 @@ Claude által szerkesztett fájlt a háttérben frissít; egyetlen bejegyzést v
 többit megtartja, és előtte `settings.json.bak` mentést ír. Eltávolítás:
 `bash ~/.claude/skills/callgraph/callgraph.sh hook uninstall`. Részletek: [`docs/PROJECT-GRAPH.md`](docs/PROJECT-GRAPH.md).
 
+### Ellenőrzés a session elején (opcionális hook)
+
+A `bash install.sh` egyszer rákérdez (alapból igen; nem interaktívan: `--session-hook`), hogy felvegyen-e egy Claude
+Code `SessionStart` hookot (`callgraph.sh hook install-session`). Új session elején hálózat nélkül megnézi, ki van-e
+kapcsolva egy ajánlott beállítás — a fenti frissítő hook, az MCP-szerver `--auto-update`-tel, a használati számok
+megosztása —, vagy van-e újabb callgraph; ha igen, egy rövid sort mutat, és megkéri az agentet, hogy kérdezzen meg.
+Az igened nélkül semmi nem változik; a telemetriát csak te kapcsolhatod be, terminálban. Egy tétel legfeljebb 2
+naponta és összesen 3-szor; a `callgraph.sh hook never hook|mcp|telemetry` egyet, a `CALLGRAPH_RECOMMEND=0` mindet
+elhallgattatja; CI-ban soha. Eltávolítás: `callgraph.sh hook uninstall`.
+
 ### Helyi használati statisztika
 
 A callgraph a gépeden egy kis használati összesítőt vezet: melyik parancs vagy MCP-eszköz hányszor futott, volt-e

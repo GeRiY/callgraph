@@ -56,8 +56,8 @@ fn refresh_usage() -> &'static str {
 
 fn hook_usage() -> &'static str {
     crate::t!(
-        "callgraph hook install|uninstall|status [--settings <file>]  (Claude Code PostToolUse hook: background refresh after Edit / Write / MultiEdit; default settings: ~/.claude/settings.json) | callgraph hook post-edit  (run by the hook: reads the hook JSON from stdin)",
-        "callgraph hook install|uninstall|status [--settings <fájl>]  (Claude Code PostToolUse hook: háttér-frissítés Edit / Write / MultiEdit után; alapértelmezett beállítások: ~/.claude/settings.json) | callgraph hook post-edit  (a hook futtatja: a hook JSON-ját a stdin-ről olvassa)"
+        "callgraph hook install|install-session|uninstall|status [--settings <file>]  (Claude Code hooks: PostToolUse background refresh after Edit / Write / MultiEdit; SessionStart recommended settings and update notice; default settings: ~/.claude/settings.json) | callgraph hook post-edit|session-start  (run by the hooks) | callgraph hook never hook|mcp|telemetry  (stop recommending it)",
+        "callgraph hook install|install-session|uninstall|status [--settings <fájl>]  (Claude Code-hookok: PostToolUse háttér-frissítés Edit / Write / MultiEdit után; SessionStart ajánlott beállítások és frissítés-értesítés; alapértelmezett beállítások: ~/.claude/settings.json) | callgraph hook post-edit|session-start  (a hookok futtatják) | callgraph hook never hook|mcp|telemetry  (többé ne ajánlja)"
     )
 }
 
@@ -79,8 +79,8 @@ pub fn take_no_gitignore(args: &mut Vec<String>) -> bool {
     args.len() != before
 }
 
-/// A `hook` alparancs művelete (Claude Code-hook a fájl-írásokra, `crate::hook`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// A `hook` alparancs művelete (Claude Code-hookok: fájl-írás utáni frissítés, session-indítás; `crate::hook`).
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HookAction {
     /// A hook maga: a stdin JSON-jából a szerkesztett fájl háttér-frissítése.
     PostEdit,
@@ -90,6 +90,12 @@ pub enum HookAction {
     Uninstall,
     /// Telepítve van-e.
     Status,
+    /// A `SessionStart` hook maga: ajánlások és frissítés-értesítés a session elején.
+    SessionStart,
+    /// A `SessionStart` hook felvétele a `settings.json`-ba.
+    InstallSession,
+    /// Egy ajánlás végleges elhallgattatása (`hook never hook|mcp|telemetry`).
+    Never(String),
 }
 
 /// A `note` alparancs művelete (PILOT: jegyzetek fájlhoz / metódushoz).
@@ -588,12 +594,18 @@ impl CliArgs {
                     i += 1;
                 }
                 x if x.starts_with("--settings=") => settings = Some(PathBuf::from(&x[11..])),
+                "never" if action.is_none() && i + 1 < args.len() => {
+                    action = Some(HookAction::Never(args[i + 1].clone()));
+                    i += 1;
+                }
                 x if action.is_none() => {
                     action = Some(match x {
                         "post-edit" => HookAction::PostEdit,
                         "install" => HookAction::Install,
                         "uninstall" | "remove" => HookAction::Uninstall,
                         "status" => HookAction::Status,
+                        "session-start" => HookAction::SessionStart,
+                        "install-session" => HookAction::InstallSession,
                         _ => return Err(usage()),
                     });
                 }
