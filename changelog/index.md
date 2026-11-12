@@ -8,6 +8,18 @@ Every release with its date, newest first: what was added, changed and fixed. Do
 
 [Install the latest version](https://callgraph.eu/#install)[Latest release on GitHub](https://github.com/GeRiY/callgraph/releases/latest)
 
+## v0.9.2 — 2026-11-12
+
+[Release notes and downloads on GitHub](https://github.com/GeRiY/callgraph/releases/tag/v0.9.2)
+
+### Fixed
+
+- **JS / TS literal computed call target:** `o['x']()`, `o["x"]()` and ``o[`x`]()`` now get the same target as `o.x()` (the old `[]` target is gone); `o[k]()` stays a `dynamic_call`, a numeric key (`a[0]()`) no longer yields `[]`.
+
+- **`--guess` on a single-level `--grep`:** `--grep 'Type::method' --guess` (and `--depth 1 --guess`) now also lists the unresolved, name-only callers, marked with `?` as in the `--depth 2+` view.
+
+- **Single-level `--grep 'Type::method'` footers:** the `(+N unresolved, name-only matches skipped — --guess shows them)` and `(N of these callers contain dynamic calls — check them by hand)` lines of the `--depth 2+` view now also appear on the single-level view, when there is something to say.
+
 ## v0.9.1 — 2026-11-11
 
 [Release notes and downloads on GitHub](https://github.com/GeRiY/callgraph/releases/tag/v0.9.1)
