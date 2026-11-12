@@ -1,7 +1,8 @@
 //! `callgraph wrap …` — a `callgraph.sh` burok logikája: projekt-alias feloldása, `show` futtatása,
 //! belső hibánál error-id-s naplózás (a felhasználói hiba — hibás kapcsoló, rétegnév, nem létező fájl — csak az
 //! üzenet), utána az automatikus frissítés-ellenőrzés (`update::check`: naponta legfeljebb
-//! egy háttérfolyamat, újabb verziónál egysoros értesítés a kimenet végén). A burok csak a súgót írja ki és ide továbbít.
+//! egy háttérfolyamat, újabb verziónál egysoros értesítés a kimenet végén) és a napi névtelen check (`update::usage`).
+//! A burok csak a súgót írja ki és ide továbbít.
 
 use std::io::Write;
 
@@ -9,6 +10,7 @@ use crate::cli::{CliArgs, Command, build_command};
 use crate::error::Result;
 use crate::skill::{ProjectRegistry, SkillFailure, SkillHome, finish};
 use crate::update::check::{UpdateCheck, now_secs};
+use crate::update::usage::{DetachedSender, UsageCheck, Via};
 
 const SOURCE: &str = "callgraph.sh";
 fn usage() -> &'static str {
@@ -26,11 +28,12 @@ const NOT_FOUND_PREFIXES: [&str; 4] = [
     "Nincs ilyen metódus",
 ];
 
-/// A `wrap` parancs; a frissítés-ellenőrzés DI-vel cserélhető.
+/// A `wrap` parancs; a frissítés-ellenőrzés és a napi check DI-vel cserélhető.
 pub struct WrapCommand {
     args: Vec<String>,
     home: SkillHome,
     update_check: UpdateCheck,
+    usage: UsageCheck,
 }
 
 /// A burok-argumentumok szétválogatva: alias, a `show`-nak továbbadott kapcsolók és a célok.
@@ -89,10 +92,12 @@ fn is_env_assignment(a: &str) -> bool {
 impl WrapCommand {
     pub fn new(args: Vec<String>, home: SkillHome) -> Self {
         let update_check = UpdateCheck::from_env(&home);
+        let usage = UsageCheck::from_env(&home, Box::new(DetachedSender));
         Self {
             args,
             home,
             update_check,
+            usage,
         }
     }
 
@@ -207,6 +212,8 @@ impl Command for WrapCommand {
         let result = self.exec(out);
         self.update_check
             .after_command(now_secs(), result.is_ok(), out);
+        // a napi névtelen check (naponta legfeljebb egyszer, háttérben; lásd update::usage)
+        self.usage.after_use(now_secs(), Via::Cli);
         let code = result.as_ref().map_or(0, |code| *code);
         let finished = finish(&self.home, SOURCE, result.map(|_| ()), err)?;
         Ok(if finished == 0 { code } else { finished })

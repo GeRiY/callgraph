@@ -11,6 +11,7 @@ mod platform;
 mod release;
 mod source;
 mod target;
+pub(crate) mod usage;
 mod version;
 
 #[cfg(test)]

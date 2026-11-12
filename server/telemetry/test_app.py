@@ -17,6 +17,7 @@ TMP = tempfile.mkdtemp()
 os.environ["TELEMETRY_DB"] = os.path.join(TMP, "t.sqlite")
 sys.path.insert(0, HERE)
 import app  # noqa: E402
+import counts  # noqa: E402
 
 app.DB_PATH = os.environ["TELEMETRY_DB"]
 
@@ -138,6 +139,129 @@ class Receiver(unittest.TestCase):
         codes = [self.post(payload(batch="dddd-%d" % i)) for i in range(app.RATE_LIMIT + 2)]
         self.assertIn(429, codes)
         app._hits.clear()
+
+
+class _NoFollow(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args, **kwargs):
+        return None
+
+
+class Counting(unittest.TestCase):
+    """check.callgraph.eu / update.callgraph.eu: anonymous daily counters and the GitHub redirects."""
+
+    @classmethod
+    def setUpClass(cls):
+        app.db().close()
+        cls.srv = ThreadingHTTPServer(("127.0.0.1", 0), app.Handler)
+        cls.base = "http://127.0.0.1:%d" % cls.srv.server_address[1]
+        threading.Thread(target=cls.srv.serve_forever, daemon=True).start()
+        cls.opener = urllib.request.build_opener(_NoFollow)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.srv.shutdown()
+
+    def setUp(self):
+        app._hits.clear()
+        counts.reset_latest()
+        con = sqlite3.connect(app.DB_PATH)
+        con.executescript("DELETE FROM checks; DELETE FROM updates;")
+        con.commit()
+        con.close()
+
+    def get(self, path):
+        try:
+            r = self.opener.open(self.base + path, timeout=5)
+            return r.status, r.headers.get("Location")
+        except urllib.error.HTTPError as e:
+            return e.code, e.headers.get("Location")
+
+    def q(self, sql):
+        con = sqlite3.connect(app.DB_PATH)
+        try:
+            return con.execute(sql).fetchall()
+        finally:
+            con.close()
+
+    def test_check_counts_valid_and_silently_drops_bad(self):
+        ok = "/v1/check?v=0.9.4&p=linux-x86_64&via=cli&n=1&w=1&m=1"
+        self.assertEqual(self.get(ok)[0], 204)
+        self.assertEqual(self.get(ok)[0], 204)
+        self.assertEqual(self.get("/v1/check?v=0.9.4-dev.abc1234&p=darwin-arm64&via=mcp&n=0&w=0&m=0")[0], 204)
+        bad = [
+            "/v1/check?v=0.9.4&p=linux-x86_64&via=cli&n=1&w=1",  # missing flag
+            "/v1/check?v=0.9.4&p=solaris&via=cli&n=0&w=0&m=0",
+            "/v1/check?v=../x&p=linux-x86_64&via=cli&n=0&w=0&m=0",
+            "/v1/check?v=0.9.4&p=linux-x86_64&via=web&n=0&w=0&m=0",
+            "/v1/check?v=0.9.4&p=linux-x86_64&via=cli&n=2&w=0&m=0",
+            "/v1/check",
+        ]
+        for path in bad:
+            self.assertEqual(self.get(path)[0], 204, path)  # the client must never retry
+        rows = self.q("SELECT version, platform, via, n, w, m, count FROM checks ORDER BY version")
+        self.assertEqual(rows, [("0.9.4", "linux-x86_64", "cli", 1, 1, 1, 2),
+                                ("0.9.4-dev.abc1234", "darwin-arm64", "mcp", 0, 0, 0, 1)])
+
+    def test_nothing_identifying_is_stored(self):
+        self.get("/v1/check?v=0.9.4&p=linux-x86_64&via=cli&n=0&w=0&m=0&id=secret-machine-id")
+        dump = "\n".join(str(r) for t in ("checks", "updates") for r in self.q("SELECT * FROM " + t))
+        self.assertNotIn("secret", dump)
+        self.assertNotIn("127.0.0.1", dump)
+
+    def test_latest_redirects_like_github(self):
+        counts.latest_tag(fetch=lambda: "v0.9.4")
+        status, loc = self.get("/v1/latest?v=0.9.3&p=darwin-arm64")
+        self.assertEqual(status, 302)
+        self.assertEqual(loc, "https://github.com/GeRiY/callgraph/releases/tag/v0.9.4")
+        self.get("/v1/latest?v=garbage&p=???")  # still redirected, counted as unknown
+        rows = self.q("SELECT event, version, platform, target, count FROM updates ORDER BY version")
+        self.assertEqual(rows, [("check", "0.9.3", "darwin-arm64", "v0.9.4", 1), ("check", "?", "?", "v0.9.4", 1)])
+
+    def test_latest_unknown_gives_503(self):
+        self.assertIsNone(counts.latest_tag(fetch=lambda: None))
+        old = counts.fetch_latest_tag
+        counts.fetch_latest_tag = lambda opener=None: None
+        try:
+            self.assertEqual(self.get("/v1/latest?v=0.9.3&p=linux-x86_64")[0], 503)
+        finally:
+            counts.fetch_latest_tag = old
+
+    def test_latest_cache_is_not_served_when_too_old(self):
+        counts.latest_tag(fetch=lambda: "v0.9.4")
+        later = counts._latest["at"] + counts.LATEST_MAX_AGE + 1
+        self.assertIsNone(counts.latest_tag(fetch=lambda: None, now=later))
+
+    def test_download_redirects_only_release_files(self):
+        status, loc = self.get("/v1/download/v0.9.4/callgraph-linux-x86_64.zip?k=update&v=0.9.3")
+        self.assertEqual((status, loc), (302, "https://github.com/GeRiY/callgraph/releases/download/v0.9.4/callgraph-linux-x86_64.zip"))
+        status, loc = self.get("/v1/download/latest/callgraph-darwin-arm64.zip?k=install")
+        self.assertEqual((status, loc), (302, "https://github.com/GeRiY/callgraph/releases/latest/download/callgraph-darwin-arm64.zip"))
+        self.assertEqual(self.get("/v1/download/v0.9.4/SHA256SUMS")[0], 302)
+        self.assertEqual(self.get("/v1/download/v0.9.4/callgraph.mcpb?k=install")[0], 302)
+        for path in [
+            "/v1/download/v0.9.4/evil.sh",
+            "/v1/download/v0.9.4/../../x",
+            "/v1/download/main/callgraph-linux-x86_64.zip",
+            "/v1/download/v0.9.4/callgraph-linux-x86_64.zip/extra",
+            "/v1/download/v0.9.4/https:%2F%2Fevil.example",
+            "/v1/download//callgraph-linux-x86_64.zip",
+        ]:
+            status, loc = self.get(path)
+            self.assertEqual(status, 404, path)
+            self.assertIsNone(loc, path)
+        rows = self.q("SELECT event, version, platform, target, count FROM updates ORDER BY event, platform")
+        self.assertEqual(rows, [("install", "?", "?", "v0.9.4", 1), ("install", "?", "darwin-arm64", "latest", 1),
+                                ("update", "0.9.3", "linux-x86_64", "v0.9.4", 1)])
+
+    def test_over_budget_still_redirects_but_does_not_count(self):
+        old = app.COUNT_LIMIT
+        app.COUNT_LIMIT = 2
+        try:
+            codes = [self.get("/v1/download/v0.9.4/callgraph-linux-x86_64.zip?k=update")[0] for _ in range(5)]
+        finally:
+            app.COUNT_LIMIT = old
+        self.assertEqual(codes, [302] * 5)
+        self.assertEqual(self.q("SELECT SUM(count) FROM updates")[0][0], 2)
 
 
 if __name__ == "__main__":

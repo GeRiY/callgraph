@@ -7,6 +7,7 @@
 use super::fetch::{API_LIMIT, FetchError, Fetcher};
 use super::platform::Platform;
 use super::release::{Asset, DEFAULT_API, Release, ReleaseError};
+use super::version::Version;
 
 /// A legutóbbi kiadás webes címe — átirányít a legutóbbi stabil kiadás tagjére.
 pub(crate) const DEFAULT_LATEST: &str = "https://github.com/GeRiY/callgraph/releases/latest";
@@ -29,21 +30,44 @@ pub(crate) trait ReleaseSource {
     fn latest(&self, fetcher: &dyn Fetcher) -> Result<Option<Release>, SourceError>;
 }
 
-/// A környezet szerinti forrás: `CALLGRAPH_UPDATE_API` › átirányítás (tartalék: az API).
+/// A környezet szerinti forrás: `CALLGRAPH_UPDATE_API` › (számlálás bekapcsolva: `update.callgraph.eu` ›)
+/// GitHub-átirányítás › GitHub API. A saját szerver hibájánál / 503-jánál a lánc a GitHubbal folytatódik.
 pub(crate) fn default_source(platform: &Platform) -> Box<dyn ReleaseSource> {
     match std::env::var("CALLGRAPH_UPDATE_API") {
         Ok(api) if !api.is_empty() => Box::new(ApiSource::new(api)),
-        _ => Box::new(FallbackSource {
-            primary: Box::new(RedirectSource::new(DEFAULT_LATEST, platform)),
-            fallback: Box::new(ApiSource::new(DEFAULT_API)),
-        }),
+        _ => source_chain(
+            platform,
+            !super::usage::opted_out_env(),
+            &Version::current().to_string(),
+        ),
     }
+}
+
+/// A frissítési forráslánc; `counted`: a saját (számláló) szerver az első.
+pub(crate) fn source_chain(
+    platform: &Platform,
+    counted: bool,
+    version: &str,
+) -> Box<dyn ReleaseSource> {
+    let github: Box<dyn ReleaseSource> = Box::new(FallbackSource {
+        primary: Box::new(RedirectSource::new(DEFAULT_LATEST, platform)),
+        fallback: Box::new(ApiSource::new(DEFAULT_API)),
+    });
+    if !counted {
+        return github;
+    }
+    Box::new(FallbackSource {
+        primary: Box::new(RedirectSource::counted(platform, version)),
+        fallback: github,
+    })
 }
 
 /// A `releases/latest` átirányításából olvassa ki a tagot; az asset címe: `…/releases/download/<tag>/<asset>`.
 pub(crate) struct RedirectSource {
     url: String,
     asset: String,
+    /// A saját (számláló) szerver: a zip a `update.callgraph.eu/v1/download` címről jön (a saját verzióval).
+    counted: Option<String>,
 }
 
 impl RedirectSource {
@@ -51,6 +75,16 @@ impl RedirectSource {
         Self {
             url: url.into(),
             asset: platform.asset_name(),
+            counted: None,
+        }
+    }
+
+    /// A saját szerver (`update.callgraph.eu/v1/latest`): ugyanolyan `Location`-t ad, mint a GitHub.
+    pub(crate) fn counted(platform: &Platform, version: &str) -> Self {
+        Self {
+            url: super::usage::latest_url(version, &platform.dir()),
+            asset: platform.asset_name(),
+            counted: Some(version.to_owned()),
         }
     }
 
@@ -61,10 +95,25 @@ impl RedirectSource {
             return Ok(None);
         };
         let tag = rest.split(['?', '#', '/']).next().unwrap_or_default();
-        let assets = vec![Asset {
-            name: self.asset.clone(),
-            browser_download_url: format!("{repo}/releases/download/{tag}/{}", self.asset),
-        }];
+        let direct = |name: &str| format!("{repo}/releases/download/{tag}/{name}");
+        let assets = match &self.counted {
+            None => vec![Asset {
+                name: self.asset.clone(),
+                browser_download_url: direct(&self.asset),
+            }],
+            // a zip a saját letöltési címről (számolva; hibánál a frissítő a GitHub-címmel próbálja újra),
+            // a SHA256SUMS közvetlenül a GitHubról
+            Some(version) => vec![
+                Asset {
+                    name: self.asset.clone(),
+                    browser_download_url: super::usage::download_url(tag, &self.asset, version),
+                },
+                Asset {
+                    name: super::checksum::SUMS_FILE.to_owned(),
+                    browser_download_url: direct(super::checksum::SUMS_FILE),
+                },
+            ],
+        };
         Release::stable(tag.to_owned(), assets)
             .map(Some)
             .map_err(SourceError::Release)
@@ -89,10 +138,20 @@ impl ReleaseSource for RedirectSource {
     }
 
     fn latest(&self, fetcher: &dyn Fetcher) -> Result<Option<Release>, SourceError> {
-        match fetcher.redirect(&self.url) {
+        let result = match fetcher.redirect(&self.url) {
             Ok(location) => self.parse_location(&location),
             Err(FetchError::NotFound) => Ok(None),
             Err(e) => Err(SourceError::Fetch(e)),
+        };
+        // a saját szerver csak egy biztos kiadást adhat: minden más (nincs kiadás, rossz tag, hiba) letöltési
+        // hibának számít, hogy a lánc a GitHubbal folytatódjon
+        match result {
+            Ok(Some(release)) => Ok(Some(release)),
+            Err(SourceError::Fetch(e)) => Err(SourceError::Fetch(e)),
+            _ if self.counted.is_some() => Err(SourceError::Fetch(FetchError::Other(
+                "update.callgraph.eu: no usable release".to_owned(),
+            ))),
+            other => other,
         }
     }
 }
@@ -184,6 +243,102 @@ mod tests {
 
     fn source() -> RedirectSource {
         RedirectSource::new(LATEST, &Platform::from_consts("linux", "x86_64"))
+    }
+
+    const OURS: &str = "https://update.callgraph.eu/v1/latest?v=0.9.3&p=linux-x86_64";
+
+    fn chain() -> Box<dyn ReleaseSource> {
+        source_chain(&Platform::from_consts("linux", "x86_64"), true, "0.9.3")
+    }
+
+    fn api_body(tag: &str) -> Vec<u8> {
+        format!(
+            r#"{{"tag_name":"{tag}","draft":false,"prerelease":false,"assets":[{{"name":"callgraph-linux-x86_64.zip","browser_download_url":"https://github.com/GeRiY/callgraph/releases/download/{tag}/callgraph-linux-x86_64.zip"}}]}}"#
+        )
+        .into_bytes()
+    }
+
+    #[test]
+    fn counted_chain_asks_our_server_first_and_downloads_through_it() {
+        let mut f = Fixture::default();
+        f.redirects.insert(
+            OURS.into(),
+            Ok("https://github.com/GeRiY/callgraph/releases/tag/v0.9.4".into()),
+        );
+        let release = chain().latest(&f).unwrap().unwrap();
+        assert_eq!(release.tag, "v0.9.4");
+        assert_eq!(
+            release
+                .asset("callgraph-linux-x86_64.zip")
+                .unwrap()
+                .browser_download_url,
+            "https://update.callgraph.eu/v1/download/v0.9.4/callgraph-linux-x86_64.zip?k=update&v=0.9.3"
+        );
+        // a SHA256SUMS mindig közvetlenül a GitHubról
+        assert_eq!(
+            release.asset("SHA256SUMS").unwrap().browser_download_url,
+            "https://github.com/GeRiY/callgraph/releases/download/v0.9.4/SHA256SUMS"
+        );
+    }
+
+    #[test]
+    fn counted_chain_falls_back_to_github_on_any_trouble() {
+        for ours in [
+            Err(FetchError::Status(503)),
+            Err(FetchError::Other("timeout".into())),
+            Err(FetchError::NotFound),
+            Ok("https://github.com/GeRiY/callgraph/releases".to_owned()),
+            Ok("https://github.com/GeRiY/callgraph/releases/tag/not-a-version".to_owned()),
+        ] {
+            let mut f = Fixture::default();
+            f.redirects.insert(OURS.into(), ours.clone());
+            f.redirects.insert(
+                LATEST.into(),
+                Ok("https://github.com/GeRiY/callgraph/releases/tag/v0.9.4".into()),
+            );
+            let release = chain()
+                .latest(&f)
+                .unwrap()
+                .unwrap_or_else(|| panic!("{ours:?}"));
+            assert_eq!(release.tag, "v0.9.4", "{ours:?}");
+            // a GitHub-ágon a letöltés közvetlen
+            assert_eq!(
+                release
+                    .asset("callgraph-linux-x86_64.zip")
+                    .unwrap()
+                    .browser_download_url,
+                "https://github.com/GeRiY/callgraph/releases/download/v0.9.4/callgraph-linux-x86_64.zip"
+            );
+        }
+    }
+
+    #[test]
+    fn counted_chain_reaches_the_api_when_both_redirects_fail() {
+        let mut f = Fixture::default();
+        f.redirects
+            .insert(OURS.into(), Err(FetchError::Status(503)));
+        f.redirects
+            .insert(LATEST.into(), Err(FetchError::Status(500)));
+        f.bodies.insert(DEFAULT_API.into(), Ok(api_body("v0.9.4")));
+        assert_eq!(chain().latest(&f).unwrap().unwrap().tag, "v0.9.4");
+    }
+
+    #[test]
+    fn uncounted_chain_never_touches_our_server() {
+        let mut f = Fixture::default();
+        f.redirects.insert(
+            OURS.into(),
+            Ok("https://github.com/GeRiY/callgraph/releases/tag/v9.9.9".into()),
+        );
+        f.redirects.insert(
+            LATEST.into(),
+            Ok("https://github.com/GeRiY/callgraph/releases/tag/v0.9.4".into()),
+        );
+        let release = source_chain(&Platform::from_consts("linux", "x86_64"), false, "0.9.3")
+            .latest(&f)
+            .unwrap()
+            .unwrap();
+        assert_eq!(release.tag, "v0.9.4");
     }
 
     #[test]

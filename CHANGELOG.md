@@ -5,6 +5,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+## [0.9.4] — 2026-11-12
+
+### Added
+
+- **MCP Registry**: each release now ships `callgraph.mcpb` (an MCPB bundle with the binaries for all
+  five platforms) and publishes it to the official MCP Registry as `io.github.GeRiY/callgraph`, so MCPB-aware
+  clients (e.g. Claude Desktop) can install the MCP server in one step, without a Rust toolchain.
+
+### Changed
+
+- Update checks and downloads go through `update.callgraph.eu` (falls back to GitHub); anonymous daily
+  usage count — see "Anonymous daily count" in the README.
+
+### Fixed
+
+- The release zips now keep the executable bit on the binary and scripts, so a manually unpacked
+  package runs without `chmod +x` (the installer already set it).
+
 ## [0.9.3] — 2026-11-12
 
 ### Added
@@ -542,7 +560,8 @@ First release.
 - Built-in update: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Prebuilt packages for macOS (arm64, x86_64), Linux (x86_64, ARM64, static musl) and Windows.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.9.3...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.9.4...develop
+[0.9.4]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.4
 [0.9.3]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.3
 [0.9.2]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.2
 [0.9.1]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.1

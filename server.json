@@ -1,0 +1,22 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.GeRiY/callgraph",
+  "title": "callgraph",
+  "description": "AST call graph and code map for AI coding agents: PHP, JS, TS, Vue, Rust, Swift, Python, Go.",
+  "repository": {
+    "url": "https://github.com/GeRiY/callgraph",
+    "source": "github"
+  },
+  "websiteUrl": "https://callgraph.eu",
+  "version": "0.0.0",
+  "packages": [
+    {
+      "registryType": "mcpb",
+      "identifier": "https://github.com/GeRiY/callgraph/releases/download/v0.0.0/callgraph.mcpb",
+      "fileSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}

@@ -24,6 +24,37 @@ def main() -> None:
         "SELECT referrer, SUM(count) n FROM hits WHERE event='view' AND day>=? GROUP BY referrer ORDER BY n DESC LIMIT 8")))
     tel = q("SELECT COUNT(*), COUNT(DISTINCT platform) FROM days WHERE received>=?")[0]
     print(f"telemetry: {tel[0]} daily batches received ({tel[1]} platforms)")
+    usage(con, since)
+
+
+def usage(con: sqlite3.Connection, since: str) -> None:
+    """Anonymous counters (check.callgraph.eu, update.callgraph.eu): active installs, new installs, updates."""
+    try:
+        con.execute("SELECT 1 FROM checks LIMIT 1")
+    except sqlite3.Error:
+        return
+    today = date.today()
+    week = (today - timedelta(days=today.weekday())).isoformat()
+    month = today.replace(day=1).isoformat()
+    one = lambda sql, *a: con.execute(sql, a).fetchone()[0] or 0  # noqa: E731
+    print("active installs (daily check; one per install and day):")
+    for day, n, new, mcp in con.execute(
+        "SELECT day, SUM(count), SUM(CASE WHEN n=1 THEN count END), SUM(CASE WHEN via='mcp' THEN count END) "
+        "FROM checks WHERE day>=? GROUP BY day ORDER BY day", (since,)):
+        print(f"  {day}: {n} active, {new or 0} new, {mcp or 0} via MCP")
+    print(f"  this week (since {week}): {one('SELECT SUM(count) FROM checks WHERE w=1 AND day>=?', week)} active"
+          f" · this month: {one('SELECT SUM(count) FROM checks WHERE m=1 AND day>=?', month)} active")
+    versions = con.execute("SELECT version, SUM(count) n FROM checks WHERE day>=? GROUP BY version ORDER BY n DESC LIMIT 6",
+                           (since,)).fetchall()
+    if versions:
+        print("  versions: " + ", ".join(f"{v} {n}" for v, n in versions))
+    platforms = con.execute("SELECT platform, SUM(count) n FROM checks WHERE day>=? GROUP BY platform ORDER BY n DESC",
+                            (since,)).fetchall()
+    if platforms:
+        print("  platforms: " + ", ".join(f"{p} {n}" for p, n in platforms))
+    rows = dict(con.execute("SELECT event, SUM(count) FROM updates WHERE day>=? GROUP BY event", (since,)).fetchall())
+    print(f"updates: {rows.get('check', 0)} update checks, {rows.get('update', 0)} update downloads, "
+          f"{rows.get('install', 0)} installer downloads")
 
 
 if __name__ == "__main__":

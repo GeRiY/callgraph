@@ -150,7 +150,7 @@ MCP server and the hook); `.callgraphignore` and the built-in skipped folders st
 ```bash
 # 1. install (macOS / Linux, see below for Windows)
 p="$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)" && t="$(mktemp -d)" \
-  && curl -fsSL -o "$t/cg.zip" "https://github.com/GeRiY/callgraph/releases/latest/download/callgraph-$p.zip" \
+  && curl -fsSL -o "$t/cg.zip" "https://update.callgraph.eu/v1/download/latest/callgraph-$p.zip?k=install" \
   && mkdir -p ~/.claude/skills && unzip -qo "$t/cg.zip" -d ~/.claude/skills \
   && bash ~/.claude/skills/callgraph/install.sh && rm -rf "$t"
 
@@ -429,6 +429,15 @@ version, the OS / architecture, a random batch id per day and the schema version
 kept for 90 days, then only monthly totals. The installer asks once (Yes / Not now / Never) in an interactive terminal;
 after "Not now" `stats` reminds you once more about two weeks later, and an agent may very rarely be asked to mention it
 to you.
+
+#### Anonymous daily count
+
+Once a day, on the first real use (a `callgraph.sh` command or an MCP tool call), callgraph sends one request to
+`https://check.callgraph.eu/v1/check` with only its version, the OS / architecture, whether it came from the CLI or the
+MCP server, and three yes/no flags it works out from a local date file (first use on this install, first this week,
+first this month). There is no ID of any kind, and the server stores no IP addresses, only daily totals. Update checks
+and update downloads go through `https://update.callgraph.eu` (redirects to GitHub; straight to GitHub if it is down).
+Off: `CALLGRAPH_COUNT=0`, `DO_NOT_TRACK=1`, `CALLGRAPH_UPDATE_CHECK=0` or `CALLGRAPH_TELEMETRY=0`; never in CI.
 
 ### Suggested next step (opt-in)
 

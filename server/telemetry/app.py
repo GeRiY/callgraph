@@ -1,4 +1,5 @@
-"""callgraph opt-in telemetry receiver and callgraph.eu page-view counter.
+"""callgraph opt-in telemetry receiver, callgraph.eu page-view counter, and the anonymous usage / update
+counters (check.callgraph.eu, update.callgraph.eu — see counts.py).
 
 Accepts the daily banded usage counts that `callgraph.sh telemetry on` users send (POST JSON, see
 src/stats/telemetry/payload.rs). Stores nothing that identifies a person or a machine: no IP address,
@@ -16,6 +17,8 @@ import threading
 import time
 from datetime import date, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+import counts
 
 DB_PATH = os.environ.get("TELEMETRY_DB", "/data/telemetry.sqlite")
 PORT = int(os.environ.get("PORT", "8080"))
@@ -66,6 +69,7 @@ def db() -> sqlite3.Connection:
         );
         """
     )
+    con.executescript(counts.SCHEMA)
     return con
 
 
@@ -128,6 +132,9 @@ HOST_RE = re.compile(r"^[a-z0-9.-]{1,64}$")
 EVENTS = ("view", "download")
 SITE_ORIGIN = "https://callgraph.eu"
 HIT_LIMIT = 600
+# check / update requests per address and hour that are counted (a NAT can hide many installs);
+# above it the request still works, it is only not counted
+COUNT_LIMIT = 600
 
 
 def validate_hit(obj) -> tuple[str, str, str] | None:
@@ -214,9 +221,63 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
-        if self.path.rstrip("/").endswith("/health"):
+        path, _, query = self.path.partition("?")
+        if path.rstrip("/").endswith("/health"):
             return self._reply(200, "ok")
+        if path == "/v1/check":
+            return self._check(query)
+        if path == "/v1/latest":
+            return self._latest(query)
+        if path.startswith("/v1/download/"):
+            return self._download(path, query)
         return self._reply(404)
+
+    def _redirect(self, location: str) -> None:
+        self.send_response(302)
+        self.send_header("Location", location)
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def _counted(self, budget: str, limit: int, write) -> None:
+        """Runs a counter update unless the address is over its budget or the database is full (never fails the request)."""
+        if not _rate_ok(budget + ":" + (self.headers.get("X-Real-IP") or self.client_address[0]), limit) or _db_full():
+            return
+        with _lock:
+            con = db()
+            try:
+                write(con)
+                con.commit()
+            except sqlite3.Error:
+                pass
+            finally:
+                con.close()
+
+    def _check(self, query: str):
+        row = counts.parse_check(query)
+        if row is not None:
+            self._counted("check", COUNT_LIMIT, lambda con: counts.count_check(con, row))
+        # 204 also for a malformed check: the client must not retry
+        return self._reply(204)
+
+    def _latest(self, query: str):
+        tag = counts.latest_tag()
+        if tag is None:
+            return self._reply(503, "latest release unknown")
+        version, platform = counts.parse_client(query)
+        self._counted("update", COUNT_LIMIT, lambda con: counts.count_update(con, "check", version, platform, tag))
+        return self._redirect(f"{counts.REPO}/releases/tag/{tag}")
+
+    def _download(self, path: str, query: str):
+        parsed = counts.parse_download(path, query)
+        if parsed is None:
+            return self._reply(404)
+        tag, asset, kind = parsed
+        if counts.counted_asset(asset):
+            version, _ = counts.parse_client(query)
+            platform = counts.asset_platform(asset)
+            self._counted("update", COUNT_LIMIT, lambda con: counts.count_update(con, kind, version, platform, tag))
+        return self._redirect(counts.download_url(tag, asset))
 
     def do_OPTIONS(self):
         self.send_response(204)

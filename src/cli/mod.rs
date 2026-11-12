@@ -154,6 +154,7 @@ pub fn build_command(args: CliArgs) -> Result<Box<dyn Command>> {
                 "set-lang" => Box::new(commands::LangCommand::new(args, home)),
                 "self-update" => Box::new(commands::SelfUpdateCommand::new(args, home)),
                 "skill-sync" => Box::new(commands::SkillSyncCommand::new(args, home)),
+                "usage-check" => Box::new(commands::UsageCheckCommand::new(args)),
                 _ => Box::new(commands::WrapCommand::new(args, home)),
             })
         }

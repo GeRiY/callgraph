@@ -147,6 +147,8 @@ jobs:
         run: |
           for d in dist/pkg/callgraph-*; do
             n="$(basename "$d")"
+            # az upload-artifact elveszíti a futtatási jogot: kézi kicsomagolásnál is induljon (az install.sh is beállítja)
+            chmod +x "$d"/callgraph/*.sh "$d"/callgraph/bin/*/callgraph 2>/dev/null || true
             (cd "$d" && zip -qr "../../$n.zip" callgraph)
           done
           ls -l dist/*.zip
@@ -158,11 +160,23 @@ jobs:
           sha256sum callgraph-*.tar.gz callgraph-*.zip > SHA256SUMS
           cat SHA256SUMS
           sha256sum -c SHA256SUMS
+      # MCPB-csomag (az összes platform binárisa + manifest) a hivatalos MCP Registry-hez; develop-pushnál csak
+      # elkészül (a build-script tesztje), a release-be csak tagnél kerül. A SHA256SUMS-ba nem kerül (a self-update
+      # azt ellenőrzi, az MCPB hash-e a server.json-ba megy).
+      - name: MCPB-csomag
+        if: env.PUBLISH == 'true'
+        run: bash tools/build-mcpb.sh
+      - uses: actions/upload-artifact@v4
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          name: callgraph-mcpb
+          path: dist/callgraph.mcpb
+          retention-days: 1
       - name: GitHub Release (csak tagnél)
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${GITHUB_REF_NAME}" dist/callgraph-*.tar.gz dist/callgraph-*.zip dist/SHA256SUMS --title "${GITHUB_REF_NAME}" --generate-notes
+        run: gh release create "${GITHUB_REF_NAME}" dist/callgraph-*.tar.gz dist/callgraph-*.zip dist/SHA256SUMS dist/callgraph.mcpb --title "${GITHUB_REF_NAME}" --generate-notes
       # Dev-csatorna: develop-pushnál ugyanezek a fájlok (azonos nevek, azonos SHA256SUMS) a gördülő `dev` előzetes
       # kiadásba. Sorrend: tag mozgatása → kiadás létrehozása, ha nincs → feltöltés (--clobber) → elavult assetek
       # törlése → végül a leírás (benne a `version:` sor) frissítése: a kliens a leírásból olvassa a verziót, így az
@@ -198,3 +212,51 @@ jobs:
           done
           gh release edit dev --prerelease --latest=false --title "$title" --notes "$notes"
           gh release view dev
+
+  # Hivatalos MCP Registry (registry.modelcontextprotocol.io): tagnél a release-be feltöltött callgraph.mcpb-vel
+  # frissíti az io.github.GeRiY/callgraph bejegyzést. Hitelesítés GitHub OIDC-vel (a repó saját futása igazolja
+  # a GeRiY névteret), titok nem kell. A mcp-publisher verziója rögzített, a letöltését Sigstore-ral ellenőrizzük.
+  mcp-registry:
+    needs: package
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      MCP_PUBLISHER_VERSION: v1.8.9
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: callgraph-mcpb
+          path: dist
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      - name: mcp-publisher letöltése és ellenőrzése
+        run: |
+          set -euo pipefail
+          archive="mcp-publisher_linux_amd64.tar.gz"
+          base_url="https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}"
+          curl --fail --location --silent --show-error --output "$archive" "$base_url/$archive"
+          curl --fail --location --silent --show-error --output "$archive.sigstore.json" "$base_url/$archive.sigstore.json"
+          cosign verify-blob \
+            --bundle "$archive.sigstore.json" \
+            --certificate-identity "https://github.com/modelcontextprotocol/registry/.github/workflows/release.yml@refs/tags/${MCP_PUBLISHER_VERSION}" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            "$archive"
+          tar xzf "$archive" mcp-publisher
+          rm -f "$archive" "$archive.sigstore.json"
+      - name: server.json kitöltése (verzió, letöltési URL, SHA-256)
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          sha="$(sha256sum dist/callgraph.mcpb | cut -d' ' -f1)"
+          url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/callgraph.mcpb"
+          jq --arg v "$version" --arg u "$url" --arg s "$sha" \
+            '.version = $v | .packages[0].identifier = $u | .packages[0].fileSha256 = $s' server.json > server.tmp
+          mv server.tmp server.json
+          cat server.json
+      - name: közzététel
+        run: |
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish

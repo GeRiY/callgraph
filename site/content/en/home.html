@@ -99,7 +99,7 @@ class Order extends Model  <span class="d">L7-23</span>
   <div class="panel" id="p-unix" role="tabpanel" aria-labelledby="t-unix">
     <h3 class="tab-title">macOS / Linux</h3>
 <pre class="code"><code>p="$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)" && t="$(mktemp -d)" \
-  && curl -fsSL -o "$t/cg.zip" "https://github.com/GeRiY/callgraph/releases/latest/download/callgraph-$p.zip" \
+  && curl -fsSL -o "$t/cg.zip" "https://update.callgraph.eu/v1/download/latest/callgraph-$p.zip?k=install" \
   && mkdir -p ~/.claude/skills && unzip -qo "$t/cg.zip" -d ~/.claude/skills \
   && bash ~/.claude/skills/callgraph/install.sh && rm -rf "$t"</code></pre>
   </div>

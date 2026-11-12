@@ -151,7 +151,7 @@ A `--signatures` (vagy `CALLGRAPH_SIGNATURES=1`) az outline metódussorában a s
 ```bash
 # 1. telepítés (macOS / Linux; Windows: lent)
 p="$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)" && t="$(mktemp -d)" \
-  && curl -fsSL -o "$t/cg.zip" "https://github.com/GeRiY/callgraph/releases/latest/download/callgraph-$p.zip" \
+  && curl -fsSL -o "$t/cg.zip" "https://update.callgraph.eu/v1/download/latest/callgraph-$p.zip?k=install" \
   && mkdir -p ~/.claude/skills && unzip -qo "$t/cg.zip" -d ~/.claude/skills \
   && bash ~/.claude/skills/callgraph/install.sh && rm -rf "$t"
 
@@ -431,6 +431,16 @@ naponta egyszer, a háttérben, ide: `https://telemetry.callgraph.eu/v1`. CI-ben
 adatok 90 napig maradnak meg, utána csak havi összesítők. A telepítő egyszer rákérdez (Igen / Most nem / Soha),
 interaktív terminálban; „Most nem” után a `stats` kb. két hét múlva még egyszer emlékeztet, és nagyon ritkán az agent
 is kérést kaphat, hogy szóljon neked.
+
+#### Névtelen napi számlálás
+
+Naponta egyszer, az első valódi használatkor (egy `callgraph.sh` parancs vagy egy MCP-eszközhívás) a callgraph egy
+kérést küld ide: `https://check.callgraph.eu/v1/check`. Benne csak a verzió, az operációs rendszer / architektúra, hogy
+a CLI-ből vagy az MCP-szerverből jött, és három igen/nem jelző, amit egy helyi dátumfájlból számol (első használat ezen
+a telepítésen, első a héten, első a hónapban). Semmilyen azonosító nincs, a szerver IP-címet nem tárol, csak napi
+összesítőket. A frissítés-ellenőrzés és a frissítés letöltése a `https://update.callgraph.eu`-n át megy (átirányít a
+GitHubra; ha nem elérhető, közvetlenül a GitHub). Kikapcsolás: `CALLGRAPH_COUNT=0`, `DO_NOT_TRACK=1`,
+`CALLGRAPH_UPDATE_CHECK=0` vagy `CALLGRAPH_TELEMETRY=0`; CI-ben soha.
 
 ### Javasolt következő lépés (opt-in)
 

@@ -6,6 +6,24 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ## [Unreleased]
 
+## [0.9.4] — 2026-11-12
+
+### Új
+
+- **MCP Registry**: minden kiadás mellé `callgraph.mcpb` is készül (MCPB-csomag mind az öt platform
+  binárisával), és felkerül a hivatalos MCP Registry-be `io.github.GeRiY/callgraph` néven, így az MCPB-t ismerő
+  kliensek (pl. Claude Desktop) egy lépésben, Rust nélkül telepíthetik az MCP szervert.
+
+### Változás
+
+- A frissítés-ellenőrzés és a letöltés az `update.callgraph.eu`-n át megy (tartalék: GitHub); névtelen napi
+  használat-számlálás — lásd a README „Névtelen napi számlálás” részét.
+
+### Javítás
+
+- A kiadási zipekben a bináris és a szkriptek megtartják a futtatási jogot, így a kézzel kicsomagolt csomag
+  is `chmod +x` nélkül indul (a telepítő eddig is beállította).
+
 ## [0.9.3] — 2026-11-12
 
 ### Új
@@ -577,7 +595,8 @@ Első kiadás.
 - Beépített frissítés: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Előre fordított csomagok macOS-re (arm64, x86_64), Linuxra (x86_64, ARM64, statikus musl) és Windowsra.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.9.3...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.9.4...develop
+[0.9.4]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.4
 [0.9.3]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.3
 [0.9.2]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.2
 [0.9.1]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.1

@@ -142,7 +142,7 @@ FAQ = {
 }
 
 INSTALL_ONELINER = ('p="$(uname -s | tr \'[:upper:]\' \'[:lower:]\')-$(uname -m)" && t="$(mktemp -d)" '
-                    '&& curl -fsSL -o "$t/cg.zip" "https://github.com/GeRiY/callgraph/releases/latest/download/callgraph-$p.zip" '
+                    '&& curl -fsSL -o "$t/cg.zip" "https://update.callgraph.eu/v1/download/latest/callgraph-$p.zip?k=install" '
                     '&& mkdir -p ~/.claude/skills && unzip -qo "$t/cg.zip" -d ~/.claude/skills '
                     '&& bash ~/.claude/skills/callgraph/install.sh && rm -rf "$t"')
 MCP_ADD_UNIX = ("claude mcp add -s user callgraph -- ~/.claude/skills/callgraph/bin/"
@@ -365,9 +365,12 @@ def footer(page, lang):
 
 PRIVACY_NOTE = {
     "en": "Privacy: no cookies. Page views are counted per day (page, referring site, download clicks) — no IP address, "
-          "no identifiers. Controller: Makra Gergő, mgeri1993@gmail.com.",
+          "no identifiers. The callgraph tool sends one anonymous count a day (version, platform, three yes/no flags; "
+          "no ID, no IP stored; off: CALLGRAPH_COUNT=0 or DO_NOT_TRACK=1). Controller: Makra Gergő, mgeri1993@gmail.com.",
     "hu": "Adatvédelem: nincs cookie. Az oldalmegtekintéseket napi számként rögzítjük (oldal, hivatkozó oldal, "
-          "letöltés-kattintás) — IP-cím és azonosító nélkül. Adatkezelő: Makra Gergő, mgeri1993@gmail.com.",
+          "letöltés-kattintás) — IP-cím és azonosító nélkül. A callgraph eszköz naponta egy névtelen jelzést küld "
+          "(verzió, platform, három igen/nem jelző; azonosító és IP nélkül; kikapcsolás: CALLGRAPH_COUNT=0 vagy "
+          "DO_NOT_TRACK=1). Adatkezelő: Makra Gergő, mgeri1993@gmail.com.",
 }
 
 # Page-view counter: no cookies, no storage, no identifiers — only the page path, the referring site's domain (or a
