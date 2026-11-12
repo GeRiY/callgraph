@@ -154,15 +154,14 @@ fn literal_key(e: &Expression<'_>) -> Option<String> {
     match e.get_inner_expression() {
         Expression::StringLiteral(s) => Some(s.value.display().to_string()),
         Expression::NumericLiteral(n) => Some(n.value.to_string()),
-        Expression::TemplateLiteral(t) if t.is_no_substitution_template() => t
-            .quasis
-            .first()
-            .map(|q| {
+        Expression::TemplateLiteral(t) if t.is_no_substitution_template() => {
+            t.quasis.first().map(|q| {
                 q.value
                     .cooked
                     .as_ref()
                     .map_or_else(|| q.value.raw.to_string(), |c| c.display().to_string())
-            }),
+            })
+        }
         _ => None,
     }
 }

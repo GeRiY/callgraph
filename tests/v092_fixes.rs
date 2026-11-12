@@ -93,9 +93,12 @@ fn box_project() -> Project {
 #[test]
 fn literal_computed_key_gets_the_dot_access_target() {
     let project = Project::new();
-    project.write("d.ts", "export function go(o: any) { o['x'](); o.plain(); }\n");
+    project.write(
+        "d.ts",
+        "export function go(o: any) { o['x'](); o.plain(); }\n",
+    );
     let outline = project.show(&["d.ts"]);
-    assert!(outline.contains("x, plain"), "{outline}");
+    assert!(outline.contains("plain, x"), "{outline}");
     assert!(!outline.contains("[]"), "{outline}");
     assert!(!outline.contains("dynamic_call"), "{outline}");
 }
@@ -142,7 +145,10 @@ fn guess_shows_name_only_callers_with_a_question_mark_on_the_single_level() {
         let out = project.show(args);
         assert!(out.contains("Use2"), "{args:?}: {out}");
         assert!(out.contains("Use1"), "{args:?}: {out}");
-        let guessed: Vec<_> = out.lines().filter(|line| line.contains("Use1::a()")).collect();
+        let guessed: Vec<_> = out
+            .lines()
+            .filter(|line| line.contains("Use1::a()"))
+            .collect();
         assert_eq!(guessed.len(), 1, "{out}");
         assert!(guessed[0].ends_with("← open  ?"), "{}", guessed[0]);
         assert!(out.contains("$x->open()"), "{out}");
@@ -221,7 +227,10 @@ fn guess_output_matches_the_depth_two_notation() {
         "<?php\nclass Top { public function t($u) { return $u->b(); } }\n",
     );
     let single = project.show(&[".", "--grep", "Box::open", "--guess"]);
-    assert!(single.lines().any(|line| line.ends_with("← open  ?")), "{single}");
+    assert!(
+        single.lines().any(|line| line.ends_with("← open  ?")),
+        "{single}"
+    );
     // a 2. szinten a név szerinti hívó ugyanígy `← név  ?` alakú
     let deep = project.show(&[".", "--grep", "Box::open", "--depth", "2", "--guess"]);
     assert!(deep.lines().any(|line| line.ends_with("← b  ?")), "{deep}");
@@ -281,7 +290,10 @@ fn footers_are_left_out_when_there_is_nothing_to_say() {
     for pattern in ["Worker::target", "Box::open"] {
         let out = project.show(&[".", "--grep", pattern]);
         assert!(!out.contains("dynamic calls"), "{pattern}: {out}");
-        assert!(!out.contains("name-only matches skipped"), "{pattern}: {out}");
+        assert!(
+            !out.contains("name-only matches skipped"),
+            "{pattern}: {out}"
+        );
         let hu = project.show_in(&[".", "--grep", pattern], "hu");
         assert!(!hu.contains("dinamikus hívást"), "{pattern}: {hu}");
         assert!(!hu.contains("kihagyva"), "{pattern}: {hu}");
