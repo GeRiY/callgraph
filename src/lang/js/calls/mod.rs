@@ -69,8 +69,12 @@ mod tests {
     use crate::lang::{Language, js::JsFrontend};
 
     fn calls(src: &str) -> Vec<(String, String, String, Option<String>)> {
+        calls_in("/p/x.ts", src)
+    }
+
+    fn calls_in(path: &str, src: &str) -> Vec<(String, String, String, Option<String>)> {
         let a = JsFrontend::with_defaults()
-            .analyze(&SourceFile::new("/p/x.ts", src.as_bytes().to_vec(), None))
+            .analyze(&SourceFile::new(path, src.as_bytes().to_vec(), None))
             .unwrap();
         let c = a.graph.calls;
         c.into_iter()
@@ -168,5 +172,61 @@ mod tests {
             2,
             "{c:?}"
         );
+    }
+
+    #[test]
+    fn jsx_components_are_component_use_calls() {
+        let src = concat!(
+            "import { Button } from 'ui-kit';\n",
+            "import * as Ui from 'ui-kit';\n",
+            "function Local() { return <i />; }\n",
+            "const Arrow = () => <b />;\n",
+            "export function Page() {\n",
+            "  return <section><Button label=\"a\" /><Ui.Card.Head>x</Ui.Card.Head><Local /><Arrow /><Global /><></></section>;\n",
+            "}\n",
+        );
+        for path in ["/p/Page.tsx", "/p/Page.jsx", "/p/Page.js"] {
+            let c = calls_in(path, src);
+            has(
+                &c,
+                ("Page", "Button", "component_use", Some("ui-kit::Button")),
+            );
+            has(
+                &c,
+                (
+                    "Page",
+                    "Ui.Card.Head",
+                    "component_use",
+                    Some("ui-kit::Ui.Card.Head"),
+                ),
+            );
+            has(&c, ("Page", "Local", "internal_helper", None));
+            has(&c, ("Page", "Arrow", "internal_helper", None));
+            has(&c, ("Page", "Global", "component_use", None));
+            // `<section>`, `<i>`, `<b>`, a fragment és a záró elem nem hívás
+            let n = c.iter().filter(|x| x.0 == "Page").count();
+            assert_eq!(n, 5, "{path}: {c:?}");
+            assert!(!c.iter().any(|x| x.1 == "section" || x.1 == "i"), "{c:?}");
+        }
+    }
+
+    #[test]
+    fn jsx_lowercase_namespaced_and_this_names_are_not_calls() {
+        let c = calls_in(
+            "/p/a.tsx",
+            "function f() { return <div><svg:rect /><this.Part /><span>a</span></div>; }\n",
+        );
+        assert!(c.is_empty(), "{c:?}");
+    }
+
+    #[test]
+    fn jsx_props_still_record_inner_calls() {
+        let c = calls_in(
+            "/p/a.jsx",
+            "import { Row } from 'ui-kit';\nfunction f() { return <Row onClick={() => go()}>{make()}</Row>; }\n",
+        );
+        has(&c, ("f", "Row", "component_use", Some("ui-kit::Row")));
+        assert!(c.iter().any(|x| x.1 == "go"), "{c:?}");
+        assert!(c.iter().any(|x| x.1 == "make"), "{c:?}");
     }
 }

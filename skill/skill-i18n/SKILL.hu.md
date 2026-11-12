@@ -76,6 +76,7 @@ bash $CG --project myapp app --grep 'Order::cancel'                  # csak az O
 bash $CG --project myapp app --grep 'Order::cancel' --depth 3        # hatáselemzés: a hívók hívói
 bash $CG --project myapp app --grep 'Order::cancel' --depth 3 --guess # + a csak név szerinti egyezések („?”)
 bash $CG --project myapp app --grep 'Order::cancel' --body           # a talált hívó metódusok forrása
+bash $CG --project myapp app --grep 'App\Svc\Order::cancel'        # PHP névtér: az egyetlen \ névtér-elválasztónak számít (az App\\Svc\\ is jó); hibás regexnél 💡 javaslat
 bash $CG --project myapp app --category model_use,orm_relation       # szűrés hívás-kategóriára
 bash $CG --project myapp app --category dynamic_call                 # a futásidőben eldőlő célú hívások
 ```

@@ -26,7 +26,7 @@ impl Formatter for Summary {
                     Lang::En => format!("{file}  procedural ({n} calls)"),
                     Lang::Hu => format!("{file}  procedurális ({n} hívás)"),
                 };
-                writeln!(out, "{line}").unwrap();
+                writeln!(out, "{line}{}", crate::io::protect_mark(&row.graph.file)).unwrap();
             } else {
                 let mut containers: Vec<_> = row.graph.containers.iter().collect();
                 containers.sort_by_key(|container| container.line);
@@ -62,6 +62,7 @@ impl Formatter for Summary {
                         };
                         write!(out, " — {doc}").unwrap();
                     }
+                    out.push_str(crate::io::protect_mark(&row.graph.file));
                     out.push('\n');
                 }
             }

@@ -20,13 +20,14 @@ impl Formatter for Stats {
                 .join(", ");
             writeln!(
                 out,
-                "== {}{} ==",
+                "== {}{} =={}",
                 graph.file,
                 graph
                     .namespace
                     .as_ref()
                     .map(|n| format!("  NS:{n}"))
-                    .unwrap_or_default()
+                    .unwrap_or_default(),
+                crate::io::protect_mark(&graph.file)
             )
             .unwrap();
             let label = |en: &'static str, hu: &'static str| lang.pick(en, hu);

@@ -80,6 +80,18 @@ bővítés) a `{{ … }}` interpolációk és a direktíva-kifejezések (`:attr=
 ## comments
 Babel `comments` — a `/** */` docblock kimarad; felvétel: `TODO|FIXME|XXX|HACK` kezdet (`tag`) vagy ≥15 kar. szöveg. `caller` = a legszűkebb tartalmazó metódus (`line < ln <= endLine`), különben `__top__`; `text` ≤200.
 
+## JSX (`.js`, `.jsx`, `.tsx`)
+- A Rust-oldali oxc-parse a `.js`, `.mjs`, `.cjs`, `.jsx` és `.tsx` fájlt JSX-képesként olvassa (CRA / babel / vite
+  projektek sima `.js`-ben is írnak JSX-et); a `.ts` / `.mts` / `.cts` nem JSX-képes (ott a `<T>x` típus-állítás
+  érvényes). A `.vue` `<script>` kezelése változatlan (a `lang` attribútum dönt).
+- Komponens-használat = hívás: a nagybetűs JSX-elem nyitó címkéje (`<Button />`, `<Button>…</Button>`, tagolt
+  `<Ui.Card.Head />`) `Call`, `kind: "component"`, `category: "component_use"` (mint a Vue-sablonban); a cél a név
+  (tagolt névnél `Ui.Card.Head`), a `resolved` az importból, mint a függvényhívásnál (`<import>::<név>`; névtér-importnál
+  `<import>::Ui.Card.Head`). A fájlon belül definiált komponens `internal_helper`, feloldás nélkül; az ismeretlen
+  (globális) nagybetűs név feloldatlan `component_use`. Nem hívás: a kisbetűs elem (`<div>`), a fragment (`<>`), a
+  névtér-es név (`<a:b>`), a `this`-gyökerű név és a záró címke. A prop-ok hívásai (`onClick={() => go()}`) a
+  szokásos módon hívásként jelennek meg.
+
 ## Ismert sajátosságok / tesztelendő minták
 - A Rust-portnak a Babel-viselkedést kell reprodukálnia (errorRecovery, `.vue` blokk-sorszámok). `.cjs`: `module.exports` nem ad metódust.
 - `golden/samples/js/`: `types.ts` (interface/enum/generikus/osztály), `Badge.tsx`, `Plain.jsx`, `OptionsApi.vue`, `SetupTs.vue`, `legacy.cjs`, `reexport.mjs` (re-export nem kerül `imports`-ba), `helpers.js`.

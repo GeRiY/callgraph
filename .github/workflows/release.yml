@@ -15,7 +15,8 @@ on:
 
 # egymás utáni pusholásnál a régi futás leáll; a release-t készítő tag-futás soha
 concurrency:
-  group: build-${{ github.ref }}
+  # a `-2` utótag: a beragadt (soha el nem induló) régi futások ne foglalják a csoportot
+  group: build-2-${{ github.ref }}
   cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 permissions:

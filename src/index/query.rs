@@ -7,7 +7,7 @@ use serde::Serialize;
 
 use super::hierarchy::{TypeHierarchy, ViaMatcher, normalize, same_type, split_target};
 use super::uncertain::{bare_name, is_uncertain, uncertain_match};
-use crate::error::{CallgraphError, Result};
+use crate::error::Result;
 use crate::model::FileGraph;
 
 /// A `callers` JSONL-kimenetének egy sora.
@@ -146,15 +146,10 @@ impl CallerIndex {
         depth: usize,
         guess: bool,
     ) -> Result<Vec<CallerRow>> {
-        let matcher = RegexBuilder::new(pattern)
+        let matcher = RegexBuilder::new(&crate::query::filter::namespace_pattern(pattern))
             .case_insensitive(true)
             .build()
-            .map_err(|error| {
-                CallgraphError::Usage(crate::tf!(
-                    "invalid pattern: {error}",
-                    "hibás minta: {error}"
-                ))
-            })?;
+            .map_err(|error| crate::query::filter::invalid_pattern(&error, pattern))?;
         let mut result = Vec::new();
         // a saját példányon át hívott (`$this->m()`) él célja a hívó típusán is: `Ns\Osztály::m` (a `lookup`),
         // így a `Típus::metódus` minta — és a leszármazottakon át a `via` — az örökölt hívást is megtalálja

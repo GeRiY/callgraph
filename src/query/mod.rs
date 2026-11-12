@@ -15,7 +15,7 @@ macro_rules! ltf {
 }
 
 mod engine;
-mod filter;
+pub(crate) mod filter;
 pub mod format;
 pub(crate) mod hint;
 mod limit;

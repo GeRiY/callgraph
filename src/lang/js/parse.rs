@@ -39,7 +39,14 @@ pub fn source_type_for(path: &Path, vue_lang: Option<&str>) -> SourceType {
     }
     // nagybetűs kiterjesztésnél (`App.TS`) a kisbetűs alak dönt
     let path = ext.map_or_else(|| path.to_path_buf(), |ext| path.with_extension(ext));
-    SourceType::from_path(&path).unwrap_or_else(|_| SourceType::jsx())
+    let source_type = SourceType::from_path(&path).unwrap_or_else(|_| SourceType::jsx());
+    // a sima JS-fájlokban (`.js`, `.mjs`, `.cjs`) is lehet JSX (CRA, babel, vite); a `.ts` nem JSX-képes,
+    // mert ott a `<T>x` típus-állítás érvényes
+    if source_type.is_javascript() {
+        source_type.with_jsx(true)
+    } else {
+        source_type
+    }
 }
 
 /// Parsolja a forrást; a program az `allocator`-ban él.
@@ -140,6 +147,30 @@ mod tests {
         assert!(source_type_for(Path::new("a.mjs"), None).is_module());
         assert!(source_type_for(Path::new("a.vue"), Some("ts")).is_typescript());
         assert!(!source_type_for(Path::new("a.vue"), None).is_typescript());
+    }
+
+    #[test]
+    fn plain_js_files_are_jsx_capable_but_ts_is_not() {
+        for name in ["a.js", "a.mjs", "a.cjs", "a.jsx", "a.tsx", "a.JS"] {
+            assert!(source_type_for(Path::new(name), None).is_jsx(), "{name}");
+        }
+        for name in ["a.ts", "a.mts", "a.cts", "a.d.ts"] {
+            assert!(!source_type_for(Path::new(name), None).is_jsx(), "{name}");
+        }
+        // a Vue `<script>` blokkok kezelése változatlan
+        assert!(source_type_for(Path::new("a.vue"), Some("ts")).is_typescript());
+        assert!(!source_type_for(Path::new("a.vue"), Some("ts")).is_jsx());
+    }
+
+    #[test]
+    fn jsx_in_plain_js_parses_without_error_and_ts_assertion_stays_valid() {
+        let alloc = Allocator::default();
+        let js = "export function render() { return <span>hi</span>; }\n";
+        let p = parse_program(&alloc, js, source_type_for(Path::new("plain.js"), None));
+        assert!(p.errors.is_empty() && !p.fatal, "{:?}", p.errors);
+        let ts = "export const a = <number>b;\n";
+        let p = parse_program(&alloc, ts, source_type_for(Path::new("a.ts"), None));
+        assert!(p.errors.is_empty() && !p.fatal, "{:?}", p.errors);
     }
 
     #[test]

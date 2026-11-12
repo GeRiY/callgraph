@@ -152,6 +152,7 @@ fn write_container(
         }
         out.push('\n');
     }
+    write_vue_contract(out, row, container);
     let mut methods: Vec<_> = row
         .graph
         .methods
@@ -193,6 +194,51 @@ fn write_container(
     out.push_str("---\n");
 }
 
+/// A Vue-komponens szerződése: a `props:` (név, ismert típus, kötelező) és az `emits:` lista; a JS-prop / emit
+/// csak a JS-frontendből jön, így más nyelv kimenete nem változik.
+fn write_vue_contract(out: &mut String, row: &QueryResult, container: &crate::model::Container) {
+    let props: Vec<_> = row
+        .graph
+        .properties
+        .iter()
+        .filter(|p| p.js && row.graph.owns(container, p.container.as_deref(), p.line))
+        .collect();
+    if !props.is_empty() {
+        let n = props.len();
+        writeln!(out, "  props ({n}):").unwrap();
+        for p in props {
+            let ty = p
+                .type_hint
+                .as_deref()
+                .filter(|t| !t.is_empty() && *t != "mixed");
+            writeln!(
+                out,
+                "    {}{}{}",
+                p.name,
+                ty.map(|t| format!(": {t}")).unwrap_or_default(),
+                if p.readonly { " [required]" } else { "" }
+            )
+            .unwrap();
+        }
+        out.push('\n');
+    }
+    let emits: Vec<_> = row
+        .graph
+        .constants
+        .iter()
+        .filter(|c| c.js && c.kind == "emit")
+        .filter(|c| row.graph.owns(container, c.container.as_deref(), c.line))
+        .collect();
+    if !emits.is_empty() {
+        let n = emits.len();
+        writeln!(out, "  emits ({n}):").unwrap();
+        for c in emits {
+            writeln!(out, "    {}", c.name.trim_start_matches("emit:")).unwrap();
+        }
+        out.push('\n');
+    }
+}
+
 /// Publikus elem: `public` (PHP / JS / Swift) vagy Rust `pub` (a `pub(crate)` / `pub(super)` nem).
 /// A Rust trait-implementációk metódusai is `pub`-ok (a trait-en át hívhatók), így ezek is listázódnak.
 fn is_public(visibility: Option<&str>) -> bool {
@@ -205,4 +251,63 @@ fn join_non_empty(values: &Option<Vec<String>>, label: &str) -> String {
         .filter(|v| !v.is_empty())
         .map(|v| format!(" {label} {}", v.join(", ")))
         .unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::FormatterRegistry;
+    use crate::core::SourceFile;
+    use crate::i18n::Lang;
+    use crate::lang::LanguageRegistry;
+    use crate::query::QueryResult;
+
+    fn api(path: &str, text: &str) -> String {
+        let language = LanguageRegistry::with_defaults();
+        let file = SourceFile::new(path, text.as_bytes().to_vec(), None);
+        let analyzer = language.for_path(std::path::Path::new(path)).unwrap();
+        let rows = [QueryResult::new(
+            analyzer.analyze(&file).unwrap().graph,
+            None,
+        )];
+        FormatterRegistry::with_defaults()
+            .in_lang(Lang::En)
+            .render_with("api", &rows, None, None)
+            .unwrap()
+    }
+
+    #[test]
+    fn vue_api_lists_props_and_emits() {
+        let sfc = "<script setup lang=\"ts\">\nconst props = defineProps<{ title: string; size?: number }>();\nconst emit = defineEmits<{ (e: 'save', v: number): void; (e: 'close'): void }>();\n</script>\n<template><div>{{ props.title }}</div></template>\n";
+        let out = api("src/Comp.vue", sfc);
+        assert!(out.contains("  props (2):\n"), "{out}");
+        assert!(out.contains("    title: string [required]\n"), "{out}");
+        assert!(out.contains("    size: number\n"), "{out}");
+        assert!(out.contains("  emits (2):\n    close\n    save\n"), "{out}");
+    }
+
+    #[test]
+    fn vue_options_api_lists_array_props_and_emits() {
+        let sfc = "<script>\nexport default { props: ['a', 'b'], emits: ['go'] };\n</script>\n";
+        let out = api("src/Opt.vue", sfc);
+        assert!(out.contains("  props (2):\n    a\n    b\n"), "{out}");
+        assert!(out.contains("  emits (1):\n    go\n"), "{out}");
+    }
+
+    #[test]
+    fn components_without_props_and_other_languages_have_no_such_lists() {
+        let out = api("src/Plain.vue", "<template><p>hi</p></template>\n");
+        assert!(
+            !out.contains("props (") && !out.contains("emits ("),
+            "{out}"
+        );
+        let out = api(
+            "src/a.ts",
+            "export class A { public go(x: number): void {} }\n",
+        );
+        assert!(
+            !out.contains("props (") && !out.contains("emits ("),
+            "{out}"
+        );
+        assert!(out.contains("go(") && out.contains("public API"), "{out}");
+    }
 }
