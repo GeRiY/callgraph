@@ -38,7 +38,10 @@ Különleges kifejezések: a szóközös, idézőjeles kifejezés (`"Szervező t
 string-literálokra illesztve (feliratok, fordítások), szavakra sosem bontva; a `route::events.show` az útvonal
 definícióját (`->name('events.show')` a `routes/*.php`-ban, elöl) és a `route()` / `to_route()` / `redirect()->route()`
 hívásait adja a PHP- és JS / TS / Vue-fájlokban; a `--orange-500` CSS custom property, nem kapcsoló. A pontos
-definíciójú vagy fájlnevű fájlok megelőzik a csak stringgel illőket (fordítások, build-kimenet).
+definíciójú vagy fájlnevű fájlok megelőzik a csak stringgel illőket (fordítások, build-kimenet). A több kifejezést
+egyesítő név (`toggleFavorite` a `toggle favorite`-ra, `PodcastEpisodeController` a `podcast episode`-ra) akkor is
+elöl van, ha a kifejezések külön-külön túl általánosak; a típusdeklarációk (`.d.ts`) definíciói kevesebbet érnek a
+valódiaknál.
 
 ```bash
 bash <skill>/callgraph.sh locate RefundController processRefund refund payment_status checkout.vue --project myapp   # honnan induljak: rangsorolt fájlok + indoklás
@@ -87,6 +90,9 @@ típusa ismeretlen, örökölt vagy trait-ből jön. A `Típus::metódus` csak a
 az interfészén / szülőjén / trait-jén át menőket), ezért hívók maradhatnak ki; gyakori, zajos névnél (`save`, `find`,
 `get`) szűkítésre használd.
 <!-- /mcp -->
+A PHP-fogadó típusa a `new Foo()`-ból, a `Foo::create()`-ből, a típusos paraméterből / property-ből és a Laravel-
+konténerből jön: a `$x = app(Foo::class)` (a `resolve()`, `app()->make()`, `$this->app->make()`, `App::make()` is) és
+a láncolt `app(Foo::class)->bar()` `Foo::bar`-ra oldódik; a sztring-azonosító (`app('foo')`) nem.
 
 <!-- mcp:output -->
 **A keresőkimenet olvasása** (`--grep`, `--depth`, `--strings`, `--const`, mappák):

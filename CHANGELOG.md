@@ -5,6 +5,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+### Changed
+- **`locate` ranks names that join several terms first:** a definition or file name containing two or more of the
+  searched terms (`toggleFavorite` for `toggle favorite`, `PodcastEpisodeController` for `podcast episode`) gets a
+  large boost that grows with the number of terms, even when each term alone is too general (the "too general" line
+  stays). Definitions in type declaration files (`.d.ts`, `.pyi`) weigh less than real ones and no longer push these
+  files to the top.
+
+### Fixed
+- **PHP: receivers from the Laravel container are resolved:** `$x = app(Foo::class)`, `resolve(Foo::class)`,
+  `app()->make(Foo::class)`, `$this->app->make(Foo::class)` and `App::make(Foo::class)` give `$x` the type `Foo`
+  (resolved through `use` and the namespace, like `new Foo()`), and `app(Foo::class)->bar()` /
+  `resolve(Foo::class)->bar()` resolve to `Foo::bar`, so `--grep 'Foo::bar'` finds these callers without `--guess`.
+  A string id (`app('foo')`) stays unresolved.
+
 ## [0.9.2] — 2026-11-12
 
 ### Fixed

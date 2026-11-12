@@ -39,7 +39,9 @@ Special terms: a quoted phrase with spaces (`"Szervező további eseményei"`) i
 string literals (UI labels, translations), never split into words; `route::events.show` finds the route definition
 (`->name('events.show')` in `routes/*.php`, ranked first) and its `route()` / `to_route()` / `redirect()->route()`
 calls in PHP and JS / TS / Vue; `--orange-500` is a CSS custom property, not a flag. Files with an exact definition or
-file name rank before files that only match strings (translations, build output).
+file name rank before files that only match strings (translations, build output). A name that joins several terms
+(`toggleFavorite` for `toggle favorite`, `PodcastEpisodeController` for `podcast episode`) ranks high even when each
+term alone is too general; definitions in type declarations (`.d.ts`) weigh less than real ones.
 
 ```bash
 bash <skill>/callgraph.sh locate RefundController processRefund refund payment_status checkout.vue --project myapp   # where to start: ranked files + reasons
@@ -88,6 +90,9 @@ type is unknown, inherited or comes from a trait. `Type::method` finds only the 
 calls through its interface / parent / trait), so it can miss callers; use it to narrow a noisy common name
 (`save`, `find`, `get`).
 <!-- /mcp -->
+PHP receiver types come from `new Foo()`, `Foo::create()`, typed parameters / properties and the Laravel container:
+`$x = app(Foo::class)` (also `resolve()`, `app()->make()`, `$this->app->make()`, `App::make()`) and the chained
+`app(Foo::class)->bar()` resolve to `Foo::bar`; a string id (`app('foo')`) does not.
 
 <!-- mcp:output -->
 **Reading search output** (`--grep`, `--depth`, `--strings`, `--const`, directories):

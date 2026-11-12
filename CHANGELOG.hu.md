@@ -6,6 +6,20 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ## [Unreleased]
 
+### Változás
+- **A `locate` elöl hozza a több kifejezést egyesítő neveket:** ha egy definíció vagy fájlnév a keresett kifejezések
+  közül kettőt vagy többet tartalmaz (`toggleFavorite` a `toggle favorite`-ra, `PodcastEpisodeController` a
+  `podcast episode`-ra), nagy, a kifejezések számával növő pontot kap, akkor is, ha a kifejezések külön-külön túl
+  általánosak (a „túl általános” sor megmarad). A típusdeklarációs fájlok (`.d.ts`, `.pyi`) definíciói kevesebbet
+  érnek a valódiaknál, és már nem tolják a lista elejére ezeket a fájlokat.
+
+### Javítás
+- **PHP: a Laravel-konténerből kért fogadó feloldása:** a `$x = app(Foo::class)`, `resolve(Foo::class)`,
+  `app()->make(Foo::class)`, `$this->app->make(Foo::class)` és `App::make(Foo::class)` után `$x` típusa `Foo` (a `use`
+  és a névtér szerint feloldva, mint a `new Foo()`-nál), az `app(Foo::class)->bar()` / `resolve(Foo::class)->bar()`
+  pedig `Foo::bar`-ra oldódik, így a `--grep 'Foo::bar'` `--guess` nélkül is megtalálja ezeket a hívókat. A
+  sztring-azonosító (`app('foo')`) feloldatlan marad.
+
 ## [0.9.2] — 2026-11-12
 
 ### Javítás
