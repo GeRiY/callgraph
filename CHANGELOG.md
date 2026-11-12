@@ -5,6 +5,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+### Fixed
+- **JS / TS literal computed call target:** `o['x']()`, `o["x"]()` and ``o[`x`]()`` now get the same target as
+  `o.x()` (the old `[]` target is gone); `o[k]()` stays a `dynamic_call`, a numeric key (`a[0]()`) no longer yields `[]`.
+- **`--guess` on a single-level `--grep`:** `--grep 'Type::method' --guess` (and `--depth 1 --guess`) now also lists the
+  unresolved, name-only callers, marked with `?` as in the `--depth 2+` view.
+- **Single-level `--grep 'Type::method'` footers:** the `(+N unresolved, name-only matches skipped — --guess shows them)`
+  and `(N of these callers contain dynamic calls — check them by hand)` lines of the `--depth 2+` view now also appear
+  on the single-level view, when there is something to say.
+
 ## [0.9.1] — 2026-11-11
 
 ### Added
