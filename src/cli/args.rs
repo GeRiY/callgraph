@@ -7,6 +7,7 @@ use crate::error::{CallgraphError, Result};
 use crate::lang::LanguageRegistry;
 use crate::query::format::BodyMode;
 
+use super::generate_args::{parse_gen, parse_undo};
 use super::next_args::parse_next;
 use super::profile_args::{LayerArgs, parse_profile};
 use super::stats_args::parse_stats;
@@ -211,6 +212,16 @@ pub enum CliArgs {
         choices: Vec<usize>,
         project: Option<String>,
     },
+    /// `gen '<kifejezés>' [--dry|--write|--into|--replace …]`: kód-generálás rövid kifejezésből (`crate::generate`).
+    Generate {
+        request: crate::generate::GenRequest,
+        project: Option<String>,
+    },
+    /// `undo [<fájl>]`: a legutóbbi generátor-módosítás visszavonása a `.callgraph/backups/` mappából.
+    Undo {
+        file: Option<String>,
+        project: Option<String>,
+    },
     /// `telemetry on|off|status|preview`: a helyi statisztika opt-in beküldése (`crate::stats::telemetry`).
     Telemetry { action: TelemetryAction },
     /// `--version` / `-V`: a verzió és a platform.
@@ -283,6 +294,12 @@ impl CliArgs {
         }
         if args.first().is_some_and(|a| a == "next") {
             return parse_next(&args[1..]);
+        }
+        if args.first().is_some_and(|a| a == "gen") {
+            return parse_gen(&args[1..]);
+        }
+        if args.first().is_some_and(|a| a == "undo") {
+            return parse_undo(&args[1..]);
         }
         if args.first().is_some_and(|a| a == "telemetry") {
             return parse_telemetry(&args[1..]);

@@ -206,6 +206,60 @@ pub(crate) struct LocateParams {
     pub all: bool,
 }
 
+// `generate` (opt-in, `--generate` / `CALLGRAPH_GENERATE=1`): PHP-kód generálása rövid kifejezésből. (Típus-szintű
+// `//` komment: a `///` a sémába kerülne, és növelné a `tools/list` tokenjeit.)
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, JsonSchema)]
+pub(crate) struct GenerateParams {
+    /// The expression, e.g. `c!:Pay<Base>[Chargeable] > ctor(-Client $http) + +charge(Order $o):Receipt{ … }`:
+    /// `c:` class `i:` interface `t:` trait `e:` enum; `>` child, `+` sibling, `^` up, `*n` repeat; members
+    /// `+`/`-`/`#` visibility, `::` static, `name(Type $p):Type{body}`, `$prop:Type=1`, `K=1`, `ctor(-Type $x)` promoted.
+    pub expr: String,
+    /// Return the generated code instead of writing it.
+    #[serde(default)]
+    pub dry: bool,
+    /// New file to create (an existing file is never overwritten).
+    #[serde(default)]
+    pub write: Option<String>,
+    /// `path` or `path::Class`: insert the generated members into that class.
+    #[serde(default)]
+    pub into: Option<String>,
+    /// With `into`: insert after this method (default: at the end of the class).
+    #[serde(default)]
+    pub after: Option<String>,
+    /// `path::method` or `path:L42-L87`: replace that method / line range (a backup is made first).
+    #[serde(default)]
+    pub replace: Option<String>,
+    /// With `replace`: refuse unless the replaced text still has this sha256 prefix.
+    #[serde(default)]
+    pub expect: Option<String>,
+    /// Registered project alias; default: the server's working directory.
+    #[serde(default)]
+    pub project: Option<String>,
+}
+
+impl GenerateParams {
+    /// A CLI `gen` argumentumai (a kifejezés külön argumentum; a `--project` a hívónál jön).
+    pub(crate) fn to_args(&self) -> Vec<String> {
+        let mut args = vec!["gen".to_owned(), self.expr.clone()];
+        if self.dry {
+            args.push("--dry".to_owned());
+        }
+        for (flag, value) in [
+            ("--write", &self.write),
+            ("--into", &self.into),
+            ("--after", &self.after),
+            ("--replace", &self.replace),
+            ("--expect", &self.expect),
+        ] {
+            if let Some(value) = value {
+                args.push(flag.to_owned());
+                args.push(value.clone());
+            }
+        }
+        args
+    }
+}
+
 // `next`: egy korábbi eredmény javasolt következő lépése az azonosítójával.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, JsonSchema)]
 pub(crate) struct NextParams {
@@ -388,6 +442,7 @@ mod tests {
             serde_json::to_string(&schemars::schema_for!(MethodBodyParams)).unwrap(),
             serde_json::to_string(&schemars::schema_for!(NextParams)).unwrap(),
             serde_json::to_string(&schemars::schema_for!(PackageUsageParams)).unwrap(),
+            serde_json::to_string(&schemars::schema_for!(GenerateParams)).unwrap(),
         ] {
             for hungarian in ["eszköz", "nézet", "választás", "metódus", "függőség"] {
                 assert!(!schema.contains(hungarian), "{hungarian}: {schema}");

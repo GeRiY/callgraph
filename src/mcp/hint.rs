@@ -6,6 +6,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
+use super::params::GenerateParams;
 use super::request::ShowQuery;
 use super::runner::QueryRunner;
 use crate::skill::SkillHome;
@@ -67,6 +68,10 @@ impl QueryRunner for HintRunner {
         self.inner
             .next(project, id, choices)
             .map(|text| self.append(text))
+    }
+
+    fn generate(&self, params: &GenerateParams) -> Result<String, String> {
+        self.inner.generate(params)
     }
 }
 

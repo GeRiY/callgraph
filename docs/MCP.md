@@ -202,6 +202,15 @@ A Claude Desktop nem a projektmappában indít: add meg a `project` aliast (lás
 }
 ```
 
+## `generate` (opt-in, ír)
+
+Az egyetlen író eszköz: egy rövid, Emmet-szerű kifejezésből PHP-kódot generál, és maga írja a fájlt (a kód
+visszaadása a kimeneti token-nyereséget elvinné). **Alapból nincs a listán**: `callgraph mcp --generate` vagy
+`CALLGRAPH_GENERATE=1`. Paraméterek: `expr`, `dry`, `write` (új fájl), `into` (`fájl` / `fájl::Osztály`) + `after`,
+`replace` (`fájl::metódus` / `fájl:L42-L87`) + `expect`, `project`. Létező fájlt nem ír felül; módosítás előtt
+mentés készül a `.callgraph/backups/` alá, az új szöveget írás előtt a PHP-parser ellenőrzi. A válasz egy sor.
+A nyelvtan: `callgraph --help` (a „Code generator” rész) és a `src/generate/mod.rs` doksija.
+
 ## Kipróbálás kézzel
 
 Egy sor = egy JSON-RPC üzenet a stdin-en:
