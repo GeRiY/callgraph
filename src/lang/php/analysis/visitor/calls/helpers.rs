@@ -60,7 +60,8 @@ impl Collector<'_, '_> {
 
     pub(super) fn class(&self, e: &Expression<'_>) -> Option<String> {
         match strip(e) {
-            Expression::Identifier(i) => Some(lossy(i.value()).trim_start_matches('\\').into()),
+            // a vezető `\` marad: a feloldásnál a teljesen minősített név globális (`resolve_class`)
+            Expression::Identifier(i) => Some(lossy(i.value())),
             Expression::Self_(x) | Expression::Static(x) | Expression::Parent(x) => {
                 Some(self.parsed.text(x.span()))
             }
@@ -170,7 +171,7 @@ impl Collector<'_, '_> {
         };
         raw.eq_ignore_ascii_case(FACADE)
             || s.resolver.resolve_class(&raw).eq_ignore_ascii_case(FACADE)
-            || (raw == "App" && !s.imports.contains("App"))
+            || (raw.trim_start_matches('\\') == "App" && !s.imports.contains("App"))
     }
 
     /// Az `ast_graph.php` `resolveTypedExpr()` tükre: csak `Class::m()`, `new Class` és az

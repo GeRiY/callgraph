@@ -245,14 +245,14 @@ impl<'a, 'arena> Walker<'a, 'arena, State> for Collector<'_, '_> {
         };
         if let Some(c) = self.class(n.class) {
             let m = super::lossy(name.value);
-            let x = self.push(s, n, "static_call", format!("{c}::{m}"));
+            let x = self.push(s, n, "static_call", format!("{}::{m}", shown(&c)));
             s.calls[x].resolved = Some(format!("{}::{m}", s.resolver.resolve_class(&c)));
             s.calls[x].args = self.args(&n.argument_list)
         }
     }
     fn walk_in_instantiation(&self, n: &Instantiation<'arena>, s: &mut State) {
         if let Some(c) = self.class(n.class) {
-            let x = self.push(s, n, "new", c.clone());
+            let x = self.push(s, n, "new", shown(&c).to_string());
             s.calls[x].resolved = Some(s.resolver.resolve_class(&c))
         } else {
             // `new $class(...)`, `new $obj->prop(...)`: az osztály futásidőben dől el
@@ -268,7 +268,7 @@ impl<'a, 'arena> Walker<'a, 'arena, State> for Collector<'_, '_> {
                 s,
                 n,
                 "const_fetch",
-                format!("{c}::{}", super::lossy(k.value)),
+                format!("{}::{}", shown(&c), super::lossy(k.value)),
             );
             s.calls[x].resolved = Some(format!(
                 "{}::{}",
@@ -282,9 +282,14 @@ impl<'a, 'arena> Walker<'a, 'arena, State> for Collector<'_, '_> {
             return;
         };
         let name = super::lossy(v.name);
-        let target = format!("{c}::{name}");
+        let target = format!("{}::{name}", shown(&c));
         let x = self.push(s, n, "static_property_fetch", target.clone());
         s.calls[x].resolved = Some(format!("{}::{name}", s.resolver.resolve_class(&c)));
         s.calls[x].on = Some(target);
     }
+}
+
+/// Az osztálynév a hívás-célban: a vezető `\\` nélkül (a feloldott alak külön: `resolve_class`).
+fn shown(class: &str) -> &str {
+    class.trim_start_matches('\\')
 }

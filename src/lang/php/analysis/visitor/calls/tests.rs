@@ -415,3 +415,30 @@ fn container_lookups_without_a_class_constant_give_no_type() {
         vec!["Other\\Baz::bar".to_string()]
     );
 }
+
+/// A teljesen minősített (`\`-es) név a globális névtérből oldódik fel, nem az aktuálisból és nem importból.
+#[test]
+fn fully_qualified_class_is_global() {
+    let src = "<?php\nnamespace App\\Services;\nuse Other\\Helper;\nclass A {\n  function f() {\n    throw new \\LogicException('x');\n    \\Helper::make();\n    new Helper();\n    new Local();\n  }\n}\n";
+    let got: Vec<(String, Option<String>)> = PhpBackend::with_defaults()
+        .analyze_source("a.php", src.as_bytes())
+        .graph
+        .calls
+        .into_iter()
+        .map(|c| (c.target, c.resolved))
+        .collect();
+    let pair = |t: &str, r: &str| (t.to_string(), Some(r.to_string()));
+    assert!(
+        got.contains(&pair("LogicException", "LogicException")),
+        "{got:?}"
+    );
+    assert!(
+        got.contains(&pair("Helper::make", "Helper::make")),
+        "{got:?}"
+    );
+    assert!(got.contains(&pair("Helper", "Other\\Helper")), "{got:?}");
+    assert!(
+        got.contains(&pair("Local", "App\\Services\\Local")),
+        "{got:?}"
+    );
+}
