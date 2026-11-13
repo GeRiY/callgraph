@@ -12,6 +12,7 @@ use crate::analysis::Analyzer;
 use crate::index::TypeHierarchy;
 use crate::io::FileWalker;
 use crate::model::FileGraph;
+use crate::packages::Packages;
 
 use super::classify::{Classifier, Reason};
 use super::confirm::{confirm, enum_only};
@@ -93,7 +94,8 @@ pub(crate) fn with_graph(root: &Path, with_vendor: bool) -> ProjectProfile {
     for (entry, file_graph) in entries.iter_mut().zip(&graphs) {
         settle(entry, *file_graph, &hierarchy, &classifier);
     }
-    let mut frameworks = manifest_frameworks(root);
+    let packages = crate::packages::open(root);
+    let mut frameworks = manifest_frameworks(root, &packages);
     let present: Vec<&FileGraph> = graphs.iter().flatten().copied().collect();
     for name in present.iter().filter_map(|g| g.framework.as_deref()) {
         if GRAPH_FRAMEWORKS.contains(&name) && !frameworks.iter().any(|have| have == name) {
@@ -113,7 +115,7 @@ pub(crate) fn with_graph(root: &Path, with_vendor: bool) -> ProjectProfile {
         .collect();
     let flow = flow::compute(&flow_files);
     let profile = ProjectProfile::aggregate(&entries, frameworks, flow, true);
-    finish(profile, &classifier, skipped)
+    finish(profile, &classifier, skipped, &packages)
 }
 
 /// A megerősítés (C jel); kód-jelet kívánó szerepnél megerősítés nélkül a tartalék besorolás (és annak megerősítése).
@@ -198,8 +200,10 @@ fn names_only(root: &Path, files: &[PathBuf], with_vendor: bool) -> ProjectProfi
         }
         entries.push(entry);
     }
-    let profile = ProjectProfile::aggregate(&entries, manifest_frameworks(root), None, false);
-    finish(profile, &classifier, skipped)
+    let packages = crate::packages::open(root);
+    let frameworks = manifest_frameworks(root, &packages);
+    let profile = ProjectProfile::aggregate(&entries, frameworks, None, false);
+    finish(profile, &classifier, skipped, &packages)
 }
 
 /// A gyökér kódfájljai a bejárás (és a hívó-index) sorrendjében.
@@ -250,16 +254,18 @@ fn by_count(counts: HashMap<String, usize>) -> Vec<(String, usize)> {
     out
 }
 
-/// A `.callgraph-layers` helye és figyelmeztetései, és a kihagyott kód a profilba.
+/// A `.callgraph-layers` helye és figyelmeztetései, a kihagyott kód és a kiemelt csomagok (`stack:`) a profilba.
 fn finish(
     mut profile: ProjectProfile,
     classifier: &Classifier,
     skipped: Skipped,
+    packages: &Packages,
 ) -> ProjectProfile {
     let overrides = classifier.overrides();
     profile.overrides = overrides.source.clone();
     profile.warnings = overrides.warnings.clone();
     profile.vendor = by_count(skipped.vendor);
     profile.generated = by_count(skipped.generated);
+    profile.stack = packages.stack();
     profile
 }

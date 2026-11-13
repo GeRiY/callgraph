@@ -1,4 +1,5 @@
-//! Factory: a megfelelő stratégia kiválasztása a projekt composer-függőségei alapján.
+//! Factory: a megfelelő stratégia kiválasztása a projekt composer-függőségei alapján (a legközelebbi
+//! `composer.json`, a csomagtérkép olvasójával: `crate::packages`).
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -54,13 +55,19 @@ fn find_composer_json(start_dir: &Path) -> Option<PathBuf> {
     }
 }
 
+/// A `composer.json` frameworkje: előbb a `require`, utána a `require-dev` csomagjai közül az első, amely a
+/// `FRAMEWORK_PACKAGE_MAP`-ben szerepel (a map sorrendjében). Az olvasás a csomagtérképével közös
+/// (`packages::composer_requires`).
 fn detect_framework(json: &str) -> Option<String> {
-    let value: serde_json::Value = serde_json::from_str(json).ok()?;
-    ["require", "require-dev"].iter().find_map(|section| {
-        let packages = value.get(*section)?.as_object()?;
+    let requires = crate::packages::composer_requires(json);
+    [false, true].into_iter().find_map(|dev| {
         FRAMEWORK_PACKAGE_MAP
             .iter()
-            .find(|(package, _)| packages.contains_key(*package))
+            .find(|(package, _)| {
+                requires
+                    .iter()
+                    .any(|(name, is_dev)| *is_dev == dev && name == package)
+            })
             .map(|(_, factory)| factory().name().unwrap().to_owned())
     })
 }

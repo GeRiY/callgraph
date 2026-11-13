@@ -1,5 +1,5 @@
 //! A projekt-profil kapcsolói: a `profile` parancs (`callgraph profile [--project <alias|mappa>] [--full]
-//! [--with-vendor]`), és a
+//! [--with-vendor] [--packages]`), és a
 //! `show` réteg-kapcsolói (`--layer <név,…>`, `--layers`, `--by-layer`). Külön fájlban, hogy az `args.rs` csak
 //! egy-egy sorral bővüljön.
 
@@ -9,8 +9,8 @@ use super::CliArgs;
 
 fn profile_usage() -> &'static str {
     crate::t!(
-        "callgraph profile [--project <alias|dir>] [--full] [--with-vendor]  (architecture, layers and patterns from folder and file names, checked against the graph; --with-vendor: embedded third-party code counts too)",
-        "callgraph profile [--project <alias|mappa>] [--full] [--with-vendor]  (architektúra, rétegek és minták a mappa- és fájlnevekből, a gráffal ellenőrizve; --with-vendor: a beágyazott külső kód is számít)"
+        "callgraph profile [--project <alias|dir>] [--full] [--with-vendor] [--packages]  (architecture, layers and patterns from folder and file names, checked against the graph; --with-vendor: embedded third-party code counts too; --packages: every direct composer / npm dependency with its installed version)",
+        "callgraph profile [--project <alias|mappa>] [--full] [--with-vendor] [--packages]  (architektúra, rétegek és minták a mappa- és fájlnevekből, a gráffal ellenőrizve; --with-vendor: a beágyazott külső kód is számít; --packages: minden közvetlen composer / npm függőség a telepített verzióval)"
     )
 }
 
@@ -67,11 +67,12 @@ impl LayerArgs {
     }
 }
 
-/// `profile [--project <alias|mappa>] [--full] [--with-vendor]`.
+/// `profile [--project <alias|mappa>] [--full] [--with-vendor] [--packages]`.
 pub(crate) fn parse_profile(args: &[String]) -> Result<CliArgs> {
     let mut project = None;
     let mut full = false;
     let mut with_vendor = false;
+    let mut packages = false;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
@@ -81,6 +82,10 @@ pub(crate) fn parse_profile(args: &[String]) -> Result<CliArgs> {
             }
             "--with-vendor" => {
                 with_vendor = true;
+                i += 1;
+            }
+            "--packages" => {
+                packages = true;
                 i += 1;
             }
             "--project" if i + 1 < args.len() => {
@@ -98,6 +103,7 @@ pub(crate) fn parse_profile(args: &[String]) -> Result<CliArgs> {
         project,
         full,
         with_vendor,
+        packages,
     })
 }
 
@@ -142,7 +148,8 @@ mod tests {
             CliArgs::Profile {
                 project: Some("sp".into()),
                 full: true,
-                with_vendor: false
+                with_vendor: false,
+                packages: false
             }
         );
         assert_eq!(
@@ -150,7 +157,8 @@ mod tests {
             CliArgs::Profile {
                 project: None,
                 full: false,
-                with_vendor: false
+                with_vendor: false,
+                packages: false
             }
         );
         assert_eq!(
@@ -158,7 +166,17 @@ mod tests {
             CliArgs::Profile {
                 project: None,
                 full: false,
-                with_vendor: true
+                with_vendor: true,
+                packages: false
+            }
+        );
+        assert_eq!(
+            parse_profile(&s(&["--packages", "--full"])).unwrap(),
+            CliArgs::Profile {
+                project: None,
+                full: true,
+                with_vendor: false,
+                packages: true
             }
         );
         assert!(parse_profile(&s(&["--bogus"])).is_err());

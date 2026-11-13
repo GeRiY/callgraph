@@ -221,16 +221,17 @@ impl CallgraphServer {
             idempotent_hint = true,
             open_world_hint = false
         ),
-        description = "Project profile from folder and file names, checked against the code graph: architecture (Laravel/Yii layered MVC, DDD/hexagonal, Vue/React frontend, SwiftUI MVVM, Rust web), layers with their folders and file counts, design patterns, the call direction between layers, unknown folders (~15 lines). Call it first in an unfamiliar project, then pass `layer` (e.g. \"service\") to `outline` / `search` / `find_callers`. Example: {} or {\"project\": \"shop\", \"full\": true}. Pitfall: a layer name comes from this list (controller, service, repository, model, component, store…), not a folder path."
+        description = "Project profile from folder and file names, checked against the code graph: architecture (Laravel/Yii layered MVC, DDD/hexagonal, Vue/React frontend, SwiftUI MVVM, Rust web), layers with their folders and file counts, design patterns, the call direction between layers, unknown folders, the notable packages with their locked versions (`stack:` line) (~15 lines); `packages: true` also lists every direct composer / npm dependency. Call it first in an unfamiliar project, then pass `layer` (e.g. \"service\") to `outline` / `search` / `find_callers`. Example: {} or {\"project\": \"shop\", \"full\": true}. Pitfall: a layer name comes from this list (controller, service, repository, model, component, store…), not a folder path."
     )]
     async fn project_profile(&self, Parameters(p): Parameters<ProfileParams>) -> CallToolResult {
         let started = Instant::now();
         let project = p.project.clone();
         let runner = Arc::clone(&self.runner);
-        let result =
-            tokio::task::spawn_blocking(move || runner.profile(p.project.as_deref(), p.full))
-                .await
-                .unwrap_or_else(|e| Err(e.to_string()));
+        let result = tokio::task::spawn_blocking(move || {
+            runner.profile(p.project.as_deref(), p.full, p.packages)
+        })
+        .await
+        .unwrap_or_else(|e| Err(e.to_string()));
         let call = Self::plain(CommandKind::ProjectProfile, started, project.as_deref());
         self.finish(&call, result)
     }

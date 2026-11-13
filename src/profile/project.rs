@@ -11,6 +11,7 @@ use super::classify::Classification;
 use super::flow::FlowStats;
 use super::layer::{Layer, Mixed};
 use super::role::{Confidence, Kind};
+use crate::packages::Stack;
 
 /// Egy fájl a profilhoz: a relatív útja, a besorolása, és a gráfból jött megerősítés címkéje (C jel).
 #[derive(Debug, Clone)]
@@ -78,6 +79,8 @@ pub(crate) struct ProjectProfile {
     /// A `.callgraph-layers` helye és a fel nem ismert sorai.
     pub overrides: Option<PathBuf>,
     pub warnings: Vec<String>,
+    /// A kiemelt csomagok (`stack:` sor; `crate::packages`), a projekt-gyökér manifestjeiből és lockjaiból.
+    pub stack: Stack,
 }
 
 impl ProjectProfile {
@@ -190,6 +193,7 @@ impl ProjectProfile {
             generated: Vec::new(),
             overrides: None,
             warnings: Vec::new(),
+            stack: Stack::default(),
         }
     }
 

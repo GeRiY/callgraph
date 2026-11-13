@@ -88,11 +88,13 @@ Supported files: PHP, JS, TS, Vue, Rust, Swift, Python (.py, .pyi), Go (.go) + C
   bash ~/.claude/skills/callgraph/callgraph.sh --version                       version, platform and the binary's path
 
 Project profile (architecture, layers and patterns from folder / file names, checked against the graph):
-  bash ~/.claude/skills/callgraph/callgraph.sh profile [--project alias] [--full] [--with-vendor]
-                                                ~15 lines: architecture, layers with folders and file counts, patterns,
+  bash ~/.claude/skills/callgraph/callgraph.sh profile [--project alias] [--full] [--with-vendor] [--packages]
+                                                ~15 lines: architecture, notable packages with their locked versions
+                                                (stack:), layers with folders and file counts, patterns,
                                                 call direction between layers, unknown folders; --full: per folder;
                                                 embedded third-party code and build output are skipped (--with-vendor:
-                                                counted too); a role in both PHP and JS: controller (php) / controller (js)
+                                                counted too); a role in both PHP and JS: controller (php) / controller (js);
+                                                --packages: every direct composer / npm dependency (installed, declared)
   bash ~/.claude/skills/callgraph/callgraph.sh <dir> --layer service           only the files of that layer (name,name...;
                                                 one ecosystem: controller:php, controller:js, …:swift, …:rust)
   bash ~/.claude/skills/callgraph/callgraph.sh <dir> --layers                  summary grouped by layer, [role] on FILE lines

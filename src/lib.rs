@@ -16,6 +16,7 @@ pub mod mcp;
 pub mod model;
 pub mod next;
 pub mod notes;
+pub mod packages;
 pub mod profile;
 pub mod project;
 pub mod query;

@@ -20,6 +20,7 @@ use std::path::PathBuf;
 use crate::lang::LanguageRegistry;
 
 pub(crate) use pool::{SharedGraph, lock, shared};
+pub(crate) use record::FileStamp;
 pub(crate) use refresh::{RefreshLock, refresh_all, refresh_paths, within_root};
 pub(crate) use store::{ProjectGraph, Refreshed};
 

@@ -14,9 +14,10 @@ pub(crate) trait QueryRunner: Send + Sync {
     fn run(&self, query: &ShowQuery) -> Result<String, String>;
     /// A regisztrált projektek: `alias<TAB>gyökér` soronként.
     fn projects(&self) -> Result<String, String>;
-    /// A projekt-profil (`callgraph profile`) szövege; `project`: alias (`None` = a munkakönyvtár).
-    fn profile(&self, project: Option<&str>, full: bool) -> Result<String, String> {
-        let _ = (project, full);
+    /// A projekt-profil (`callgraph profile`) szövege; `project`: alias (`None` = a munkakönyvtár); `packages`: a
+    /// közvetlen függőségek listája is (`--packages`).
+    fn profile(&self, project: Option<&str>, full: bool, packages: bool) -> Result<String, String> {
+        let _ = (project, full, packages);
         Err(crate::t!(
             "project_profile is not available",
             "a project_profile nem érhető el"
@@ -113,7 +114,7 @@ impl QueryRunner for ShowRunner {
         Self::execute(args, &root)
     }
 
-    fn profile(&self, project: Option<&str>, full: bool) -> Result<String, String> {
+    fn profile(&self, project: Option<&str>, full: bool, packages: bool) -> Result<String, String> {
         let root = self.root(project)?;
         let mut args = vec![
             "profile".to_owned(),
@@ -122,6 +123,9 @@ impl QueryRunner for ShowRunner {
         ];
         if full {
             args.push("--full".into());
+        }
+        if packages {
+            args.push("--packages".into());
         }
         Self::execute(args, &root)
     }

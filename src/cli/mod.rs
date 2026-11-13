@@ -137,9 +137,11 @@ pub fn build_command(args: CliArgs) -> Result<Box<dyn Command>> {
             project,
             full,
             with_vendor,
+            packages,
         } => Ok(Box::new(
             commands::ProfileCommand::new(project, full, crate::skill::SkillHome::from_env())
-                .with_vendor(with_vendor),
+                .with_vendor(with_vendor)
+                .with_packages(packages),
         )),
         CliArgs::Mcp { auto_update } => Ok(Box::new(commands::McpCommand::new(
             crate::skill::SkillHome::from_env(),

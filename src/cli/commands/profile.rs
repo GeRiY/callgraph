@@ -1,7 +1,8 @@
-//! `callgraph profile [--project <alias|mappa>] [--full] [--with-vendor]`: a projekt-profil — architektúra,
-//! rétegek mappánként, tervezési minták, ismeretlen mappák és a rétegek közti hívásirány (`crate::profile`). Tömör
-//! (~15 sor) alapból; `--full`: mappánként, bizonyosság szerint, a hívásirány párjaival; `--with-vendor`: a
-//! beágyazott külső kód sem marad ki.
+//! `callgraph profile [--project <alias|mappa>] [--full] [--with-vendor] [--packages]`: a projekt-profil —
+//! architektúra, rétegek mappánként, tervezési minták, ismeretlen mappák és a rétegek közti hívásirány
+//! (`crate::profile`). Tömör (~15 sor) alapból; `--full`: mappánként, bizonyosság szerint, a hívásirány párjaival;
+//! `--with-vendor`: a beágyazott külső kód sem marad ki; `--packages`: utána minden közvetlen composer / npm
+//! függőség csomag-gyökerenként (`crate::packages`).
 
 use std::io::Write;
 use std::path::Path;
@@ -17,6 +18,7 @@ pub struct ProfileCommand {
     project: Option<String>,
     full: bool,
     with_vendor: bool,
+    packages: bool,
     home: SkillHome,
 }
 
@@ -26,6 +28,7 @@ impl ProfileCommand {
             project,
             full,
             with_vendor: false,
+            packages: false,
             home,
         }
     }
@@ -33,6 +36,12 @@ impl ProfileCommand {
     /// `--with-vendor`: a beágyazott külső kód (vendor) is számít a profilban.
     pub fn with_vendor(mut self, on: bool) -> Self {
         self.with_vendor = on;
+        self
+    }
+
+    /// `--packages`: a profil után a közvetlen függőségek listája.
+    pub fn with_packages(mut self, on: bool) -> Self {
+        self.packages = on;
         self
     }
 }
@@ -43,6 +52,9 @@ impl Command for ProfileCommand {
         let profile = with_graph(&root, self.with_vendor);
         let lang = crate::i18n::lang();
         write!(out, "{}", render(&profile, lang, self.full, Tip::Show))?;
+        if self.packages {
+            write!(out, "{}", crate::packages::open(&root).listing(lang))?;
+        }
         // a gráf-alapú megerősítés hibás fájlnál hiányos: a záró `⚠` sor (hiba nélkül üres)
         let issues = parse_issues(&root);
         write!(

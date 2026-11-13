@@ -14,6 +14,7 @@ use super::rules::{DOTTED_RULES, FOLDER_RULES, SUFFIX_RULES, USE_PREFIX, VUE_FAL
 use crate::i18n::Lang;
 use crate::index::TypeHierarchy;
 use crate::model::FileGraph;
+use crate::packages::{Ecosystem, EcosystemPackages, Package, Packages, ProjectPackages};
 
 fn role(rel: &str) -> Option<&'static str> {
     Classifier::default().role_of(rel).map(Role::name)
@@ -373,6 +374,78 @@ fn compact_profile_is_short_and_bilingual() {
     assert!(full.contains("(names only"), "{full}");
     let empty = ProjectProfile::aggregate(&[], Vec::new(), None, false);
     assert!(render(&empty, Lang::En, false, Tip::Show).starts_with("profile: no code files"));
+}
+
+/// Egy rész a csomagtérképben: (név, deklarált tartomány, telepített verzió).
+fn part(
+    ecosystem: Ecosystem,
+    root: &str,
+    lock: Option<&str>,
+    packages: &[(&str, &str, Option<&str>)],
+) -> EcosystemPackages {
+    EcosystemPackages {
+        root: root.into(),
+        ecosystem,
+        name: None,
+        packages: packages
+            .iter()
+            .map(|(name, declared, installed)| Package {
+                name: (*name).to_owned(),
+                ecosystem,
+                declared: Some((*declared).to_owned()),
+                installed: installed.map(str::to_owned),
+                dev: false,
+                namespaces: Vec::new(),
+            })
+            .collect(),
+        installed_only: Vec::new(),
+        own_namespaces: Vec::new(),
+        lock: lock.map(str::to_owned),
+    }
+}
+
+#[test]
+fn stack_line_follows_the_headline_only_when_there_are_notable_packages() {
+    let mut profile =
+        ProjectProfile::aggregate(&entries(LARAVEL), vec!["laravel".into()], None, false);
+    let plain = render(&profile, Lang::En, false, Tip::Hide);
+    assert!(!plain.contains("stack:"), "{plain}");
+    let map = ProjectPackages {
+        root: "/proj".into(),
+        parts: vec![
+            part(
+                Ecosystem::Php,
+                "/proj",
+                Some("composer.lock"),
+                &[
+                    ("laravel/framework", "^11.0", Some("11.31.0")),
+                    ("guzzlehttp/guzzle", "^7.8", Some("7.9.2")),
+                ],
+            ),
+            part(
+                Ecosystem::Node,
+                "/proj",
+                None,
+                &[("vue", "^3.4", None), ("tailwindcss", "^3.4", None)],
+            ),
+        ],
+    };
+    profile.stack = Packages::from_map(map).stack();
+    let en = render(&profile, Lang::En, false, Tip::Hide);
+    assert!(
+        en.starts_with(
+            "profile: laravel (layered MVC) · confidence: high\nstack:   laravel/framework 11.31.0 · vue ^3.4 (range) · tailwindcss ^3.4 (range)   (composer.lock)\nlayers (files):\n"
+        ),
+        "{en}"
+    );
+    assert!(en.lines().count() <= 15, "{en}");
+    let hu = render(&profile, Lang::Hu, true, Tip::Hide);
+    assert!(
+        hu.starts_with(
+            "profil: laravel (layered MVC) · bizonyosság: magas\nstack:   laravel/framework 11.31.0 · vue ^3.4 (tartomány) · tailwindcss ^3.4 (tartomány)   (composer.lock)\n"
+        ),
+        "{hu}"
+    );
 }
 
 fn graph(json: serde_json::Value) -> FileGraph {

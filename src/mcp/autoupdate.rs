@@ -350,9 +350,9 @@ impl QueryRunner for NoticeRunner {
         self.inner.projects().map(|text| self.append(text))
     }
 
-    fn profile(&self, project: Option<&str>, full: bool) -> Result<String, String> {
+    fn profile(&self, project: Option<&str>, full: bool, packages: bool) -> Result<String, String> {
         self.inner
-            .profile(project, full)
+            .profile(project, full, packages)
             .map(|text| self.append(text))
     }
 

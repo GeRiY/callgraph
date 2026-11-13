@@ -267,6 +267,10 @@ pub(crate) struct ProfileParams {
     /// Per-folder details, confidence counts and the call pairs between layers.
     #[serde(default)]
     pub full: bool,
+    /// Also list every direct composer / npm dependency per package root: installed version (from the lock),
+    /// declared range, dev flag.
+    #[serde(default)]
+    pub packages: bool,
 }
 
 impl OutlineFormat {

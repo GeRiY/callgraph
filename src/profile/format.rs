@@ -61,6 +61,11 @@ fn header(out: &mut String, profile: &ProjectProfile, lang: Lang) {
         Lang::En => writeln!(out, "profile: {architecture} · confidence: {confidence}"),
         Lang::Hu => writeln!(out, "profil: {architecture} · bizonyosság: {confidence}"),
     };
+    // a kiemelt csomagok (frameworkök, a kódírást meghatározó könyvtárak) a lock verziójával
+    if !profile.stack.is_empty() {
+        out.push_str(&profile.stack.line(lang));
+        out.push('\n');
+    }
 }
 
 fn compact(out: &mut String, profile: &ProjectProfile, lang: Lang) {
