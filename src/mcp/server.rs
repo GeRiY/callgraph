@@ -103,7 +103,7 @@ impl CallgraphServer {
             idempotent_hint = true,
             open_world_hint = false
         ),
-        description = "Where to start with a task: give the names and domain terms from the task in ONE call; answers from the project map (no file reading) with a short ranked list of files (top 5; `all: true` = every match), each with its reasons: exact definition, file name, name part, string literal, call, `callers: N`. Example: {\"terms\": [\"RefundController\", \"processRefund\", \"refund\", \"payment_status\", \"checkout.vue\"]}. Pitfall: pass code names, not a sentence; translate non-English domain words to their English code names (visszatérítés → refund); one call with all terms, not one call per term. For exact text (log message, config value) use Grep."
+        description = "Where to start with a task: give the names and domain terms from the task in ONE call; answers from the project map (no file reading) with a short ranked list of files (top 5; `all: true` = every match), each with its reasons: exact definition, file name, name part, string literal, call, `callers: N`. Example: {\"terms\": [\"RefundController\", \"processRefund\", \"refund\", \"payment_status\", \"checkout.vue\"]}. Pitfall: pass code names, not a sentence; translate non-English domain words to their English code names (visszatérítés → refund); one call with all terms, not one call per term. Use `locate` to find WHERE to start; once you know the file use `outline`; for a string literal or constant use `search`, for other exact text (log message, config value) Grep."
     )]
     async fn locate(&self, Parameters(p): Parameters<LocateParams>) -> CallToolResult {
         self.execute(CommandKind::Locate, ShowQuery::locate(p))
@@ -117,7 +117,7 @@ impl CallgraphServer {
             idempotent_hint = true,
             open_world_hint = false
         ),
-        description = "Structure of a code file or directory without reading it: classes/components, methods with line ranges, calls by category. With `method`: that one method's call graph. Start here once you know the file (else `locate`). Example: {\"path\": \"app/Order.php\", \"method\": \"cancel\"}. Pitfall: give the method in `method`, not as `path::method`; on a large directory use `format: summary` or a subdirectory."
+        description = "Structure of a code file or directory without reading it: classes/components, methods with line ranges, calls by category. With `method`: that one method's call graph — what it calls (callees, each classified: internal_helper, model_use, orm_relation, framework_use, external_call, …), so there is no separate callees tool; for the opposite direction (who calls it) use `find_callers`. Start here once you know the file (else `locate`); for routes / events / validation across a framework use `framework_view` instead. Example: {\"path\": \"app/Order.php\", \"method\": \"cancel\"}. Pitfall: give the method in `method`, not as `path::method`; on a large directory use `format: summary` or a subdirectory."
     )]
     async fn outline(&self, Parameters(p): Parameters<OutlineParams>) -> CallToolResult {
         self.execute(CommandKind::Outline, ShowQuery::outline(p))
@@ -159,7 +159,7 @@ impl CallgraphServer {
             idempotent_hint = true,
             open_world_hint = false
         ),
-        description = "Where a string literal (error message, key) or a constant is used/defined (substring match). Example: {\"kind\": \"strings\", \"pattern\": \"Order not found\"} or {\"kind\": \"constants\", \"pattern\": \"STATUS_ACTIVE\"}. For calls of a function use `find_callers`."
+        description = "Where a string literal (error message, key) or a constant is used/defined (substring match). Example: {\"kind\": \"strings\", \"pattern\": \"Order not found\"} or {\"kind\": \"constants\", \"pattern\": \"STATUS_ACTIVE\"}. For calls of a function use `find_callers`; to find which files to start a task in, use `locate` (names and terms, ranked), not this."
     )]
     async fn search(&self, Parameters(p): Parameters<SearchParams>) -> CallToolResult {
         self.execute(CommandKind::Search, ShowQuery::search(p))
@@ -173,7 +173,7 @@ impl CallgraphServer {
             idempotent_hint = true,
             open_world_hint = false
         ),
-        description = "Framework view of a directory: routes, middleware, validation, jobs, events, providers, magic, di, views. Example: {\"view\": \"routes\", \"path\": \"routes\"}. Run it on the directory that holds the definitions (a file works too)."
+        description = "Framework view of a directory: routes, middleware, validation, jobs, events, providers, magic, di, views. Example: {\"view\": \"routes\", \"path\": \"routes\"}. Run it on the directory that holds the definitions (a file works too). Use it for framework wiring (which route → which controller, which event → which listener); for the structure of one file or folder use `outline`."
     )]
     async fn framework_view(
         &self,

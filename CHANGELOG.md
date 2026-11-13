@@ -23,9 +23,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   command transition (`hit1` / `hit5` / `hit` / `miss`, symbol `hit` / `miss`) — still no names, paths, code or
   hashes. You are told once; `callgraph.sh telemetry preview` shows exactly what would be sent.
 - The session-start check may suggest sharing usage counts up to 10 times (every 2 days), never after you said no.
-- **MCP tools say they only read:** every MCP tool now declares `readOnlyHint: true`, `destructiveHint: false`,
-  `idempotentHint: true` and `openWorldHint: false`, since none of them changes anything or reaches outside the
-  project, so directories that require these hints (e.g. OpenAI's) accept the server.
+- **MCP tools say they only read, and when to use which:** every MCP tool now declares `readOnlyHint: true`,
+  `destructiveHint: false`, `idempotentHint: true` and `openWorldHint: false`, since none of them changes anything or
+  reaches outside the project, so directories that require these hints (e.g. OpenAI's) accept the server. The
+  descriptions of `locate`, `outline`, `search` and `framework_view` now tell the agent which one fits: `outline` with
+  `method` lists what that method calls (so there is no separate callees tool) and points to `find_callers` for who
+  calls it.
 
 ### Fixed
 

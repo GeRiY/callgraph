@@ -27,10 +27,13 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   menne el.
 - Az indításkori ellenőrzés legfeljebb 10-szer (2 naponta) javasolja a használati számok megosztását, nemleges válasz
   után soha.
-- **Az MCP-eszközök jelzik, hogy csak olvasnak:** mostantól minden MCP-eszköz kifejezetten megadja a
-  `readOnlyHint: true`, `destructiveHint: false`, `idempotentHint: true` és `openWorldHint: false` jelzést, mert egyik
-  sem módosít semmit, és nem nyúl ki a projektből, így az ezeket a jelzéseket megkövetelő katalógusok (pl. az OpenAI-é)
-  is elfogadják a szervert.
+- **Az MCP-eszközök jelzik, hogy csak olvasnak, és hogy melyiket mikor érdemes használni:** mostantól minden
+  MCP-eszköz kifejezetten megadja a `readOnlyHint: true`, `destructiveHint: false`, `idempotentHint: true` és
+  `openWorldHint: false` jelzést, mert egyik sem módosít semmit, és nem nyúl ki a projektből, így az ezeket a
+  jelzéseket megkövetelő katalógusok (pl. az OpenAI-é) is elfogadják a szervert. A `locate`, az `outline`, a `search`
+  és a `framework_view` leírása most megmondja az agentnek, melyik való az adott feladatra: az `outline` `method`-dal
+  felsorolja, mit hív az a metódus (ezért nincs külön callees eszköz), a fordított irányhoz (ki hívja) pedig a
+  `find_callers`-t ajánlja.
 
 ### Javítás
 
