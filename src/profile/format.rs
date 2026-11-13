@@ -21,6 +21,22 @@ pub(crate) enum Tip {
 
 /// A profil szövege.
 pub(crate) fn render(profile: &ProjectProfile, lang: Lang, full: bool, tip: Tip) -> String {
+    render_with(profile, lang, full, tip, false)
+}
+
+/// Az MCP-kapcsolódáskori tömör profil: mint a `render` tipp nélkül, de a stack-sor a legrövidebb formában (minden
+/// munkamenet elején megjelenik; a pontos verziók a `profile`-ban, a teljes lista a `--packages`-ben).
+pub(crate) fn render_startup(profile: &ProjectProfile, lang: Lang) -> String {
+    render_with(profile, lang, false, Tip::Hide, true)
+}
+
+fn render_with(
+    profile: &ProjectProfile,
+    lang: Lang,
+    full: bool,
+    tip: Tip,
+    compact_stack: bool,
+) -> String {
     let mut out = String::new();
     if profile.files == 0 {
         out.push_str(lang.pick(
@@ -29,7 +45,7 @@ pub(crate) fn render(profile: &ProjectProfile, lang: Lang, full: bool, tip: Tip)
         ));
         return out;
     }
-    header(&mut out, profile, lang);
+    header(&mut out, profile, lang, compact_stack);
     if full {
         details(&mut out, profile, lang);
     } else {
@@ -44,7 +60,7 @@ pub(crate) fn render(profile: &ProjectProfile, lang: Lang, full: bool, tip: Tip)
     out
 }
 
-fn header(out: &mut String, profile: &ProjectProfile, lang: Lang) {
+fn header(out: &mut String, profile: &ProjectProfile, lang: Lang, compact_stack: bool) {
     let architecture = if profile.architectures.is_empty() {
         lang.pick("no recognised architecture", "nem felismert architektúra")
             .to_owned()
@@ -62,8 +78,13 @@ fn header(out: &mut String, profile: &ProjectProfile, lang: Lang) {
         Lang::Hu => writeln!(out, "profil: {architecture} · bizonyosság: {confidence}"),
     };
     // a kiemelt csomagok (frameworkök, a kódírást meghatározó könyvtárak) a lock verziójával
-    if !profile.stack.is_empty() {
-        out.push_str(&profile.stack.line(lang));
+    let stack = if compact_stack {
+        profile.stack.compact_line()
+    } else {
+        (!profile.stack.is_empty()).then(|| profile.stack.line(lang))
+    };
+    if let Some(stack) = stack {
+        out.push_str(&stack);
         out.push('\n');
     }
 }

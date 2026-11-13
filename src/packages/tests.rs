@@ -504,3 +504,38 @@ fn composer_requires_keeps_the_dev_flag_and_skips_the_platform() {
     );
     assert!(composer_requires("nope").is_empty());
 }
+
+/// A tömör (MCP-indító) stack-sor: rövid nevek, főverzió, a teszt- és build-eszközök nélkül.
+#[test]
+fn compact_stack_line_has_short_names_and_major_versions() {
+    use super::stack::{Stack, StackEntry};
+    let entry = |name: &'static str, version: &str, from_lock: bool| StackEntry {
+        name,
+        version: Some(version.to_owned()),
+        from_lock,
+    };
+    let stack = Stack {
+        entries: vec![
+            entry("laravel/framework", "12.69.3", true),
+            entry("inertiajs/inertia-laravel", "v3.4.0", true),
+            entry("phpunit/phpunit", "11.5.56", true),
+            entry("vue", "^3.5.0", false),
+            entry("@inertiajs/vue3", "2.3.27", true),
+            entry("tailwindcss", "4.3.3", true),
+            entry("typescript", "5.9.3", true),
+            entry("vite", "8.2.2", true),
+            entry("pinia", "0.9.1", true),
+        ],
+        locks: vec!["composer.lock".into()],
+    };
+    assert_eq!(
+        stack.compact_line().as_deref(),
+        Some("stack: laravel 12 · inertia 3 · vue 3 · inertia-vue 2 · tailwindcss 4 · pinia 0.9")
+    );
+    assert_eq!(Stack::default().compact_line(), None);
+    let tools_only = Stack {
+        entries: vec![entry("vite", "8.0.0", true)],
+        locks: Vec::new(),
+    };
+    assert_eq!(tools_only.compact_line(), None);
+}

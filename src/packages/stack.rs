@@ -45,6 +45,50 @@ const NOTABLE: &[(Ecosystem, &str)] = &[
     (Ecosystem::Node, "jest"),
 ];
 
+/// Teszt- és build-eszközök: a tömör (MCP-indító) sorból kimaradnak, mert a kód írásának módját nem határozzák meg.
+const TOOLING: &[&str] = &[
+    "pestphp/pest",
+    "phpunit/phpunit",
+    "typescript",
+    "vite",
+    "vitest",
+    "jest",
+];
+
+/// A tömör sor rövid nevei (a többi csomag a saját nevével).
+fn short_name(name: &str) -> &str {
+    match name {
+        "laravel/framework" => "laravel",
+        "symfony/framework-bundle" | "symfony/symfony" => "symfony",
+        "yiisoft/yii2" => "yii2",
+        "livewire/livewire" => "livewire",
+        "filament/filament" => "filament",
+        "inertiajs/inertia-laravel" => "inertia",
+        "doctrine/orm" => "doctrine",
+        "@angular/core" => "angular",
+        "@nestjs/core" => "nest",
+        "@inertiajs/vue3" => "inertia-vue",
+        "@inertiajs/react" => "inertia-react",
+        other => other,
+    }
+}
+
+/// A főverzió egy verzióból vagy tartományból (`^11.31` → `11`, `v3.5.2` → `3`, `0.462.0` → `0.462`).
+fn major(version: &str) -> Option<String> {
+    let start = version.find(|c: char| c.is_ascii_digit())?;
+    let mut parts = version[start..]
+        .split(|c: char| !c.is_ascii_digit())
+        .filter(|part| !part.is_empty());
+    let first = parts.next()?;
+    Some(if first == "0" {
+        parts
+            .next()
+            .map_or_else(|| "0".to_owned(), |minor| format!("0.{minor}"))
+    } else {
+        first.to_owned()
+    })
+}
+
 /// Legfeljebb ennyi csomag a sorban; a többi `+N`.
 const SHOWN: usize = 10;
 
@@ -109,6 +153,23 @@ impl Stack {
 
     pub(crate) fn is_empty(&self) -> bool {
         self.entries.is_empty()
+    }
+
+    /// A tömör stack-sor az MCP-kapcsolódáskor (minden munkamenet elején megjelenik, ezért a legrövidebb forma):
+    /// rövid nevek, csak a főverzió (0.x-nél fő.al), a teszt- és build-eszközök nélkül, tartomány-jelölés nélkül.
+    /// `stack: laravel 12 · inertia 2 · vue 3 · tailwindcss 4`. Üres, ha nincs mit mutatni.
+    pub(crate) fn compact_line(&self) -> Option<String> {
+        let items: Vec<String> = self
+            .entries
+            .iter()
+            .filter(|entry| !TOOLING.contains(&entry.name))
+            .take(SHOWN)
+            .map(|entry| match entry.version.as_deref().and_then(major) {
+                Some(version) => format!("{} {version}", short_name(entry.name)),
+                None => short_name(entry.name).to_owned(),
+            })
+            .collect();
+        (!items.is_empty()).then(|| format!("stack: {}", items.join(" · ")))
     }
 
     /// A stack-sor (sorvége nélkül).
