@@ -12,7 +12,7 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   eredmény, idő- és méretsáv, hogyan viszonyul az előző híváshoz) és a leggyakoribb parancs-átmeneteket. A napló ezen a
   gépen marad (14 nap), és nincs benne név, útvonal vagy kód.
 
-### Változott
+### Változás
 
 - **Opt-in telemetria (schema 2)**: ha bekapcsoltad a telemetriát, a napi számokban mostantól a parancsok sorrendjének
   számai (melyik után melyik jött, időzítési sávok) és a munkamenet-hossz sávjai is benne vannak — név, útvonal és kód
@@ -37,6 +37,8 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 - A frissítés-ellenőrzés és a letöltés az `update.callgraph.eu`-n át megy (tartalék: GitHub); névtelen napi
   használat-számlálás — lásd a README „Névtelen napi számlálás” részét.
+- `telemetry reset` (újra döntetlen, kikapcsolva) és `hook reset [tétel]` (a `hook never` visszavonása); a
+  `DO_NOT_TRACK=1` mostantól a telemetriát is leállítja.
 
 ### Javítás
 

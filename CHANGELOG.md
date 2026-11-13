@@ -35,6 +35,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 - Update checks and downloads go through `update.callgraph.eu` (falls back to GitHub); anonymous daily
   usage count — see "Anonymous daily count" in the README.
+- `telemetry reset` (undecided again, still off) and `hook reset [item]` (undoes `hook never`); `DO_NOT_TRACK=1`
+  now also stops telemetry.
 
 ### Fixed
 

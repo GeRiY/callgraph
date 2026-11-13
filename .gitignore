@@ -20,7 +20,10 @@
 .DS_Store
 /spike/
 /tools/local.env
-/.claude/
+/.claude/*
+# a közös agentek és parancsok verziózva (pl. changelog-writer)
+!/.claude/agents/
+!/.claude/commands/
 
 # a skill futásidejű adatai (projekt-aliasok, hibanapló, visszajelzések, nyelv, frissítés-ellenőrzés)
 /skill/projects.json
