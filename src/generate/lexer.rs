@@ -150,7 +150,9 @@ impl Lexer {
         self.start = self.pos;
         match self.peek() {
             Some('^') => self.single(Tok::Up),
-            Some('+') if self.peek_at(1).is_none_or(char::is_whitespace) => self.single(Tok::Sibling),
+            Some('+') if self.peek_at(1).is_none_or(char::is_whitespace) => {
+                self.single(Tok::Sibling)
+            }
             None | Some(')') => self.op(),
             _ => Ok(Tok::NewlineSibling),
         }

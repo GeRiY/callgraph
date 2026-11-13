@@ -265,8 +265,14 @@ fn neutral_types_parse_and_native_names_stay() {
         TypeRef::parse("opt<int>").unwrap(),
         TypeRef::Opt(Box::new(TypeRef::Int))
     );
-    assert_eq!(TypeRef::parse("string").unwrap(), TypeRef::Named("string".into()));
-    assert!(matches!(TypeRef::parse("int|string").unwrap(), TypeRef::Union(_)));
+    assert_eq!(
+        TypeRef::parse("string").unwrap(),
+        TypeRef::Named("string".into())
+    );
+    assert!(matches!(
+        TypeRef::parse("int|string").unwrap(),
+        TypeRef::Union(_)
+    ));
     assert!(TypeRef::parse("Collection<Order>").is_err());
 }
 
@@ -325,10 +331,22 @@ fn todo_bodies_follow_one_rule() {
         "c:Svc > +a(?int $x=null, string ...$rest):int + +b():Generator + +e():void + +n() + ctor(int $a)",
     );
     assert!(text.contains("public function a(?int $x = null, string ...$rest): int\n    {\n        throw new \\LogicException('TODO');"), "{text}");
-    assert!(text.contains("public function b(): Generator\n    {\n        yield from [];"), "{text}");
-    assert!(text.contains("public function e(): void\n    {\n        // TODO"), "{text}");
-    assert!(text.contains("public function n()\n    {\n        // TODO"), "{text}");
-    assert!(text.contains("public function __construct(int $a)\n    {\n        // TODO"), "{text}");
+    assert!(
+        text.contains("public function b(): Generator\n    {\n        yield from [];"),
+        "{text}"
+    );
+    assert!(
+        text.contains("public function e(): void\n    {\n        // TODO"),
+        "{text}"
+    );
+    assert!(
+        text.contains("public function n()\n    {\n        // TODO"),
+        "{text}"
+    );
+    assert!(
+        text.contains("public function __construct(int $a)\n    {\n        // TODO"),
+        "{text}"
+    );
 }
 
 #[test]
@@ -338,13 +356,19 @@ fn neutral_types_map_to_php_with_docblocks() {
     );
     assert!(text.contains("     * @return iterable<int>\n     */\n    public function c(): iterable\n    {\n        yield from [];"), "{text}");
     assert!(text.contains("@param list<Order> $orders\n     * @param array<string,int> $m\n     * @return list<Order>\n     */\n    public function d(array $orders, array $m, ?int $o): array"), "{text}");
-    assert!(text.contains("public function s(string $a, string $b, float $f, bool $c): mixed"), "{text}");
+    assert!(
+        text.contains("public function s(string $a, string $b, float $f, bool $c): mixed"),
+        "{text}"
+    );
 }
 
 #[test]
 fn list_properties_get_a_var_docblock() {
     let text = emit("c:A > -$items:list<Order>=[]");
-    assert!(text.contains("    /** @var list<Order> */\n    private array $items = [];"), "{text}");
+    assert!(
+        text.contains("    /** @var list<Order> */\n    private array $items = [];"),
+        "{text}"
+    );
 }
 
 #[test]
@@ -352,8 +376,14 @@ fn long_parameter_lists_wrap_with_trailing_commas() {
     let text = emit(
         "c:A > +handle(string $firstArgument, string $secondArgument, string $thirdArgument, string $fourthArgument):void",
     );
-    assert!(text.contains("    public function handle(\n        string $firstArgument,\n"), "{text}");
-    assert!(text.contains("        string $fourthArgument,\n    ): void {\n        // TODO\n    }"), "{text}");
+    assert!(
+        text.contains("    public function handle(\n        string $firstArgument,\n"),
+        "{text}"
+    );
+    assert!(
+        text.contains("        string $fourthArgument,\n    ): void {\n        // TODO\n    }"),
+        "{text}"
+    );
 }
 
 #[test]
@@ -385,7 +415,8 @@ fn generator_bodies_pass_through_and_validate() {
 
 // ---- projekt-ismeret, feloldó-lánc ----
 
-const COMPOSER: &str = r#"{"autoload":{"psr-4":{"App\\":"app/"}},"autoload-dev":{"psr-4":{"Tests\\":["tests/"]}}}"#;
+const COMPOSER: &str =
+    r#"{"autoload":{"psr-4":{"App\\":"app/"}},"autoload-dev":{"psr-4":{"Tests\\":["tests/"]}}}"#;
 
 fn project() -> MemFs {
     MemFs::with(&[
@@ -412,10 +443,19 @@ fn project() -> MemFs {
 #[test]
 fn psr4_maps_paths_to_namespaces() {
     let map = Psr4::parse(COMPOSER);
-    assert_eq!(map.namespace_of("app/Services/Pay.php").as_deref(), Some("App\\Services"));
+    assert_eq!(
+        map.namespace_of("app/Services/Pay.php").as_deref(),
+        Some("App\\Services")
+    );
     assert_eq!(map.namespace_of("app/Pay.php").as_deref(), Some("App"));
-    assert_eq!(map.fqcn_of("app/Models/Order.php").as_deref(), Some("App\\Models\\Order"));
-    assert_eq!(map.namespace_of("tests/Unit/PayTest.php").as_deref(), Some("Tests\\Unit"));
+    assert_eq!(
+        map.fqcn_of("app/Models/Order.php").as_deref(),
+        Some("App\\Models\\Order")
+    );
+    assert_eq!(
+        map.namespace_of("tests/Unit/PayTest.php").as_deref(),
+        Some("Tests\\Unit")
+    );
     assert_eq!(map.namespace_of("lib/X.php"), None);
     assert!(Psr4::parse("not json").is_empty());
 }
@@ -492,7 +532,10 @@ fn explicit_use_and_namespace_override_win() {
     .unwrap();
     let text = out.lines.join("\n");
     assert!(text.contains("namespace Acme\\Pay;"), "{text}");
-    assert!(text.contains("use App\\Models\\Order;\nuse Vendor\\Lib\\Order as Ord;"), "{text}");
+    assert!(
+        text.contains("use App\\Models\\Order;\nuse Vendor\\Lib\\Order as Ord;"),
+        "{text}"
+    );
 }
 
 #[test]
@@ -543,7 +586,10 @@ fn write_creates_a_new_file_and_refuses_an_existing_one() {
         )]
     );
     let err = run(&fs, &clock, &req).unwrap_err();
-    assert!(err.contains("already exists") && err.contains("--into"), "{err}");
+    assert!(
+        err.contains("already exists") && err.contains("--into"),
+        "{err}"
+    );
     assert_eq!(fs.get("app/Fresh.php").unwrap(), text);
 }
 
@@ -669,7 +715,10 @@ fn into_reports_missing_class_and_method() {
     };
     assert!(into(Some("Nope"), None).contains("no class `Nope`"));
     let e = into(None, Some("nope"));
-    assert!(e.contains("no method `nope`") && e.contains("charge, other"), "{e}");
+    assert!(
+        e.contains("no method `nope`") && e.contains("charge, other"),
+        "{e}"
+    );
 }
 
 const DOCUMENTED: &str = "<?php\n\nclass A\n{\n    /**\n     * Old doc.\n     */\n    public function go(): int\n    {\n        return 1;\n    }\n\n    public function keep(): int\n    {\n        return 2;\n    }\n}\n";
@@ -702,7 +751,9 @@ fn replace_by_method_swaps_the_docblock_too() {
     let backup = format!(".callgraph/backups/app/A.php.{}.bak", stamp(T0));
     assert_eq!(
         out.lines,
-        [format!("replaced app/A.php L5-11 → L5-11 (go) · backup: {backup}")]
+        [format!(
+            "replaced app/A.php L5-11 → L5-11 (go) · backup: {backup}"
+        )]
     );
 }
 
@@ -715,8 +766,16 @@ fn replace_by_lines_and_the_expect_hash() {
         at: ReplaceAt::Lines(13, 16),
         expect: expect.map(str::to_owned),
     };
-    let bad = run(&fs, &clock, &request("+keep():int{ return 9; }", false, lines_target(Some("deadbeef"))))
-        .unwrap_err();
+    let bad = run(
+        &fs,
+        &clock,
+        &request(
+            "+keep():int{ return 9; }",
+            false,
+            lines_target(Some("deadbeef")),
+        ),
+    )
+    .unwrap_err();
     assert!(bad.contains("changed"), "{bad}");
     assert_eq!(fs.get("app/A.php").unwrap(), DOCUMENTED);
     assert!(fs.names_under(".callgraph").is_empty());
@@ -727,7 +786,11 @@ fn replace_by_lines_and_the_expect_hash() {
     run(
         &fs,
         &clock,
-        &request("+keep():int{ return 9; }", false, lines_target(Some(&current[..8]))),
+        &request(
+            "+keep():int{ return 9; }",
+            false,
+            lines_target(Some(&current[..8])),
+        ),
     )
     .unwrap();
     assert!(fs.get("app/A.php").unwrap().contains("return 9;"));
@@ -753,7 +816,13 @@ fn replace_reports_unknown_methods_and_bad_ranges() {
         )
         .unwrap_err()
     };
-    assert!(replace(ReplaceAt::Method { class: None, name: "nope".into() }).contains("no method"));
+    assert!(
+        replace(ReplaceAt::Method {
+            class: None,
+            name: "nope".into()
+        })
+        .contains("no method")
+    );
     assert!(replace(ReplaceAt::Lines(5, 400)).contains("bad line range"));
     assert!(replace(ReplaceAt::Lines(0, 3)).contains("bad line range"));
 }
@@ -817,7 +886,10 @@ fn crlf_files_keep_their_line_endings() {
     )
     .unwrap();
     let text = fs.get("app/C.php").unwrap();
-    assert!(text.contains("{\r\n    public function a(): void\r\n"), "{text:?}");
+    assert!(
+        text.contains("{\r\n    public function a(): void\r\n"),
+        "{text:?}"
+    );
     assert!(!text.replace("\r\n", "").contains('\n'), "{text:?}");
 }
 
@@ -878,7 +950,11 @@ fn undo_restores_and_is_itself_undoable() {
     let generator = Generator::new(env(&fs, &clock), PhpEmitter);
 
     let first = generator.undo(Some("app/A.php")).unwrap();
-    assert!(first.lines[0].starts_with("restored app/A.php from .callgraph/backups/app/A.php."), "{:?}", first.lines);
+    assert!(
+        first.lines[0].starts_with("restored app/A.php from .callgraph/backups/app/A.php."),
+        "{:?}",
+        first.lines
+    );
     assert_eq!(fs.get("app/A.php").unwrap(), DOCUMENTED);
 
     // az undo is visszavonható: a következő undo a szerkesztett állapotot hozza vissza
@@ -891,9 +967,18 @@ fn undo_without_a_backup_is_a_one_line_error() {
     let fs = project();
     let clock = FixedClock(Cell::new(T0));
     let generator = Generator::new(env(&fs, &clock), PhpEmitter);
-    let e = generator.undo(Some("app/Models/Order.php")).unwrap_err().to_string();
+    let e = generator
+        .undo(Some("app/Models/Order.php"))
+        .unwrap_err()
+        .to_string();
     assert!(e.contains("no backup of app/Models/Order.php"), "{e}");
-    assert!(generator.undo(None).unwrap_err().to_string().contains("no backups yet"));
+    assert!(
+        generator
+            .undo(None)
+            .unwrap_err()
+            .to_string()
+            .contains("no backups yet")
+    );
 }
 
 #[test]
@@ -961,11 +1046,23 @@ fn edit_helpers_extend_ranges_and_sort_imports() {
         .map(|s| (*s).to_owned())
         .collect();
     assert_eq!(extend_over_docs(&doc, 4), 2);
-    let mut file: Vec<String> = ["<?php", "", "namespace A;", "", "use B\\Zed;", "", "class C {}"]
-        .iter()
-        .map(|s| (*s).to_owned())
-        .collect();
-    let added = add_imports(&mut file, 6, &[("B\\Alpha".into(), None), ("B\\Zed".into(), None)]);
+    let mut file: Vec<String> = [
+        "<?php",
+        "",
+        "namespace A;",
+        "",
+        "use B\\Zed;",
+        "",
+        "class C {}",
+    ]
+    .iter()
+    .map(|s| (*s).to_owned())
+    .collect();
+    let added = add_imports(
+        &mut file,
+        6,
+        &[("B\\Alpha".into(), None), ("B\\Zed".into(), None)],
+    );
     assert_eq!(added, 1);
     assert_eq!(file[4], "use B\\Alpha;");
     assert_eq!(file[5], "use B\\Zed;");
@@ -1013,4 +1110,24 @@ fn the_emitter_trait_is_a_strategy() {
     let lines: Vec<String> = Names.declaration(&program.decls[0]).collect();
     assert_eq!(lines, ["type A"]);
     assert_eq!(Names.extension(), "txt");
+}
+
+/// Nyelvfüggetlen paraméter: a név `$` nélkül is jó; a típus, az alapérték, a `...` és a `&` megmarad.
+#[test]
+fn params_accept_names_without_a_dollar() {
+    let params = super::head::parse_params(
+        "-Request request, int retries=3, list<int> items, ...rest, &out",
+    )
+    .unwrap();
+    let names: Vec<&str> = params.iter().map(|p| p.name.as_str()).collect();
+    assert_eq!(names, ["request", "retries", "items", "rest", "out"]);
+    assert!(params[0].promote.is_some());
+    assert_eq!(params[1].default.as_deref(), Some("3"));
+    assert!(params[3].variadic && params[4].by_ref);
+    // a `$`-os PHP-alak változatlanul működik
+    let php = super::head::parse_params("Order $order = null").unwrap();
+    assert_eq!(
+        (php[0].name.as_str(), php[0].default.as_deref()),
+        ("order", Some("null"))
+    );
 }

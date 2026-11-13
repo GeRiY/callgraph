@@ -96,9 +96,8 @@ pub(crate) fn parse_gen(args: &[String]) -> Result<CliArgs> {
             gen_usage()
         )));
     };
-    let targets = usize::from(write.is_some())
-        + usize::from(into.is_some())
-        + usize::from(replace.is_some());
+    let targets =
+        usize::from(write.is_some()) + usize::from(into.is_some()) + usize::from(replace.is_some());
     if targets > 1 || (after.is_some() && into.is_none()) || (expect.is_some() && replace.is_none())
     {
         return Err(usage_error(gen_usage()));

@@ -123,11 +123,7 @@ impl Parser {
                     other => {
                         return Err(self.lexer.error_at(
                             self.lexer.token_col(),
-                            &crate::tf!(
-                                "unexpected {:?}",
-                                "váratlan elem: {:?}",
-                                other
-                            ),
+                            &crate::tf!("unexpected {:?}", "váratlan elem: {:?}", other),
                         ));
                     }
                 }
@@ -152,10 +148,9 @@ impl Parser {
             Tok::Open => {
                 let (kids, end) = self.seq()?;
                 if end != Tok::Close {
-                    return Err(self.lexer.error_at(
-                        col,
-                        crate::t!("unclosed `(`", "lezáratlan `(`"),
-                    ));
+                    return Err(self
+                        .lexer
+                        .error_at(col, crate::t!("unclosed `(`", "lezáratlan `(`")));
                 }
                 (NodeKind::Group, kids)
             }

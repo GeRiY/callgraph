@@ -12,8 +12,8 @@ use rmcp::model::{CallToolResult, ContentBlock, Implementation, ServerCapabiliti
 use rmcp::{ServerHandler, tool, tool_handler, tool_router};
 
 use super::params::{
-    FindCallersParams, FrameworkViewParams, GenerateParams, LocateParams, MethodBodyParams, NextParams,
-    NotesParams, OutlineParams, ProfileParams, SearchParams,
+    FindCallersParams, FrameworkViewParams, GenerateParams, LocateParams, MethodBodyParams,
+    NextParams, NotesParams, OutlineParams, ProfileParams, SearchParams,
 };
 use super::request::ShowQuery;
 use super::runner::QueryRunner;

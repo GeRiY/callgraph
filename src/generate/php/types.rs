@@ -54,10 +54,7 @@ pub fn needs_doc(ty: &TypeRef) -> bool {
 pub fn is_generator_type(ty: &TypeRef) -> bool {
     match ty {
         TypeRef::Iter(_) => true,
-        TypeRef::Named(name) => matches!(
-            name.trim_start_matches('\\'),
-            "Generator" | "iterable"
-        ),
+        TypeRef::Named(name) => matches!(name.trim_start_matches('\\'), "Generator" | "iterable"),
         _ => false,
     }
 }
@@ -89,9 +86,7 @@ pub fn is_builtin(name: &str) -> bool {
 
 /// Importálandó jelölt-e a név: rövid (nincs `\`), nagybetűvel kezdődik, nem beépített.
 pub fn is_candidate(name: &str) -> bool {
-    !name.contains('\\')
-        && name.chars().next().is_some_and(char::is_uppercase)
-        && !is_builtin(name)
+    !name.contains('\\') && name.chars().next().is_some_and(char::is_uppercase) && !is_builtin(name)
 }
 
 /// A típusban hivatkozott jelölt-nevek.
@@ -168,7 +163,8 @@ pub fn scan_names(code: &str) -> Vec<String> {
         }
         if c.is_alphabetic() || c == '_' || c == '\\' {
             let start = i;
-            while i < chars.len() && (chars[i].is_alphanumeric() || chars[i] == '_' || chars[i] == '\\')
+            while i < chars.len()
+                && (chars[i].is_alphanumeric() || chars[i] == '_' || chars[i] == '\\')
             {
                 i += 1;
             }

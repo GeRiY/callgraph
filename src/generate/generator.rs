@@ -47,10 +47,7 @@ pub enum ReplaceAt {
     /// Sortartomány (1-alapú, zárt).
     Lines(usize, usize),
     /// Egy metódus (a docblockjával és az attribútumaival); `class`: ha több osztályban is van ilyen.
-    Method {
-        class: Option<String>,
-        name: String,
-    },
+    Method { class: Option<String>, name: String },
 }
 
 /// Egy generálási kérés.
@@ -526,7 +523,9 @@ impl<'a, E: Emitter> Generator<'a, E> {
             }
             all
         };
-        let names = self.emitter.referenced_names(&program.decls, &program.loose);
+        let names = self
+            .emitter
+            .referenced_names(&program.decls, &program.loose);
         let psr4 = Psr4::load(self.env.fs, self.env.root);
         let (imports, unresolved) = self.resolve_names(
             &names,
@@ -649,9 +648,7 @@ fn method_range(
         .methods
         .iter()
         .filter(|m| m.name == name)
-        .filter(|m| {
-            class.is_none_or(|c| m.container.as_deref().map(&short) == Some(short(c)))
-        })
+        .filter(|m| class.is_none_or(|c| m.container.as_deref().map(short) == Some(short(c))))
         .collect();
     match matching.as_slice() {
         [m] => Ok((

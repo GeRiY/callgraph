@@ -1,6 +1,7 @@
 //! Chain of Responsibility: a rövid osztálynév teljes névvé (FQCN) oldása láncolt feloldókkal, az első találatig:
 //! 1. explicit `use:` (és a célfájl meglévő importjai) → 2. a projekt osztály-indexe (PSR-4 + fájlnév) →
 //! 3. a projektben már használt importok (`use X\Y;` sorok) → 4. a PHP globális osztályai → feloldatlan.
+//!
 //! A 2. és 3. lépés lustán halad: a jelölteket (fájlokat) folyamatosan adja, és az első találatnál megáll.
 
 use std::path::Path;
@@ -57,7 +58,10 @@ impl NameResolver for ProjectClasses<'_> {
             .roots()
             .into_iter()
             .flat_map(|dir| walk_php(self.fs, self.root.join(dir)))
-            .find(|path| path.file_name().is_some_and(|n| n.to_str() == Some(wanted.as_str())))
+            .find(|path| {
+                path.file_name()
+                    .is_some_and(|n| n.to_str() == Some(wanted.as_str()))
+            })
             .and_then(|path| relative(self.root, &path))
             .and_then(|rel| self.psr4.fqcn_of(&rel))
     }

@@ -60,10 +60,7 @@ impl TypeRef {
     pub fn parse(text: &str) -> GenResult<Self> {
         let text = text.trim();
         if text.is_empty() {
-            return Err(GenError::new(crate::t!(
-                "empty type",
-                "üres típus"
-            )));
+            return Err(GenError::new(crate::t!("empty type", "üres típus")));
         }
         if let Some(inner) = text.strip_prefix('?') {
             return Ok(Self::Opt(Box::new(Self::parse(inner)?)));

@@ -9,7 +9,9 @@
 //!   `K=érték` / `K:Típus=érték` konstans
 //! - paraméter: `[+|-|#][readonly ]Típus [&][...]$név[=alapérték]` (láthatóság-előtag = promoted property)
 
-use super::ast::{EnumCase, Member, MemberKind, Param, TypeDecl, TypeKind, TypeRef, UseImport, Visibility};
+use super::ast::{
+    EnumCase, Member, MemberKind, Param, TypeDecl, TypeKind, TypeRef, UseImport, Visibility,
+};
 use super::error::{GenError, GenResult};
 
 /// A legfelső szinten (zárójelen, idézőjelen, `<…>`-on kívül) előforduló `sep` karakterek bájt-pozíciói.
@@ -169,7 +171,10 @@ pub fn is_decl_head(head: &str) -> bool {
     let mut chars = prefix.chars();
     matches!(chars.next(), Some('c' | 'i' | 't' | 'e' | 's'))
         && chars.all(|c| matches!(c, '!' | '~' | '%'))
-        && rest.chars().next().is_some_and(|c| c.is_alphabetic() || c == '_')
+        && rest
+            .chars()
+            .next()
+            .is_some_and(|c| c.is_alphabetic() || c == '_')
 }
 
 /// Típus-deklaráció feje (a tagok nélkül); `list`: a külön álló `[A, B]` (implements).
@@ -184,9 +189,7 @@ pub fn parse_decl(head: &str, list: Option<&str>) -> GenResult<TypeDecl> {
         Some('e') => TypeKind::Enum,
         _ => TypeKind::Struct,
     };
-    let name_end = rest
-        .find(['<', '[', ':', '('])
-        .unwrap_or(rest.len());
+    let name_end = rest.find(['<', '[', ':', '(']).unwrap_or(rest.len());
     let name = rest[..name_end].trim();
     if !is_ident(name) {
         return Err(bad_name(name));
@@ -303,7 +306,8 @@ pub fn parse_member(head: &str, raw: Option<&str>) -> GenResult<Member> {
     if visibility.is_some() {
         s = &s[1..];
     }
-    let (mut is_abstract, mut is_final, mut is_readonly, mut is_static) = (false, false, false, false);
+    let (mut is_abstract, mut is_final, mut is_readonly, mut is_static) =
+        (false, false, false, false);
     loop {
         if let Some(rest) = s.strip_prefix("::") {
             is_static = true;
@@ -454,6 +458,26 @@ fn parse_param(piece: &str) -> GenResult<Param> {
         readonly = true;
         s = rest.trim_start();
     }
+    // nyelvfüggetlen alak: a név `$` nélkül is jó (`Request request`, `int retries=3`, `...xs`) — az utolsó szó a
+    // név, előtte a típus; a PHP-emitter teszi elé a `$`-t
+    let normalized;
+    if !s.contains('$') {
+        let (decl, default) = match s.split_once('=') {
+            Some((d, rest)) => (d.trim_end(), Some(rest)),
+            None => (s.trim_end(), None),
+        };
+        let (ty, name) = match decl.rfind(char::is_whitespace) {
+            Some(at) => (&decl[..at], decl[at..].trim_start()),
+            None => ("", decl),
+        };
+        let bare = name.trim_start_matches(['.', '&']);
+        let prefix = &name[..name.len() - bare.len()];
+        normalized = match default {
+            Some(d) => format!("{ty} {prefix}${bare}={d}"),
+            None => format!("{ty} {prefix}${bare}"),
+        };
+        s = normalized.as_str();
+    }
     let Some(dollar) = s.find('$') else {
         return Err(bad(crate::tf!(
             "parameter `{}` needs a `$name` (e.g. `Order $order`)",
@@ -481,7 +505,10 @@ fn parse_param(piece: &str) -> GenResult<Param> {
     };
     let after = &s[dollar + 1..];
     let (name, default) = match after.split_once('=') {
-        Some((n, d)) => (n.trim(), Some(d.trim().to_owned()).filter(|d| !d.is_empty())),
+        Some((n, d)) => (
+            n.trim(),
+            Some(d.trim().to_owned()).filter(|d| !d.is_empty()),
+        ),
         None => (after.trim(), None),
     };
     if !is_ident(name) {

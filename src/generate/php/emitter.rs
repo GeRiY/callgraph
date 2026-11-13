@@ -9,16 +9,12 @@
 use std::collections::BTreeSet;
 
 use super::builder::PhpFileBuilder;
-use super::types::{
-    doc_type, is_generator_type, member_names, needs_doc, php_type, type_names,
-};
+use super::types::{doc_type, is_generator_type, member_names, needs_doc, php_type, type_names};
+use crate::generate::ast::{Member, MemberKind, Param, TypeDecl, TypeKind, TypeRef, Visibility};
+use crate::generate::emitter::{Emitter, FileSpec};
 use crate::lang::php::PhpBackend;
 use crate::lang::php::parser::{MagoAdapter, PhpParser};
 use crate::model::FileGraph;
-use crate::generate::ast::{
-    Member, MemberKind, Param, TypeDecl, TypeKind, TypeRef, Visibility,
-};
-use crate::generate::emitter::{Emitter, FileSpec};
 
 const IND: &str = "    ";
 const TODO_THROW: &str = "throw new \\LogicException('TODO');";
@@ -94,7 +90,11 @@ impl PhpEmitter {
             s.push_str(": ");
             s.push_str(&php_type(backing));
         }
-        if !decl.extends.is_empty() && matches!(decl.kind, TypeKind::Class | TypeKind::Struct | TypeKind::Interface)
+        if !decl.extends.is_empty()
+            && matches!(
+                decl.kind,
+                TypeKind::Class | TypeKind::Struct | TypeKind::Interface
+            )
         {
             s.push_str(" extends ");
             s.push_str(&Self::type_list(&decl.extends));
@@ -239,7 +239,11 @@ impl PhpEmitter {
 
     fn method(&self, kind: TypeKind, m: &Member) -> Vec<String> {
         let is_ctor = m.kind == MemberKind::Ctor;
-        let name = if is_ctor { "__construct" } else { m.name.as_str() };
+        let name = if is_ctor {
+            "__construct"
+        } else {
+            m.name.as_str()
+        };
         let interface = kind == TypeKind::Interface;
         let params: Vec<String> = m.params.iter().map(php_param).collect();
         let ret = match (&m.ty, is_ctor) {

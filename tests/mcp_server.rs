@@ -608,7 +608,11 @@ fn generate_tool_appears_only_when_enabled() {
         "{generate}"
     );
 
-    let dry = on.call(3, "generate", json!({"expr": "c:A > +x():void", "dry": true}));
+    let dry = on.call(
+        3,
+        "generate",
+        json!({"expr": "c:A > +x():void", "dry": true}),
+    );
     assert_ne!(dry["isError"], json!(true), "{dry}");
     assert!(text(&dry).contains("class A\n{"), "{dry}");
     let written = on.call(
@@ -617,7 +621,10 @@ fn generate_tool_appears_only_when_enabled() {
         json!({"expr": "c:Pay > +run():int", "write": "app/Pay.php"}),
     );
     assert_ne!(written["isError"], json!(true), "{written}");
-    assert!(text(&written).starts_with("wrote app/Pay.php ("), "{written}");
+    assert!(
+        text(&written).starts_with("wrote app/Pay.php ("),
+        "{written}"
+    );
     assert!(
         std::fs::read_to_string(dir.join("app/Pay.php"))
             .unwrap()

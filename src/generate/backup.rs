@@ -20,10 +20,13 @@ pub struct Backups<'a> {
 /// Érvényes időbélyeg-e (`yyyymmddThhmmss`).
 fn valid_stamp(text: &str) -> bool {
     text.len() == 15
-        && text
-            .bytes()
-            .enumerate()
-            .all(|(i, b)| if i == 8 { b == b'T' } else { b.is_ascii_digit() })
+        && text.bytes().enumerate().all(|(i, b)| {
+            if i == 8 {
+                b == b'T'
+            } else {
+                b.is_ascii_digit()
+            }
+        })
 }
 
 /// A mentés-fájl nevéből a `(fájlnév, időbélyeg)` pár.

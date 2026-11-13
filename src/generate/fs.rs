@@ -100,8 +100,7 @@ impl Clock for SystemClock {
 
 /// `yyyymmddThhmmss` (UTC) a Unix-másodpercből; a biztonsági mentések nevében ez rendez időrendben.
 pub fn stamp(secs: u64) -> String {
-    let (year, month, day) =
-        crate::update::usage::civil(i64::try_from(secs / 86_400).unwrap_or(0));
+    let (year, month, day) = crate::update::usage::civil(i64::try_from(secs / 86_400).unwrap_or(0));
     let rest = secs % 86_400;
     format!(
         "{year:04}{month:02}{day:02}T{:02}{:02}{:02}",

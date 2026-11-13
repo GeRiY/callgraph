@@ -109,7 +109,11 @@ pub struct InsertInto {
 impl EditCommand for InsertInto {
     fn execute(&self, env: Env<'_>) -> GenResult<String> {
         let backup = commit(env, &self.rel, &self.text)?;
-        Ok(format!("{} · {}", self.summary, backup_note(backup.as_deref())))
+        Ok(format!(
+            "{} · {}",
+            self.summary,
+            backup_note(backup.as_deref())
+        ))
     }
 }
 
@@ -123,7 +127,11 @@ pub struct ReplaceRange {
 impl EditCommand for ReplaceRange {
     fn execute(&self, env: Env<'_>) -> GenResult<String> {
         let backup = commit(env, &self.rel, &self.text)?;
-        Ok(format!("{} · {}", self.summary, backup_note(backup.as_deref())))
+        Ok(format!(
+            "{} · {}",
+            self.summary,
+            backup_note(backup.as_deref())
+        ))
     }
 }
 

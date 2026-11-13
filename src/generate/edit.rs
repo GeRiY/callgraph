@@ -102,7 +102,10 @@ pub fn add_imports(
         }
         let line = use_line(fqcn, alias.as_deref());
         let key = fqcn.to_ascii_lowercase();
-        if let Some((idx, _, _)) = existing.iter().find(|(_, f, _)| f.to_ascii_lowercase() > key) {
+        if let Some((idx, _, _)) = existing
+            .iter()
+            .find(|(_, f, _)| f.to_ascii_lowercase() > key)
+        {
             lines.insert(*idx, line);
         } else if let Some((idx, _, _)) = existing.last() {
             lines.insert(idx + 1, line);
@@ -110,7 +113,11 @@ pub fn add_imports(
             let anchor = lines[..limit]
                 .iter()
                 .rposition(|l| l.starts_with("namespace "))
-                .or_else(|| lines[..limit].iter().rposition(|l| l.starts_with("declare(")))
+                .or_else(|| {
+                    lines[..limit]
+                        .iter()
+                        .rposition(|l| l.starts_with("declare("))
+                })
                 .or_else(|| lines[..limit].iter().position(|l| l.starts_with("<?php")))
                 .map_or(0, |i| i + 1);
             let mut inserted = vec![String::new(), line];
