@@ -6,9 +6,11 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ## [Unreleased]
 
+## [0.9.5] — 2026-11-13
+
 ### Új
 
-- **Helyi parancsnapló**: a `callgraph stats --events [--days N]` kilistázza a legutóbbi hívásaidat (parancs, kliens,
+- **Helyi parancsnapló**: a `callgraph.sh stats --events [--days N]` kilistázza a legutóbbi hívásaidat (parancs, kliens,
   eredmény, idő- és méretsáv, hogyan viszonyul az előző híváshoz, és benne volt-e a fájlja / szimbóluma az előző hívás
   kimenetében) és a leggyakoribb parancs-átmeneteket. Az „az előző kimenet felhasználása” összesítő átmenetenként
   mutatja, hányszor volt a következő hívás fájlja az első felsorolt fájl (`hit1`), a 2.–5. (`hit5`), egy későbbi
@@ -635,7 +637,8 @@ Első kiadás.
 - Beépített frissítés: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Előre fordított csomagok macOS-re (arm64, x86_64), Linuxra (x86_64, ARM64, statikus musl) és Windowsra.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.9.4...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.9.5...develop
+[0.9.5]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.5
 [0.9.4]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.4
 [0.9.3]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.3
 [0.9.2]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.2

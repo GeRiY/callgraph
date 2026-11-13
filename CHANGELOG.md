@@ -5,9 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+## [0.9.5] — 2026-11-13
+
 ### Added
 
-- **Local command log**: `callgraph stats --events [--days N]` lists your recent calls (command, client, outcome,
+- **Local command log**: `callgraph.sh stats --events [--days N]` lists your recent calls (command, client, outcome,
   timing and size bands, how it relates to the previous call, and whether its file / symbol appeared in the previous
   call's output) and the most common command transitions. A "previous output reused" summary shows per transition how
   often the next call's file was the first file listed (`hit1`), the 2nd–5th (`hit5`), a later one (`hit`) or not
@@ -596,7 +598,8 @@ First release.
 - Built-in update: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Prebuilt packages for macOS (arm64, x86_64), Linux (x86_64, ARM64, static musl) and Windows.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.9.4...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.9.5...develop
+[0.9.5]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.5
 [0.9.4]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.4
 [0.9.3]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.3
 [0.9.2]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.2
