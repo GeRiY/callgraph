@@ -226,6 +226,14 @@ class Counting(unittest.TestCase):
         finally:
             counts.fetch_latest_tag = old
 
+    def test_a_stale_tag_is_refreshed_before_answering(self):
+        counts.latest_tag(fetch=lambda: "v0.9.4")
+        stale = counts._latest["at"] + counts.LATEST_TTL + 1
+        self.assertEqual(counts.latest_tag(fetch=lambda: "v0.9.5", now=stale), "v0.9.5")
+        # GitHub does not answer: the stale tag is still served (until LATEST_MAX_AGE)
+        stale = counts._latest["at"] + counts.LATEST_TTL + 1
+        self.assertEqual(counts.latest_tag(fetch=lambda: None, now=stale), "v0.9.5")
+
     def test_latest_cache_is_not_served_when_too_old(self):
         counts.latest_tag(fetch=lambda: "v0.9.4")
         later = counts._latest["at"] + counts.LATEST_MAX_AGE + 1
