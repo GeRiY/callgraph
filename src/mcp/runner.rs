@@ -4,6 +4,7 @@
 use std::path::PathBuf;
 
 use super::guard::ProjectRoot;
+use super::params::GenerateParams;
 use super::request::ShowQuery;
 use crate::cli::{CliArgs, build_command};
 use crate::skill::{ProjectRegistry, SkillHome};
@@ -31,6 +32,11 @@ pub(crate) trait QueryRunner: Send + Sync {
     fn next(&self, project: Option<&str>, id: &str, choices: &[usize]) -> Result<String, String> {
         let _ = (project, choices);
         Err(unknown_result(id))
+    }
+    /// Kód generálása (`generate` eszköz, opt-in, `crate::generate`): a CLI `gen` parancsának kimenete.
+    fn generate(&self, params: &GenerateParams) -> Result<String, String> {
+        let _ = params;
+        Err(crate::t!("generate is not available", "a generate nem érhető el").into())
     }
 }
 
@@ -135,6 +141,14 @@ impl QueryRunner for ShowRunner {
             return Err(String::from_utf8_lossy(&err).trim_end().to_owned());
         }
         Ok(String::from_utf8_lossy(&out).into_owned())
+    }
+
+    fn generate(&self, params: &GenerateParams) -> Result<String, String> {
+        let root = self.root(params.project.as_deref())?;
+        let mut args = params.to_args();
+        args.push("--project".to_owned());
+        args.push(root.root().display().to_string());
+        Self::execute_plain(args)
     }
 
     fn startup_note(&self) -> String {

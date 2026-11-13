@@ -3,6 +3,7 @@
 mod args;
 mod command;
 pub mod commands;
+mod generate_args;
 mod next_args;
 mod profile_args;
 pub mod signatures;
@@ -125,6 +126,16 @@ pub fn build_command(args: CliArgs) -> Result<Box<dyn Command>> {
         ))),
         CliArgs::Telemetry { action } => Ok(Box::new(commands::TelemetryCommand::new(
             action,
+            crate::skill::SkillHome::from_env(),
+        ))),
+        CliArgs::Generate { request, project } => Ok(Box::new(commands::GenerateCommand::new(
+            request,
+            project,
+            crate::skill::SkillHome::from_env(),
+        ))),
+        CliArgs::Undo { file, project } => Ok(Box::new(commands::UndoCommand::new(
+            file,
+            project,
             crate::skill::SkillHome::from_env(),
         ))),
         CliArgs::Version => Ok(Box::new(commands::VersionCommand)),

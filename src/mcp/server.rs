@@ -1,4 +1,4 @@
-//! Az MCP-szerver (rmcp): tíz, csak olvasó eszköz a meglévő lekérdező-motor fölött. A leírások rövidek (minden
+//! Az MCP-szerver (rmcp): tíz, csak olvasó eszköz a meglévő lekérdező-motor fölött (plusz az opt-in `generate`). A leírások rövidek (minden
 //! kliensben kontextus-tokenbe kerülnek): mit ad, egy példa, a fő buktató. Az `initialize` útmutatója és a `guide`
 //! eszköz szövege a skill-utasítás forrásából készül (`guide.rs`), így nem csúszik szét a SKILL.md-vel. Minden
 //! eszköz-hívás vége egy helyen megy át (`finish`): ott méri a helyi használati statisztika (`stats::McpStats`),
@@ -12,7 +12,7 @@ use rmcp::model::{CallToolResult, ContentBlock, Implementation, ServerCapabiliti
 use rmcp::{ServerHandler, tool, tool_handler, tool_router};
 
 use super::params::{
-    FindCallersParams, FrameworkViewParams, LocateParams, MethodBodyParams, NextParams,
+    FindCallersParams, FrameworkViewParams, GenerateParams, LocateParams, MethodBodyParams, NextParams,
     NotesParams, OutlineParams, ProfileParams, SearchParams,
 };
 use super::request::ShowQuery;
@@ -33,11 +33,16 @@ pub(crate) struct CallgraphServer {
 #[tool_router]
 impl CallgraphServer {
     pub(crate) fn new(runner: Arc<dyn QueryRunner>, stats: McpStats) -> Self {
+        let mut tool_router = Self::tool_router();
+        // az egyetlen író eszköz alapból nincs a listán (a „csak olvas” ígéret a meglévő telepítéseknél változatlan)
+        if !crate::generate::enabled() {
+            tool_router.remove_route("generate");
+        }
         Self {
             runner,
             stats: Arc::new(stats),
             usage: Arc::new(UsageCheck::disabled()),
-            tool_router: Self::tool_router(),
+            tool_router,
         }
     }
 
@@ -264,6 +269,26 @@ impl CallgraphServer {
         .await
         .unwrap_or_else(|e| Err(e.to_string()));
         let call = Self::plain(CommandKind::Next, started, project.as_deref());
+        self.finish(&call, result)
+    }
+
+    #[tool(
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            idempotent_hint = false,
+            open_world_hint = false
+        ),
+        description = "Generate PHP from a short expression and write it (never overwrites; backup and syntax check first). Example: {\"expr\": \"c!:Pay<Base> > ctor(-Client $http) + +charge(Order $o):Receipt\", \"write\": \"app/Pay.php\"}. Also: into, replace, dry."
+    )]
+    async fn generate(&self, Parameters(p): Parameters<GenerateParams>) -> CallToolResult {
+        let started = Instant::now();
+        let project = p.project.clone();
+        let runner = Arc::clone(&self.runner);
+        let result = tokio::task::spawn_blocking(move || runner.generate(&p))
+            .await
+            .unwrap_or_else(|e| Err(e.to_string()));
+        let call = Self::plain(CommandKind::Other, started, project.as_deref());
         self.finish(&call, result)
     }
 

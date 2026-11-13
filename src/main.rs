@@ -39,6 +39,13 @@ fn main() -> ExitCode {
             std::env::set_var(callgraph::next::NEXT_ENV, "1");
         }
     }
+    if callgraph::generate::take_generate(&mut args) {
+        // SAFETY: mint fent — egyszálú pont; a `callgraph mcp --generate` ebből tudja, hogy a `generate` eszköz be van
+        // kapcsolva
+        unsafe {
+            std::env::set_var(callgraph::generate::GENERATE_ENV, "1");
+        }
+    }
     callgraph::update::cleanup_stale_binary();
     let probe = CliProbe::start(&args);
     let command = match CliArgs::parse(args.clone()).and_then(cli::build_command) {

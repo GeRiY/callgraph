@@ -13,6 +13,8 @@
 # `callgraph.sh --version` (or `-V`, `version`) prints the binary's version and platform, and the binary's path.
 # `--no-gitignore` with any command: the .gitignore files are not applied (.callgraphignore still is).
 # `--strict` (or CALLGRAPH_STRICT=1): show / locate / profile exit with code 3 if a file read had a syntax error.
+# `gen '<expr>' [--dry|--write <file>|--into <file>[::Class]|--replace <file>…]` / `undo [<file>]`: code generator (forwarded;
+# `--generate` / CALLGRAPH_GENERATE=1 turns on the MCP `generate` tool).
 # `--next` (or CALLGRAPH_NEXT=1): a result may end with `↪ rN possible next: [1] …`; `callgraph.sh next rN 1` runs it.
 # `callgraph.sh telemetry on|off|status|preview`: opt-in sending of the local stats (only the user turns it on).
 # `--project <dir>`: an existing folder (absolute or relative) works without registering it as an alias.
@@ -27,7 +29,9 @@ source "$SCRIPT_DIR/lib.sh"
 # (`locate`, `profile` …) az első argumentumot lássa
 args=()
 for a in "$@"; do
-    if [[ "$a" == --next ]]; then export CALLGRAPH_NEXT=1; else args+=("$a"); fi
+    if [[ "$a" == --next ]]; then export CALLGRAPH_NEXT=1;
+    elif [[ "$a" == --generate ]]; then export CALLGRAPH_GENERATE=1;
+    else args+=("$a"); fi
 done
 set -- "${args[@]+"${args[@]}"}"
 
@@ -69,6 +73,11 @@ if [[ "${1:-}" == stats || "${1:-}" == telemetry ]]; then
 fi
 # javasolt következő lépés: `callgraph.sh next r7 1[,3] [--project alias]` → `callgraph next …`
 if [[ "${1:-}" == next ]]; then
+    run_callgraph "$@"
+fi
+# kódgenerátor: `callgraph.sh gen '<kifejezés>' [--dry|--write|--into|--replace …]` → `callgraph gen …`;
+# az utolsó módosítás visszavonása: `callgraph.sh undo [<fájl>]` → `callgraph undo …`
+if [[ "${1:-}" == gen || "${1:-}" == undo ]]; then
     run_callgraph "$@"
 fi
 # verzió: `callgraph.sh --version|-V|version` → `callgraph --version` + a bináris helye (nem a show-súgó)

@@ -164,6 +164,23 @@ Frissítés (a GitHub Releases-ből; a projects.json, a lang, az errors.jsonl, a
   check.callgraph.eu-ra (azonosító és IP nélkül). Kikapcsolás: CALLGRAPH_COUNT=0 vagy DO_NOT_TRACK=1 (a CALLGRAPH_UPDATE_CHECK=0 is);
   a DO_NOT_TRACK=1 az opt-in telemetriát is leállítja.
 
+Kódgenerátor (fájlt ír; az MCP `generate` eszköz alapból ki van, a szervert --generate kapcsolóval vagy CALLGRAPH_GENERATE=1-gyel kell indítani):
+  bash ~/.claude/skills/callgraph/callgraph.sh gen '<kif>' [--dry] [--write <fájl> | --into <fájl>[::Osztály] [--after <metódus>] | --replace <fájl>(:L<a>-L<b> | ::<metódus>) [--expect <sha256-előtag>]] [--project alias]
+    Egy sort ír ki (mi íródott, a mentés, `unresolved: Foo` a nem importálható nevekre); kódot csak a --dry ír ki (cél nélkül
+    ez az alap). Fájlt soha nem ír felül (a --write létezőt elutasít); a meglévő fájl minden módosítása előtt mentés készül:
+    .callgraph/backups/<út>.<UTC yyyymmddThhmmss>.bak (fájlonként a legújabb 10); az új fájlt írás előtt teljesen
+    parse-oljuk, szintaktikai hibánál semmi nem íródik. A névtér a composer.json psr-4-ből, az importok a projektből jönnek.
+    Kifejezés: c:Név osztály, i: interfész, t: trait, e:Név:string(A=a,B=b) enum, s: struct; c! final, c~ abstract, c% readonly;
+      <Ős> extends, [A,B] implements; > gyerek, + testvér (az új sor is), ^ fel, *n ismétlés ($ = számláló), ( ) csoport, {törzs} nyers kód
+      tagok: + public, - private, # protected, majd ~ abstract, ! final, :: static:  +charge(Order $o, int ...$xs):Receipt{ ... }
+      ctor(-Client $http, -int $n=3) promoted, $prop:Típus=1, K=1; törzs nélkül: // TODO (void) / throw LogicException (típusos) /
+      yield from [] (Generator, iterable, iter<T>); ns:App\X, use:Foo\Bar,Baz\Qux as Q
+      típusok: int float bool str bytes void mixed list<T> map<K,V> opt<T> vagy ?T iter<T> A|B, vagy natív PHP-nevek (list/map -> array + docblock)
+    Példák:
+      gen 'c!:PaymentGateway<BaseGateway>[Chargeable] > ctor(-Client $http, -int $retries=3) + +charge(Order $order):Receipt + -sign(array $p):string' --write app/Services/PaymentGateway.php
+      gen '+refund(Order $o):void{ $this->http->post($o->id); }' --into app/Services/PaymentGateway.php::PaymentGateway --after charge
+  bash ~/.claude/skills/callgraph/callgraph.sh undo [<fájl>]    a legutóbbi mentés visszaállítása (a fájlé, vagy a legutóbb módosítotté); az undo is visszavonható
+
 Kimenet-korlát: 400 sor fölött a mappás outline summary-ra, az egyfájlos metódus-indexre vált;
 
 Motor: a logika (projekt-alias feloldása, `show`, hibák error-id-ja) a `callgraph wrap` alparancsban él;

@@ -161,6 +161,23 @@ Update (from GitHub Releases; projects.json, lang, errors.jsonl, feedback.jsonl,
   check.callgraph.eu (no ID, no IP stored). Off: CALLGRAPH_COUNT=0 or DO_NOT_TRACK=1 (also with CALLGRAPH_UPDATE_CHECK=0);
   DO_NOT_TRACK=1 also stops the opt-in telemetry.
 
+Code generator (writes files; the MCP `generate` tool is off unless the server runs with --generate or CALLGRAPH_GENERATE=1):
+  bash ~/.claude/skills/callgraph/callgraph.sh gen '<expr>' [--dry] [--write <file> | --into <file>[::Class] [--after <method>] | --replace <file>(:L<a>-L<b> | ::<method>) [--expect <sha256-prefix>]] [--project alias]
+    Prints one line (what was written, the backup, `unresolved: Foo` for names it could not import); code only with --dry
+    (the default without a target). Never overwrites a file (--write refuses an existing one); every change to an existing
+    file is backed up first to .callgraph/backups/<path>.<UTC yyyymmddThhmmss>.bak (newest 10 per file); the whole new file
+    is parsed before writing, on a syntax error nothing is written. Namespace from composer.json psr-4, imports from the project.
+    Expression: c:Name class, i: interface, t: trait, e:Name:string(A=a,B=b) enum, s: struct; c! final, c~ abstract, c% readonly;
+      <Base> extends, [A,B] implements; > child, + sibling (a new line too), ^ up, *n repeat ($ = counter), ( ) group, {body} raw code
+      members: + public, - private, # protected, then ~ abstract, ! final, :: static:  +charge(Order $o, int ...$xs):Receipt{ ... }
+      ctor(-Client $http, -int $n=3) promoted, $prop:Type=1, K=1; no body: // TODO (void) / throw LogicException (typed) /
+      yield from [] (Generator, iterable, iter<T>); ns:App\X, use:Foo\Bar,Baz\Qux as Q
+      types: int float bool str bytes void mixed list<T> map<K,V> opt<T> or ?T iter<T> A|B, or native PHP names (list/map -> array + docblock)
+    Examples:
+      gen 'c!:PaymentGateway<BaseGateway>[Chargeable] > ctor(-Client $http, -int $retries=3) + +charge(Order $order):Receipt + -sign(array $p):string' --write app/Services/PaymentGateway.php
+      gen '+refund(Order $o):void{ $this->http->post($o->id); }' --into app/Services/PaymentGateway.php::PaymentGateway --after charge
+  bash ~/.claude/skills/callgraph/callgraph.sh undo [<file>]    restore the newest backup (of the file, or of the last changed one); itself undoable
+
 Output limit: above 400 lines the directory outline switches to summary, the single-file one to a method index;
 
 Engine: the logic (project alias resolution, `show`, error ids) lives in the `callgraph wrap` subcommand;
