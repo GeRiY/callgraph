@@ -27,13 +27,19 @@ pub(crate) enum CommandKind {
     Next,
     /// `uses` (CLI) és `package_usage` (MCP): egy függőség használata.
     PackageUsage,
+    /// `deps` (CLI) és `project_profile` `deps: true` (MCP): fölösleges / hiányzó / csak-dev függőségek.
+    Deps,
+    /// `gen` (CLI) és `generate` (MCP, opt-in): kódgenerálás rövid kifejezésből.
+    Generate,
+    /// `undo`: a generátor utolsó módosításának visszavonása (a gráfban: generálás után jön-e visszavonás).
+    Undo,
     Other,
 }
 
 impl CommandKind {
     /// Minden változat (a tesztekhez).
     #[cfg(test)]
-    pub(crate) const ALL: [Self; 17] = [
+    pub(crate) const ALL: [Self; 20] = [
         Self::Show,
         Self::Outline,
         Self::MethodBody,
@@ -50,6 +56,9 @@ impl CommandKind {
         Self::Projects,
         Self::Next,
         Self::PackageUsage,
+        Self::Deps,
+        Self::Generate,
+        Self::Undo,
         Self::Other,
     ];
 
@@ -72,6 +81,9 @@ impl CommandKind {
             Self::Projects => "projects",
             Self::Next => "next",
             Self::PackageUsage => "package_usage",
+            Self::Deps => "deps",
+            Self::Generate => "generate",
+            Self::Undo => "undo",
             Self::Other => "other",
         }
     }

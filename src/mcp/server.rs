@@ -234,6 +234,12 @@ impl CallgraphServer {
         let started = Instant::now();
         let project = p.project.clone();
         let runner = Arc::clone(&self.runner);
+        // a statisztikában (és a parancs-gráfban) külön lépés: `deps`
+        let kind = if p.deps {
+            CommandKind::Deps
+        } else {
+            CommandKind::ProjectProfile
+        };
         // `deps: true`: a profil helyett a függőség-vizsgálat (ritka, igény szerinti)
         let result = tokio::task::spawn_blocking(move || {
             if p.deps {
@@ -244,7 +250,7 @@ impl CallgraphServer {
         })
         .await
         .unwrap_or_else(|e| Err(e.to_string()));
-        let call = Self::plain(CommandKind::ProjectProfile, started, project.as_deref());
+        let call = Self::plain(kind, started, project.as_deref());
         self.finish(&call, result)
     }
 
@@ -318,7 +324,7 @@ impl CallgraphServer {
         let result = tokio::task::spawn_blocking(move || runner.generate(&p))
             .await
             .unwrap_or_else(|e| Err(e.to_string()));
-        let call = Self::plain(CommandKind::Other, started, project.as_deref());
+        let call = Self::plain(CommandKind::Generate, started, project.as_deref());
         self.finish(&call, result)
     }
 

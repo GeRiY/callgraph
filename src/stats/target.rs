@@ -176,7 +176,11 @@ const MAX_CANDIDATES: usize = 8;
 pub(crate) fn cli_target(command: CommandKind, args: &[String], cwd: &Path) -> Option<Target> {
     if matches!(
         command,
-        CommandKind::Locate | CommandKind::Next | CommandKind::Projects | CommandKind::PackageUsage
+        CommandKind::Locate
+            | CommandKind::Next
+            | CommandKind::Projects
+            | CommandKind::PackageUsage
+            | CommandKind::Deps
     ) {
         return None;
     }
@@ -220,7 +224,11 @@ pub(crate) fn cli_target(command: CommandKind, args: &[String], cwd: &Path) -> O
 pub(crate) fn cli_symbols(command: CommandKind, args: &[String]) -> Vec<String> {
     if matches!(
         command,
-        CommandKind::Locate | CommandKind::Next | CommandKind::Projects | CommandKind::PackageUsage
+        CommandKind::Locate
+            | CommandKind::Next
+            | CommandKind::Projects
+            | CommandKind::PackageUsage
+            | CommandKind::Deps
     ) {
         return Vec::new();
     }
