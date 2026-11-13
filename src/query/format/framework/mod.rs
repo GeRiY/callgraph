@@ -2,8 +2,9 @@
 //! fájlonként szekciók, mindegyik egy forrást (hívás / string / metódus) regexszel szűr és fix sorsablont tölt ki.
 //! Egy nézet = egy gyűjtőfüggvény a `rules.rs`-ben + egy sor a `register`-ben. Kivétel az `inertia` nézet
 //! (`inertia.rs`): fájlokon átívelő (PHP render-hívás ↔ page-komponens), a projekt-szintű kötésekből; ugyanígy a
-//! `ziggy` nézet (`ziggy.rs`: JS `route('név')` ↔ a Laravel route-tábla).
+//! `ziggy` nézet (`ziggy.rs`: JS `route('név')` ↔ a Laravel route-tábla) és a `forms` nézet (`forms.rs`: `useForm` ↔ validáció).
 
+mod forms;
 mod inertia;
 mod routes;
 mod rules;
@@ -118,6 +119,7 @@ pub(super) fn register(registry: &mut FormatterRegistry) {
     }
     registry.register("inertia", Box::new(inertia::InertiaView));
     registry.register("ziggy", Box::new(ziggy::ZiggyView));
+    registry.register("forms", Box::new(forms::FormsView));
 }
 
 /// `<ns><container|__top__>::<caller>` — a hívás helye.
@@ -226,6 +228,22 @@ mod tests {
             register(&mut registry);
             let text = registry
                 .render("ziggy", std::slice::from_ref(&row))
+                .unwrap();
+            assert_eq!(text, want);
+        }
+    }
+
+    #[test]
+    fn forms_view_without_bindings_reports_empty() {
+        let row = QueryResult::new(FileGraphBuilder::new("app/x.php").build(), None);
+        for (lang, want) in [
+            (Lang::En, "(no Inertia forms found)\n"),
+            (Lang::Hu, "(nincs Inertia-űrlap találat)\n"),
+        ] {
+            let mut registry = FormatterRegistry::default().in_lang(lang);
+            register(&mut registry);
+            let text = registry
+                .render("forms", std::slice::from_ref(&row))
                 .unwrap();
             assert_eq!(text, want);
         }

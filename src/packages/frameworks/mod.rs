@@ -47,8 +47,14 @@ pub(crate) fn annotate(rows: &mut [QueryResult], root: &Path, format: &str) {
         format == "inertia"
             || (format == "outline" && rows.iter().any(|row| inertia.is_page(&row.graph.file)))
     });
+    // az űrlap-szerződés (`useForm` ↔ route ↔ validáció) csak Laravel + Inertia projektben
+    let with_forms = laravel.is_some() && inertia.is_some();
+    let scan_forms = with_forms
+        && (format == "forms"
+            || (matches!(format, "outline" | "json" | "jsonl") && rows.iter().any(needs_forms)));
     let scan_laravel = laravel.is_some()
         && (format == "ziggy"
+            || scan_forms
             || (matches!(format, "outline" | "json" | "jsonl") && rows.iter().any(needs_routes)));
     if scan_inertia || scan_laravel {
         let analyzer = Analyzer::with_defaults();
@@ -65,6 +71,9 @@ pub(crate) fn annotate(rows: &mut [QueryResult], root: &Path, format: &str) {
             }
             if let Some(laravel) = laravel.as_mut().filter(|_| scan_laravel) {
                 laravel.scan(code(), &DiskProjectFiles, format == "ziggy");
+                if scan_forms {
+                    laravel.scan_forms(code(), &DiskProjectFiles);
+                }
             }
         });
     }
@@ -79,15 +88,31 @@ pub(crate) fn annotate(rows: &mut [QueryResult], root: &Path, format: &str) {
 /// Kell-e a route-tábla a sorhoz: Ziggy `route('név')` hívás van benne (JS / Vue), vagy controller-fájl (a
 /// metódusok `route:` sora).
 fn needs_routes(row: &QueryResult) -> bool {
-    let graph = &row.graph;
-    graph
+    row.graph
         .calls
         .iter()
         .any(|call| laravel::route_name(call).is_some())
-        || (graph.file.ends_with(".php")
-            && (graph.file.contains("/Controllers/")
-                || graph
-                    .containers
-                    .iter()
-                    .any(|c| c.name.ends_with("Controller"))))
+        || is_controller(row)
+}
+
+/// Controller-fájl-e a sor (a metódusok `route:` / `form:` sora).
+fn is_controller(row: &QueryResult) -> bool {
+    let graph = &row.graph;
+    graph.file.ends_with(".php")
+        && (graph.file.contains("/Controllers/")
+            || graph
+                .containers
+                .iter()
+                .any(|c| c.name.ends_with("Controller")))
+}
+
+/// Kell-e az űrlap-ellenőrzés a sorhoz: `useForm` küldés van benne (`form.post(..)` …), vagy controller-fájl (a
+/// metódusok `form:` sora).
+fn needs_forms(row: &QueryResult) -> bool {
+    is_controller(row)
+        || row.graph.calls.iter().any(|call| {
+            call.resolved
+                .as_deref()
+                .is_some_and(|r| r.starts_with("@inertiajs/vue3::useForm"))
+        })
 }

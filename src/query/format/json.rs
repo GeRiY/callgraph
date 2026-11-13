@@ -138,6 +138,32 @@ struct JsCall<'a> {
     package: Option<crate::packages::Attribution>,
     /// Laravel-kötésekkel a Ziggy `route('név')` hívásnál a route.
     route: Option<RouteJson>,
+    /// Laravel + Inertia kötésekkel a `useForm` küldésnél az űrlap-szerződés.
+    form: Option<FormJson>,
+}
+
+/// A `form` mező: az űrlap mezői, a szabály-kulcsok, az eltérések és a controller-akció.
+#[derive(serde::Serialize)]
+struct FormJson {
+    fields: Vec<String>,
+    rules: Vec<String>,
+    unvalidated: Vec<String>,
+    missing_required: Vec<String>,
+    action: String,
+}
+
+impl FormJson {
+    /// A hívás űrlapja a Laravel-kötésekből; kötések nélkül vagy nem ellenőrzött küldésnél `None`.
+    fn of(row: &QueryResult, call: &crate::model::Call) -> Option<Self> {
+        let form = row.laravel.as_ref()?.form_of(&row.graph.file, call)?;
+        Some(Self {
+            fields: form.fields.clone(),
+            rules: form.rules.clone(),
+            unvalidated: form.unvalidated.clone(),
+            missing_required: form.missing_required.clone(),
+            action: form.action(),
+        })
+    }
 }
 
 /// A `route` mező: a megtalált route (`name`, `verb`, `uri`, `action`), vagy `{"missing": true}`, ha a név nem létezik.
@@ -211,6 +237,9 @@ impl serde::Serialize for JsCall<'_> {
         if let Some(route) = &self.route {
             m.serialize_entry("route", route)?;
         }
+        if let Some(form) = &self.form {
+            m.serialize_entry("form", form)?;
+        }
         m.end()
     }
 }
@@ -242,6 +271,7 @@ pub(super) fn ordered_graph(row: &QueryResult) -> OrderedGraph<'_> {
                         call,
                         package: row.package_of(call),
                         route: RouteJson::of(row, call),
+                        form: FormJson::of(row, call),
                     })
                     .collect(),
             )

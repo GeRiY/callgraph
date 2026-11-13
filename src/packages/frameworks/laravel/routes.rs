@@ -610,7 +610,7 @@ fn skip_ws(text: &str, from: usize) -> usize {
 }
 
 /// A `open` helyi nyitó zárójel párja (string- és beágyazás-tudóan); lezáratlan: `None`.
-fn matching(text: &str, open: usize, to: usize) -> Option<usize> {
+pub(super) fn matching(text: &str, open: usize, to: usize) -> Option<usize> {
     let mut depth = 0usize;
     let mut quote: Option<u8> = None;
     let mut escaped = false;
@@ -692,7 +692,7 @@ fn blank(out: &mut String, ch: char) {
 
 /// A PHP-megjegyzések (`//`, `#`, `/* */`) szóközre cserélve — a bájt-helyek és a sortörések megmaradnak, és a
 /// stringeken belüli `//` (url) érintetlen.
-fn strip_comments(text: &str) -> String {
+pub(super) fn strip_comments(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     let mut chars = text.chars().peekable();
     let mut quote: Option<char> = None;

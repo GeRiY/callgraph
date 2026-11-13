@@ -182,6 +182,20 @@ fn outline(
             }) {
                 writeln!(s, "    {route}").unwrap();
             }
+            // Inertia-űrlapok: a controller-akció alatt a küldő page-fájlok, a küldő függvény alatt az
+            // űrlap-szerződés egy sora (kötések / űrlap nélkül nincs sor)
+            if let Some(laravel) = row.laravel.as_ref() {
+                if let Some(form) = m
+                    .container
+                    .as_deref()
+                    .and_then(|c| laravel.form_line(g.namespace.as_deref(), c, &m.name))
+                {
+                    writeln!(s, "    {form}").unwrap();
+                }
+                for form in laravel.form_lines(&g.file, m.container.as_deref(), &m.name, lang) {
+                    writeln!(s, "    {form}").unwrap();
+                }
+            }
             for cat in categories(row, m, lang) {
                 writeln!(s, "    {:<18}{}", cat.0, cat.1).unwrap();
             }

@@ -180,7 +180,7 @@ impl CallgraphServer {
             idempotent_hint = true,
             open_world_hint = false
         ),
-        description = "Framework wiring of the directory (or file) holding the definitions: which route → which controller, which event → which listener; also middleware, validation, jobs, providers, magic, di, views; inertia: page ← render site, props; ziggy: JS route('name') calls checked against the Laravel route table. Example: {\"view\": \"routes\", \"path\": \"routes\"}. Structure of a file or folder: `outline`."
+        description = "Framework wiring of the directory (or file) holding the definitions: which route → which controller, which event → which listener; also middleware, validation, jobs, providers, magic, di, views; inertia: page ← render site, props; ziggy: JS route('name') calls checked against the Laravel route table; forms: Inertia useForm fields checked against the controller validation rules. Example: {\"view\": \"routes\", \"path\": \"routes\"}. Structure of a file or folder: `outline`."
     )]
     async fn framework_view(
         &self,

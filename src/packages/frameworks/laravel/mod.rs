@@ -2,11 +2,17 @@
 //! Facade: `Laravel` — a route-tábla (`routes.rs`, a route-fájlok forrásából: csoportok, resource-ok, nevek), és ha a
 //! kérés igényli, a projekt `route(..)` hivatkozásai. A kimenetek: az outline `route::név → POST /uri · X@m` linkje a
 //! JS-hívásnál (hiányzó névnél `⚠ no route`), a controller-metódus `route:` sora, a json `route` mezője és a `ziggy`
-//! nézet (`view.rs`: ismeretlen route-nevek). Nem új szekció: link — ezért kevés token.
+//! nézet (`view.rs`: ismeretlen route-nevek). Az Inertia `useForm` űrlap-szerződés (`forms.rs` + `rules.rs`): a küldött
+//! mezők ↔ a controller validációja — `form:` sor az outline-ban, `form` mező a json-ban, `forms` nézet. Nem új
+//! szekció: link — ezért kevés token.
 
+mod forms;
 mod routes;
+mod rules;
 mod view;
 
+#[cfg(test)]
+mod forms_tests;
 #[cfg(test)]
 mod tests;
 
@@ -18,6 +24,7 @@ use super::inertia::{Inertia, render};
 use crate::i18n::Lang;
 use crate::model::{Call, FileGraph};
 use crate::packages::Packages;
+use forms::Form;
 use routes::{Action, Route};
 
 /// A framework neve a `FRAMEWORKS` regiszterben (`laravel/framework`): ez kapcsolja be a stratégiát.
@@ -51,6 +58,8 @@ pub(crate) struct Laravel {
     by_name: HashMap<String, usize>,
     /// A `route(..)` hivatkozások (csak a `references` kéréssel végzett `scan` után).
     refs: Vec<Reference>,
+    /// Az ellenőrzött `useForm` küldések (csak a `scan_forms` után).
+    forms: Vec<Form>,
 }
 
 /// A hívás route-neve: Ziggy `route('név')` JS-hívás string-literál névvel (a gráf `resolved`-je `route::név`);
@@ -103,6 +112,7 @@ impl Laravel {
             routes: Vec::new(),
             by_name: HashMap::new(),
             refs: Vec::new(),
+            forms: Vec::new(),
         }
     }
 
@@ -245,9 +255,14 @@ impl Laravel {
 
     /// A küldés igéjéhez illő route (lásd `link_text`); ha nincs küldés vagy nincs ilyen route, maga a `route`.
     fn by_submit<'a>(&'a self, route: &'a Route, call: &Call, siblings: &[Call]) -> &'a Route {
-        let Some(verb) = submit_verb(call, siblings) else {
-            return route;
-        };
+        match submit_verb(call, siblings) {
+            Some(verb) => self.for_verb(route, verb),
+            None => route,
+        }
+    }
+
+    /// A route, vagy ha az igéje nem fogadja a `verb`-et, az azonos URI-jú, az igét fogadó route (ha nincs: a `route`).
+    fn for_verb<'a>(&'a self, route: &'a Route, verb: &str) -> &'a Route {
         if has_verb(&route.verb, verb) {
             return route;
         }

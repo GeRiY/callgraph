@@ -14,10 +14,10 @@ use crate::model::{Call, FileGraph, Imports};
 use crate::packages::{Ecosystem, EcosystemPackages, Package, Packages, ProjectPackages};
 
 /// Memóriabeli fájlrendszer: a gyökérhez relatív út → szöveg.
-struct MemFiles(BTreeMap<PathBuf, String>);
+pub(super) struct MemFiles(BTreeMap<PathBuf, String>);
 
 impl MemFiles {
-    fn new(files: &[(&str, &str)]) -> Self {
+    pub(super) fn new(files: &[(&str, &str)]) -> Self {
         Self(
             files
                 .iter()
@@ -41,11 +41,11 @@ impl ProjectFiles for MemFiles {
     }
 }
 
-fn root() -> PathBuf {
+pub(super) fn root() -> PathBuf {
     PathBuf::from("/p")
 }
 
-fn graph(
+pub(super) fn graph(
     file: &str,
     module: Option<&str>,
     imports: &[(&str, &str)],
@@ -76,7 +76,13 @@ fn graph(
     }
 }
 
-fn call(kind: &str, target: &str, resolved: Option<&str>, category: &str, line: u32) -> Call {
+pub(super) fn call(
+    kind: &str,
+    target: &str,
+    resolved: Option<&str>,
+    category: &str,
+    line: u32,
+) -> Call {
     Call {
         container: None,
         caller: Some("__top__".into()),
@@ -94,7 +100,7 @@ fn call(kind: &str, target: &str, resolved: Option<&str>, category: &str, line: 
 }
 
 /// Egy JS-oldali `route('név')` hívás, ahogy a gráf tárolja (a `resolved`: `route::név`).
-fn js_route(name: &str, line: u32) -> Call {
+pub(super) fn js_route(name: &str, line: u32) -> Call {
     call(
         "func_call",
         "route",
@@ -107,7 +113,7 @@ fn js_route(name: &str, line: u32) -> Call {
 const CONTROLLERS: &str = "App\\Http\\Controllers";
 
 /// A `routes/web.php` szövegéből a tábla (a fájl `use`-ai az `imports`-ban).
-fn table(text: &str, imports: &[(&str, &str)]) -> Laravel {
+pub(super) fn table(text: &str, imports: &[(&str, &str)]) -> Laravel {
     let files = MemFiles::new(&[("routes/web.php", text)]);
     let web = graph("/p/routes/web.php", None, imports, Vec::new());
     let path = root().join("routes/web.php");
