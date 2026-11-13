@@ -367,15 +367,22 @@ fn the_session_key_is_created_once_and_kept() {
 }
 
 fn call(command: CommandKind, end_ms: u64, ms: u64, target: Option<Target>, ok: bool) -> Call {
+    failing(command, end_ms, ms, target, (!ok).then_some(ErrorKind::Io))
+}
+
+/// Mint a `call`, a hiba fajtájával (`None` = sikeres).
+fn failing(
+    command: CommandKind,
+    end_ms: u64,
+    ms: u64,
+    target: Option<Target>,
+    error: Option<ErrorKind>,
+) -> Call {
     Call {
         event: Event {
             command,
             client: Client::Mcp,
-            outcome: if ok {
-                Outcome::Ok
-            } else {
-                Outcome::Error(ErrorKind::NotFound)
-            },
+            outcome: error.map_or(Outcome::Ok, Outcome::Error),
             latency: LatencyBucket::from_millis(u128::from(ms)),
             size: SizeBucket::from_chars(100),
             truncated: false,
@@ -434,10 +441,7 @@ fn recorded_calls_build_edges_sessions_and_the_event_log() {
     assert_eq!(lines[0].lang.as_deref(), Some("php"));
     assert_eq!(lines[1].rel, Rel::SameFile);
     assert_eq!(lines[1].rep.as_deref(), Some("2-3"));
-    assert_eq!(
-        (lines[1].ok, lines[1].err),
-        (false, Some(ErrorKind::NotFound))
-    );
+    assert_eq!((lines[1].ok, lines[1].err), (false, Some(ErrorKind::Io)));
     assert_eq!((lines[2].sess, lines[2].seq), (2, 1));
     assert_eq!(
         (lines[2].lang.as_deref(), lines[2].rep.as_deref()),
@@ -452,6 +456,40 @@ fn recorded_calls_build_edges_sessions_and_the_event_log() {
         text.contains(lang.pick("top transitions", "leggyakoribb átmenetek")),
         "{text}"
     );
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+/// Egy nem létező cél (`not_found`) nem viszony-alap: se ő, se az utána jövő hívás nem kap `other_project`-et.
+#[test]
+fn a_missing_target_does_not_break_the_relation_chain() {
+    let dir = temp_dir("flow-missing");
+    let store = StatsStore::new(dir.clone());
+    let at = |p: &str| Target::from_text(Some("shop"), p);
+    store.record_call(&call(
+        CommandKind::Outline,
+        T + 100,
+        10,
+        at("src/A.php"),
+        true,
+    ));
+    let missing = Target::from_text(Some("elsewhere"), "src/Nope.php");
+    store.record_call(&failing(
+        CommandKind::Outline,
+        T + 200,
+        10,
+        missing,
+        Some(ErrorKind::NotFound),
+    ));
+    store.record_call(&call(
+        CommandKind::Outline,
+        T + 300,
+        10,
+        at("lib/B.php"),
+        true,
+    ));
+    let day = Day::from_secs(T / 1000);
+    let rels: Vec<Rel> = events::read(&dir, day, day).iter().map(|l| l.rel).collect();
+    assert_eq!(rels, [Rel::None, Rel::None, Rel::None]);
     let _ = std::fs::remove_dir_all(dir);
 }
 

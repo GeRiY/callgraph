@@ -297,11 +297,16 @@ impl StatsStore {
         let session_path = self.dir.join(SESSION_FILE);
         let mut state = SessionState::load(&session_path);
         let key = state.key_bytes();
-        let keys = call.target.as_ref().map(|t| t.keys(&key));
         let error = match call.event.outcome {
             Outcome::Ok => None,
             Outcome::Error(kind) => Some(kind),
         };
+        // egy nem létező cél nem viszony-alap: se ez a hívás, se a következő ne kapjon tőle `other_project`-et
+        let keys = call
+            .target
+            .as_ref()
+            .filter(|_| error != Some(ErrorKind::NotFound))
+            .map(|t| t.keys(&key));
         let step = state.advance(Visit {
             start_ms,
             end_ms: call.end_ms,

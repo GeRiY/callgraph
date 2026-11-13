@@ -74,11 +74,14 @@ impl McpStats {
     /// A hívás célja: a feloldott gyökérhez képest a fájlrendszerből, különben a kérés szövegéből.
     fn target(&self, call: &ToolCall<'_>) -> Option<Target> {
         let path = call.path.filter(|p| !p.is_empty())?;
-        let resolved = (self.roots)(call.project).and_then(|root| {
-            let root = root.canonicalize().ok()?;
-            Target::from_path(&root.join(path), Some(root.display().to_string()))
-        });
-        resolved.or_else(|| Target::from_text(call.project, path))
+        let root = (self.roots)(call.project).and_then(|root| root.canonicalize().ok());
+        if let Some(root) = root {
+            let project = root.display().to_string();
+            // nem létező út: a projekt akkor is a feloldott gyökér (különben `other_project` lenne belőle)
+            return Target::from_path(&root.join(path), Some(project.clone()))
+                .or_else(|| Target::from_text(Some(&project), path));
+        }
+        Target::from_text(call.project, path)
     }
 
     /// Egy eszköz-hívás vége: a hívás rögzítése, és a `locate`-követés léptetése (ha most zárult egy lista, a

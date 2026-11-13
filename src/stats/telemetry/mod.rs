@@ -224,8 +224,8 @@ impl Telemetry {
         );
         if !self.env.allowed() {
             text.push_str(crate::t!(
-                "Sending is blocked here (CALLGRAPH_TELEMETRY=0, CALLGRAPH_STATS=0, CI, or not a skill install).\n",
-                "A beküldés itt tiltva (CALLGRAPH_TELEMETRY=0, CALLGRAPH_STATS=0, CI, vagy nem skill-telepítés).\n"
+                "Sending is blocked here (DO_NOT_TRACK, CALLGRAPH_TELEMETRY=0, CALLGRAPH_STATS=0, CI, or not a skill install).\n",
+                "A beküldés itt tiltva (DO_NOT_TRACK, CALLGRAPH_TELEMETRY=0, CALLGRAPH_STATS=0, CI, vagy nem skill-telepítés).\n"
             ));
         }
         text
