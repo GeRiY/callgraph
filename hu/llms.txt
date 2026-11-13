@@ -1,6 +1,6 @@
 # callgraph
 
-> Token-hatékony kód-térkép AI kódoló agenteknek: szerkezet, kategorizált hívás-gráf, metódus-törzs, „ki hívja?” és hatáselemzés az AST-ből, a teljes fájlok beolvasása nélkül. PHP, JavaScript / TypeScript, Vue, Rust, Swift / SwiftUI, Python, Go, CSS / SCSS, JSON, Markdown, HTML. Egyetlen statikus bináris (MIT): parancssorból, Claude Code skillként vagy helyi MCP-szerverként (`callgraph mcp`). Legújabb kiadás: v0.9.4.
+> Token-hatékony kód-térkép AI kódoló agenteknek: szerkezet, kategorizált hívás-gráf, metódus-törzs, „ki hívja?” és hatáselemzés az AST-ből, a teljes fájlok beolvasása nélkül. PHP, JavaScript / TypeScript, Vue, Rust, Swift / SwiftUI, Python, Go, CSS / SCSS, JSON, Markdown, HTML. Egyetlen statikus bináris (MIT): parancssorból, Claude Code skillként vagy helyi MCP-szerverként (`callgraph mcp`). Legújabb kiadás: v0.9.5.
 
 Telepítés (macOS / Linux):
 

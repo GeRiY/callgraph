@@ -8,6 +8,29 @@ Every release with its date, newest first: what was added, changed and fixed. Do
 
 [Install the latest version](https://callgraph.eu/#install)[Latest release on GitHub](https://github.com/GeRiY/callgraph/releases/latest)
 
+## v0.9.5 — 2026-11-13
+
+[Release notes and downloads on GitHub](https://github.com/GeRiY/callgraph/releases/tag/v0.9.5)
+
+### Added
+
+
+- **Local command log**: `callgraph.sh stats --events [--days N]` lists your recent calls (command, client, outcome, timing and size bands, how it relates to the previous call, and whether its file / symbol appeared in the previous call's output) and the most common command transitions. A "previous output reused" summary shows per transition how often the next call's file was the first file listed (`hit1`), the 2nd–5th (`hit5`), a later one (`hit`) or not there (`miss`), and whether its symbol was there (`hit` / `miss`). The log stays on this machine (14 days) and contains no names, paths or code; the reuse check keeps only the last call's output items, as keyed hashes in the local `session.json`, replaced at every call and never sent. Off: `CALLGRAPH_STATS=0`.
+
+### Changed
+
+
+- **Opt-in telemetry (schema 2)**: if you turned telemetry on, the daily counts now also include command-order counts (which command followed which, the gap between them, whether the target was the same file, folder or project), session-length bands, the target file's language and size band, and the previous-output bands per command transition (`hit1` / `hit5` / `hit` / `miss`, symbol `hit` / `miss`) — still no names, paths, code or hashes. You are told once; `callgraph.sh telemetry preview` shows exactly what would be sent.
+
+- The session-start check may suggest sharing usage counts up to 10 times (every 2 days), never after you said no.
+
+- **MCP tools say they only read, and when to use which:** every MCP tool now declares `readOnlyHint: true`, `destructiveHint: false`, `idempotentHint: true` and `openWorldHint: false`, since none of them changes anything or reaches outside the project, so directories that require these hints (e.g. OpenAI's) accept the server. The descriptions of `locate`, `outline`, `search` and `framework_view` now tell the agent which one fits: `outline` with `method` lists what that method calls (so there is no separate callees tool) and points to `find_callers` for who calls it.
+
+### Fixed
+
+
+- `callgraph.sh telemetry status` now lists `DO_NOT_TRACK` among the reasons sending is blocked.
+
 ## v0.9.4 — 2026-11-12
 
 [Release notes and downloads on GitHub](https://github.com/GeRiY/callgraph/releases/tag/v0.9.4)
