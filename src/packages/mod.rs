@@ -8,6 +8,8 @@
 //! - `registry.rs`: Registry / Factory — `ECOSYSTEMS` (melyik manifest és lockok), `FRAMEWORKS`;
 //! - `builder.rs`: Builder — manifest + lock → csomagok; `project.rs`: Composite — gyökerenként (monorepo);
 //! - `cache.rs`: Proxy — `.callgraph/packages.bin`, bélyeg szerint újraépítve; `files.rs`: DI a fájlrendszerhez;
+//! - `resolve/`: Chain of Responsibility — melyik csomagé egy hívás célja (lekérdezéskor, a tárolt nyers
+//!   minősítőből: az outline csomag-címkéje, a json `package` mezője, a `locate` „uses package” indoklása);
 //! - `stack.rs`: a kiemelt csomagok sora.
 //!
 //! Minden hibatűrő: hiányzó vagy hibás manifest / lock → az a rész üres, soha nem hiba.
@@ -18,6 +20,7 @@ mod files;
 mod model;
 mod project;
 mod registry;
+mod resolve;
 mod sources;
 mod stack;
 
@@ -26,11 +29,15 @@ mod tests;
 
 use std::fmt::Write as _;
 use std::path::Path;
+use std::sync::Arc;
 
 use crate::i18n::Lang;
+use crate::model::Call;
+use crate::query::QueryResult;
 
 pub(crate) use model::Package;
 pub(crate) use project::ProjectPackages;
+pub(crate) use resolve::Attribution;
 pub(crate) use stack::Stack;
 
 #[cfg(test)]
@@ -52,6 +59,27 @@ pub(crate) struct Packages {
 pub(crate) fn open(root: &Path) -> Packages {
     let map = cache::load_or_build(root, &files::DiskFiles, &cache::DirCache::at(root));
     Packages::from_map(map)
+}
+
+/// A sorok a projekt csomagtérképével (az outline csomag-címkéihez és a json `package` mezőjéhez); ha a projektnek
+/// nincs manifestje, a sorok érintetlenek (a kimenet a régi).
+pub(crate) fn annotate(rows: &mut [QueryResult], root: &Path) {
+    if rows.is_empty() {
+        return;
+    }
+    let packages = open(root);
+    if !packages.has_parts() {
+        return;
+    }
+    let shared = Arc::new(packages);
+    for row in rows {
+        row.packages = Some(Arc::clone(&shared));
+    }
+}
+
+/// Framework-csomag-e a név (`laravel/framework`, `vue` … — a `FRAMEWORKS` regiszter szerint).
+pub(crate) fn is_framework(name: &str) -> bool {
+    FRAMEWORKS.iter().any(|(_, package, _)| *package == name)
 }
 
 /// A `composer.json` szövegének függőségei (név, dev-e) a manifest sorrendjében, a platform-bejegyzések nélkül —
@@ -104,6 +132,25 @@ impl Packages {
     /// Nincs egyetlen közvetlen függőség sem.
     pub(crate) fn is_empty(&self) -> bool {
         self.all_direct().is_empty()
+    }
+
+    /// Van-e legalább egy csomag-rész (manifest) — nélküle egy hívás sem kap csomagot.
+    pub(crate) fn has_parts(&self) -> bool {
+        !self.map.parts.is_empty()
+    }
+
+    /// Egy szimbólum feloldása a lánccal (a fájlhoz legközelebbi rész szerint).
+    pub(crate) fn resolve(&self, sym: &resolve::SymbolRef<'_>) -> resolve::Resolution {
+        resolve::resolve(sym, &self.map)
+    }
+
+    /// A hívás csomagja (a `path` fájlban), ha a célja egy csomagé; saját kódnál és ismeretlennél `None`.
+    pub(crate) fn package_of_call(&self, path: &Path, call: &Call) -> Option<Attribution> {
+        let sym = resolve::SymbolRef::of_call(path, call)?;
+        match self.resolve(&sym) {
+            resolve::Resolution::Package(package) => Some(package),
+            resolve::Resolution::Own | resolve::Resolution::Unknown => None,
+        }
     }
 
     /// A függőségekből felismert frameworkök (`laravel`, `vue` …): részenként, a `FRAMEWORKS` sorrendjében,

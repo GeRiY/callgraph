@@ -24,7 +24,7 @@ use crate::model::{
 };
 
 /// A tárolt szerkezet verziója; ha változik, a régi tároló csendben újraépül.
-pub(crate) const FORMAT_VERSION: u32 = 5; // 5: a szűkített rekord a property-ket is tartja (locate)
+pub(crate) const FORMAT_VERSION: u32 = 6; // 6: a JS-hívás nem helyi import-forrása (`Call::from`, csomag-feloldás)
 
 /// A keretezett fájlok eleje.
 const MAGIC: &[u8; 4] = b"CGB1";

@@ -34,6 +34,7 @@ impl Scan<'_> {
                         Binding {
                             resolved: "vue::emit".into(),
                             category: "vue_emit",
+                            from: None,
                         },
                     );
                 }

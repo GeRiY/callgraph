@@ -24,6 +24,8 @@ use crate::lang::js::imports::ImportBinding;
 pub struct TypeRef {
     pub name: String,
     pub category: &'static str,
+    /// A nem helyi import forrása, ha a típus csomagból jön (`Call::from`).
+    pub from: Option<String>,
 }
 
 /// A fájlban ismert típusnevek: a top-level osztályok / interfészek és az importált nevek.
@@ -32,8 +34,8 @@ pub struct TypeNames {
     local: HashSet<String>,
     /// Helyi név → az importált (exportált) név és az import kategóriája.
     imported: HashMap<String, TypeRef>,
-    /// `import * as ns` → az import kategóriája (`ns.Repo`).
-    namespaces: HashMap<String, &'static str>,
+    /// `import * as ns` → az import kategóriája és nem helyi forrása (`ns.Repo`).
+    namespaces: HashMap<String, (&'static str, Option<String>)>,
 }
 
 impl TypeNames {
@@ -41,7 +43,9 @@ impl TypeNames {
         let mut names = Self::default();
         for b in imports {
             if b.import_value.ends_with("::*") {
-                names.namespaces.insert(b.local.clone(), b.category);
+                names
+                    .namespaces
+                    .insert(b.local.clone(), (b.category, b.package.clone()));
                 continue;
             }
             // `<forrás>::<importált név>` (default importnál a helyi név)
@@ -51,6 +55,7 @@ impl TypeNames {
                 TypeRef {
                     name: name.to_string(),
                     category: b.category,
+                    from: b.package.clone(),
                 },
             );
         }
@@ -88,6 +93,7 @@ impl TypeNames {
             return Some(TypeRef {
                 name: name.to_string(),
                 category: "internal_helper",
+                from: None,
             });
         }
         self.imported.get(name).cloned()
@@ -95,9 +101,10 @@ impl TypeNames {
 
     /// `ns.Repo` (névtér-import) → `Repo`.
     fn qualified(&self, ns: &str, name: &str) -> Option<TypeRef> {
-        self.namespaces.get(ns).map(|&category| TypeRef {
+        self.namespaces.get(ns).map(|(category, from)| TypeRef {
             name: name.to_string(),
             category,
+            from: from.clone(),
         })
     }
 

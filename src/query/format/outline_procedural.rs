@@ -6,17 +6,18 @@ use std::fmt::Write as _;
 
 use super::selection::pad;
 use crate::i18n::Lang;
-use crate::model::FileGraph;
 use crate::query::QueryResult;
 use crate::query::snippet::{self, SourceLines};
 
-/// `calls`: a `--grep` nézetben a sor + a forrássor (`L12  f │ f($x);`) a „hívások sorrendben” listában.
+/// `source`: a `--grep` nézetben a sor + a forrássor (`L12  f │ f($x);`) a „hívások sorrendben” listában.
 pub(super) fn procedural(
-    g: &FileGraph,
+    row: &QueryResult,
     s: &mut String,
     lang: Lang,
-    calls: Option<(&QueryResult, &SourceLines)>,
+    source: Option<&SourceLines>,
 ) {
+    let g = &row.graph;
+    let calls = source.map(|lines| (row, lines));
     if g.calls.is_empty() {
         s.push_str(lang.pick(
             "(no class/interface/trait, and no calls either)\n",
@@ -29,15 +30,23 @@ pub(super) fn procedural(
         "(procedurális fájl — nincs class/interface/trait)\n\n",
     ));
     let target = |c: &crate::model::Call| c.resolved.clone().unwrap_or_else(|| c.target.clone());
-    let mut groups: BTreeMap<&str, BTreeSet<String>> = BTreeMap::new();
+    // a csomaghoz rendelt külső hívások külön sorban, a csomag címkéjével (`guzzle: …`; csomagtérkép nélkül nincs)
+    let mut groups: BTreeMap<(&str, Option<String>), BTreeSet<String>> = BTreeMap::new();
     for c in &g.calls {
-        groups.entry(&c.category).or_default().insert(target(c));
+        groups
+            .entry((c.category.as_str(), super::outline::package_label(row, c)))
+            .or_default()
+            .insert(target(c));
     }
     let mut ordered: Vec<_> = groups.iter().collect();
-    ordered.sort_by_key(|(category, _)| crate::model::category_rank(category));
-    for (category, targets) in ordered {
+    ordered.sort_by_key(|((category, _), _)| crate::model::category_rank(category));
+    for ((category, label), targets) in ordered {
         let list: Vec<&str> = targets.iter().map(String::as_str).collect();
-        writeln!(s, "  {}{}", pad(category, 18), list.join(", ")).unwrap();
+        let label = label
+            .as_deref()
+            .map(|label| format!("{label}: "))
+            .unwrap_or_default();
+        writeln!(s, "  {}{label}{}", pad(category, 18), list.join(", ")).unwrap();
     }
     s.push('\n');
     let mut flows: Vec<_> = g

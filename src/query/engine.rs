@@ -25,6 +25,9 @@ pub struct QueryResult {
     pub via: Vec<ViaCall>,
     /// A fájl jegyzetei (PILOT, `crate::notes`): csak az outline / `--body` előtt töltődik; üres = nincs kiírás.
     pub notes: Vec<crate::notes::Note>,
+    /// A projekt csomagjai (`crate::packages::annotate`): csak az outline és a json előtt töltődik, és csak ha a
+    /// projektnek van manifestje; `None` = a hívások nem kapnak csomagot (a kimenet a régi).
+    pub(crate) packages: Option<std::sync::Arc<crate::packages::Packages>>,
 }
 
 /// Egy rokon típuson át illesztett hívás: sor + cél (a `resolved` / `target`), és a hívás típusának rövid neve.
@@ -42,7 +45,16 @@ impl QueryResult {
             methods,
             via: Vec::new(),
             notes: Vec::new(),
+            packages: None,
         }
+    }
+
+    /// A hívás csomagja (a hívás nyers minősítőjéből, a fájlhoz legközelebbi manifest szerint), ha a sorhoz
+    /// csomagtérkép tartozik és a cél egy csomagé.
+    pub(crate) fn package_of(&self, call: &Call) -> Option<crate::packages::Attribution> {
+        self.packages
+            .as_ref()?
+            .package_of_call(Path::new(&self.graph.file), call)
     }
 
     /// Ha a hívás rokon típuson át illeszkedett a mintára: a típus rövid neve (`via Resolver`).
@@ -262,6 +274,7 @@ impl QueryEngine {
             };
             let mut kept = QueryResult::new(graph, None);
             kept.notes.clone_from(&row.notes);
+            kept.packages.clone_from(&row.packages);
             if let Some((regex, matcher)) = &via {
                 kept.via = kept
                     .graph

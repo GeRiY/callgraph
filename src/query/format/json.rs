@@ -1,6 +1,5 @@
 //! `json` (a callgraph `jq -s '.'` paritása) és `jsonl` (soronként egy FileGraph) formázók.
 
-use crate::model::FileGraph;
 use crate::query::QueryResult;
 
 use super::Formatter;
@@ -66,12 +65,39 @@ impl serde::Serialize for OrderedGraph<'_> {
     }
 }
 
-/// A hívások mezősorrendje nyelvfüggő: a JS-motor `category`-t a `resolved` elé teszi.
+/// A hívások mezősorrendje nyelvfüggő: a JS-motor `category`-t a `resolved` elé teszi. Csomagtérképpel (a
+/// projektnek van manifestje) a hívás végén a csomag: `package` (teljes név) és `package_version` (a lock verziója).
 #[derive(serde::Serialize)]
 #[serde(untagged)]
 enum Calls<'a> {
     Php(&'a [crate::model::Call]),
+    PhpPackages(Vec<PhpCall<'a>>),
     Js(Vec<JsCall<'a>>),
+}
+
+/// PHP- (nem JS-) sorrend: a `Call` saját mezői, utána a csomag, ha a cél egy csomagé.
+#[derive(serde::Serialize)]
+struct PhpCall<'a> {
+    #[serde(flatten)]
+    call: &'a crate::model::Call,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    package: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    package_version: Option<String>,
+}
+
+impl<'a> PhpCall<'a> {
+    fn new(row: &QueryResult, call: &'a crate::model::Call) -> Self {
+        let (package, package_version) = match row.package_of(call) {
+            Some(found) => (Some(found.name), found.version),
+            None => (None, None),
+        };
+        Self {
+            call,
+            package,
+            package_version,
+        }
+    }
 }
 
 #[derive(serde::Serialize)]
@@ -96,12 +122,15 @@ fn js_comment<S: serde::Serializer>(c: &&crate::model::Comment, ser: S) -> Resul
     m.end()
 }
 
-struct JsCall<'a>(&'a crate::model::Call);
+struct JsCall<'a> {
+    call: &'a crate::model::Call,
+    package: Option<crate::packages::Attribution>,
+}
 
 impl serde::Serialize for JsCall<'_> {
     fn serialize<S: serde::Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
         use serde::ser::SerializeMap;
-        let c = self.0;
+        let c = self.call;
         let mut m = ser.serialize_map(None)?;
         m.serialize_entry("container", &c.container)?;
         m.serialize_entry("caller", &c.caller)?;
@@ -124,11 +153,18 @@ impl serde::Serialize for JsCall<'_> {
         if let Some(v) = &c.handler {
             m.serialize_entry("handler", v)?;
         }
+        if let Some(package) = &self.package {
+            m.serialize_entry("package", &package.name)?;
+            if let Some(version) = &package.version {
+                m.serialize_entry("package_version", version)?;
+            }
+        }
         m.end()
     }
 }
 
-pub(super) fn ordered_graph(graph: &FileGraph) -> OrderedGraph<'_> {
+pub(super) fn ordered_graph(row: &QueryResult) -> OrderedGraph<'_> {
+    let graph = &row.graph;
     OrderedGraph {
         file: &graph.file,
         module: &graph.module,
@@ -140,7 +176,24 @@ pub(super) fn ordered_graph(graph: &FileGraph) -> OrderedGraph<'_> {
         constants: &graph.constants,
         methods: &graph.methods,
         calls: if graph.module.is_some() {
-            Calls::Js(graph.calls.iter().map(JsCall).collect())
+            Calls::Js(
+                graph
+                    .calls
+                    .iter()
+                    .map(|call| JsCall {
+                        call,
+                        package: row.package_of(call),
+                    })
+                    .collect(),
+            )
+        } else if row.packages.is_some() {
+            Calls::PhpPackages(
+                graph
+                    .calls
+                    .iter()
+                    .map(|call| PhpCall::new(row, call))
+                    .collect(),
+            )
         } else {
             Calls::Php(&graph.calls)
         },
@@ -162,7 +215,7 @@ pub struct Json;
 
 impl Formatter for Json {
     fn format(&self, rows: &[QueryResult], _lang: crate::i18n::Lang) -> String {
-        let graphs: Vec<_> = rows.iter().map(|r| ordered_graph(&r.graph)).collect();
+        let graphs: Vec<_> = rows.iter().map(ordered_graph).collect();
         let mut text = serde_json::to_string_pretty(&graphs).unwrap_or_default();
         text.push('\n');
         text
@@ -174,7 +227,7 @@ pub struct Jsonl;
 impl Formatter for Jsonl {
     fn format(&self, rows: &[QueryResult], _lang: crate::i18n::Lang) -> String {
         rows.iter()
-            .map(|r| serde_json::to_string(&ordered_graph(&r.graph)).unwrap_or_default() + "\n")
+            .map(|r| serde_json::to_string(&ordered_graph(r)).unwrap_or_default() + "\n")
             .collect()
     }
 }

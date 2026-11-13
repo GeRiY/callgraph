@@ -97,6 +97,8 @@ pub fn is_native(name: &str) -> bool {
 pub struct Binding {
     pub resolved: String,
     pub category: &'static str,
+    /// A nem helyi import forrása, amelyből a név (közvetve) jön (`Call::from`).
+    pub from: Option<String>,
 }
 
 /// Egy feloldott hívás.
@@ -107,6 +109,8 @@ pub struct Callee {
     pub resolved: Option<String>,
     pub category: &'static str,
     pub kind: &'static str,
+    /// A nem helyi import forrása (`Call::from`).
+    pub from: Option<String>,
 }
 
 impl Callee {
@@ -123,6 +127,7 @@ impl Callee {
             resolved,
             category,
             kind,
+            from: None,
         }
     }
 
@@ -221,7 +226,9 @@ impl Scope {
             return f(None, "internal_helper");
         }
         if let Some(b) = self.bindings.get(nm) {
-            return f(Some(b.resolved.clone()), b.category);
+            let mut callee = f(Some(b.resolved.clone()), b.category);
+            callee.from.clone_from(&b.from);
+            return callee;
         }
         if self.local_fns.contains(nm) {
             return f(None, "internal_helper");
@@ -247,7 +254,9 @@ impl Scope {
                 let tgt = format!("{nm}.{joined}");
                 if let Some(b) = self.bindings.get(nm) {
                     let resolved = format!("{}.{joined}", b.resolved);
-                    return Callee::new(&tgt, Some(nm), Some(resolved), b.category, m);
+                    let mut callee = Callee::new(&tgt, Some(nm), Some(resolved), b.category, m);
+                    callee.from.clone_from(&b.from);
+                    return callee;
                 }
                 if is_native(nm) {
                     return Callee::new(&tgt, Some(nm), None, "native_js", m);

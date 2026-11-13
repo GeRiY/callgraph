@@ -191,3 +191,124 @@ fn output_limit_notices_follow_the_language() {
     );
     assert!(summary(Lang::En).ends_with("\n\nS") && summary(Lang::Hu).ends_with("\n\nS"));
 }
+
+const PAY: &str = "<?php\nnamespace App;\n\nuse GuzzleHttp\\Client;\nuse Illuminate\\Support\\Facades\\Http;\n\nclass Pay\n{\n    public function charge(): void\n    {\n        $client = new Client();\n        $client->request('GET', '/');\n        Http::get('/x');\n        strlen('x');\n    }\n}\n";
+
+/// Csomagtérkép a `/p` gyökérre: guzzle és laravel (lockkal), saját `App\` névtér.
+fn pay_packages() -> std::sync::Arc<crate::packages::Packages> {
+    use crate::packages::{Ecosystem, EcosystemPackages, Package, Packages, ProjectPackages};
+    let package = |name: &str, version: &str, namespace: &str| Package {
+        name: name.to_owned(),
+        ecosystem: Ecosystem::Php,
+        declared: Some("*".to_owned()),
+        installed: Some(version.to_owned()),
+        dev: false,
+        namespaces: vec![namespace.to_owned()],
+    };
+    let part = EcosystemPackages {
+        root: "/p".into(),
+        ecosystem: Ecosystem::Php,
+        name: None,
+        packages: vec![
+            package("guzzlehttp/guzzle", "7.9.2", "GuzzleHttp\\"),
+            package("laravel/framework", "11.31.0", "Illuminate\\"),
+        ],
+        installed_only: Vec::new(),
+        own_namespaces: vec!["App\\".to_owned()],
+        lock: Some("composer.lock".to_owned()),
+    };
+    std::sync::Arc::new(Packages::from_map(ProjectPackages {
+        root: "/p".into(),
+        parts: vec![part],
+    }))
+}
+
+#[test]
+fn outline_labels_package_calls_but_not_the_framework_itself() {
+    let plain = row("/p/app/Pay.php", PAY);
+    let mut labelled = row("/p/app/Pay.php", PAY);
+    labelled.packages = Some(pay_packages());
+    let before = render(Lang::En, "outline", std::slice::from_ref(&plain));
+    let after = render(Lang::En, "outline", std::slice::from_ref(&labelled));
+    assert!(!before.contains("guzzle: "), "{before}");
+    assert!(
+        after
+            .lines()
+            .any(|line| line.contains("guzzle: ") && line.contains("GuzzleHttp\\Client::request")),
+        "{after}"
+    );
+    // a `framework_use` sor már mondja, hogy framework: a `laravel:` címke elmarad
+    assert!(!after.contains("laravel: "), "{after}");
+    // a címkén kívül a kimenet ugyanaz (nincs új sor, fejléc)
+    assert_eq!(
+        before.lines().count() + 1,
+        after.lines().count(),
+        "{before}\n{after}"
+    );
+}
+
+#[test]
+fn outline_without_a_matching_package_is_unchanged() {
+    use crate::packages::{Ecosystem, EcosystemPackages, Packages, ProjectPackages};
+    let plain = row("/p/app/Pay.php", PAY);
+    let mut other = row("/p/app/Pay.php", PAY);
+    // csak egy Node-rész: a PHP-hívások egyike sem kap csomagot
+    other.packages = Some(std::sync::Arc::new(Packages::from_map(ProjectPackages {
+        root: "/p".into(),
+        parts: vec![EcosystemPackages {
+            root: "/p".into(),
+            ecosystem: Ecosystem::Node,
+            name: None,
+            packages: Vec::new(),
+            installed_only: Vec::new(),
+            own_namespaces: Vec::new(),
+            lock: None,
+        }],
+    })));
+    for format in ["outline", "json"] {
+        assert_eq!(
+            render(Lang::En, format, std::slice::from_ref(&plain)),
+            render(Lang::En, format, std::slice::from_ref(&other)),
+            "{format}"
+        );
+    }
+}
+
+#[test]
+fn json_calls_carry_the_full_package_name_and_version() {
+    let mut labelled = row("/p/app/Pay.php", PAY);
+    labelled.packages = Some(pay_packages());
+    let text = render(Lang::En, "json", std::slice::from_ref(&labelled));
+    let json: serde_json::Value = serde_json::from_str(&text).unwrap();
+    let calls = json[0]["calls"].as_array().unwrap();
+    let package_of = |resolved: &str| {
+        let call = calls
+            .iter()
+            .find(|call| call["resolved"] == resolved)
+            .unwrap_or_else(|| panic!("{resolved}: {text}"));
+        (call["package"].clone(), call["package_version"].clone())
+    };
+    assert_eq!(
+        package_of("GuzzleHttp\\Client::request"),
+        (
+            serde_json::json!("guzzlehttp/guzzle"),
+            serde_json::json!("7.9.2")
+        )
+    );
+    assert_eq!(
+        package_of("Illuminate\\Support\\Facades\\Http::get"),
+        (
+            serde_json::json!("laravel/framework"),
+            serde_json::json!("11.31.0")
+        )
+    );
+    // a saját kód és a natív függvény: nincs `package` kulcs
+    let strlen = calls
+        .iter()
+        .find(|call| call["target"] == "strlen")
+        .unwrap();
+    assert!(strlen.get("package").is_none(), "{strlen}");
+    // csomagtérkép nélkül egy hívásnak sincs `package` kulcsa
+    let plain = render(Lang::En, "json", &[row("/p/app/Pay.php", PAY)]);
+    assert!(!plain.contains("\"package\""), "{plain}");
+}

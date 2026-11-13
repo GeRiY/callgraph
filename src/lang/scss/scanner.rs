@@ -253,6 +253,7 @@ impl<'a> ScssScanner<'a> {
             if let Some(b) = s[a..].find('}') {
                 self.builder.call(Call {
                     handler: None,
+                    from: None,
                     container: Some(self.container.clone()),
                     caller: None,
                     line: ln,

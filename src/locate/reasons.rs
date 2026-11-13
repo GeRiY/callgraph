@@ -33,6 +33,7 @@ fn key(symbol: &Symbol) -> String {
         Symbol::Key { name, line } => format!("j\0{name}\0{line}"),
         Symbol::Str { value, .. } => format!("s\0{value}"),
         Symbol::Call { target, .. } => format!("x\0{target}"),
+        Symbol::Package { name, .. } => format!("g\0{name}"),
     }
 }
 
@@ -45,7 +46,8 @@ fn line_of(symbol: &Symbol) -> u32 {
         | Symbol::Property { line, .. }
         | Symbol::Key { line, .. }
         | Symbol::Str { line, .. }
-        | Symbol::Call { line, .. } => *line,
+        | Symbol::Call { line, .. }
+        | Symbol::Package { line, .. } => *line,
     }
 }
 
@@ -151,6 +153,7 @@ pub(crate) fn describe(reason: &Reason, terms: &[Term]) -> String {
         Symbol::Property { name, line, .. } => format!("property {name}  L{line}"),
         Symbol::Key { name, line } => format!("{name}  L{line}"),
         Symbol::Str { value, .. } => format!("'{}'  {}", clip(value, 60), lines(&reason.lines)),
+        Symbol::Package { label, .. } => format!("pkg {label}  {}", lines(&reason.lines)),
         Symbol::Call { caller, target, .. } => {
             let at = lines(&reason.lines);
             match caller {
@@ -168,16 +171,16 @@ pub(crate) fn describe(reason: &Reason, terms: &[Term]) -> String {
         .filter_map(|&t| terms.get(t))
         .map(|term| format!("\"{}\"", term.raw))
         .collect();
-    let arrow = if reason.kind == Kind::NamePart {
-        "~"
-    } else {
-        "←"
-    };
+    let fuzzy = reason.kind == Kind::NamePart && !matches!(reason.symbol, Symbol::Package { .. });
+    let arrow = if fuzzy { "~" } else { "←" };
     format!("{what}  {arrow} {} ({})", quoted.join(", "), label(reason))
 }
 
 /// A fajta címkéje zárójelben (`exact class`, `name part`, `string` …).
 fn label(reason: &Reason) -> String {
+    if matches!(reason.symbol, Symbol::Package { .. }) {
+        return crate::t!("package", "csomag").to_owned();
+    }
     match reason.kind {
         // a `route::név` definíciója (`->name('név')` a `routes/*.php`-ban)
         Kind::Definition if matches!(reason.symbol, Symbol::Str { .. }) => {

@@ -96,6 +96,7 @@ impl GoVisitor<'_, '_> {
             category: category.to_string(),
             args,
             handler: None,
+            from: None,
         });
     }
 
@@ -269,6 +270,7 @@ impl GoVisitor<'_, '_> {
             category: category.to_string(),
             args: None,
             handler: None,
+            from: None,
         });
     }
 

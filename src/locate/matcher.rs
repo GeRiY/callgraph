@@ -3,9 +3,12 @@
 //! A több szavas kifejezés (`Phrase`) csak string-literálra illeszt, egészében; a `route::név` (`Route`) a névvel
 //! egyenlő string-literálra (a `routes/*.php` fájlban definíció: `->name('név')`) és a `route::név` hívásra.
 
+use std::path::Path;
+
 use super::callers::{CallerCounts, Callers};
 use super::terms::{Term, TermKind, same_word, short_name, split_member, words};
 use crate::model::FileGraph;
+use crate::packages::Packages;
 
 /// Az egyezés fajtája, a legerősebbtől a leggyengébbig (a sorrend a rangsor és a kiírás sorrendje is).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -64,6 +67,12 @@ pub(crate) enum Symbol {
         target: String,
         line: u32,
     },
+    /// A fájl hívásai egy csomagot használnak (`name`: a teljes név, `label`: a rövid címke).
+    Package {
+        name: String,
+        label: String,
+        line: u32,
+    },
 }
 
 /// Egy egyezés: melyik kifejezés (index a kifejezés-listában), milyen fajta, mire.
@@ -78,11 +87,63 @@ pub(crate) struct Hit {
 pub(crate) struct Matcher<'a> {
     terms: &'a [Term],
     callers: &'a CallerCounts,
+    /// A projekt csomagjai (a „használja a csomagot” egyezéshez); manifest nélkül `None`.
+    packages: Option<&'a Packages>,
 }
 
 impl<'a> Matcher<'a> {
     pub(crate) fn new(terms: &'a [Term], callers: &'a CallerCounts) -> Self {
-        Self { terms, callers }
+        Self {
+            terms,
+            callers,
+            packages: None,
+        }
+    }
+
+    /// A csomag-egyezéssel (`package_hits`).
+    pub(crate) fn with_packages(mut self, packages: Option<&'a Packages>) -> Self {
+        self.packages = packages;
+        self
+    }
+
+    /// A csomag-egyezések a fájl (`path`: abszolút út) már meglévő egyezései (`hits`) mellé: a kifejezés egy
+    /// csomag neve vagy rövid neve (`guzzle`, `stripe`, `inertia`), és a fájl hívásai közül valamelyik ehhez a
+    /// csomaghoz tartozik. Súlya a név-részleté; csak az a kifejezés kapja, amelyre a fájlban nincs legalább
+    /// név-részlet erősségű egyezés.
+    pub(crate) fn package_hits(&self, path: &Path, graph: &FileGraph, hits: &mut Vec<Hit>) {
+        let Some(packages) = self.packages else {
+            return;
+        };
+        let open: Vec<usize> = self
+            .terms
+            .iter()
+            .enumerate()
+            .filter(|(i, term)| {
+                term.kind == TermKind::Name
+                    && !hits
+                        .iter()
+                        .any(|hit| hit.term == *i && hit.kind <= Kind::NamePart)
+            })
+            .map(|(i, _)| i)
+            .collect();
+        if open.is_empty() {
+            return;
+        }
+        for call in &graph.calls {
+            let Some(package) = packages.package_of_call(path, call) else {
+                continue;
+            };
+            for &i in &open {
+                if package.matches_term(&self.terms[i].lower) {
+                    let symbol = Symbol::Package {
+                        name: package.name.clone(),
+                        label: package.label().to_owned(),
+                        line: call.line,
+                    };
+                    Self::push(hits, i, Kind::NamePart, symbol);
+                }
+            }
+        }
     }
 
     /// A fájl összes egyezése. `rel`: a gyökérhez relatív út; `code`: kódfájl-e. A dokumentum / adat (md, html, json) a
@@ -389,9 +450,11 @@ fn identifier_hit(hit: &Hit) -> bool {
         | Symbol::Container { .. }
         | Symbol::Method { .. }
         | Symbol::Constant { .. } => true,
-        Symbol::Property { .. } | Symbol::Key { .. } | Symbol::Str { .. } | Symbol::Call { .. } => {
-            false
-        }
+        Symbol::Property { .. }
+        | Symbol::Key { .. }
+        | Symbol::Str { .. }
+        | Symbol::Call { .. }
+        | Symbol::Package { .. } => false,
     };
     kind && symbol
 }

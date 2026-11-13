@@ -230,6 +230,7 @@ impl<'a> CssScanner<'a> {
                     let category = if target == "var" { "var" } else { "function" };
                     self.builder.call(Call {
                         handler: None,
+                        from: None,
                         container: Some(self.container.clone()),
                         caller: None,
                         line: line(self.source, start + i),

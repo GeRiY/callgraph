@@ -18,6 +18,7 @@ impl Collector<'_, '_> {
     pub(super) fn push(&self, s: &mut State, n: &impl HasSpan, k: &str, t: String) -> usize {
         s.calls.push(Call {
             handler: None,
+            from: None,
             container: s.container.clone(),
             caller: Some(s.caller.clone().unwrap_or_else(|| "__top__".into())),
             line: self.parsed.lines_of(n).0,

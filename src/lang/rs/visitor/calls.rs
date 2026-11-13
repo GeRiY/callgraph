@@ -116,6 +116,7 @@ impl Collector<'_, '_> {
             category: verdict.category.to_owned(),
             args: None,
             handler: None,
+            from: None,
         });
     }
 

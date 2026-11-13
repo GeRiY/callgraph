@@ -32,6 +32,16 @@ pub(crate) struct EcosystemPackages {
     pub lock: Option<String>,
 }
 
+impl EcosystemPackages {
+    /// A név szerinti csomag: előbb a közvetlen függőségek, utána a csak a lockban szereplők.
+    pub(crate) fn package(&self, name: &str) -> Option<&Package> {
+        self.packages
+            .iter()
+            .chain(&self.installed_only)
+            .find(|package| package.name == name)
+    }
+}
+
 /// A projekt összes csomag-része, gyökerenként (a projekt gyökere elöl), azon belül a regiszter sorrendjében.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct ProjectPackages {
@@ -41,7 +51,6 @@ pub(crate) struct ProjectPackages {
 
 impl ProjectPackages {
     /// A fájlhoz / mappához legközelebbi (legmélyebb ős-gyökerű) rész az ökoszisztémában.
-    #[cfg_attr(not(test), allow(dead_code))] // a szimbólum-feloldás (következő szakasz) használja
     pub(crate) fn nearest(&self, path: &Path, ecosystem: Ecosystem) -> Option<&EcosystemPackages> {
         self.parts
             .iter()

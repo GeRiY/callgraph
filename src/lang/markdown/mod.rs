@@ -102,6 +102,7 @@ impl Language for MdDocument {
                     let target = dest_url.to_string();
                     b.call(Call {
                         handler: None,
+                        from: None,
                         container: Some(name.clone()),
                         caller: Some(caller),
                         line: Self::line(range.start, &starts),
@@ -121,6 +122,7 @@ impl Language for MdDocument {
                         .unwrap_or_else(|| "__top__".into());
                     b.call(Call {
                         handler: None,
+                        from: None,
                         container: Some(name.clone()),
                         caller: Some(caller),
                         line: Self::line(range.start, &starts),

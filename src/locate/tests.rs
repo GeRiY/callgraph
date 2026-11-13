@@ -139,6 +139,7 @@ fn call(container: &str, caller: &str, line: u32, target: &str) -> Call {
         category: "external_call".into(),
         args: None,
         handler: None,
+        from: None,
     }
 }
 
@@ -823,4 +824,60 @@ fn a_rare_property_is_an_exact_match() {
     ];
     let ranked = rank(files, super::rank::is_test_path);
     assert_eq!(ranked[0].path, "app/Models/Invoice.php", "{ranked:?}");
+}
+
+/// A `guzzle` kifejezés a `GuzzleHttp\Client`-et hívó fájlban „pkg guzzle” indoklást ad (név-részlet súllyal); ahol
+/// a kifejezés már erősebben illik (a fájl neve), ott nem.
+#[test]
+fn package_term_gives_a_uses_package_reason_in_the_calling_file() {
+    use crate::packages::{Ecosystem, EcosystemPackages, Package, Packages, ProjectPackages};
+    let guzzle = Package {
+        name: "guzzlehttp/guzzle".into(),
+        ecosystem: Ecosystem::Php,
+        declared: Some("^7.9".into()),
+        installed: Some("7.9.2".into()),
+        dev: false,
+        namespaces: vec!["GuzzleHttp\\".into()],
+    };
+    let packages = Packages::from_map(ProjectPackages {
+        root: "/p".into(),
+        parts: vec![EcosystemPackages {
+            root: "/p".into(),
+            ecosystem: Ecosystem::Php,
+            name: None,
+            packages: vec![guzzle],
+            installed_only: Vec::new(),
+            own_namespaces: vec!["App\\".into()],
+            lock: Some("composer.lock".into()),
+        }],
+    });
+    let mut pay = graph("app/Services/Pay.php");
+    let mut request = call("Pay", "charge", 42, "request");
+    request.kind = "method_call".into();
+    request.resolved = Some("GuzzleHttp\\Client::request".into());
+    pay.calls.push(request);
+    let terms = Term::parse_all(&["guzzle"]);
+    let callers = CallerCounts::build([&pay]);
+    let matcher = Matcher::new(&terms, &callers).with_packages(Some(&packages));
+    let path = std::path::Path::new("/p/app/Services/Pay.php");
+    let mut hits = matcher.file_hits("app/Services/Pay.php", &pay, true);
+    assert!(hits.is_empty(), "{hits:?}");
+    matcher.package_hits(path, &pay, &mut hits);
+    assert_eq!(hits.len(), 1, "{hits:?}");
+    assert_eq!(hits[0].kind, Kind::NamePart);
+    let reasons = group(&hits);
+    let text = super::reasons::describe(&reasons[0], &terms);
+    assert!(text.starts_with("pkg guzzle  L42  ← \"guzzle\""), "{text}");
+    // a csomagtérkép nélküli matcher nem ad ilyen egyezést
+    let mut none = Vec::new();
+    Matcher::new(&terms, &callers).package_hits(path, &pay, &mut none);
+    assert!(none.is_empty());
+    // erősebb egyezés (a fájl neve `Guzzle.php`) mellett nincs külön csomag-indoklás
+    let mut named = graph("app/Guzzle.php");
+    named.calls = pay.calls.clone();
+    let mut hits = matcher.file_hits("app/Guzzle.php", &named, true);
+    let before = hits.len();
+    assert!(before > 0, "{hits:?}");
+    matcher.package_hits(std::path::Path::new("/p/app/Guzzle.php"), &named, &mut hits);
+    assert_eq!(hits.len(), before, "{hits:?}");
 }

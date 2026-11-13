@@ -81,7 +81,7 @@ fn outline(
     crate::notes::unlisted_lines(&mut s, &row.notes, g);
     writeln!(s).unwrap();
     if g.containers.is_empty() {
-        super::outline_procedural::procedural(g, &mut s, lang, source.map(|lines| (row, lines)));
+        super::outline_procedural::procedural(row, &mut s, lang, source);
         return s;
     }
     for (i, c) in g.containers.iter().enumerate() {
@@ -172,7 +172,7 @@ fn outline(
                 }
             }
             crate::notes::method_lines(&mut s, &row.notes, m.container.as_deref(), &m.name, "    ");
-            for cat in categories(g, m) {
+            for cat in categories(row, m) {
                 writeln!(s, "    {:<18}{}", cat.0, cat.1).unwrap();
             }
             if let Some(lines) = source {
@@ -285,8 +285,14 @@ pub(crate) fn call_lines(
     }
 }
 
-pub(super) fn categories(g: &FileGraph, m: &Method) -> Vec<(String, String)> {
-    let mut grouped: std::collections::BTreeMap<String, Vec<String>> =
+/// A metódus hívásai kategóriánként (`external_call`, `a, b`); a csomaghoz rendelt külső hívások külön sorban, a
+/// csomag rövid címkéjével a célok előtt (`guzzle: GuzzleHttp\Client::request` — `package_label`).
+/// Egy hívás-csoport kulcsa: (kategória, a csomag rövid címkéje).
+type CategoryKey = (String, Option<String>);
+
+pub(super) fn categories(row: &QueryResult, m: &Method) -> Vec<(String, String)> {
+    let g = &row.graph;
+    let mut grouped: std::collections::BTreeMap<CategoryKey, Vec<String>> =
         std::collections::BTreeMap::new();
     for c in g
         .calls
@@ -295,16 +301,16 @@ pub(super) fn categories(g: &FileGraph, m: &Method) -> Vec<(String, String)> {
         .filter(|c| c.container.as_deref() == m.container.as_deref())
     {
         grouped
-            .entry(c.category.clone())
+            .entry((c.category.clone(), package_label(row, c)))
             .or_default()
             .push(c.resolved.clone().unwrap_or_else(|| c.target.clone()));
     }
-    let mut ordered: Vec<(String, Vec<String>)> = grouped.into_iter().collect();
+    let mut ordered: Vec<(CategoryKey, Vec<String>)> = grouped.into_iter().collect();
     // a `dynamic_call` a lista végére (a rendezés stabil: a többi marad ábécében)
-    ordered.sort_by_key(|(category, _)| crate::model::category_rank(category));
+    ordered.sort_by_key(|((category, _), _)| crate::model::category_rank(category));
     ordered
         .into_iter()
-        .map(|(category, targets)| {
+        .map(|((category, label), targets)| {
             let mut unique = Vec::new();
             for target in targets {
                 if !unique.contains(&target) {
@@ -312,7 +318,26 @@ pub(super) fn categories(g: &FileGraph, m: &Method) -> Vec<(String, String)> {
                 }
             }
             unique.sort();
-            (category, unique.join(", "))
+            let list = unique.join(", ");
+            let list = match label {
+                Some(label) => format!("{label}: {list}"),
+                None => list,
+            };
+            (category, list)
         })
         .collect()
+}
+
+/// A hívás csomag-címkéje az outline-ban (`guzzle`): csak a csomaghoz rendelt `external_call` / `framework_use`
+/// hívásnál, és a `framework_use`-nál nem, ha a csomag maga a framework (`laravel/framework`: a kategória már
+/// mondja). Csomagtérkép nélkül mindig `None` (a kimenet a régi).
+pub(super) fn package_label(row: &QueryResult, call: &Call) -> Option<String> {
+    if !matches!(call.category.as_str(), "external_call" | "framework_use") {
+        return None;
+    }
+    let package = row.package_of(call)?;
+    if call.category == "framework_use" && crate::packages::is_framework(&package.name) {
+        return None;
+    }
+    Some(package.label().to_owned())
 }

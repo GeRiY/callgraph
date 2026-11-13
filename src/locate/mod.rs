@@ -55,6 +55,9 @@ impl Locator {
         }
         // jegyzet-jelölők (`  📝 N`) a fájl-sorokon: egyszer betöltve; jegyzetfájl nélkül üres
         let marks = crate::notes::NoteMarks::load(&self.root);
+        // a csomagtérkép (a „pkg” indokláshoz): egyszer, a `.callgraph/packages.bin`-ből; manifest nélkül nincs
+        let packages = crate::packages::open(&self.root);
+        let packages = packages.has_parts().then_some(&packages);
         let mut notes: HashMap<String, usize> = HashMap::new();
         let (ranked, issues) =
             ProjectSource::new(&self.root, &self.analyzer).with_files(|files| {
@@ -66,12 +69,15 @@ impl Locator {
                     })
                     .collect();
                 let callers = CallerCounts::build(files.iter().map(|file| file.graph));
-                let matcher = Matcher::new(&terms, &callers);
+                let matcher = Matcher::new(&terms, &callers).with_packages(packages);
                 let matched: Vec<FileMatch> = files
                     .iter()
                     .filter_map(|file| {
                         let rel = self.relative(file.path);
-                        let hits = matcher.file_hits(&rel, file.graph, file.code);
+                        let mut hits = matcher.file_hits(&rel, file.graph, file.code);
+                        if file.code {
+                            matcher.package_hits(file.path, file.graph, &mut hits);
+                        }
                         if !hits.is_empty() && !marks.is_empty() {
                             // az árva (a fájlban már nem létező metódusra szóló) jegyzetek nem számítanak
                             let methods = file.graph.methods.iter();

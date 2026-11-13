@@ -148,6 +148,7 @@ impl Language for HtmlDocument {
             };
             b.call(Call {
                 handler: None,
+                from: None,
                 container: Some(name.clone()),
                 caller: Some(caller_at(link.start)),
                 line: line(link.start),
