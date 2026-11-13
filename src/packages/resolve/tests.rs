@@ -22,6 +22,8 @@ fn package(name: &str, version: &str, namespaces: &[&str]) -> Package {
         installed: Some(version.to_owned()),
         dev: false,
         namespaces: namespaces.iter().map(|ns| (*ns).to_owned()).collect(),
+        auto_discovered: false,
+        plugin: false,
     }
 }
 

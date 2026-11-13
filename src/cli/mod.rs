@@ -119,6 +119,10 @@ pub fn build_command(args: CliArgs) -> Result<Box<dyn Command>> {
             project,
             crate::skill::SkillHome::from_env(),
         ))),
+        CliArgs::Deps { project } => Ok(Box::new(commands::DepsCommand::new(
+            project,
+            crate::skill::SkillHome::from_env(),
+        ))),
         CliArgs::Hook { action, settings } => Ok(Box::new(commands::HookCommand::new(
             action,
             settings,

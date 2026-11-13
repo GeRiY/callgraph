@@ -96,6 +96,7 @@ Project profile (architecture, layers and patterns from folder / file names, che
                                                 counted too); a role in both PHP and JS: controller (php) / controller (js);
                                                 --packages: every direct composer / npm dependency (installed, declared)
   bash ~/.claude/skills/callgraph/callgraph.sh uses <package> [--calls] [--project alias]   where the code uses a dependency (guzzle, @vueuse/core): per API symbol the count, first file, +N; (type) = import without a call; --calls: every call line per file
+  bash ~/.claude/skills/callgraph/callgraph.sh deps [--project alias]   probably unused / missing / dev-only composer / npm dependencies (one line each; .callgraphignore: deps-ignore <name>)
   bash ~/.claude/skills/callgraph/callgraph.sh <dir> --layer service           only the files of that layer (name,name...;
                                                 one ecosystem: controller:php, controller:js, …:swift, …:rust)
   bash ~/.claude/skills/callgraph/callgraph.sh <dir> --layers                  summary grouped by layer, [role] on FILE lines

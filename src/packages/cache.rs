@@ -13,8 +13,8 @@ use super::project::{self, ProjectPackages};
 
 /// A cache fájlneve a `.callgraph/` mappában.
 const CACHE_FILE: &str = "packages.bin";
-/// A tárolt szerkezet verziója; ha változik, a régi cache csendben újraépül.
-const FORMAT: u32 = 1;
+/// A tárolt szerkezet verziója; ha változik, a régi cache csendben újraépül (2: auto-discovery és plugin jelző).
+const FORMAT: u32 = 2;
 
 /// A cache tárolója (DI: a tesztek memóriában tartják).
 pub(crate) trait CacheStore {

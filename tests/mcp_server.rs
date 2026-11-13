@@ -540,6 +540,64 @@ fn package_usage_matches_the_cli_uses() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// A `project_profile` `deps: true`: a profil helyett a CLI `deps` kimenete (soronként egy találat).
+#[test]
+fn project_profile_deps_matches_the_cli_deps() {
+    let id = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let dir = std::env::temp_dir().join(format!("callgraph-mcp-deps-{}-{id}", std::process::id()));
+    let files = [
+        (
+            "composer.json",
+            r#"{"require": {"guzzlehttp/guzzle": "^7.9", "stripe/stripe-php": "^15.0"}, "autoload": {"psr-4": {"App\\": "app/"}}}"#,
+        ),
+        (
+            "composer.lock",
+            r#"{"packages": [
+                {"name": "guzzlehttp/guzzle", "version": "7.9.2", "autoload": {"psr-4": {"GuzzleHttp\\": "src/"}}},
+                {"name": "stripe/stripe-php", "version": "15.1.0", "autoload": {"psr-4": {"Stripe\\": "lib/"}}}
+            ]}"#,
+        ),
+        (
+            "app/Services/Shipping.php",
+            "<?php\nnamespace App\\Services;\n\nuse GuzzleHttp\\Client;\n\nclass Shipping\n{\n    public function client(): Client\n    {\n        return new Client();\n    }\n}\n",
+        ),
+    ];
+    for (path, body) in files {
+        let path = dir.join(path);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, body).unwrap();
+    }
+    let dir = dir.canonicalize().unwrap();
+    let mut s = Session::start_in(&dir);
+    s.send(
+        json!({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
+        "protocolVersion": "2025-06-18", "capabilities": {},
+        "clientInfo": {"name": "test", "version": "0"}}}),
+    );
+    s.response(1);
+    s.send(json!({"jsonrpc": "2.0", "method": "notifications/initialized"}));
+
+    let deps = s.call(2, "project_profile", json!({"deps": true}));
+    assert_ne!(deps["isError"], json!(true), "{deps}");
+    assert_eq!(
+        text(&deps),
+        "unused?   stripe/stripe-php  no reference in code\n"
+    );
+    let cli = Command::new(env!("CARGO_BIN_EXE_callgraph"))
+        .args(["deps", "--project"])
+        .arg(&dir)
+        .env("CALLGRAPH_LANG", "en")
+        .env("CALLGRAPH_REGISTRY", "/nonexistent/projects.json")
+        .output()
+        .unwrap();
+    assert_eq!(text(&deps), String::from_utf8_lossy(&cli.stdout));
+    drop(s);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 /// A helyi statisztika `locate`-találata: `locate`, utána `outline` a lista első fájljára → a `callgraph stats`
 /// (ugyanazzal a `CALLGRAPH_STATS_DIR`-rel) „1 of 1” első-találatot mutat. Út a napi fájlba nem kerül.
 #[test]

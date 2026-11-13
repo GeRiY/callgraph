@@ -88,6 +88,35 @@ fn composer_lock_versions_without_v_and_namespaces() {
     assert_eq!(installed[3].namespaces, ["PHPUnit\\"]);
 }
 
+/// A `deps` kivételeihez: `extra.laravel.providers` (auto-discovery) és `type: composer-plugin`.
+#[test]
+fn composer_lock_auto_discovery_and_plugin_flags() {
+    let installed = ComposerLock.read(
+        r#"{
+            "packages": [
+                {"name": "spatie/laravel-backup", "version": "9.1.0",
+                 "extra": {"laravel": {"providers": ["Spatie\\Backup\\BackupServiceProvider"]}}},
+                {"name": "acme/empty", "version": "1.0.0", "extra": {"laravel": {"providers": []}}},
+                {"name": "pestphp/pest-plugin", "version": "3.0.0", "type": "composer-plugin"},
+                {"name": "guzzlehttp/guzzle", "version": "7.9.2", "type": "library"}
+            ]
+        }"#,
+    );
+    let flags: Vec<(&str, bool, bool)> = installed
+        .iter()
+        .map(|item| (item.name.as_str(), item.auto_discovered, item.plugin))
+        .collect();
+    assert_eq!(
+        flags,
+        [
+            ("spatie/laravel-backup", true, false),
+            ("acme/empty", false, false),
+            ("pestphp/pest-plugin", false, true),
+            ("guzzlehttp/guzzle", false, false)
+        ]
+    );
+}
+
 #[test]
 fn package_json_peer_is_not_dev_and_both_workspace_forms() {
     let manifest = Npm

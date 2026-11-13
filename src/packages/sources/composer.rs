@@ -1,6 +1,6 @@
 //! Composer: a `composer.json` (`require` / `require-dev` a platform-bejegyzések — `php`, `ext-*`, `lib-*` — nélkül;
 //! a saját `autoload` psr-4 / psr-0 névterek) és a `composer.lock` (`packages` + `packages-dev`: pontos verzió vezető
-//! `v` nélkül, a csomag psr-4 / psr-0 névterei).
+//! `v` nélkül, a csomag psr-4 / psr-0 névterei, az `extra.laravel` auto-discovery és a `composer-plugin` típus).
 
 use serde_json::Value;
 
@@ -65,10 +65,26 @@ impl LockSource for ComposerLock {
                     version: strip_v(version).to_owned(),
                     namespaces: autoload_namespaces(entry.get("autoload")),
                     ranges: Vec::new(),
+                    auto_discovered: auto_discovered(entry),
+                    plugin: entry.get("type").and_then(Value::as_str) == Some("composer-plugin"),
                 })
             })
             .collect()
     }
+}
+
+/// A bejegyzés `extra.laravel.providers` (vagy `aliases`) listája nem üres: a Laravel package auto-discovery tölti be.
+fn auto_discovered(entry: &Value) -> bool {
+    let Some(laravel) = entry.get("extra").and_then(|extra| extra.get("laravel")) else {
+        return false;
+    };
+    ["providers", "aliases"]
+        .iter()
+        .any(|key| match laravel.get(*key) {
+            Some(Value::Array(list)) => !list.is_empty(),
+            Some(Value::Object(map)) => !map.is_empty(),
+            _ => false,
+        })
 }
 
 /// Valódi csomag-e (`vendor/név`); a platform-bejegyzéseknek (`php`, `ext-json`, `lib-icu`,

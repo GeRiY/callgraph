@@ -31,6 +31,9 @@ use facade::FacadeTable;
 use own::OwnNamespace;
 use psr4::Psr4Prefix;
 
+// a `deps` vizsgálat ugyanezzel a két szabállyal dönt a CSS-importról és a beépített modulról
+pub(crate) use bare_import::{is_builtin, package_name};
+
 /// A lánc, sorrendben. A homlokzat a saját névtér előtt áll: a `use` nélkül, névtérben írt `Http::get`-et az
 /// elemző a fájl névterébe oldja (`App\Services\Http`), amit a saját névtér különben elvinne.
 const CHAIN: &[&dyn SymbolResolver] = &[&FacadeTable, &OwnNamespace, &Psr4Prefix, &BareImport];

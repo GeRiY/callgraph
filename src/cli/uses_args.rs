@@ -1,6 +1,7 @@
 //! A `uses` parancs kapcsolói: `callgraph uses <csomag> [--calls] [--project <alias|mappa>]` (hol és hogyan használja
-//! a projekt egy függőségét, `crate::packages::UsageQuery`). Külön fájlban, hogy az `args.rs` csak egy sorral
-//! bővüljön.
+//! a projekt egy függőségét, `crate::packages::UsageQuery`), és a `deps [--project <alias|mappa>]` parancsé
+//! (fölösleges, hiányzó és csak dev függőségek, `crate::packages::DepsQuery`). Külön fájlban, hogy az `args.rs` csak
+//! egy-egy sorral bővüljön.
 
 use crate::error::{CallgraphError, Result};
 
@@ -48,6 +49,36 @@ pub(crate) fn parse_uses(args: &[String]) -> Result<CliArgs> {
     })
 }
 
+/// A `deps` parancs használata.
+pub(crate) fn deps_usage() -> &'static str {
+    crate::t!(
+        "callgraph deps [--project <alias|dir>]  (probably unused, missing and dev-only composer / npm dependencies)",
+        "callgraph deps [--project <alias|mappa>]  (valószínűleg fölösleges, hiányzó és csak dev composer / npm függőségek)"
+    )
+}
+
+/// `deps [--project <alias|mappa>]`.
+pub(crate) fn parse_deps(args: &[String]) -> Result<CliArgs> {
+    let usage = || CallgraphError::Usage(deps_usage().into());
+    let mut project = None;
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--project" if i + 1 < args.len() => {
+                project = Some(args[i + 1].clone());
+                i += 1;
+            }
+            x if x.starts_with("--project=") => project = Some(x["--project=".len()..].to_owned()),
+            _ => return Err(usage()),
+        }
+        i += 1;
+    }
+    if project.as_deref().is_some_and(str::is_empty) {
+        return Err(usage());
+    }
+    Ok(CliArgs::Deps { project })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -92,6 +123,31 @@ mod tests {
             &[" "],
         ] {
             assert!(parse_uses(&s(bad)).is_err(), "{bad:?}");
+        }
+    }
+
+    #[test]
+    fn parses_deps_with_an_optional_project() {
+        assert_eq!(parse_deps(&[]).unwrap(), CliArgs::Deps { project: None });
+        assert_eq!(
+            parse_deps(&s(&["--project", "shop"])).unwrap(),
+            CliArgs::Deps {
+                project: Some("shop".into())
+            }
+        );
+        assert_eq!(
+            parse_deps(&s(&["--project=/x"])).unwrap(),
+            CliArgs::Deps {
+                project: Some("/x".into())
+            }
+        );
+        for bad in [
+            &["guzzle"][..],
+            &["--calls"],
+            &["--project"],
+            &["--project="],
+        ] {
+            assert!(parse_deps(&s(bad)).is_err(), "{bad:?}");
         }
     }
 }

@@ -63,7 +63,7 @@ impl SymbolResolver for BareImport {
             return None;
         }
         let name = package_name(sym.qualifier)?;
-        if BUILTINS.contains(&name) {
+        if is_builtin(name) {
             return Some(Resolution::Unknown);
         }
         let version = part
@@ -76,8 +76,13 @@ impl SymbolResolver for BareImport {
     }
 }
 
+/// A Node beépített modulja-e a név (`fs`, `path`; a `node:` / `bun:` előtagos alak is).
+pub(crate) fn is_builtin(name: &str) -> bool {
+    name.starts_with("node:") || name.starts_with("bun:") || BUILTINS.contains(&name)
+}
+
 /// A specifikátor csomagneve: `@scope/név/al-út` → `@scope/név`, `név/al-út` → `név`; ha nem csomag alakú, `None`.
-pub(super) fn package_name(spec: &str) -> Option<&str> {
+pub(crate) fn package_name(spec: &str) -> Option<&str> {
     if spec.contains([':', '\\']) {
         return None;
     }

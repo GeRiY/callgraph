@@ -11,7 +11,7 @@ use super::next_args::parse_next;
 use super::profile_args::{LayerArgs, parse_profile};
 use super::stats_args::parse_stats;
 use super::telemetry_args::{TelemetryAction, parse_telemetry};
-use super::uses_args::parse_uses;
+use super::uses_args::{parse_deps, parse_uses};
 
 fn usage() -> &'static str {
     crate::t!(
@@ -194,6 +194,8 @@ pub enum CliArgs {
         calls: bool,
         project: Option<String>,
     },
+    /// `deps`: fölösleges, hiányzó és csak dev függőségek; `project`: alias vagy gyökér-út.
+    Deps { project: Option<String> },
     /// `hook post-edit|install|uninstall|status`; `settings`: a Claude Code `settings.json` helye (alapból
     /// `~/.claude/settings.json`).
     Hook {
@@ -266,6 +268,9 @@ impl CliArgs {
         }
         if args.first().is_some_and(|a| a == "uses") {
             return parse_uses(&args[1..]);
+        }
+        if args.first().is_some_and(|a| a == "deps") {
+            return parse_deps(&args[1..]);
         }
         if args.first().is_some_and(|a| a == "hook") {
             return Self::parse_hook(&args[1..]);

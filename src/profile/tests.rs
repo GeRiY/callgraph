@@ -396,6 +396,8 @@ fn part(
                 installed: installed.map(str::to_owned),
                 dev: false,
                 namespaces: Vec::new(),
+                auto_discovered: false,
+                plugin: false,
             })
             .collect(),
         installed_only: Vec::new(),

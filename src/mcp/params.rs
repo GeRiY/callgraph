@@ -270,6 +270,9 @@ pub(crate) struct ProfileParams {
     /// Also list every direct composer / npm dependency: installed and declared version, dev flag.
     #[serde(default)]
     pub packages: bool,
+    /// Instead: probably unused, missing and dev-only composer / npm dependencies.
+    #[serde(default)]
+    pub deps: bool,
 }
 
 // `package_usage`: egy függőség használata (a CLI `uses`).
@@ -359,6 +362,20 @@ mod tests {
         assert!(calls.calls);
         assert_eq!(calls.project.as_deref(), Some("shop"));
         assert!(serde_json::from_value::<PackageUsageParams>(serde_json::json!({})).is_err());
+    }
+
+    #[test]
+    fn profile_deps_is_an_optional_flag_with_a_short_doc() {
+        let plain: ProfileParams = serde_json::from_value(serde_json::json!({})).unwrap();
+        assert!(!plain.deps && !plain.packages);
+        let deps: ProfileParams =
+            serde_json::from_value(serde_json::json!({"deps": true, "project": "shop"})).unwrap();
+        assert!(deps.deps);
+        // a `tools/list` alig nő: egy rövid mező-leírás
+        let schema = serde_json::to_string(&schemars::schema_for!(ProfileParams)).unwrap();
+        let doc = "Instead: probably unused, missing and dev-only composer / npm dependencies.";
+        assert!(doc.chars().count() <= 80, "{doc}");
+        assert!(schema.contains(doc), "{schema}");
     }
 
     /// A típusok fölötti (magyar) megjegyzés nem kerül a sémába: csak a mezők angol leírása (`tools/list` hossza).

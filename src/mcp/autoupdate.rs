@@ -362,6 +362,10 @@ impl QueryRunner for NoticeRunner {
             .map(|text| self.append(text))
     }
 
+    fn deps(&self, project: Option<&str>) -> Result<String, String> {
+        self.inner.deps(project).map(|text| self.append(text))
+    }
+
     fn startup_note(&self) -> String {
         self.inner.startup_note()
     }

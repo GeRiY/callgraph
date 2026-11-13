@@ -170,7 +170,8 @@ pub(crate) fn classify(args: &[String], client: Option<&str>) -> Option<(Command
         "hook" if args.get(1).is_some_and(|a| a == "post-edit") => return None,
         "show" | "wrap" => CommandKind::Show,
         "locate" => CommandKind::Locate,
-        "profile" => CommandKind::Profile,
+        // a `deps` ritka, a profil része (az MCP-ben `project_profile` `deps: true`): nincs külön fajtája
+        "profile" | "deps" => CommandKind::Profile,
         "refresh" => CommandKind::Refresh,
         "callers" => CommandKind::Callers,
         "note" => CommandKind::Notes,

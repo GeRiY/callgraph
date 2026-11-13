@@ -34,6 +34,13 @@ pub(crate) struct Package {
     pub dev: bool,
     /// PHP: a csomag psr-4 / psr-0 névtér-előtagjai a lockból, `\`-re végződve.
     pub namespaces: Vec<String>,
+    /// PHP: a lock-bejegyzés `extra.laravel.providers`-t ad (a Laravel package auto-discovery tölti be, kód-hivatkozás
+    /// nélkül is használt).
+    #[serde(default)]
+    pub auto_discovered: bool,
+    /// PHP: a lock-bejegyzés `type: composer-plugin` (a Composer tölti be, nem a kód).
+    #[serde(default)]
+    pub plugin: bool,
 }
 
 /// A manifest egy függősége.
@@ -68,4 +75,8 @@ pub(crate) struct Installed {
     pub namespaces: Vec<String>,
     /// yarn: a tartományok, amelyekre ez a verzió feloldódott (több verziónál ez választ a közvetlen függőséghez).
     pub ranges: Vec<String>,
+    /// PHP: `extra.laravel.providers` van a bejegyzésben (Laravel package auto-discovery).
+    pub auto_discovered: bool,
+    /// PHP: `type: composer-plugin`.
+    pub plugin: bool,
 }

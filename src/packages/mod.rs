@@ -11,12 +11,14 @@
 //! - `resolve/`: Chain of Responsibility — melyik csomagé egy hívás célja (lekérdezéskor, a tárolt nyers
 //!   minősítőből: az outline csomag-címkéje, a json `package` mezője, a `locate` „uses package” indoklása);
 //! - `stack.rs`: a kiemelt csomagok sora;
-//! - `usage/`: `uses <csomag>` / MCP `package_usage` — hol és hogyan használja a projekt egy függőségét.
+//! - `usage/`: `uses <csomag>` / MCP `package_usage` — hol és hogyan használja a projekt egy függőségét;
+//! - `deps/`: `deps` / MCP `project_profile` `deps: true` — fölösleges, hiányzó és csak dev függőségek (Specification).
 //!
 //! Minden hibatűrő: hiányzó vagy hibás manifest / lock → az a rész üres, soha nem hiba.
 
 mod builder;
 mod cache;
+mod deps;
 mod files;
 mod model;
 mod project;
@@ -37,6 +39,7 @@ use crate::i18n::Lang;
 use crate::model::Call;
 use crate::query::QueryResult;
 
+pub(crate) use deps::{DepsQuery, user_ignores};
 pub(crate) use model::Package;
 pub(crate) use project::ProjectPackages;
 pub(crate) use resolve::Attribution;

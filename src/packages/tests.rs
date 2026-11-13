@@ -147,6 +147,8 @@ fn builder_lock_overrides_the_range_and_keeps_transitive_apart() {
             installed: Some("11.31.0".into()),
             dev: false,
             namespaces: vec!["Illuminate\\".into()],
+            auto_discovered: false,
+            plugin: false,
         }
     );
     let phpunit = package(part, "phpunit/phpunit");
@@ -375,6 +377,8 @@ fn locked(ecosystem: Ecosystem, lock: &str, names: &[(&str, &str)]) -> Ecosystem
                 installed: Some((*version).to_owned()),
                 dev: false,
                 namespaces: Vec::new(),
+                auto_discovered: false,
+                plugin: false,
             })
             .collect(),
         installed_only: Vec::new(),

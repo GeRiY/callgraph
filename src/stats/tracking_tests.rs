@@ -108,6 +108,11 @@ fn classifies_cli_runs_and_skips_servers_and_background_children() {
         cli(&["note", "list"]),
         Some((CommandKind::Notes, Client::Cli))
     );
+    // a ritka `deps` a profil fajtája (nincs külön kulcsa)
+    assert_eq!(
+        cli(&["deps", "--project", "/x"]),
+        Some((CommandKind::Profile, Client::Cli))
+    );
     assert_eq!(
         cli(&["src/Order.php"]),
         Some((CommandKind::Other, Client::Cli))

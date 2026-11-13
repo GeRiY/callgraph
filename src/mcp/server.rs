@@ -228,8 +228,13 @@ impl CallgraphServer {
         let started = Instant::now();
         let project = p.project.clone();
         let runner = Arc::clone(&self.runner);
+        // `deps: true`: a profil helyett a függőség-vizsgálat (ritka, igény szerinti)
         let result = tokio::task::spawn_blocking(move || {
-            runner.profile(p.project.as_deref(), p.full, p.packages)
+            if p.deps {
+                runner.deps(p.project.as_deref())
+            } else {
+                runner.profile(p.project.as_deref(), p.full, p.packages)
+            }
         })
         .await
         .unwrap_or_else(|e| Err(e.to_string()));

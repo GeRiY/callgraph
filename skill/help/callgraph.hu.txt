@@ -96,6 +96,7 @@ Projekt-profil (architektúra, rétegek és minták a mappa- / fájlnevekből, a
                                                 számít); PHP-ben és JS-ben is meglévő szerep: controller (php) / (js);
                                                 --packages: minden közvetlen composer / npm függőség (telepített, deklarált)
   bash ~/.claude/skills/callgraph/callgraph.sh uses <csomag> [--calls] [--project alias]   hol használja a kód egy függőségét (guzzle, @vueuse/core): API-szimbólumonként a darabszám, az első fájl, +N; (típus) = import hívás nélkül; --calls: fájlonként minden hívás-sor
+  bash ~/.claude/skills/callgraph/callgraph.sh deps [--project alias]   valószínűleg fölösleges / hiányzó / csak dev composer / npm függőségek (soronként egy; .callgraphignore: deps-ignore <név>)
   bash ~/.claude/skills/callgraph/callgraph.sh <mappa> --layer service         csak az adott réteg fájljai (név,név...;
                                                 egy ökoszisztéma: controller:php, controller:js, …:swift, …:rust)
   bash ~/.claude/skills/callgraph/callgraph.sh <mappa> --layers                summary rétegenként, [szerep] a FILE sorokon

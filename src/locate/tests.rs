@@ -838,6 +838,8 @@ fn package_term_gives_a_uses_package_reason_in_the_calling_file() {
         installed: Some("7.9.2".into()),
         dev: false,
         namespaces: vec!["GuzzleHttp\\".into()],
+        auto_discovered: false,
+        plugin: false,
     };
     let packages = Packages::from_map(ProjectPackages {
         root: "/p".into(),

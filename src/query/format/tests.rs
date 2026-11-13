@@ -204,6 +204,8 @@ fn pay_packages() -> std::sync::Arc<crate::packages::Packages> {
         installed: Some(version.to_owned()),
         dev: false,
         namespaces: vec![namespace.to_owned()],
+        auto_discovered: false,
+        plugin: false,
     };
     let part = EcosystemPackages {
         root: "/p".into(),

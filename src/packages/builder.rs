@@ -40,6 +40,8 @@ pub(crate) fn build(
                     .filter(|version| !version.is_empty()),
                 dev: dep.dev,
                 namespaces: hit.map(|item| item.namespaces.clone()).unwrap_or_default(),
+                auto_discovered: hit.is_some_and(|item| item.auto_discovered),
+                plugin: hit.is_some_and(|item| item.plugin),
             }
         })
         .collect();
@@ -56,6 +58,8 @@ pub(crate) fn build(
             installed: Some(item.version.clone()).filter(|version| !version.is_empty()),
             dev: false,
             namespaces: item.namespaces.clone(),
+            auto_discovered: item.auto_discovered,
+            plugin: item.plugin,
         });
     }
     Some(EcosystemPackages {

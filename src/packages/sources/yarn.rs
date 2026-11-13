@@ -42,8 +42,8 @@ impl LockSource for YarnLock {
                     None => out.push(Installed {
                         name,
                         version: version.to_owned(),
-                        namespaces: Vec::new(),
                         ranges: vec![range],
+                        ..Installed::default()
                     }),
                 }
             }

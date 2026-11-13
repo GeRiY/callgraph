@@ -33,6 +33,16 @@ pub(crate) trait QueryRunner: Send + Sync {
         )
         .into())
     }
+    /// A függőség-vizsgálat (`callgraph deps`): fölösleges, hiányzó és csak dev függőségek (`project_profile`
+    /// `deps: true`).
+    fn deps(&self, project: Option<&str>) -> Result<String, String> {
+        let _ = project;
+        Err(crate::t!(
+            "project_profile is not available",
+            "a project_profile nem érhető el"
+        )
+        .into())
+    }
     /// Az `initialize` útmutatójának vége: a munkakönyvtár tömör profilja, vagy tipp a `project_profile`-ra.
     fn startup_note(&self) -> String {
         String::new()
@@ -136,6 +146,16 @@ impl QueryRunner for ShowRunner {
         if packages {
             args.push("--packages".into());
         }
+        Self::execute(args, &root)
+    }
+
+    fn deps(&self, project: Option<&str>) -> Result<String, String> {
+        let root = self.root(project)?;
+        let args = vec![
+            "deps".to_owned(),
+            "--project".to_owned(),
+            root.root().display().to_string(),
+        ];
         Self::execute(args, &root)
     }
 

@@ -10,6 +10,7 @@
 # forwarded to `callgraph locate`).
 # `callgraph.sh profile [--project alias] [--full]` prints the project profile (forwarded to `callgraph profile`).
 # `callgraph.sh uses <package> [--calls] [--project alias]` shows where the code uses a dependency (forwarded to `callgraph uses`).
+# `callgraph.sh deps [--project alias]` lists probably unused / missing / dev-only dependencies (forwarded to `callgraph deps`).
 # `callgraph.sh stats [--days N]` shows the local usage stats (forwarded to `callgraph stats`; nothing is sent anywhere).
 # `callgraph.sh --version` (or `-V`, `version`) prints the binary's version and platform, and the binary's path.
 # `--no-gitignore` with any command: the .gitignore files are not applied (.callgraphignore still is).
@@ -68,6 +69,13 @@ if [[ "${1:-}" == --project && "${3:-}" == uses ]]; then
     run_callgraph uses --project "$2" "${@:4}"
 fi
 if [[ "${1:-}" == uses ]]; then
+    run_callgraph "$@"
+fi
+# függőség-vizsgálat: `callgraph.sh [--project alias] deps` → `callgraph deps …` (fölösleges / hiányzó / csak dev)
+if [[ "${1:-}" == --project && "${3:-}" == deps ]]; then
+    run_callgraph deps --project "$2" "${@:4}"
+fi
+if [[ "${1:-}" == deps ]]; then
     run_callgraph "$@"
 fi
 # helyi használati statisztika: `callgraph.sh stats [--days N]` → `callgraph stats …` (hálózat nincs);

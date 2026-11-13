@@ -2,6 +2,7 @@
 
 mod analyze;
 mod callers;
+mod deps;
 mod error;
 mod feedback;
 mod help;
@@ -32,6 +33,7 @@ use crate::skill::{ProjectRegistry, SkillHome};
 
 pub use analyze::AnalyzeCommand;
 pub use callers::CallersCommand;
+pub use deps::DepsCommand;
 pub use error::ErrorCommand;
 pub use feedback::FeedbackCommand;
 pub use help::HelpCommand;

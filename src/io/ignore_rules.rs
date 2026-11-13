@@ -13,6 +13,9 @@
 //! kimenet `🔒`-val jelöli (`is_protected`). Ugyanazok a szabályok (mappához relatív minta, beágyazott fájl, `!`);
 //! a külön álló `protect` szó továbbra is sima kiterjesztés-szabály, a `protect` sor sosem zár ki fájlt.
 //!
+//! `deps-ignore <csomag>` sor (`laravel/pint`, `@types/*`): a `deps` függőség-vizsgálat erről a csomagról nem jelez;
+//! a bejárásra nincs hatása (nem útminta).
+//!
 //! Kapcsoló: `--no-gitignore` (CLI) / `CALLGRAPH_GITIGNORE=0` (MCP, hook) — ekkor a `.gitignore` fájlok nem
 //! számítanak; a `.callgraphignore` és a beépített kihagyott mappák igen. A projekt-gráf (`.callgraph/`) a két módot
 //! nem keveri: kulcsa a fájl útja, és minden teljes hatókörű lekérdezés / `refresh` a bejárás aktuális fájllistájára
@@ -79,7 +82,22 @@ pub fn path_patterns(contents: &str) -> Vec<&str> {
             extension_rule(line).is_none()
                 && !matches!(*line, "." | "*.")
                 && protect_pattern(line).is_none()
+                && deps_ignore_pattern(line).is_none()
         })
+        .collect()
+}
+
+/// A `deps-ignore <csomag>` sor csomagneve / mintája (a szó után szóköz / tab és nem üres név kell); különben `None`.
+pub fn deps_ignore_pattern(line: &str) -> Option<&str> {
+    let rest = line.trim().strip_prefix("deps-ignore")?;
+    let pattern = rest.trim_start();
+    (pattern.len() < rest.len() && !pattern.is_empty()).then_some(pattern)
+}
+
+/// A `.callgraphignore` `deps-ignore` csomagnevei / mintái, változatlanul.
+pub fn deps_ignore_patterns(contents: &str) -> Vec<&str> {
+    rule_lines(contents)
+        .filter_map(deps_ignore_pattern)
         .collect()
 }
 
@@ -495,6 +513,18 @@ mod tests {
         );
         assert_eq!(super::parse_ignore(text), ["md", "protect"]);
         assert_eq!(super::path_patterns(text), ["protects/"]);
+    }
+
+    /// A `deps-ignore` sor sem kiterjesztés, sem útminta: csak a `deps` vizsgálat kivétele.
+    #[test]
+    fn deps_ignore_lines_are_their_own_kind() {
+        let text = "md\ndeps-ignore laravel/pint\ndeps-ignore\t@types/*\ndeps-ignore\nvendor/\n";
+        assert_eq!(
+            super::deps_ignore_patterns(text),
+            ["laravel/pint", "@types/*"]
+        );
+        assert_eq!(super::path_patterns(text), ["deps-ignore", "vendor/"]);
+        assert_eq!(super::parse_ignore(text), ["md"]);
     }
 
     /// Védett fájl a térképben marad; mappához relatív, beágyazott fájl, `!` visszavétel.
