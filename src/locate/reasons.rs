@@ -34,6 +34,7 @@ fn key(symbol: &Symbol) -> String {
         Symbol::Str { value, .. } => format!("s\0{value}"),
         Symbol::Call { target, .. } => format!("x\0{target}"),
         Symbol::Package { name, .. } => format!("g\0{name}"),
+        Symbol::Page { page, site, .. } => format!("i\0{page}\0{site}"),
     }
 }
 
@@ -47,7 +48,8 @@ fn line_of(symbol: &Symbol) -> u32 {
         | Symbol::Key { line, .. }
         | Symbol::Str { line, .. }
         | Symbol::Call { line, .. }
-        | Symbol::Package { line, .. } => *line,
+        | Symbol::Package { line, .. }
+        | Symbol::Page { line, .. } => *line,
     }
 }
 
@@ -154,6 +156,7 @@ pub(crate) fn describe(reason: &Reason, terms: &[Term]) -> String {
         Symbol::Key { name, line } => format!("{name}  L{line}"),
         Symbol::Str { value, .. } => format!("'{}'  {}", clip(value, 60), lines(&reason.lines)),
         Symbol::Package { label, .. } => format!("pkg {label}  {}", lines(&reason.lines)),
+        Symbol::Page { site, .. } => format!("page ← {site}  {}", lines(&reason.lines)),
         Symbol::Call { caller, target, .. } => {
             let at = lines(&reason.lines);
             match caller {
@@ -180,6 +183,9 @@ pub(crate) fn describe(reason: &Reason, terms: &[Term]) -> String {
 fn label(reason: &Reason) -> String {
     if matches!(reason.symbol, Symbol::Package { .. }) {
         return crate::t!("package", "csomag").to_owned();
+    }
+    if matches!(reason.symbol, Symbol::Page { .. }) {
+        return crate::t!("Inertia page", "Inertia-oldal").to_owned();
     }
     match reason.kind {
         // a `route::név` definíciója (`->name('név')` a `routes/*.php`-ban)

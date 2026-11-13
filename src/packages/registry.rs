@@ -30,14 +30,19 @@ pub(crate) const ECOSYSTEMS: &[EcosystemSpec] = &[
 ];
 
 /// Csomag → framework-név (a profil architektúra-felismerése és a PHP framework-detektor ugyanezeket a neveket
-/// használja); ugyanazon a részen belül ebben a sorrendben.
+/// használja; az `inertia` név a lekérdezés-idejű framework-kötéseket kapcsolja be: `frameworks/`); ugyanazon a
+/// részen belül ebben a sorrendben.
 pub(crate) const FRAMEWORKS: &[(Ecosystem, &str, &str)] = &[
     (Ecosystem::Php, "laravel/framework", "laravel"),
     (Ecosystem::Php, "yiisoft/yii2", "yii"),
+    (Ecosystem::Php, "inertiajs/inertia-laravel", "inertia"),
     (Ecosystem::Node, "nuxt", "nuxt"),
     (Ecosystem::Node, "vue", "vue"),
     (Ecosystem::Node, "next", "next"),
     (Ecosystem::Node, "react", "react"),
     (Ecosystem::Node, "svelte", "svelte"),
     (Ecosystem::Node, "@angular/core", "angular"),
+    (Ecosystem::Node, "@inertiajs/vue3", "inertia"),
+    (Ecosystem::Node, "@inertiajs/react", "inertia"),
+    (Ecosystem::Node, "@inertiajs/svelte", "inertia"),
 ];

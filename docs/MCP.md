@@ -20,7 +20,7 @@ ugyanaz a tömör kimenet, amit a `callgraph show` kiír (ez a token-hatékony r
 | `method_body` | `path`, `method` (egy név stringként vagy névtömb), `project?`, `doc?`, `raw?`, `full?` | a metódus(ok) forrása sorszámozva, tömören (docblock és üres sorok nélkül, a törzsbeli megjegyzések maradnak; a kihagyott docblockot a fejléc jelzi); `doc: true`: docblockkal, `raw: true`: szűretlenül | `show <út>::m --body [--doc\|--raw]` |
 | `find_callers` | `pattern`, `path?`, `project?`, `depth?` (1–5), `guess?`, `full?` | ki hívja; `depth` > 1: hatáselemzés | `show <út> --grep <minta> --depth N [--guess]` |
 | `search` | `kind` (`strings`\|`constants`), `pattern`, `path?`, `project?`, `full?` | string-literál / konstans helye | `show <út> --strings` / `--const` |
-| `framework_view` | `view` (`routes`\|`middleware`\|`validation`\|`jobs`\|`events`\|`providers`\|`magic`\|`di`\|`views`), `path`, `project?`, `full?` | framework-nézet | `show <út> --format <nézet>` |
+| `framework_view` | `view` (`routes`\|`middleware`\|`validation`\|`jobs`\|`events`\|`providers`\|`magic`\|`di`\|`views`\|`inertia`), `path`, `project?`, `full?` | framework-nézet | `show <út> --format <nézet>` |
 | `notes` (pilot) | `pattern?` (regex a szövegre / horgonyra; üres = mind), `path?`, `project?` | a fájlokhoz / metódusokhoz írt jegyzetek: `út[::metódus]  idő  📝 szöveg`, `[orphaned]`, ha a metódus már nincs | `show <út> --notes <minta>` |
 | `projects` | — | a regisztrált aliasok és gyökereik | `projects.sh list` |
 | `guide` | — | a teljes skill-útmutató (`SKILL.md` törzse, frontmatter nélkül) a beállított nyelven | `skill/SKILL.md` |

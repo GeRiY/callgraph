@@ -76,6 +76,10 @@ fn outline(
     .unwrap();
     // szintaktikai hiba: közvetlenül a FILE sor alatt (hiba nélkül nincs sor)
     s.push_str(&super::parse_error_lines(g, lang));
+    // Inertia-oldal: egy sor a render-helyekkel (kötések / render-hely nélkül nincs sor)
+    if let Some(by) = row.inertia.as_ref().and_then(|i| i.rendered_by(&g.file)) {
+        writeln!(s, "{}{by}", lang.pick("rendered by: ", "renderelő: ")).unwrap();
+    }
     // jegyzetek (PILOT): fájl-jegyzetek, és a nem listázott (konténer nélküli) függvényeiké
     crate::notes::file_lines(&mut s, &row.notes);
     crate::notes::unlisted_lines(&mut s, &row.notes, g);
@@ -172,7 +176,7 @@ fn outline(
                 }
             }
             crate::notes::method_lines(&mut s, &row.notes, m.container.as_deref(), &m.name, "    ");
-            for cat in categories(row, m) {
+            for cat in categories(row, m, lang) {
                 writeln!(s, "    {:<18}{}", cat.0, cat.1).unwrap();
             }
             if let Some(lines) = source {
@@ -290,7 +294,7 @@ pub(crate) fn call_lines(
 /// Egy hívás-csoport kulcsa: (kategória, a csomag rövid címkéje).
 type CategoryKey = (String, Option<String>);
 
-pub(super) fn categories(row: &QueryResult, m: &Method) -> Vec<(String, String)> {
+pub(super) fn categories(row: &QueryResult, m: &Method, lang: Lang) -> Vec<(String, String)> {
     let g = &row.graph;
     let mut grouped: std::collections::BTreeMap<CategoryKey, Vec<String>> =
         std::collections::BTreeMap::new();
@@ -303,7 +307,7 @@ pub(super) fn categories(row: &QueryResult, m: &Method) -> Vec<(String, String)>
         grouped
             .entry((c.category.clone(), package_label(row, c)))
             .or_default()
-            .push(c.resolved.clone().unwrap_or_else(|| c.target.clone()));
+            .push(shown_target(row, c, lang));
     }
     let mut ordered: Vec<(CategoryKey, Vec<String>)> = grouped.into_iter().collect();
     // a `dynamic_call` a lista végére (a rendezés stabil: a többi marad ábécében)
@@ -326,6 +330,21 @@ pub(super) fn categories(row: &QueryResult, m: &Method) -> Vec<(String, String)>
             (category, list)
         })
         .collect()
+}
+
+/// A hívás kiírt célja: a feloldott (különben a nyers) cél; Inertia render-hívásnál utána a page-fájl rövid alakja
+/// (`Inertia\Inertia::render → Pages/Board.vue`, nem létező fájlnál `(missing)`). Kötések nélkül a régi.
+pub(super) fn shown_target(row: &QueryResult, call: &Call, lang: Lang) -> String {
+    let target = call.resolved.as_deref().unwrap_or(&call.target);
+    match row.inertia_page(call) {
+        Some(page) if page.exists => format!("{target} → {}", page.short),
+        Some(page) => format!(
+            "{target} → {}{}",
+            page.short,
+            lang.pick(" (missing)", " (hiányzik)")
+        ),
+        None => target.to_owned(),
+    }
 }
 
 /// A hívás csomag-címkéje az outline-ban (`guzzle`): csak a csomaghoz rendelt `external_call` / `framework_use`

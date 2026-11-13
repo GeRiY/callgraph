@@ -1,7 +1,9 @@
 //! PHP-framework nézetek (`events`, `routes`, `middleware`, `validation`, `jobs`, `providers`, `magic`, `di`, `views`):
 //! fájlonként szekciók, mindegyik egy forrást (hívás / string / metódus) regexszel szűr és fix sorsablont tölt ki.
-//! Egy nézet = egy gyűjtőfüggvény a `rules.rs`-ben + egy sor a `register`-ben.
+//! Egy nézet = egy gyűjtőfüggvény a `rules.rs`-ben + egy sor a `register`-ben. Kivétel az `inertia` nézet
+//! (`inertia.rs`): fájlokon átívelő (PHP render-hívás ↔ page-komponens), a projekt-szintű kötésekből.
 
+mod inertia;
 mod routes;
 mod rules;
 
@@ -112,6 +114,7 @@ pub(super) fn register(registry: &mut FormatterRegistry) {
     for (name, empty, collect) in views {
         registry.register(name, Box::new(RuleView { empty, collect }));
     }
+    registry.register("inertia", Box::new(inertia::InertiaView));
 }
 
 /// `<ns><container|__top__>::<caller>` — a hívás helye.
@@ -190,6 +193,22 @@ mod tests {
                 text.starts_with("(no ") && text.ends_with(" matches)\n"),
                 "{name}: {text}"
             );
+        }
+    }
+
+    #[test]
+    fn inertia_view_without_bindings_reports_empty() {
+        let row = QueryResult::new(FileGraphBuilder::new("app/x.php").build(), None);
+        for (lang, want) in [
+            (Lang::En, "(no Inertia page matches)\n"),
+            (Lang::Hu, "(nincs Inertia-oldal találat)\n"),
+        ] {
+            let mut registry = FormatterRegistry::default().in_lang(lang);
+            register(&mut registry);
+            let text = registry
+                .render("inertia", std::slice::from_ref(&row))
+                .unwrap();
+            assert_eq!(text, want);
         }
     }
 

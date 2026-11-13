@@ -23,6 +23,7 @@ use std::path::{Path, PathBuf};
 
 use crate::analysis::Analyzer;
 use crate::error::{CallgraphError, Result};
+use crate::packages::Inertia;
 
 use callers::CallerCounts;
 use format::Report;
@@ -60,9 +61,21 @@ impl Locator {
         // a csomagtérkép (a „pkg” indokláshoz): egyszer, a `.callgraph/packages.bin`-ből; manifest nélkül nincs
         let packages = crate::packages::open(&self.root);
         let packages = packages.has_parts().then_some(&packages);
+        // Inertia-oldalak (a „page ←” indokláshoz): csak Inertia-projektben, a render-helyek a bejárt tényekből
+        let mut inertia = packages.and_then(|packages| {
+            Inertia::detect(&self.root, packages, &crate::packages::DiskProjectFiles)
+        });
         let mut notes: HashMap<String, usize> = HashMap::new();
         let (ranked, issues) =
             ProjectSource::new(&self.root, &self.analyzer).with_files(|files| {
+                if let Some(inertia) = inertia.as_mut() {
+                    let code = files
+                        .iter()
+                        .filter(|file| file.code)
+                        .map(|file| (file.path, file.graph));
+                    inertia.scan(code, &crate::packages::DiskProjectFiles);
+                }
+                let inertia = inertia.as_ref();
                 // a szintaktikai hibás fájlok a záró sorhoz (a rangsoruk hiányos térképből jön)
                 let issues: Vec<(String, u32)> = files
                     .iter()
@@ -79,6 +92,9 @@ impl Locator {
                         let mut hits = matcher.file_hits(&rel, file.graph, file.code);
                         if file.code {
                             matcher.package_hits(file.path, file.graph, &mut hits);
+                            if let Some(inertia) = inertia {
+                                matcher.page_hits(&rel, inertia, &mut hits);
+                            }
                         }
                         if !hits.is_empty() && !marks.is_empty() {
                             // az árva (a fájlban már nem létező metódusra szóló) jegyzetek nem számítanak

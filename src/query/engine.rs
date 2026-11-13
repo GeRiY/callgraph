@@ -28,6 +28,9 @@ pub struct QueryResult {
     /// A projekt csomagjai (`crate::packages::annotate`): csak az outline és a json előtt töltődik, és csak ha a
     /// projektnek van manifestje; `None` = a hívások nem kapnak csomagot (a kimenet a régi).
     pub(crate) packages: Option<std::sync::Arc<crate::packages::Packages>>,
+    /// A framework-kötések (`crate::packages::annotate_frameworks`): csak Inertia-projektben, az outline, a json és
+    /// az `inertia` nézet előtt; `None` = a kimenet a régi.
+    pub(crate) inertia: Option<std::sync::Arc<crate::packages::Inertia>>,
 }
 
 /// Egy rokon típuson át illesztett hívás: sor + cél (a `resolved` / `target`), és a hívás típusának rövid neve.
@@ -46,7 +49,13 @@ impl QueryResult {
             via: Vec::new(),
             notes: Vec::new(),
             packages: None,
+            inertia: None,
         }
+    }
+
+    /// Inertia render-hívásnál (string-literál page-névvel) a page-fájl; kötések nélkül mindig `None`.
+    pub(crate) fn inertia_page(&self, call: &Call) -> Option<crate::packages::PageLink> {
+        self.inertia.as_ref()?.link(call)
     }
 
     /// A hívás csomagja (a hívás nyers minősítőjéből, a fájlhoz legközelebbi manifest szerint), ha a sorhoz
@@ -275,6 +284,7 @@ impl QueryEngine {
             let mut kept = QueryResult::new(graph, None);
             kept.notes.clone_from(&row.notes);
             kept.packages.clone_from(&row.packages);
+            kept.inertia.clone_from(&row.inertia);
             if let Some((regex, matcher)) = &via {
                 kept.via = kept
                     .graph

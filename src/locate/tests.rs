@@ -883,3 +883,98 @@ fn package_term_gives_a_uses_package_reason_in_the_calling_file() {
     matcher.package_hits(std::path::Path::new("/p/app/Guzzle.php"), &named, &mut hits);
     assert_eq!(hits.len(), before, "{hits:?}");
 }
+
+/// A page-név kifejezés (`Board`, `Users/Index`): a render-hely fájljában a page-név string-egyezése helyett
+/// „page ← Osztály::metódus” indoklás (ugyanannyi egyezés, ugyanaz a súly), a page-fájl a fájlnév-egyezést kapja.
+#[test]
+fn page_term_gives_a_page_reason_at_the_render_site() {
+    let inertia = crate::packages::Inertia::fixture(
+        std::path::Path::new("/p"),
+        "resources/js/Pages",
+        &[
+            "resources/js/Pages/Board.vue",
+            "resources/js/Pages/Users/Index.vue",
+        ],
+        &[
+            (
+                "app/Http/Controllers/BoardController.php",
+                "BoardController",
+                "show",
+                23,
+                "Board",
+            ),
+            (
+                "app/Http/Controllers/UserController.php",
+                "UserController",
+                "index",
+                12,
+                "Users/Index",
+            ),
+        ],
+    );
+    let mut controller = graph("app/Http/Controllers/BoardController.php");
+    controller.strings.push(StringLit {
+        container: Some("BoardController".into()),
+        caller: Some("show".into()),
+        line: 23,
+        end_line: None,
+        value: "Board".into(),
+    });
+    let terms = Term::parse_all(&["Board", "Users/Index"]);
+    let callers = CallerCounts::build([&controller]);
+    let matcher = Matcher::new(&terms, &callers);
+    let rel = "app/Http/Controllers/BoardController.php";
+    let mut hits = matcher.file_hits(rel, &controller, true);
+    let before: Vec<(usize, Kind)> = hits.iter().map(|hit| (hit.term, hit.kind)).collect();
+    matcher.page_hits(rel, &inertia, &mut hits);
+    let after: Vec<(usize, Kind)> = hits.iter().map(|hit| (hit.term, hit.kind)).collect();
+    assert_eq!(before, after, "{hits:?}");
+    let plain = matcher.file_hits(rel, &controller, true);
+    assert_eq!(score(&hits), score(&plain));
+    let page = hits
+        .iter()
+        .find(|hit| matches!(hit.symbol, Symbol::Page { .. }))
+        .unwrap_or_else(|| panic!("{hits:?}"));
+    let reasons = group(std::slice::from_ref(page));
+    let text = super::reasons::describe(&reasons[0], &terms);
+    assert!(
+        text.starts_with("page ← BoardController::show  L23  ← \"Board\""),
+        "{text}"
+    );
+    // a render-hely string-egyezése nélkül (szűkített tényekben sincs) új, string-súlyú egyezés
+    let mut hits = Vec::new();
+    matcher.page_hits(
+        "app/Http/Controllers/UserController.php",
+        &inertia,
+        &mut hits,
+    );
+    assert_eq!(hits.len(), 1, "{hits:?}");
+    assert_eq!((hits[0].term, hits[0].kind), (1, Kind::StringLit));
+    // a page-fájl: `Users/Index` → fájlnév-egyezés (a `Board.vue`-é már a meglévő fájlnév-egyezés)
+    let page_rel = "resources/js/Pages/Users/Index.vue";
+    let page_graph = graph(page_rel);
+    let mut hits = matcher.file_hits(page_rel, &page_graph, true);
+    assert!(
+        !hits
+            .iter()
+            .any(|hit| hit.term == 1 && hit.kind == Kind::FileName),
+        "{hits:?}"
+    );
+    matcher.page_hits(page_rel, &inertia, &mut hits);
+    assert!(
+        hits.iter()
+            .any(|hit| hit.term == 1 && hit.kind == Kind::FileName),
+        "{hits:?}"
+    );
+    let board_rel = "resources/js/Pages/Board.vue";
+    let board = graph(board_rel);
+    let mut hits = matcher.file_hits(board_rel, &board, true);
+    let count = hits.len();
+    assert!(
+        hits.iter()
+            .any(|hit| hit.term == 0 && hit.kind == Kind::FileName),
+        "{hits:?}"
+    );
+    matcher.page_hits(board_rel, &inertia, &mut hits);
+    assert_eq!(hits.len(), count, "{hits:?}");
+}

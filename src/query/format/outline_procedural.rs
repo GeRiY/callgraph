@@ -33,10 +33,11 @@ pub(super) fn procedural(
     // a csomaghoz rendelt külső hívások külön sorban, a csomag címkéjével (`guzzle: …`; csomagtérkép nélkül nincs)
     let mut groups: BTreeMap<(&str, Option<String>), BTreeSet<String>> = BTreeMap::new();
     for c in &g.calls {
+        // Inertia render-hívásnál (`Route::inertia`) a page-fájllal: `→ Pages/About.vue`
         groups
             .entry((c.category.as_str(), super::outline::package_label(row, c)))
             .or_default()
-            .insert(target(c));
+            .insert(super::outline::shown_target(row, c, lang));
     }
     let mut ordered: Vec<_> = groups.iter().collect();
     ordered.sort_by_key(|((category, _), _)| crate::model::category_rank(category));

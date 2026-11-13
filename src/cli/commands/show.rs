@@ -159,6 +159,19 @@ impl Command for ShowCommand {
             // nélkül a kimenet változatlan (a csomagtérkép a `.callgraph/packages.bin`-ből, bélyeg szerint)
             crate::packages::annotate(&mut rows, engine.root());
         }
+        if !self.body
+            && matches!(
+                self.format.as_str(),
+                "outline" | "json" | "jsonl" | "inertia"
+            )
+            && self.lines.is_none()
+            && self.strings.is_none()
+            && self.const_filter.is_none()
+        {
+            // framework-kötések (Inertia): a render-hívás page-fájlja, a page-fájl `rendered by:` sora és az
+            // `inertia` nézet; Inertia nélkül a kimenet változatlan
+            crate::packages::annotate_frameworks(&mut rows, engine.root(), &self.format);
+        }
         let text = match self.render(&rows) {
             Ok(value) => value,
             Err(error) => return Self::report(_err, error),

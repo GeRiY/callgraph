@@ -66,7 +66,8 @@ impl serde::Serialize for OrderedGraph<'_> {
 }
 
 /// A hívások mezősorrendje nyelvfüggő: a JS-motor `category`-t a `resolved` elé teszi. Csomagtérképpel (a
-/// projektnek van manifestje) a hívás végén a csomag: `package` (teljes név) és `package_version` (a lock verziója).
+/// projektnek van manifestje) a hívás végén a csomag: `package` (teljes név) és `package_version` (a lock verziója);
+/// Inertia-kötésekkel a render-hívásnál a page-fájl: `inertia_page` (és ha nem létezik, `inertia_page_missing`).
 #[derive(serde::Serialize)]
 #[serde(untagged)]
 enum Calls<'a> {
@@ -84,6 +85,12 @@ struct PhpCall<'a> {
     package: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     package_version: Option<String>,
+    /// Inertia render-hívásnál a page-fájl a gyökérhez relatívan (`resources/js/Pages/Board.vue`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    inertia_page: Option<String>,
+    /// Csak ha a page-fájl nem létezik: `true`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    inertia_page_missing: Option<bool>,
 }
 
 impl<'a> PhpCall<'a> {
@@ -92,10 +99,14 @@ impl<'a> PhpCall<'a> {
             Some(found) => (Some(found.name), found.version),
             None => (None, None),
         };
+        let page = row.inertia_page(call);
+        let inertia_page_missing = page.as_ref().filter(|page| !page.exists).map(|_| true);
         Self {
             call,
             package,
             package_version,
+            inertia_page: page.map(|page| page.rel),
+            inertia_page_missing,
         }
     }
 }
@@ -186,7 +197,7 @@ pub(super) fn ordered_graph(row: &QueryResult) -> OrderedGraph<'_> {
                     })
                     .collect(),
             )
-        } else if row.packages.is_some() {
+        } else if row.packages.is_some() || row.inertia.is_some() {
             Calls::PhpPackages(
                 graph
                     .calls

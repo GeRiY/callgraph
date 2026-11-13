@@ -39,6 +39,7 @@ pub(crate) enum FrameworkView {
     Magic,
     Di,
     Views,
+    Inertia,
 }
 
 // `outline`: egy fájl / mappa szerkezete vagy egy metódus hívás-gráfja.
@@ -313,6 +314,7 @@ impl FrameworkView {
             Self::Magic => "magic",
             Self::Di => "di",
             Self::Views => "views",
+            Self::Inertia => "inertia",
         }
     }
 }
