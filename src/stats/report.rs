@@ -2,6 +2,7 @@
 //! hibák, az idő- és a kimenet-méret sávjai, a `locate`-találati arány, és hogy hol az adat, és hogy nem megy
 //! sehova.
 
+use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::path::Path;
 
@@ -9,6 +10,7 @@ use super::buckets::{LatencyBucket, RankBucket, SizeBucket};
 use super::day::Day;
 use super::event::{Client, CommandKind};
 use super::events::{EVENT_DAYS, EVENTS_DIR, EventLine, read as read_events};
+use super::reuse::{FILE_BANDS, SYM_BANDS};
 use super::store::{Counters, StatsStore, Totals};
 
 /// A riport a `today`-jel végződő `days` napra (a `totals` erre az időszakra összegzett), a mappa, és hogy most
@@ -209,8 +211,8 @@ pub(crate) fn render_events(store: &StatsStore, today: Day, days: u32) -> String
     }
     if !events.is_empty() {
         out.push_str(crate::t!(
-            "time (UTC) · session#call · via · command · result · ms · output · lang · input · relation · repeat\n",
-            "idő (UTC) · munkamenet#hívás · kliens · parancs · eredmény · ms · kimenet · nyelv · bemenet · viszony · ismétlés\n"
+            "time (UTC) · session#call · via · command · result · ms · output · lang · input · relation · repeat · use (f: file, s: symbol in the previous output)\n",
+            "idő (UTC) · munkamenet#hívás · kliens · parancs · eredmény · ms · kimenet · nyelv · bemenet · viszony · ismétlés · use (f: fájl, s: szimbólum az előző kimenetben)\n"
         ));
     }
     for line in &events[skipped..] {
@@ -228,6 +230,16 @@ pub(crate) fn render_events(store: &StatsStore, today: Day, days: u32) -> String
             let _ = writeln!(out, "  {n:>5}  {key}");
         }
     }
+    let reuse = reuse_lines(&store.use_totals(from, today));
+    if !reuse.is_empty() {
+        out.push_str(crate::t!(
+            "previous output reused (file: hit1 = first file listed, hit5 = 2nd–5th, hit = later, miss = not there):\n",
+            "az előző kimenet felhasználása (fájl: hit1 = az első felsorolt, hit5 = 2.–5., hit = később, miss = nem volt benne):\n"
+        ));
+        for line in reuse {
+            out.push_str(&line);
+        }
+    }
     let dir = store.dir().join(EVENTS_DIR);
     out.push_str(&crate::tf!(
         "Log: {} (kept {EVENT_DAYS} days, no paths or names; never sent)\n",
@@ -235,6 +247,62 @@ pub(crate) fn render_events(store: &StatsStore, today: Day, days: u32) -> String
         dir.display()
     ));
     out
+}
+
+/// Egy átmenet (`előző>következő`) újrahasznosítási számai.
+#[derive(Default)]
+struct Reuse<'a> {
+    calls: u64,
+    files: BTreeMap<&'a str, u64>,
+    syms: BTreeMap<&'a str, u64>,
+}
+
+/// A napi `uses` kulcsaiból (`{előző}[!]>{ez}|f:{sáv}|s:{sáv}`) a leggyakoribb átmenetek soronként, a fájl- és a
+/// szimbólum-sávok megoszlásával (a `-` sávok nélkül; az `other` kimarad).
+fn reuse_lines(uses: &BTreeMap<String, u64>) -> Vec<String> {
+    let mut pairs: BTreeMap<&str, Reuse<'_>> = BTreeMap::new();
+    for (key, n) in uses {
+        let mut parts = key.split('|');
+        let (Some(pair), Some(file), Some(sym)) = (parts.next(), parts.next(), parts.next()) else {
+            continue;
+        };
+        let entry = pairs.entry(pair).or_default();
+        entry.calls += n;
+        if let Some(band) = file.strip_prefix("f:").filter(|b| *b != "-") {
+            *entry.files.entry(band).or_default() += n;
+        }
+        if let Some(band) = sym.strip_prefix("s:").filter(|b| *b != "-") {
+            *entry.syms.entry(band).or_default() += n;
+        }
+    }
+    let mut top: Vec<(&str, Reuse<'_>)> = pairs.into_iter().collect();
+    top.sort_by(|a, b| b.1.calls.cmp(&a.1.calls).then(a.0.cmp(b.0)));
+    top.into_iter()
+        .take(TOP_EDGES)
+        .map(|(pair, reuse)| {
+            let pair = pair.replace('>', " → ");
+            let n = reuse.calls;
+            let files = split(&reuse.files, &FILE_BANDS);
+            let syms = split(&reuse.syms, &SYM_BANDS);
+            crate::tf!(
+                "  {pair}: {n} (file from previous output: {files} · symbol: {syms})\n",
+                "  {pair}: {n} (fájl az előző kimenetből: {files} · szimbólum: {syms})\n"
+            )
+        })
+        .collect()
+}
+
+/// `hit1 10, hit5 3, miss 2` a sávok sorrendjében (üresen `-`).
+fn split(counts: &BTreeMap<&str, u64>, bands: &[&str]) -> String {
+    let parts: Vec<String> = bands
+        .iter()
+        .filter_map(|band| counts.get(band).map(|n| format!("{band} {n}")))
+        .collect();
+    if parts.is_empty() {
+        "-".to_owned()
+    } else {
+        parts.join(", ")
+    }
 }
 
 /// Egy esemény egy sorban.
@@ -249,7 +317,7 @@ fn event_row(line: &EventLine) -> String {
             .to_owned(),
     };
     format!(
-        "{}  s{}#{:<3} {:<4} {:<15} {:<11} {:>6}  {:<7} {:<5} {:<7} {:<13} {}\n",
+        "{}  s{}#{:<3} {:<4} {:<15} {:<11} {:>6}  {:<7} {:<5} {:<7} {:<13} {:<4} use f:{} s:{}\n",
         line.t0,
         line.sess,
         line.seq,
@@ -261,6 +329,8 @@ fn event_row(line: &EventLine) -> String {
         dash(&line.lang),
         dash(&line.input),
         line.rel.name(),
-        dash(&line.rep)
+        dash(&line.rep),
+        line.use_file,
+        line.use_sym
     )
 }

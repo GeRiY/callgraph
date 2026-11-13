@@ -425,7 +425,8 @@ a `CALLGRAPH_RECOMMEND=0` mindet elhallgattatja; CI-ban soha. Eltávolítás: `c
 A callgraph a gépeden egy kis használati összesítőt vezet: melyik parancs vagy MCP-eszköz hányszor futott, volt-e
 hiba, és sávokban mennyi ideig tartott és mekkora volt a kimenete. Az MCP-n futó `locate`-nél azt is, hogy az agent
 utána az első találatot nyitotta-e meg; naponként azt is, melyik parancs után melyik jött (a szünettel, és hogy
-ugyanarra a fájlra, mappára vagy projektre vonatkozott-e), a munkamenet-hossz sávjait, és a célfájl nyelvét és
+ugyanarra a fájlra, mappára vagy projektre vonatkozott-e, és hogy a következő hívás fájlja / szimbóluma benne volt-e
+az előző hívás kimenetében — csak a hely sávja), a munkamenet-hossz sávjait, és a célfájl nyelvét és
 méretsávját. A `stats --events` a helyi, hívásonkénti naplót mutatja (14 napig marad, soha nem megy el, és ebben sincs
 név). Utat, fájl- és szimbólumnevet, keresési kifejezést, projektnevet és
 hibaszöveget soha nem rögzít, és **semmit nem küld el**, hacsak be nem kapcsolod a beküldést (lent). Megtekintés:

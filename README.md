@@ -424,7 +424,8 @@ Remove: `callgraph.sh hook uninstall`.
 callgraph keeps a small usage summary on your computer: how often each command or MCP tool ran, whether it
 failed, and how long it took and how big its output was, in ranges. For `locate` over MCP it also notes whether the
 file the agent opened next was the first result, and per day which command followed which (with the gap and whether
-the target was the same file, folder or project), session-length bands, and the target file's language and size band.
+the target was the same file, folder or project, and whether the next call's file / symbol appeared in the previous
+call's output — only its position band), session-length bands, and the target file's language and size band.
 `stats --events` shows the local per-call log (kept 14 days, never sent; it also has no names). It never records paths, file or symbol names, search terms,
 project names or error texts, and **nothing is sent** unless you turn sending on (below). See it with
 `bash ~/.claude/skills/callgraph/callgraph.sh stats [--days N]` (last 7 days by default). The data lives in

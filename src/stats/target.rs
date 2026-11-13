@@ -8,15 +8,20 @@ use std::path::{Path, PathBuf};
 use super::buckets::InputBucket;
 use super::event::{CommandKind, Event};
 use super::hmac::keyed_hex;
+use super::reuse::{OutputItems, query_symbols, single_identifier};
 
 /// Egy befejezett, mért hívás a rögzítéshez (`StatsStore::record_call`): a sávos esemény, a vége (Unix-ms), a
-/// futási idő (ms) és a cél (csak a memóriában).
+/// futási idő (ms), és csak a memóriában a cél, a kért szimbólumok és a kimenet elemei (`reuse.rs`).
 #[derive(Debug, Clone)]
 pub(crate) struct Call {
     pub(crate) event: Event,
     pub(crate) end_ms: u64,
     pub(crate) ms: u64,
     pub(crate) target: Option<Target>,
+    /// A hívás által kért szimbólum(ok) azonosítói (metódus, `--grep`-minta…; üres = nincs).
+    pub(crate) symbols: Vec<String>,
+    /// A kimenet elemei (`None` = nem volt kimenet).
+    pub(crate) output: Option<OutputItems>,
 }
 
 /// Egy hívás célja (a nyers, kanonikus utakkal; nem tárolódik).
@@ -207,6 +212,62 @@ pub(crate) fn cli_target(command: CommandKind, args: &[String], cwd: &Path) -> O
     candidates
         .iter()
         .find_map(|c| Target::from_path(&base.join(c), project.clone()))
+}
+
+/// A CLI-hívás által kért szimbólumok azonosítói a nyers argumentumokból (csak a memóriában): a `fájl::metódus` /
+/// `Osztály::metódus` utótag, a `--grep` és a `callers` mintája, és a `--const` értéke, ha egyetlen azonosító (a
+/// `--strings` és a `--notes` szabad szöveg, nem számít). A `locate`, `next` és `project` parancsnál nincs.
+pub(crate) fn cli_symbols(command: CommandKind, args: &[String]) -> Vec<String> {
+    if matches!(
+        command,
+        CommandKind::Locate | CommandKind::Next | CommandKind::Projects
+    ) {
+        return Vec::new();
+    }
+    let mut texts: Vec<String> = Vec::new();
+    // `callers <minta>`: az első argumentum a parancs neve után
+    if command == CommandKind::Callers
+        && let Some(pattern) = args.get(1).filter(|a| !a.starts_with('-'))
+    {
+        texts.push(pattern.clone());
+    }
+    let mut i = usize::from(command != CommandKind::Other);
+    while i < args.len() {
+        let arg = args[i].as_str();
+        i += 1;
+        match arg {
+            "--grep" | "--const" => {
+                if let Some(value) = args.get(i) {
+                    symbol_flag(arg, value, &mut texts);
+                }
+                i += 1;
+            }
+            "--project" | "--label" | "--cache" | "--lang" | "--format" | "--strings"
+            | "--notes" | "--category" | "--depth" | "--lines" => i += 1,
+            _ => {
+                if let Some((flag, value)) = arg
+                    .split_once('=')
+                    .filter(|(flag, _)| matches!(*flag, "--grep" | "--const"))
+                {
+                    symbol_flag(flag, value, &mut texts);
+                } else if !arg.starts_with('-')
+                    && let Some((_, symbol)) = arg.split_once("::")
+                {
+                    texts.push(symbol.to_owned());
+                }
+            }
+        }
+    }
+    query_symbols(&texts.join(" "))
+}
+
+/// Egy szimbólumot hordozó kapcsoló értéke: a `--grep` mintájának azonosítói, a `--const` csak egyetlen azonosítóként.
+fn symbol_flag(flag: &str, value: &str, texts: &mut Vec<String>) {
+    if flag == "--grep" {
+        texts.push(value.to_owned());
+    } else if let Some(word) = single_identifier(value) {
+        texts.push(word);
+    }
 }
 
 /// Egy `--flag érték` vagy `--flag=érték` alakú kapcsoló értéke.

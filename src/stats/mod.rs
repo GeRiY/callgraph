@@ -17,7 +17,9 @@
 //! CSAK helyben, soha nem megy el: az eseménynapló (`events/YYYY-MM-DD.jsonl`, 14 nap, `events.rs`: hívásonként
 //! egy sor, nevek nélkül) és a munkamenet-állapot (`session.json`, `session.rs`). Utakból származó adat egyedül
 //! az utóbbiban van: kulcsolt hash (HMAC-SHA256 egy telepítésenkénti véletlen kulccsal, ami szintén nem hagyja el a
-//! gépet), kizárólag a `rel` / `rep` jelzők kiszámításához.
+//! gépet), kizárólag a `rel` / `rep` jelzők kiszámításához; ugyanígy az utolsó hívás kimenetének elemei (fájl-utak,
+//! azonosítók) rövidített kulcsolt hash-ként, kizárólag a `use_file` / `use_sym` sávokhoz (`reuse.rs`: a következő
+//! hívás célja benne volt-e az előző kimenetben). A napi összesítőbe ebből csak a sáv kerül (`uses`).
 
 mod buckets;
 mod cli_probe;
@@ -29,6 +31,7 @@ mod locate_hits;
 mod mcp_probe;
 mod policy;
 mod report;
+mod reuse;
 mod session;
 mod store;
 mod target;
@@ -36,6 +39,8 @@ pub(crate) mod telemetry;
 
 #[cfg(test)]
 mod flow_tests;
+#[cfg(test)]
+mod reuse_tests;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
@@ -48,6 +53,7 @@ pub(crate) use event::{CommandKind, truncated};
 pub(crate) use mcp_probe::{McpStats, ToolCall};
 pub(crate) use policy::StatsEnv;
 pub(crate) use report::{render, render_events};
+pub(crate) use reuse::single_identifier;
 pub(crate) use store::StatsStore;
 
 use buckets::RankBucket;

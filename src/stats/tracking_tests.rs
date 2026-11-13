@@ -11,6 +11,7 @@ use super::day::Day;
 use super::event::{Client, CommandKind, ErrorKind, truncated};
 use super::locate_hits::{LocateHits, WINDOW, ranked_files};
 use super::mcp_probe::{McpStats, ToolCall};
+use super::reuse::USE_BANDS;
 use super::session::{GAP_BANDS, REP_LABELS, Rel};
 use super::store::MonthFile;
 use super::target::LANGUAGES;
@@ -171,6 +172,7 @@ fn the_day_file_holds_no_paths_or_names() {
         started: Instant::now(),
         project: Some("SecretShop"),
         path,
+        symbol: Some("processRefund"),
         invalid: false,
     };
     stats.tool_call(&call(CommandKind::Locate, None), &Ok(locate_output.into()));
@@ -222,7 +224,10 @@ fn the_day_file_holds_no_paths_or_names() {
     collect_strings(&value, &mut strings);
     for s in &strings {
         assert!(
-            known.contains(&s.as_str()) || Day::parse(s).is_some() || is_edge_key(s),
+            known.contains(&s.as_str())
+                || Day::parse(s).is_some()
+                || is_edge_key(s)
+                || is_use_key(s),
             "unexpected text in the day file: {s}"
         );
     }
@@ -234,6 +239,21 @@ fn the_day_file_holds_no_paths_or_names() {
         .flat_map(|day| day.as_object().unwrap().keys())
         .collect();
     assert_eq!(edges.len(), 4, "{edges:?}");
+    // az előző kimenet felhasználása: a munkamenet első hívása nem számít, a többi csak sávnevekkel
+    let uses: Vec<&String> = value["uses"]
+        .as_object()
+        .unwrap()
+        .values()
+        .flat_map(|day| day.as_object().unwrap().keys())
+        .collect();
+    assert_eq!(uses.len(), 3, "{uses:?}");
+    for key in [
+        "locate>outline|f:hit1|s:hit",
+        "outline>method_body|f:miss|s:hit",
+        "method_body!>find_callers|f:-|s:-",
+    ] {
+        assert!(uses.iter().any(|k| *k == key), "{key}: {uses:?}");
+    }
     // a helyi eseménynapló: ugyanaz a szótár, út és név nélkül
     let events_dir = dir.join("events");
     let logs: Vec<PathBuf> = std::fs::read_dir(&events_dir)
@@ -302,11 +322,14 @@ pub(super) fn known_words() -> Vec<&'static str> {
             "len",
             "dur",
             "rep_max",
+            "uses",
         ])
         // az eseménynapló mezői és sávjai
         .chain([
             "t0", "ms", "cmd", "via", "ok", "err", "in", "out", "rel", "rep", "sess", "seq",
+            "use_file", "use_sym",
         ])
+        .chain(USE_BANDS)
         .chain(InputBucket::LABELS)
         .chain(SizeBucket::LABELS)
         .chain(REP_LABELS)
@@ -335,6 +358,31 @@ pub(super) fn is_edge_key(key: &str) -> bool {
         && (to == "end" || names.contains(&to))
         && Rel::ALL.iter().any(|r| r.name() == rel)
         && GAP_BANDS.contains(&gap)
+}
+
+/// Egy újrahasznosítás-kulcs a rögzített szerkezetben: `{előző}[!]>{ez}|f:{sáv}|s:{sáv}` vagy `other`.
+pub(super) fn is_use_key(key: &str) -> bool {
+    if key == "other" {
+        return true;
+    }
+    let mut parts = key.split('|');
+    let (Some(pair), Some(file), Some(sym), None) =
+        (parts.next(), parts.next(), parts.next(), parts.next())
+    else {
+        return false;
+    };
+    let Some((from, to)) = pair.split_once('>') else {
+        return false;
+    };
+    let names: Vec<&str> = CommandKind::ALL.iter().map(|c| c.name()).collect();
+    let from = from.strip_suffix('!').unwrap_or(from);
+    let file_ok = file
+        .strip_prefix("f:")
+        .is_some_and(|b| USE_BANDS.contains(&b));
+    let sym_ok = sym
+        .strip_prefix("s:")
+        .is_some_and(|b| ["hit", "miss", "-"].contains(&b));
+    names.contains(&from) && names.contains(&to) && file_ok && sym_ok
 }
 
 fn collect_strings(value: &serde_json::Value, out: &mut Vec<String>) {

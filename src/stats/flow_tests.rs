@@ -293,6 +293,8 @@ fn event_files_older_than_14_days_are_pruned() {
         rep: None,
         sess: 1,
         seq: 1,
+        use_file: "-".into(),
+        use_sym: "-".into(),
     };
     events::append(&dir, today, &line);
     assert!(!events_dir.join("2026-11-01.jsonl").exists());
@@ -381,6 +383,8 @@ fn call(command: CommandKind, end_ms: u64, ms: u64, target: Option<Target>, ok: 
         end_ms,
         ms,
         target,
+        symbols: Vec::new(),
+        output: None,
     }
 }
 

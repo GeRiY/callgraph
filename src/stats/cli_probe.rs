@@ -1,7 +1,8 @@
 //! A CLI-mérés: a `main.rs` egyetlen helyen indítja (`CliProbe::start`) és zárja (`finish`); a kimenetet egy
-//! számláló író (`Meter`) adja tovább, amely csak a karakterszámot és az első néhány száz bájtot (a levágás-
-//! figyelmeztetéshez) tartja meg. A háttérben indított gyerekfolyamatok (`CLIENT_ENV`) a hook frissítései
-//! kivételével nem mérnek; a `callgraph mcp` és a `callgraph stats` sem (az MCP-hívásokat a szerver méri).
+//! számláló író (`Meter`) adja tovább, amely csak a karakterszámot és a kimenet első legfeljebb 64 KiB-ját tartja
+//! meg (az eleje a levágás-figyelmeztetéshez, az egész minta az előző kimenet elemeihez, `reuse.rs`; csak a
+//! memóriában). A háttérben indított gyerekfolyamatok (`CLIENT_ENV`) a hook frissítései kivételével nem mérnek; a
+//! `callgraph mcp` és a `callgraph stats` sem (az MCP-hívásokat a szerver méri).
 
 use std::io::Write;
 use std::sync::Mutex;
@@ -11,7 +12,8 @@ use super::Recorder;
 use super::buckets::{LatencyBucket, SizeBucket};
 use super::event::{Client, CommandKind, ErrorKind, Event, Outcome, truncated};
 use super::events::now_ms;
-use super::target::{Call, cli_target};
+use super::reuse::{OutputItems, SAMPLE_BYTES};
+use super::target::{Call, cli_symbols, cli_target};
 use crate::error::{CallgraphError, Result};
 use crate::skill::SkillHome;
 
@@ -85,7 +87,7 @@ impl CliProbe {
 
     /// Az argumentumok hibásak voltak (a parancs el sem indult).
     pub fn failed(self, error: &CallgraphError) {
-        self.record(Outcome::Error(ErrorKind::of(error)), 0, false);
+        self.record(Outcome::Error(ErrorKind::of(error)), 0, false, None);
     }
 
     /// A futás vége: az eredmény, a kimenet mérete, és nem nulla kilépési kódnál a hibacsatorna eleje (csak a
@@ -105,10 +107,18 @@ impl CliProbe {
             Err(error) => Outcome::Error(ErrorKind::of(error)),
         };
         let head = String::from_utf8_lossy(out.head());
-        self.record(outcome, out.chars(), truncated(&head));
+        let cut = truncated(&head);
+        // az előző-kimenet összevetéshez csak sikeres futás mintája kell (a hibás futás után a következő `-`)
+        let output = match outcome {
+            Outcome::Ok if self.recorder.enabled() => {
+                OutputItems::from_text(&String::from_utf8_lossy(out.sample()))
+            }
+            _ => None,
+        };
+        self.record(outcome, out.chars(), cut, output);
     }
 
-    fn record(self, outcome: Outcome, chars: usize, truncated: bool) {
+    fn record(self, outcome: Outcome, chars: usize, truncated: bool, output: Option<OutputItems>) {
         let Some((command, client)) = self.target else {
             return;
         };
@@ -140,6 +150,8 @@ impl CliProbe {
             end_ms: now_ms(),
             ms: u64::try_from(elapsed).unwrap_or(u64::MAX),
             target: cli_target(command, &self.args, &cwd),
+            symbols: cli_symbols(command, &self.args),
+            output,
         });
         // opt-in beküldés a normál futásokra ráülve (bekapcsolva és esedékesen: leválasztott háttérfolyamat)
         telemetry.maybe_spawn(super::telemetry::now_secs());
@@ -169,11 +181,12 @@ pub(crate) fn classify(args: &[String], client: Option<&str>) -> Option<(Command
     Some((command, client))
 }
 
-/// Számláló író: továbbad, és megjegyzi a karakterszámot (UTF-8) meg az első `HEAD_BYTES` bájtot.
+/// Számláló író: továbbad, és megjegyzi a karakterszámot (UTF-8) meg az első `SAMPLE_BYTES` bájtot (ennek eleje a
+/// `head`).
 pub struct Meter<W> {
     inner: W,
     chars: usize,
-    head: Vec<u8>,
+    sample: Vec<u8>,
 }
 
 impl<W: Write> Meter<W> {
@@ -181,7 +194,7 @@ impl<W: Write> Meter<W> {
         Self {
             inner,
             chars: 0,
-            head: Vec::new(),
+            sample: Vec::new(),
         }
     }
 
@@ -192,7 +205,12 @@ impl<W: Write> Meter<W> {
 
     /// A kimenet első (legfeljebb `HEAD_BYTES`) bájtja.
     pub(crate) fn head(&self) -> &[u8] {
-        &self.head
+        &self.sample[..self.sample.len().min(HEAD_BYTES)]
+    }
+
+    /// A kimenet első (legfeljebb `SAMPLE_BYTES`) bájtja.
+    pub(crate) fn sample(&self) -> &[u8] {
+        &self.sample
     }
 }
 
@@ -202,8 +220,8 @@ impl<W: Write> Write for Meter<W> {
         let written = &buf[..n];
         // a UTF-8 folytató bájtok (10xxxxxx) nem új karakterek
         self.chars += written.iter().filter(|b| (**b & 0xC0) != 0x80).count();
-        let room = HEAD_BYTES.saturating_sub(self.head.len());
-        self.head
+        let room = SAMPLE_BYTES.saturating_sub(self.sample.len());
+        self.sample
             .extend_from_slice(&written[..room.min(written.len())]);
         Ok(n)
     }

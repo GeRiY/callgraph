@@ -179,6 +179,31 @@ impl ShowQuery {
         &self.path
     }
 
+    /// A kért szimbólum(ok) szövege a helyi használati méréshez (`stats::ToolCall::symbol`, csak a memóriában): a
+    /// metódusnevek, a hívó-minta (`--grep`), és a string- / konstans-keresés szövege, ha egyetlen azonosító. A
+    /// `locate` kifejezései nem számítanak.
+    pub(crate) fn symbol(&self) -> Option<String> {
+        if self.command == Subcommand::Locate {
+            return None;
+        }
+        if !self.methods.is_empty() {
+            return Some(self.methods.join(" "));
+        }
+        let value = |flag: &str| {
+            self.flags
+                .iter()
+                .position(|f| f == flag)
+                .and_then(|i| self.flags.get(i + 1))
+        };
+        if let Some(pattern) = value("--grep") {
+            return Some(pattern.clone());
+        }
+        ["--const", "--strings"]
+            .into_iter()
+            .find_map(value)
+            .and_then(|text| crate::stats::single_identifier(text.as_str()))
+    }
+
     /// A parancs eleje: a parancs neve és a feloldott gyökér (a `show`-nál a kimenet címkéje is).
     pub(crate) fn head(&self, root: &ProjectRoot) -> Vec<String> {
         let mut args = vec![
@@ -438,6 +463,60 @@ mod tests {
         assert_eq!(show.head(&root())[0], "show");
         assert!(show.head(&root()).contains(&"--label".to_owned()));
         assert!(ShowQuery::locate(LocateParams::default()).is_err());
+    }
+
+    /// A használati mérés szimbóluma: metódusnevek, hívó-minta, egyetlen azonosítós keresés; a `locate`, a
+    /// szabad szöveges keresés és a jegyzet-minta nem.
+    #[test]
+    fn the_symbol_names_methods_patterns_and_single_identifiers() {
+        let body = ShowQuery::method_body(MethodBodyParams {
+            path: "app/Order.php".into(),
+            method: OneOrMany::Many(s(&["cancel", "refund"])),
+            ..MethodBodyParams::default()
+        })
+        .unwrap();
+        assert_eq!(body.symbol().as_deref(), Some("cancel refund"));
+        let callers = ShowQuery::find_callers(FindCallersParams {
+            pattern: "Order::cancel".into(),
+            ..FindCallersParams::default()
+        })
+        .unwrap();
+        assert_eq!(callers.symbol().as_deref(), Some("Order::cancel"));
+        let search = |kind, pattern: &str| {
+            ShowQuery::search(SearchParams {
+                kind,
+                pattern: pattern.into(),
+                path: None,
+                project: None,
+                layer: None,
+                full: false,
+            })
+            .unwrap()
+            .symbol()
+        };
+        assert_eq!(
+            search(SearchKind::Constants, "STATUS_ACTIVE").as_deref(),
+            Some("STATUS_ACTIVE")
+        );
+        assert_eq!(search(SearchKind::Strings, "Order not found"), None);
+        let outline = ShowQuery::outline(OutlineParams {
+            path: "app".into(),
+            ..OutlineParams::default()
+        })
+        .unwrap();
+        assert_eq!(outline.symbol(), None);
+        let notes = ShowQuery::notes(NotesParams {
+            pattern: Some("refund".into()),
+            ..NotesParams::default()
+        })
+        .unwrap();
+        assert_eq!(notes.symbol(), None);
+        let locate = ShowQuery::locate(LocateParams {
+            terms: OneOrMany::One("--grep".into()),
+            ..LocateParams::default()
+        })
+        .unwrap();
+        assert_eq!(locate.symbol(), None);
     }
 
     #[test]

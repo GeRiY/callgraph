@@ -111,6 +111,8 @@ fn records_cli_runs_and_reports_them() {
     // a parancs-sorrend is rögzült: a `show` után a hibás `show`, utána a `locate`
     assert!(text.contains("\"edges\""), "{text}");
     assert!(text.contains("show!>locate|"), "{text}");
+    // az előző kimenet felhasználása: csak sávok (a hiányzó fájlnak nincs célja: `-`)
+    assert!(text.contains("\"show>show|f:-|s:-\""), "{text}");
     // a helyi eseménynapló: hívásonként egy sor, út és név nélkül; a munkamenet-állapotban csak hash-ek
     let log_dir = stats.join("events");
     let logs: Vec<_> = std::fs::read_dir(&log_dir).unwrap().collect();
@@ -123,6 +125,7 @@ fn records_cli_runs_and_reports_them() {
         assert!(!session.contains(secret), "{secret}: {session}");
     }
     assert!(log.contains("\"lang\":\"php\""), "{log}");
+    assert!(log.contains("\"use_file\":\"-\""), "{log}");
     let events = run(&root, &skill, dir, &["stats", "--events"]);
     assert!(events.status.success(), "{events:?}");
     let events = String::from_utf8_lossy(&events.stdout);

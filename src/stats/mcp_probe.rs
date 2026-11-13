@@ -11,11 +11,12 @@ use super::buckets::{LatencyBucket, SizeBucket};
 use super::event::{Client, CommandKind, ErrorKind, Event, Outcome, truncated};
 use super::events::now_ms;
 use super::locate_hits::{LocateHits, ranked_files};
+use super::reuse::{OutputItems, query_symbols};
 use super::target::{Call, Target};
 use crate::skill::SkillHome;
 
-/// Egy befejezett eszköz-hívás adatai. A `project` és az `opened` csak a memóriában élő `locate`-követéshez kell,
-/// nem tárolódik.
+/// Egy befejezett eszköz-hívás adatai. A `project`, a `path` és a `symbol` csak a memóriában él (a `locate`-követés
+/// és az előző-kimenet összevetés), nem tárolódik.
 pub(crate) struct ToolCall<'a> {
     pub(crate) tool: CommandKind,
     pub(crate) started: Instant,
@@ -23,6 +24,9 @@ pub(crate) struct ToolCall<'a> {
     pub(crate) project: Option<&'a str>,
     /// A hívás célja (fájl vagy mappa), ha van.
     pub(crate) path: Option<&'a str>,
+    /// A kért szimbólum(ok) szövege (metódusnév, hívó-minta, egyetlen azonosítós keresés), ha van; csak az
+    /// előző-kimenet összevetéshez (`reuse.rs`), nem tárolódik.
+    pub(crate) symbol: Option<&'a str>,
     /// A paraméterek már a lekérdezés előtt hibásak voltak.
     pub(crate) invalid: bool,
 }
@@ -105,6 +109,12 @@ impl McpStats {
             end_ms: now_ms(),
             ms: u64::try_from(elapsed).unwrap_or(u64::MAX),
             target: self.target(call),
+            symbols: call.symbol.map(query_symbols).unwrap_or_default(),
+            output: result
+                .as_ref()
+                .ok()
+                .map(String::as_str)
+                .and_then(OutputItems::from_text),
         });
         let hit = {
             let mut hits = self.hits.lock().unwrap_or_else(|e| e.into_inner());

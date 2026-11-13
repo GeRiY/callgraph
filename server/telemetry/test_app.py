@@ -337,6 +337,24 @@ class SchemaTwo(unittest.TestCase):
         v1["days"][0]["edges"] = {"start>locate|none|-": 1}
         self.assertEqual(self.post(v1), 422)  # schema 1 cannot carry edges
 
+    def test_uses_are_stored_and_validated(self):
+        con = sqlite3.connect(app.DB_PATH); con.execute("DELETE FROM uses"); con.commit(); con.close()
+        body = self.v2("eeee-1")
+        body["days"][0]["uses"] = {"locate>outline|f:hit1|s:-": 5, "outline>method_body|f:hit|s:hit": 2,
+                                   "search!>show|f:miss|s:miss": 1, "other": 3}
+        self.assertEqual(self.post(body), 204)
+        self.assertEqual(self.post(body), 204)  # same batch: no doubling
+        rows = dict(((a, b, e, f, s), n) for a, b, e, f, s, n in
+                    self.q("SELECT src, dst, err, f, s, count FROM uses"))
+        self.assertEqual(rows[("locate", "outline", 0, "hit1", "-")], 5)
+        self.assertEqual(rows[("search", "show", 1, "miss", "miss")], 1)
+        self.assertEqual(rows[("other", "other", 0, "-", "-")], 3)
+        for bad in [{"locate>outline|f:top|s:-": 1}, {"locate>outline|f:hit1": 1},
+                    {"locate>/etc/passwd|f:hit1|s:-": 1}, {"start>locate|f:-|s:-": 1},
+                    {"locate>outline|f:hit1|s:hit1": 1}]:
+            b = self.v2("eeee-2"); b["days"][0]["uses"] = bad
+            self.assertEqual(self.post(b), 422, bad)
+
     def test_schema_one_still_accepted(self):
         self.assertEqual(self.post(payload(batch="dddd-0001")), 204)
 

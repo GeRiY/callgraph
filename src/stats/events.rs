@@ -1,7 +1,8 @@
 //! A helyi eseménynapló: `<stats>/events/YYYY-MM-DD.jsonl` (UTC-nap), mért hívásonként egy JSON-sor. CSAK helyi, a
 //! beküldés soha nem olvassa. Egy sor csak rögzített neveket, sávokat, időt és sorszámot tartalmaz: út, fájl-,
 //! szimbólum- vagy projektnév, keresési kifejezés, hibaüzenet és ezek hash-e nincs benne (a `rel` / `rep` jelzők a
-//! munkamenet-állapotból jönnek, `session.rs`). 14 napig marad: egy új nap első sorának írásakor a régebbi
+//! munkamenet-állapotból jönnek, `session.rs`; a `use_file` / `use_sym` csak a sáv, hogy a cél benne volt-e az előző
+//! kimenetben, `reuse.rs`). 14 napig marad: egy új nap első sorának írásakor a régebbi
 //! napi fájlok törlődnek.
 
 use std::io::Write;
@@ -41,6 +42,17 @@ pub(crate) struct EventLine {
     pub(crate) rep: Option<String>,
     pub(crate) sess: u64,
     pub(crate) seq: u64,
+    /// A célfájl az előző hívás kimenetében: `hit1` / `hit5` / `hit` / `miss` / `-` (`reuse.rs`).
+    #[serde(default = "dash")]
+    pub(crate) use_file: String,
+    /// A kért szimbólum az előző hívás kimenetében: `hit` / `miss` / `-`.
+    #[serde(default = "dash")]
+    pub(crate) use_sym: String,
+}
+
+/// A hiányzó sáv (a régebbi sorokban nincs `use_file` / `use_sym`).
+fn dash() -> String {
+    "-".to_owned()
 }
 
 /// Unix-ms → `YYYY-MM-DDTHH:MM:SS.mmmZ`.

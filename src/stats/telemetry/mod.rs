@@ -275,8 +275,8 @@ impl Telemetry {
 /// Az egyszeri tájékoztatás szövege (`Telemetry::order_notice`).
 pub(crate) fn order_notice_text() -> String {
     crate::t!(
-        "ℹ callgraph telemetry now also sends daily command-order counts (which command followed which, timing bands — no names or paths). Preview: callgraph.sh telemetry preview · off: callgraph.sh telemetry off",
-        "ℹ a callgraph telemetria mostantól a parancsok sorrendjének napi számait is küldi (melyik parancs után melyik jött, időzítési sávok — név és útvonal nélkül). Előnézet: callgraph.sh telemetry preview · kikapcsolás: callgraph.sh telemetry off"
+        "ℹ callgraph telemetry now also sends daily command-order counts (which command followed which, timing bands, whether the next file / symbol was in the previous output — no names or paths). Preview: callgraph.sh telemetry preview · off: callgraph.sh telemetry off",
+        "ℹ a callgraph telemetria mostantól a parancsok sorrendjének napi számait is küldi (melyik parancs után melyik jött, időzítési sávok, benne volt-e a következő fájl / szimbólum az előző kimenetben — név és útvonal nélkül). Előnézet: callgraph.sh telemetry preview · kikapcsolás: callgraph.sh telemetry off"
     )
     .to_owned()
 }

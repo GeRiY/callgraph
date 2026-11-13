@@ -5,7 +5,9 @@
 //!
 //! A 2-es séma naponként a parancs-sorrend számait is hordozza: `edges` (`{előző}[!]>{ez}|{rel}|{szünet}` → darab;
 //! csak parancsnevek, a cél-viszony neve és sávok) és `sessions` (a lezárt munkamenetek hossz-, időtartam- és
-//! ismétlés-sávjai). A helyi eseménynapló és a munkamenet-állapot (a kulcsolt hash-ekkel) SOHA nem megy el.
+//! ismétlés-sávjai), és `uses` (`{előző}[!]>{ez}|f:{sáv}|s:{sáv}` → darab: a következő hívás célfájlja / szimbóluma
+//! benne volt-e az előző kimenetben, és a fájl hányadikként; csak sávnevek). A helyi eseménynapló és a
+//! munkamenet-állapot (a kulcsolt hash-ekkel) SOHA nem megy el.
 
 use std::collections::BTreeMap;
 
@@ -43,6 +45,9 @@ pub(crate) struct DayEntry {
     /// A lezárt munkamenetek sávjai.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sessions: Option<Sessions>,
+    /// Az előző kimenet felhasználása (`{előző}[!]>{ez}|f:{sáv}|s:{sáv}`) → darab.
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub uses: BTreeMap<String, u64>,
 }
 
 /// A beküldésre váró lezárt napok (régebbi elöl): a `today` előtti legfeljebb 7 nap, az utolsó beküldött nap után,
@@ -73,6 +78,7 @@ pub(crate) fn build(store: &StatsStore, days: &[Day]) -> Payload {
                     commands: store.day_counters(*day),
                     edges,
                     sessions,
+                    uses: store.day_uses(*day),
                 }
             })
             .collect(),

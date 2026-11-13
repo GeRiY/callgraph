@@ -9,14 +9,22 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 ### Új
 
 - **Helyi parancsnapló**: a `callgraph stats --events [--days N]` kilistázza a legutóbbi hívásaidat (parancs, kliens,
-  eredmény, idő- és méretsáv, hogyan viszonyul az előző híváshoz) és a leggyakoribb parancs-átmeneteket. A napló ezen a
-  gépen marad (14 nap), és nincs benne név, útvonal vagy kód.
+  eredmény, idő- és méretsáv, hogyan viszonyul az előző híváshoz, és benne volt-e a fájlja / szimbóluma az előző hívás
+  kimenetében) és a leggyakoribb parancs-átmeneteket. Az „az előző kimenet felhasználása” összesítő átmenetenként
+  mutatja, hányszor volt a következő hívás fájlja az első felsorolt fájl (`hit1`), a 2.–5. (`hit5`), egy későbbi
+  (`hit`), vagy nem volt benne (`miss`), és benne volt-e a szimbóluma (`hit` / `miss`). A napló ezen a gépen marad
+  (14 nap), és nincs benne név, útvonal vagy kód; az ellenőrzéshez csak az utolsó hívás kimenetének elemei maradnak meg,
+  kulcsolt hash-ként a helyi `session.json`-ban, minden hívásnál felülírva, és soha nem mennek el. Kikapcsolás:
+  `CALLGRAPH_STATS=0`.
 
 ### Változás
 
 - **Opt-in telemetria (schema 2)**: ha bekapcsoltad a telemetriát, a napi számokban mostantól a parancsok sorrendjének
-  számai (melyik után melyik jött, időzítési sávok) és a munkamenet-hossz sávjai is benne vannak — név, útvonal és kód
-  továbbra sem. Egyszer szólunk róla; a `callgraph.sh telemetry preview` pontosan megmutatja, mi menne el.
+  számai (melyik után melyik jött, mennyi idő telt el köztük, ugyanarra a fájlra, mappára vagy projektre irányult-e),
+  a munkamenet-hossz sávjai, a célfájl nyelve és méretsávja, valamint parancs-átmenetenként az előző kimenet
+  felhasználásának sávjai (`hit1` / `hit5` / `hit` / `miss`, szimbólumnál `hit` / `miss`) is benne vannak — név,
+  útvonal, kód és hash továbbra sem. Egyszer szólunk róla; a `callgraph.sh telemetry preview` pontosan megmutatja, mi
+  menne el.
 - Az indításkori ellenőrzés legfeljebb 10-szer (2 naponta) javasolja a használati számok megosztását, nemleges válasz
   után soha.
 

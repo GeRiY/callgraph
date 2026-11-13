@@ -6,7 +6,8 @@
 //!
 //! Naponként a parancsok mellett az átmenet-élek (`edges`: melyik parancs után melyik jött, a viszony és a szünet
 //! sávja; `session.rs`) és a lezárt munkamenetek sávjai (`sessions`) is itt vannak — ezek is csak rögzített nevek
-//! és sávok. Egy mért hívás (`record_call`) a munkamenet-állapotot (`session.json`) és a helyi eseménynaplót
+//! és sávok; az `uses` pedig hogy a következő hívás célja benne volt-e az előző kimenetben (csak sávok,
+//! `reuse.rs`). Egy mért hívás (`record_call`) a munkamenet-állapotot (`session.json`) és a helyi eseménynaplót
 //! (`events/`) is lépteti, ugyanazon zár alatt.
 
 use std::collections::BTreeMap;
@@ -19,6 +20,7 @@ use super::buckets::{InputBucket, LatencyBucket, RankBucket, SizeBucket};
 use super::day::Day;
 use super::event::{Client, CommandKind, ErrorKind, Event, Outcome};
 use super::events::{EventLine, append as append_event, rfc3339_ms};
+use super::reuse::{self, use_key};
 use super::session::{SESSION_FILE, SessionState, Sessions, Visit, add_edge, rep_band};
 use super::target::Call;
 
@@ -157,6 +159,10 @@ pub(crate) struct MonthFile {
     /// Nap → a lezárt munkamenetek sávjai (az utolsó hívásuk napjára számítva).
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     pub(crate) sessions: BTreeMap<Day, Sessions>,
+    /// Nap → az előző kimenet újrahasznosításának kulcsa (`{előző}[!]>{ez}|f:{sáv}|s:{sáv}`, `reuse.rs`) → darab; a
+    /// munkamenet első hívása nem számít; legfeljebb 500 kulcs naponként, a többi `other`.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub(crate) uses: BTreeMap<Day, BTreeMap<String, u64>>,
 }
 
 impl Default for MonthFile {
@@ -166,6 +172,7 @@ impl Default for MonthFile {
             days: BTreeMap::new(),
             edges: BTreeMap::new(),
             sessions: BTreeMap::new(),
+            uses: BTreeMap::new(),
         }
     }
 }
@@ -303,7 +310,14 @@ impl StatsStore {
             failed: error.is_some(),
             keys,
         });
+        // az előző kimenet elemeivel való összevetés, mielőtt ennek a hívásnak az elemei a helyére kerülnek
+        let uses = reuse::step(&mut state, &key, call);
         let _ = write_atomic(&session_path, &state.to_json());
+        let use_edge = step
+            .from
+            .as_deref()
+            .filter(|_| call.event.client != Client::Hook)
+            .map(|from| use_key(from, call.event.command, uses));
         let target = call.target.as_ref();
         append_event(
             &self.dir,
@@ -322,6 +336,8 @@ impl StatsStore {
                 rep: step.rep.map(|n| rep_band(n).to_owned()),
                 sess: step.sess,
                 seq: step.seq,
+                use_file: uses.file.name().to_owned(),
+                use_sym: uses.sym.name().to_owned(),
             },
         );
         // a lezárult munkamenet az utolsó hívásának napjára számít (csak ha annak a hónapnak még van fájlja)
@@ -342,6 +358,9 @@ impl StatsStore {
                 counters.add_target(target.lang, target.input);
             }
             add_edge(file.edges.entry(day).or_default(), &step.edge);
+            if let Some(key) = &use_edge {
+                add_edge(file.uses.entry(day).or_default(), key);
+            }
         });
     }
 
@@ -395,13 +414,36 @@ impl StatsStore {
         (edges, sessions)
     }
 
+    /// Egy nap újrahasznosítás-kulcsai (üres, ha nincs adat).
+    pub(crate) fn day_uses(&self, day: Day) -> BTreeMap<String, u64> {
+        MonthFile::load(&self.month_file(day))
+            .uses
+            .remove(&day)
+            .unwrap_or_default()
+    }
+
     /// Az átmenet-élek összege a `from..=to` napokra.
     pub(crate) fn edge_totals(&self, from: Day, to: Day) -> BTreeMap<String, u64> {
+        self.key_totals(from, to, |file| &file.edges)
+    }
+
+    /// Az újrahasznosítás-kulcsok összege a `from..=to` napokra.
+    pub(crate) fn use_totals(&self, from: Day, to: Day) -> BTreeMap<String, u64> {
+        self.key_totals(from, to, |file| &file.uses)
+    }
+
+    /// Egy napi kulcs → darab térkép összege a `from..=to` napokra.
+    fn key_totals(
+        &self,
+        from: Day,
+        to: Day,
+        pick: impl Fn(&MonthFile) -> &BTreeMap<Day, BTreeMap<String, u64>>,
+    ) -> BTreeMap<String, u64> {
         let mut totals = BTreeMap::new();
         let mut month = from.month_start();
         while month <= to {
             let file = MonthFile::load(&self.month_file(month));
-            for edges in file.edges.range(from..=to).map(|(_, edges)| edges) {
+            for edges in pick(&file).range(from..=to).map(|(_, edges)| edges) {
                 for (key, n) in edges {
                     *totals.entry(key.clone()).or_default() += n;
                 }

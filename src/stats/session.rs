@@ -4,8 +4,10 @@
 //!
 //! Új munkamenet indul, ha az előző hívás vége és ennek a kezdete között több mint 30 perc telt el. A fájl egy
 //! telepítésenkénti véletlen kulcsot (hexa, egyszer jön létre) és a cél kulcsolt hash-eit tartja
-//! (`HMAC-SHA256(kulcs, út)`, `target.rs`) — út, név vagy kulcs nélküli hash nincs benne. Két párhuzamos folyamat
-//! közül az utolsó írás nyer (mint a napi fájlnál); folyamaton belül a `store.rs` zárja sorba rendezi.
+//! (`HMAC-SHA256(kulcs, út)`, `target.rs`), és az utolsó hívás kimenetének elemeit rövidített kulcsolt hash-ként
+//! (`reuse.rs`: a következő hívás célja benne volt-e) — út, név vagy kulcs nélküli hash nincs benne. Két
+//! párhuzamos folyamat közül az utolsó írás nyer (mint a napi fájlnál); folyamaton belül a `store.rs` zárja sorba
+//! rendezi.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -187,6 +189,8 @@ pub(crate) struct Step {
     pub(crate) rep: Option<u32>,
     /// Az átmenet-él kulcsa: `{előző}[!]>{ez}|{rel}|{szünet}`, az első hívásnál `start>{ez}|none|-`.
     pub(crate) edge: String,
+    /// Az előző hívás neve (`!` = hibás volt) ugyanebben a munkamenetben; a munkamenet első hívásánál `None`.
+    pub(crate) from: Option<String>,
     /// A most lezárult előző munkamenet, ha ez a hívás újat nyitott.
     pub(crate) closed: Option<Closed>,
 }
@@ -226,6 +230,14 @@ pub(crate) struct SessionState {
     pub(crate) last: Option<Keys>,
     /// Kulcsolt fájl-hash → érintés-szám az aktuális munkamenetben.
     pub(crate) touches: BTreeMap<String, u32>,
+    /// Volt-e kimenete az utolsó (sikeres, nem hook) hívásnak (`reuse.rs`).
+    pub(crate) has_out: bool,
+    /// Az utolsó hívás kimenetének fájl-elemei sorrendben: rövidített kulcsolt hash-ek (`reuse.rs`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) out_files: Vec<String>,
+    /// Az utolsó hívás kimenetének azonosítói: rövidített kulcsolt hash-ek (`reuse.rs`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) out_syms: Vec<String>,
 }
 
 impl SessionState {
@@ -278,6 +290,9 @@ impl SessionState {
             self.start_ms = visit.start_ms;
             self.touches.clear();
             self.last = None;
+            self.has_out = false;
+            self.out_files.clear();
+            self.out_syms.clear();
         }
         self.seq += 1;
         let rel = if continues {
@@ -285,16 +300,22 @@ impl SessionState {
         } else {
             Rel::None
         };
-        let edge = match (continues, self.last_cmd) {
-            (true, Some(previous)) => format!(
-                "{}{}>{}|{}|{}",
+        let from = match (continues, self.last_cmd) {
+            (true, Some(previous)) => Some(format!(
+                "{}{}",
                 previous.name(),
-                if self.last_failed { "!" } else { "" },
+                if self.last_failed { "!" } else { "" }
+            )),
+            _ => None,
+        };
+        let edge = match &from {
+            Some(from) => format!(
+                "{from}>{}|{}|{}",
                 visit.command.name(),
                 rel.name(),
                 gap_band(gap)
             ),
-            _ => format!("start>{}|none|-", visit.command.name()),
+            None => format!("start>{}|none|-", visit.command.name()),
         };
         let rep = visit
             .keys
@@ -322,6 +343,7 @@ impl SessionState {
             rel,
             rep,
             edge,
+            from,
             closed,
         }
     }

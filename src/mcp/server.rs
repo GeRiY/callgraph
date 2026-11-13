@@ -55,6 +55,7 @@ impl CallgraphServer {
             .ok()
             .map(|q| (q.project.clone(), q.path().to_owned()));
         let (project, path) = target.unzip();
+        let symbol = query.as_ref().ok().and_then(ShowQuery::symbol);
         let runner = Arc::clone(&self.runner);
         let invalid = query.is_err();
         let result = match query {
@@ -69,6 +70,7 @@ impl CallgraphServer {
             started,
             project: project.as_deref(),
             path: path.as_deref(),
+            symbol: symbol.as_deref(),
             invalid,
         };
         self.finish(&call, result)
@@ -89,6 +91,7 @@ impl CallgraphServer {
             started,
             project,
             path: None,
+            symbol: None,
             invalid: false,
         }
     }

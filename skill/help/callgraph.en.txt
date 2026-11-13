@@ -107,7 +107,7 @@ Local usage stats (stays on this computer unless the user turns sending on; no p
   bash ~/.claude/skills/callgraph/callgraph.sh stats [--days N]
                                                 calls per command / MCP tool, user errors vs internal errors, time and
                                                 output size in ranges, locate hit rate; last 7 days (max 90); off: CALLGRAPH_STATS=0
-  bash ~/.claude/skills/callgraph/callgraph.sh stats --events [--days N]   local event log (one line per call, max 14 days, never sent) + top command transitions
+  bash ~/.claude/skills/callgraph/callgraph.sh stats --events [--days N]   local event log (one line per call, max 14 days, never sent) + top command transitions, and whether the next call's file / symbol was in the previous output
   bash ~/.claude/skills/callgraph/callgraph.sh telemetry status|preview|on|off
                                                 opt-in sending of these daily counts (closed days only); preview: the exact
                                                 JSON; on: asks for a y/N confirmation in a terminal (only the user can turn it

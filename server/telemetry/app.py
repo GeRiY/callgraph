@@ -78,6 +78,12 @@ def db() -> sqlite3.Connection:
             count INTEGER NOT NULL,
             PRIMARY KEY (day, version, platform, src, dst, err, rel, gap)
         );
+        CREATE TABLE IF NOT EXISTS uses (
+            day TEXT NOT NULL, version TEXT NOT NULL, platform TEXT NOT NULL,
+            src TEXT NOT NULL, dst TEXT NOT NULL, err INTEGER NOT NULL, f TEXT NOT NULL, s TEXT NOT NULL,
+            count INTEGER NOT NULL,
+            PRIMARY KEY (day, version, platform, src, dst, err, f, s)
+        );
         CREATE TABLE IF NOT EXISTS session_stats (
             batch TEXT PRIMARY KEY, day TEXT NOT NULL, version TEXT NOT NULL, platform TEXT NOT NULL,
             count INTEGER NOT NULL, len TEXT NOT NULL, dur TEXT NOT NULL, rep_max TEXT NOT NULL
@@ -127,6 +133,8 @@ EDGE_RE = re.compile(
     r"\|(<5s|5-60s|1-10m|10-30m|-)$"
 )
 MAX_EDGES = 600
+# „az előző kimenetből jött-e” (v0.9.5): `from>to|f:<fájl-sáv>|s:<szimbólum-sáv>` — csak sávok
+USE_RE = re.compile(r"^([a-z_]{1,20}!?)>([a-z_]{1,20})\|f:(hit1|hit5|hit|miss|-)\|s:(hit|miss|-)$")
 SESSION_BANDS = {"len": 5, "dur": 4, "rep_max": 3}
 
 
@@ -139,6 +147,22 @@ def validate_edges(edges) -> bool:
         return True
     return (isinstance(edges, dict) and len(edges) <= MAX_EDGES
             and all((k == "other" or EDGE_RE.match(k)) and _count(v) for k, v in edges.items()))
+
+
+def validate_uses(uses) -> bool:
+    if uses is None:
+        return True
+    return (isinstance(uses, dict) and len(uses) <= MAX_EDGES
+            and all((k == "other" or (USE_RE.match(k) and not k.startswith("start>") and ">end|" not in k))
+                    and _count(v) for k, v in uses.items()))
+
+
+def split_use(key: str) -> tuple[str, str, int, str, str]:
+    """`from>to|f:sáv|s:sáv` → (src, dst, err, f, s); az `other` gyűjtő-kulcs külön sor."""
+    if key == "other":
+        return "other", "other", 0, "-", "-"
+    src, dst, f, s = USE_RE.match(key).groups()
+    return src.rstrip("!"), dst, int(src.endswith("!")), f, s
 
 
 def validate_sessions(sessions) -> bool:
@@ -167,7 +191,7 @@ def validate(payload) -> list[dict] | None:
     today = date.today()
     out = []
     for d in days:
-        allowed = {"day", "batch", "commands"} | ({"edges", "sessions"} if schema == 2 else set())
+        allowed = {"day", "batch", "commands"} | ({"edges", "sessions", "uses"} if schema == 2 else set())
         if not isinstance(d, dict) or set(d) - allowed:
             return None
         try:
@@ -182,10 +206,12 @@ def validate(payload) -> list[dict] | None:
             return None
         if not _counts_only(d.get("commands")):
             return None
-        if not validate_edges(d.get("edges")) or not validate_sessions(d.get("sessions")):
+        if not validate_edges(d.get("edges")) or not validate_sessions(d.get("sessions")) \
+                or not validate_uses(d.get("uses")):
             return None
         out.append({"day": day.isoformat(), "batch": batch, "commands": d["commands"],
-                    "edges": d.get("edges") or {}, "sessions": d.get("sessions")})
+                    "edges": d.get("edges") or {}, "sessions": d.get("sessions"),
+                    "uses": d.get("uses") or {}})
     return out
 
 
@@ -420,6 +446,12 @@ class Handler(BaseHTTPRequestHandler):
                             "INSERT INTO edges(day, version, platform, src, dst, err, rel, gap, count) VALUES (?,?,?,?,?,?,?,?,?) "
                             "ON CONFLICT(day, version, platform, src, dst, err, rel, gap) DO UPDATE SET count=count+excluded.count",
                             (d["day"], payload["version"], payload["platform"], *split_edge(key), n),
+                        )
+                    for key, n in d["uses"].items():
+                        con.execute(
+                            "INSERT INTO uses(day, version, platform, src, dst, err, f, s, count) VALUES (?,?,?,?,?,?,?,?,?) "
+                            "ON CONFLICT(day, version, platform, src, dst, err, f, s) DO UPDATE SET count=count+excluded.count",
+                            (d["day"], payload["version"], payload["platform"], *split_use(key), n),
                         )
                     s = d["sessions"]
                     if s:

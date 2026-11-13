@@ -42,6 +42,19 @@ def graph(con: sqlite3.Connection, since: str) -> None:
     print(f"command graph (opt-in telemetry): {sessions} sessions; top transitions:")
     for src, dst, err, rel, n in rows:
         print(f"  {src}{'!' if err else ''} → {dst} ({rel}): {n}")
+    try:
+        uses = con.execute(
+            "SELECT src, dst, f, SUM(count) n FROM uses WHERE day>=? AND f!='-' GROUP BY src, dst, f "
+            "ORDER BY src, dst, n DESC", (since,)).fetchall()
+    except sqlite3.Error:
+        return
+    if uses:
+        print("target from previous output (file band):")
+        by_pair: dict = {}
+        for src, dst, f, n in uses:
+            by_pair.setdefault((src, dst), []).append(f"{f} {n}")
+        for (src, dst), parts in sorted(by_pair.items(), key=lambda kv: -sum(int(p.split()[1]) for p in kv[1]))[:10]:
+            print(f"  {src} → {dst}: " + ", ".join(parts))
 
 
 def usage(con: sqlite3.Connection, since: str) -> None:

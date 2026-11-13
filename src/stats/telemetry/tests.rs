@@ -318,6 +318,10 @@ fn populate_flow(dir: &std::path::Path) {
         end_ms,
         ms: 20,
         target: Target::from_text(Some("SecretShop"), "app/Http/RefundController.php"),
+        symbols: vec!["processRefund".to_owned()],
+        output: crate::stats::reuse::OutputItems::from_text(
+            "1. app/Http/RefundController.php  ★★★\n   processRefund (exact method)\n",
+        ),
     };
     store.record_call(&call(CommandKind::Locate, yesterday_ms));
     store.record_call(&call(CommandKind::Show, yesterday_ms + 3_000));
@@ -359,11 +363,23 @@ fn payload_schema_2_adds_edges_and_sessions_without_names() {
         serde_json::json!([0, 1, 0, 0, 0])
     );
     assert_eq!(yesterday["commands"]["show"]["lang"]["php"], 2);
+    // az előző kimenet felhasználása: csak sávnevek (a munkamenet első hívása nem számít)
+    let uses = yesterday["uses"].as_object().unwrap();
+    assert_eq!(
+        uses.get("locate>show|f:hit1|s:hit"),
+        Some(&serde_json::json!(1)),
+        "{text}"
+    );
+    assert_eq!(uses.len(), 1, "{text}");
+    for key in uses.keys() {
+        assert!(crate::stats::tracking_tests::is_use_key(key), "{key}");
+    }
+    assert!(!text.contains("processRefund"), "{text}");
     // a napbejegyzés mezői; az élek nélküli nap nem kap üres `edges`-t
     for day in days {
         for key in day.as_object().unwrap().keys() {
             assert!(
-                ["day", "batch", "commands", "edges", "sessions"].contains(&key.as_str()),
+                ["day", "batch", "commands", "edges", "sessions", "uses"].contains(&key.as_str()),
                 "{key}"
             );
         }
