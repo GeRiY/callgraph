@@ -293,6 +293,26 @@ fn symbol_of_a_call_takes_the_raw_qualifier() {
     assert!(SymbolRef::of_call(Path::new("/proj/web/a.ts"), &helper).is_none());
 }
 
+/// Egy Vue ref / computed `.value`-ján át hívott metódus a saját adaté, nem a csomag API-ja.
+#[test]
+fn a_method_on_a_ref_value_is_not_package_api() {
+    let file = Path::new("/proj/resources/js/pages/Board.vue");
+    let mut chained = call(
+        "method_call",
+        "site.value.pages.filter",
+        Some("vue::computed().value.pages.filter"),
+        "vue_api",
+    );
+    chained.from = Some("vue".to_owned());
+    assert!(SymbolRef::of_call(file, &chained).is_none());
+    let mut api = call("func_call", "computed", Some("vue::computed"), "vue_api");
+    api.from = Some("vue".to_owned());
+    assert_eq!(
+        SymbolRef::of_call(file, &api).map(|sym| sym.qualifier),
+        Some("vue")
+    );
+}
+
 #[test]
 fn label_is_the_last_segment_unless_generic() {
     let label = |name: &str| {

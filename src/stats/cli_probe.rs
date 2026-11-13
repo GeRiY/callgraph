@@ -176,6 +176,7 @@ pub(crate) fn classify(args: &[String], client: Option<&str>) -> Option<(Command
         "note" => CommandKind::Notes,
         "project" => CommandKind::Projects,
         "next" => CommandKind::Next,
+        "uses" => CommandKind::PackageUsage,
         _ => CommandKind::Other,
     };
     Some((command, client))

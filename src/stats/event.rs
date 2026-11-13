@@ -25,13 +25,15 @@ pub(crate) enum CommandKind {
     Guide,
     Projects,
     Next,
+    /// `uses` (CLI) és `package_usage` (MCP): egy függőség használata.
+    PackageUsage,
     Other,
 }
 
 impl CommandKind {
     /// Minden változat (a tesztekhez).
     #[cfg(test)]
-    pub(crate) const ALL: [Self; 16] = [
+    pub(crate) const ALL: [Self; 17] = [
         Self::Show,
         Self::Outline,
         Self::MethodBody,
@@ -47,6 +49,7 @@ impl CommandKind {
         Self::Guide,
         Self::Projects,
         Self::Next,
+        Self::PackageUsage,
         Self::Other,
     ];
 
@@ -68,6 +71,7 @@ impl CommandKind {
             Self::Guide => "guide",
             Self::Projects => "projects",
             Self::Next => "next",
+            Self::PackageUsage => "package_usage",
             Self::Other => "other",
         }
     }

@@ -24,6 +24,15 @@ pub(crate) trait QueryRunner: Send + Sync {
         )
         .into())
     }
+    /// Egy függőség használata (`callgraph uses`); `calls`: fájlonként minden hívás-sor (`--calls`).
+    fn uses(&self, project: Option<&str>, package: &str, calls: bool) -> Result<String, String> {
+        let _ = (project, package, calls);
+        Err(crate::t!(
+            "package_usage is not available",
+            "a package_usage nem érhető el"
+        )
+        .into())
+    }
     /// Az `initialize` útmutatójának vége: a munkakönyvtár tömör profilja, vagy tipp a `project_profile`-ra.
     fn startup_note(&self) -> String {
         String::new()
@@ -126,6 +135,20 @@ impl QueryRunner for ShowRunner {
         }
         if packages {
             args.push("--packages".into());
+        }
+        Self::execute(args, &root)
+    }
+
+    fn uses(&self, project: Option<&str>, package: &str, calls: bool) -> Result<String, String> {
+        let root = self.root(project)?;
+        let mut args = vec![
+            "uses".to_owned(),
+            package.to_owned(),
+            "--project".to_owned(),
+            root.root().display().to_string(),
+        ];
+        if calls {
+            args.push("--calls".into());
         }
         Self::execute(args, &root)
     }

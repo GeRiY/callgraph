@@ -28,8 +28,10 @@ use callers::CallerCounts;
 use format::Report;
 use matcher::Matcher;
 use rank::{FileMatch, rank};
-use source::ProjectSource;
 use terms::Term;
+
+// a projekt fájljainak forrása: a `uses` csomag-használat is ezen át járja be a projekt-gráfot
+pub(crate) use source::ProjectSource;
 
 /// A kiindulópont-kereső egy projekt-gyökérre.
 pub struct Locator {

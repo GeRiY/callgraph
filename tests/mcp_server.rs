@@ -131,6 +131,7 @@ fn initialize_list_and_call_outline() {
             "next",
             "notes",
             "outline",
+            "package_usage",
             "project_profile",
             "projects",
             "search"
@@ -468,6 +469,73 @@ fn project_profile_and_the_layer_parameter() {
     let wrong = s.call(6, "outline", json!({"path": "app", "layer": "nope"}));
     assert_eq!(wrong["isError"], json!(true));
     assert!(text(&wrong).contains("Unknown layer: nope"), "{wrong}");
+    drop(s);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A `package_usage` eszköz: a CLI `uses` kimenete (összesítés, `calls: true`), az ismeretlen név egy sor, nem hiba.
+#[test]
+fn package_usage_matches_the_cli_uses() {
+    let id = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let dir = std::env::temp_dir().join(format!("callgraph-mcp-uses-{}-{id}", std::process::id()));
+    let files = [
+        (
+            "composer.json",
+            r#"{"require": {"guzzlehttp/guzzle": "^7.9"}, "autoload": {"psr-4": {"App\\": "app/"}}}"#,
+        ),
+        (
+            "composer.lock",
+            r#"{"packages": [{"name": "guzzlehttp/guzzle", "version": "7.9.2", "autoload": {"psr-4": {"GuzzleHttp\\": "src/"}}}]}"#,
+        ),
+        (
+            "app/Services/Shipping.php",
+            "<?php\nnamespace App\\Services;\n\nuse GuzzleHttp\\Client;\n\nclass Shipping\n{\n    public function client(): Client\n    {\n        return new Client();\n    }\n}\n",
+        ),
+    ];
+    for (path, body) in files {
+        let path = dir.join(path);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, body).unwrap();
+    }
+    let dir = dir.canonicalize().unwrap();
+    let mut s = Session::start_in(&dir);
+    s.send(
+        json!({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
+        "protocolVersion": "2025-06-18", "capabilities": {},
+        "clientInfo": {"name": "test", "version": "0"}}}),
+    );
+    s.response(1);
+    s.send(json!({"jsonrpc": "2.0", "method": "notifications/initialized"}));
+
+    let summary = s.call(2, "package_usage", json!({"package": "guzzle"}));
+    assert_ne!(summary["isError"], json!(true), "{summary}");
+    assert_eq!(
+        text(&summary),
+        "guzzlehttp/guzzle 7.9.2 · 1 call · 1 file\n  new Client  1  app/Services/Shipping.php\n"
+    );
+    let calls = s.call(
+        3,
+        "package_usage",
+        json!({"package": "guzzle", "calls": true}),
+    );
+    let cli = Command::new(env!("CARGO_BIN_EXE_callgraph"))
+        .args(["uses", "guzzle", "--calls", "--project"])
+        .arg(&dir)
+        .env("CALLGRAPH_LANG", "en")
+        .env("CALLGRAPH_REGISTRY", "/nonexistent/projects.json")
+        .output()
+        .unwrap();
+    assert_eq!(text(&calls), String::from_utf8_lossy(&cli.stdout));
+    assert!(text(&calls).contains("\n  L10 new Client\n"), "{calls}");
+    let unknown = s.call(4, "package_usage", json!({"package": "stripe"}));
+    assert_ne!(unknown["isError"], json!(true), "{unknown}");
+    assert!(
+        text(&unknown).starts_with("unknown package: stripe"),
+        "{unknown}"
+    );
     drop(s);
     let _ = std::fs::remove_dir_all(&dir);
 }

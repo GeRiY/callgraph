@@ -1,5 +1,6 @@
-//! Az MCP-szerver (rmcp): tíz, csak olvasó eszköz a meglévő lekérdező-motor fölött. A leírások rövidek (minden
-//! kliensben kontextus-tokenbe kerülnek): mit ad, egy példa, a fő buktató. Az `initialize` útmutatója és a `guide`
+//! Az MCP-szerver (rmcp): csak olvasó eszközök a meglévő lekérdező-motor fölött. A leírások rövidek (minden
+//! kliensben kontextus-tokenbe kerülnek; a `tools/list` teljes JSON-ja ne nőjön): mit ad, egy példa, a fő buktató,
+//! mikor melyik eszköz. Az `initialize` útmutatója és a `guide`
 //! eszköz szövege a skill-utasítás forrásából készül (`guide.rs`), így nem csúszik szét a SKILL.md-vel. Minden
 //! eszköz-hívás vége egy helyen megy át (`finish`): ott méri a helyi használati statisztika (`stats::McpStats`),
 //! és ott indul a napi névtelen check (`update::usage`).
@@ -13,7 +14,7 @@ use rmcp::{ServerHandler, tool, tool_handler, tool_router};
 
 use super::params::{
     FindCallersParams, FrameworkViewParams, LocateParams, MethodBodyParams, NextParams,
-    NotesParams, OutlineParams, ProfileParams, SearchParams,
+    NotesParams, OutlineParams, PackageUsageParams, ProfileParams, SearchParams,
 };
 use super::request::ShowQuery;
 use super::runner::QueryRunner;
@@ -84,7 +85,7 @@ impl CallgraphServer {
         to_result(result)
     }
 
-    /// Egy cél nélküli hívás (`projects`, `project_profile`, `guide`) leírása.
+    /// Egy cél nélküli hívás (`projects`, `project_profile`, `package_usage`, `guide`) leírása.
     fn plain(tool: CommandKind, started: Instant, project: Option<&str>) -> ToolCall<'_> {
         ToolCall {
             tool,
@@ -103,7 +104,7 @@ impl CallgraphServer {
             idempotent_hint = true,
             open_world_hint = false
         ),
-        description = "Where to start with a task: give the names and domain terms from the task in ONE call; answers from the project map (no file reading) with a short ranked list of files (top 5; `all: true` = every match), each with its reasons: exact definition, file name, name part, string literal, call, `callers: N`. Example: {\"terms\": [\"RefundController\", \"processRefund\", \"refund\", \"payment_status\", \"checkout.vue\"]}. Pitfall: pass code names, not a sentence; translate non-English domain words to their English code names (visszatérítés → refund); one call with all terms, not one call per term. Use `locate` to find WHERE to start; once you know the file use `outline`; for a string literal or constant use `search`, for other exact text (log message, config value) Grep."
+        description = "Where to start with a task: the task's names and domain terms in ONE call → a ranked file list from the project map (no file reading; top 5, `all: true` = all), each with reasons (exact definition, file name, name part, string literal, call, `callers: N`). Example: {\"terms\": [\"RefundController\", \"refund\", \"payment_status\"]}. Pitfall: code names, not a sentence; translate non-English domain words (visszatérítés → refund); one call with all terms. Use `locate` to find WHERE to start; once you know the file use `outline`; string literal / constant: `search`; other exact text (log message, config value): Grep."
     )]
     async fn locate(&self, Parameters(p): Parameters<LocateParams>) -> CallToolResult {
         self.execute(CommandKind::Locate, ShowQuery::locate(p))
@@ -117,7 +118,7 @@ impl CallgraphServer {
             idempotent_hint = true,
             open_world_hint = false
         ),
-        description = "Structure of a code file or directory without reading it: classes/components, methods with line ranges, calls by category. With `method`: that one method's call graph — what it calls (callees, each classified: internal_helper, model_use, orm_relation, framework_use, external_call, …), so there is no separate callees tool; for the opposite direction (who calls it) use `find_callers`. Start here once you know the file (else `locate`); for routes / events / validation across a framework use `framework_view` instead. Example: {\"path\": \"app/Order.php\", \"method\": \"cancel\"}. Pitfall: give the method in `method`, not as `path::method`; on a large directory use `format: summary` or a subdirectory."
+        description = "Structure of a code file or directory without reading it: classes/components, methods with line ranges, calls by category. With `method`: that method's callees, each classified (internal_helper, model_use, orm_relation, framework_use, external_call…) — no separate callees tool; who calls it: `find_callers`. Start here once you know the file (else `locate`); routes / events / validation: `framework_view`. Example: {\"path\": \"app/Order.php\", \"method\": \"cancel\"}. Pitfall: the method goes in `method`, not `path::method`; on a large directory use `format: summary` or a subdirectory."
     )]
     async fn outline(&self, Parameters(p): Parameters<OutlineParams>) -> CallToolResult {
         self.execute(CommandKind::Outline, ShowQuery::outline(p))
@@ -131,7 +132,7 @@ impl CallgraphServer {
             idempotent_hint = true,
             open_world_hint = false
         ),
-        description = "Line-numbered source of one or more methods/functions, compact: the docblock above the method and blank lines dropped, comments inside the body kept (line numbers stay exact; the header says when a docblock was omitted; `doc: true` adds it, `raw: true` = exact, unfiltered text, e.g. before editing). Use after `outline` instead of reading the whole file. Example: {\"path\": \"app/Order.php\", \"method\": [\"cancel\", \"refund\"]} (`method` may be a string or a list)."
+        description = "Line-numbered source of methods/functions, compact: docblock and blank lines dropped, comments in the body kept (line numbers stay exact; the header notes an omitted docblock; `doc: true` adds it, `raw: true` = exact text, e.g. before editing). Use after `outline` instead of reading the whole file. Example: {\"path\": \"app/Order.php\", \"method\": [\"cancel\", \"refund\"]}."
     )]
     async fn method_body(&self, Parameters(p): Parameters<MethodBodyParams>) -> CallToolResult {
         self.execute(CommandKind::MethodBody, ShowQuery::method_body(p))
@@ -145,7 +146,7 @@ impl CallgraphServer {
             idempotent_hint = true,
             open_world_hint = false
         ),
-        description = "Who calls it: file, method, line range and the call's own line (`L25 │ code`) of each caller; paths are relative to the `root:` line. Start with the name pattern (regex) `(^|::|\\.|->)cancel$`: it finds every call, also with an unknown/inherited receiver. `Order::cancel` lists only calls resolved to that type (`via <Type>` = through its interface/parent/trait), so it can miss callers; `?::name` = name-only match. `depth` 2–5 = impact analysis (callers of callers); `guess` adds name-only matches (?). Example: {\"pattern\": \"(^|::|\\\\.|->)cancel$\", \"path\": \"app\"}."
+        description = "Who calls it: each caller's file, method, line range and call line (`L25 │ code`); paths relative to the `root:` line. Start with the name regex `(^|::|\\.|->)cancel$`: every call, also with an unknown/inherited receiver. `Order::cancel` = only calls resolved to that type (`via <Type>` = through interface/parent/trait), so it can miss callers; `?::name` = name-only match. `depth` 2–5 = impact analysis (callers of callers); `guess` adds name-only matches (?). Example: {\"pattern\": \"(^|::|\\\\.|->)cancel$\", \"path\": \"app\"}."
     )]
     async fn find_callers(&self, Parameters(p): Parameters<FindCallersParams>) -> CallToolResult {
         self.execute(CommandKind::FindCallers, ShowQuery::find_callers(p))
@@ -159,7 +160,7 @@ impl CallgraphServer {
             idempotent_hint = true,
             open_world_hint = false
         ),
-        description = "Where a string literal (error message, key) or a constant is used/defined (substring match). Example: {\"kind\": \"strings\", \"pattern\": \"Order not found\"} or {\"kind\": \"constants\", \"pattern\": \"STATUS_ACTIVE\"}. For calls of a function use `find_callers`; to find which files to start a task in, use `locate` (names and terms, ranked), not this."
+        description = "Where a string literal (error message, key) or a constant is used/defined (substring match). Example: {\"kind\": \"strings\", \"pattern\": \"Order not found\"}. Calls of a function: `find_callers`; which files to start a task in: `locate`, not this."
     )]
     async fn search(&self, Parameters(p): Parameters<SearchParams>) -> CallToolResult {
         self.execute(CommandKind::Search, ShowQuery::search(p))
@@ -173,7 +174,7 @@ impl CallgraphServer {
             idempotent_hint = true,
             open_world_hint = false
         ),
-        description = "Framework view of a directory: routes, middleware, validation, jobs, events, providers, magic, di, views. Example: {\"view\": \"routes\", \"path\": \"routes\"}. Run it on the directory that holds the definitions (a file works too). Use it for framework wiring (which route → which controller, which event → which listener); for the structure of one file or folder use `outline`."
+        description = "Framework wiring of the directory (or file) holding the definitions: which route → which controller, which event → which listener; also middleware, validation, jobs, providers, magic, di, views. Example: {\"view\": \"routes\", \"path\": \"routes\"}. Structure of a file or folder: `outline`."
     )]
     async fn framework_view(
         &self,
@@ -190,7 +191,7 @@ impl CallgraphServer {
             idempotent_hint = true,
             open_world_hint = false
         ),
-        description = "Notes (pilot) attached to files or methods by people/agents: `path[::method]  time  📝 text`, [orphaned] if the method is gone. Read-only (notes are written with the CLI `callgraph note add`). Example: {\"pattern\": \"refund\", \"path\": \"app\"}; without `pattern`: all notes."
+        description = "Notes (pilot) on files or methods by people/agents: `path[::method]  time  📝 text`, [orphaned] if the method is gone. Read-only (written with the CLI `callgraph note add`). Example: {\"pattern\": \"refund\", \"path\": \"app\"}; no `pattern`: all notes."
     )]
     async fn notes(&self, Parameters(p): Parameters<NotesParams>) -> CallToolResult {
         self.execute(CommandKind::Notes, ShowQuery::notes(p)).await
@@ -221,7 +222,7 @@ impl CallgraphServer {
             idempotent_hint = true,
             open_world_hint = false
         ),
-        description = "Project profile from folder and file names, checked against the code graph: architecture (Laravel/Yii layered MVC, DDD/hexagonal, Vue/React frontend, SwiftUI MVVM, Rust web), layers with their folders and file counts, design patterns, the call direction between layers, unknown folders, the notable packages with their locked versions (`stack:` line) (~15 lines); `packages: true` also lists every direct composer / npm dependency. Call it first in an unfamiliar project, then pass `layer` (e.g. \"service\") to `outline` / `search` / `find_callers`. Example: {} or {\"project\": \"shop\", \"full\": true}. Pitfall: a layer name comes from this list (controller, service, repository, model, component, store…), not a folder path."
+        description = "Project profile from folder and file names, checked against the code graph (~15 lines): architecture (Laravel/Yii MVC, DDD/hexagonal, Vue/React, SwiftUI MVVM, Rust web), layers with folders and file counts, patterns, call direction between layers, unknown folders, notable packages with locked versions (`stack:`); `packages: true` lists every direct composer / npm dependency. Call it first in an unfamiliar project, then pass `layer` (e.g. \"service\") to `outline` / `search` / `find_callers`. Example: {} or {\"full\": true}. Pitfall: a layer name comes from this list (controller, service, repository, model, component, store…), not a folder path."
     )]
     async fn project_profile(&self, Parameters(p): Parameters<ProfileParams>) -> CallToolResult {
         let started = Instant::now();
@@ -243,7 +244,29 @@ impl CallgraphServer {
             idempotent_hint = true,
             open_world_hint = false
         ),
-        description = "Run a suggested next step by its number instead of composing the call: some results end with `↪ r7 possible next: [1] … [2] …` (only when the server runs with `--next`). Use it only if a suggestion fits your task; otherwise ignore the line. Example: {\"result_id\": \"r7\", \"choice\": 1} or {\"result_id\": \"r7\", \"choice\": [1, 3]}. Ids are per project and expire after 24 hours."
+        description = "Where and how the code uses a composer / npm dependency: per API symbol the count, first file and +N; `calls: true` lists every call per file. Use before upgrading or replacing a package. Example: {\"package\": \"guzzle\"}."
+    )]
+    async fn package_usage(&self, Parameters(p): Parameters<PackageUsageParams>) -> CallToolResult {
+        let started = Instant::now();
+        let project = p.project.clone();
+        let runner = Arc::clone(&self.runner);
+        let result = tokio::task::spawn_blocking(move || {
+            runner.uses(p.project.as_deref(), &p.package, p.calls)
+        })
+        .await
+        .unwrap_or_else(|e| Err(e.to_string()));
+        let call = Self::plain(CommandKind::PackageUsage, started, project.as_deref());
+        self.finish(&call, result)
+    }
+
+    #[tool(
+        annotations(
+            read_only_hint = true,
+            destructive_hint = false,
+            idempotent_hint = true,
+            open_world_hint = false
+        ),
+        description = "Run a suggested next step by number instead of composing the call: some results end with `↪ r7 possible next: [1] … [2] …` (server run with `--next`). Use it only if a suggestion fits your task; else ignore the line. Example: {\"result_id\": \"r7\", \"choice\": [1, 3]}. Ids are per project and expire after 24 hours."
     )]
     async fn next(&self, Parameters(p): Parameters<NextParams>) -> CallToolResult {
         let started = Instant::now();
@@ -275,7 +298,7 @@ impl CallgraphServer {
             idempotent_hint = true,
             open_world_hint = false
         ),
-        description = "The full callgraph manual (the skill's SKILL.md in the configured language): every query with CLI examples, JS/TS/Vue, Rust, Swift, Python and Go specifics, formats, limits. Call it once when the server instructions are not enough; the CLI flags map to these tools (see its MCP section)."
+        description = "The full callgraph manual (SKILL.md in the configured language): every query with CLI examples, language specifics, formats, limits. Call it once when the server instructions are not enough; CLI flags map to these tools (see its MCP section)."
     )]
     async fn guide(&self) -> CallToolResult {
         let started = Instant::now();

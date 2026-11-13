@@ -10,7 +10,8 @@
 //! - `cache.rs`: Proxy — `.callgraph/packages.bin`, bélyeg szerint újraépítve; `files.rs`: DI a fájlrendszerhez;
 //! - `resolve/`: Chain of Responsibility — melyik csomagé egy hívás célja (lekérdezéskor, a tárolt nyers
 //!   minősítőből: az outline csomag-címkéje, a json `package` mezője, a `locate` „uses package” indoklása);
-//! - `stack.rs`: a kiemelt csomagok sora.
+//! - `stack.rs`: a kiemelt csomagok sora;
+//! - `usage/`: `uses <csomag>` / MCP `package_usage` — hol és hogyan használja a projekt egy függőségét.
 //!
 //! Minden hibatűrő: hiányzó vagy hibás manifest / lock → az a rész üres, soha nem hiba.
 
@@ -23,6 +24,7 @@ mod registry;
 mod resolve;
 mod sources;
 mod stack;
+mod usage;
 
 #[cfg(test)]
 mod tests;
@@ -39,6 +41,7 @@ pub(crate) use model::Package;
 pub(crate) use project::ProjectPackages;
 pub(crate) use resolve::Attribution;
 pub(crate) use stack::Stack;
+pub(crate) use usage::UsageQuery;
 
 #[cfg(test)]
 pub(crate) use model::Ecosystem;
@@ -151,6 +154,22 @@ impl Packages {
             resolve::Resolution::Package(package) => Some(package),
             resolve::Resolution::Own | resolve::Resolution::Unknown => None,
         }
+    }
+
+    /// Egy import (a fájl `imports` térképének értéke) csomagja a `path` fájlban. JS / TS / Vue-ban csak a
+    /// fájlhoz legközelebbi rész manifestjében / lockjában szereplő csomag (a helyi import feloldott útja —
+    /// `src/lib/a.js` — is csomag-alakú lehet).
+    pub(crate) fn package_of_import(&self, path: &Path, full: &str) -> Option<Attribution> {
+        let sym = resolve::SymbolRef::of_import(path, full)?;
+        let resolve::Resolution::Package(package) = self.resolve(&sym) else {
+            return None;
+        };
+        let known = sym.ecosystem == model::Ecosystem::Php
+            || self
+                .map
+                .nearest(path, model::Ecosystem::Node)
+                .is_some_and(|part| part.package(&package.name).is_some());
+        known.then_some(package)
     }
 
     /// A függőségekből felismert frameworkök (`laravel`, `vue` …): részenként, a `FRAMEWORKS` sorrendjében,

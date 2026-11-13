@@ -356,6 +356,12 @@ impl QueryRunner for NoticeRunner {
             .map(|text| self.append(text))
     }
 
+    fn uses(&self, project: Option<&str>, package: &str, calls: bool) -> Result<String, String> {
+        self.inner
+            .uses(project, package, calls)
+            .map(|text| self.append(text))
+    }
+
     fn startup_note(&self) -> String {
         self.inner.startup_note()
     }

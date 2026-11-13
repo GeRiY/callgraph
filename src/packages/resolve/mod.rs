@@ -102,6 +102,15 @@ impl<'a> SymbolRef<'a> {
             return None;
         }
         if let Some(spec) = call.from.as_deref() {
+            // egy ref / computed `.value`-ján át hívott metódus a saját adaté (`computed(…).value.pages.filter`),
+            // nem a csomag API-ja
+            if call
+                .resolved
+                .as_deref()
+                .is_some_and(|r| r.contains("().value."))
+            {
+                return None;
+            }
             return Some(Self {
                 path,
                 ecosystem: Ecosystem::Node,
@@ -138,6 +147,24 @@ impl<'a> SymbolRef<'a> {
             alias,
         })
     }
+
+    /// Egy import (a fájl `imports` térképének értéke) nyers minősítője: PHP-fájlban a `use` teljes neve, JS / TS /
+    /// Vue-fájlban az érték forrás-része (`@vueuse/core::useMouse` → `@vueuse/core`). Más nyelv: `None`.
+    pub(crate) fn of_import(path: &'a Path, full: &'a str) -> Option<Self> {
+        let (ecosystem, qualifier) = if is_php(path) {
+            (Ecosystem::Php, full.trim_start_matches('\\'))
+        } else if is_script(path) {
+            (Ecosystem::Node, full.split("::").next().unwrap_or(full))
+        } else {
+            return None;
+        };
+        (!qualifier.is_empty()).then_some(Self {
+            path,
+            ecosystem,
+            qualifier,
+            alias: None,
+        })
+    }
 }
 
 /// A cél rövid osztályneve, ha `use` nélkül, minősítetlenül írták: a globális névtérben a feloldott név maga a rövid
@@ -158,6 +185,19 @@ fn is_php(path: &Path) -> bool {
     path.extension()
         .and_then(|ext| ext.to_str())
         .is_some_and(|ext| ext.eq_ignore_ascii_case("php"))
+}
+
+/// JS / TS / Vue / Svelte-fájl-e az út (az import-térképe npm-csomagokra mutathat).
+fn is_script(path: &Path) -> bool {
+    path.extension()
+        .and_then(|ext| ext.to_str())
+        .is_some_and(|ext| {
+            [
+                "js", "jsx", "mjs", "cjs", "ts", "tsx", "mts", "cts", "vue", "svelte",
+            ]
+            .iter()
+            .any(|known| ext.eq_ignore_ascii_case(known))
+        })
 }
 
 /// A PHP-név a névtér-előtag alatt van-e (a PHP-névterek kis- / nagybetű-függetlenek); az üres előtag semmit.

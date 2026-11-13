@@ -171,12 +171,12 @@ fn git_root(dir: &Path) -> Option<PathBuf> {
 const MAX_CANDIDATES: usize = 8;
 
 /// A CLI-hívás célja a nyers argumentumokból: az első nem kapcsoló argumentum, amely létező fájl vagy mappa
-/// (`::metódus` utótag nélkül; a `--project` mappájához vagy a munkakönyvtárhoz képest). A `locate`, `next` és
-/// `project` parancsnak nincs fájl-célja.
+/// (`::metódus` utótag nélkül; a `--project` mappájához vagy a munkakönyvtárhoz képest). A `locate`, `next`,
+/// `project` és `uses` parancsnak nincs fájl-célja.
 pub(crate) fn cli_target(command: CommandKind, args: &[String], cwd: &Path) -> Option<Target> {
     if matches!(
         command,
-        CommandKind::Locate | CommandKind::Next | CommandKind::Projects
+        CommandKind::Locate | CommandKind::Next | CommandKind::Projects | CommandKind::PackageUsage
     ) {
         return None;
     }
@@ -216,11 +216,11 @@ pub(crate) fn cli_target(command: CommandKind, args: &[String], cwd: &Path) -> O
 
 /// A CLI-hívás által kért szimbólumok azonosítói a nyers argumentumokból (csak a memóriában): a `fájl::metódus` /
 /// `Osztály::metódus` utótag, a `--grep` és a `callers` mintája, és a `--const` értéke, ha egyetlen azonosító (a
-/// `--strings` és a `--notes` szabad szöveg, nem számít). A `locate`, `next` és `project` parancsnál nincs.
+/// `--strings` és a `--notes` szabad szöveg, nem számít). A `locate`, `next`, `project` és `uses` parancsnál nincs.
 pub(crate) fn cli_symbols(command: CommandKind, args: &[String]) -> Vec<String> {
     if matches!(
         command,
-        CommandKind::Locate | CommandKind::Next | CommandKind::Projects
+        CommandKind::Locate | CommandKind::Next | CommandKind::Projects | CommandKind::PackageUsage
     ) {
         return Vec::new();
     }

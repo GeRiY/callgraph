@@ -1,10 +1,11 @@
 //! Az MCP-eszközök bemenete (serde + JSON Schema). A mezők doc-kommentje a sémában leírásként jelenik meg
-//! (minden kliensnél kontextus-token): rövid, pontos, angol.
+//! (minden kliensnél kontextus-token): rövid, pontos, angol. A típusok fölött szándékosan sima `//` megjegyzés áll:
+//! a `///` a séma tetejére (és minden hivatkozó eszköz `$defs`-ébe) is bekerülne, a `tools/list` hosszát növelve.
 
 use rmcp::schemars::{self, JsonSchema};
 use serde::Deserialize;
 
-/// Az `outline` eszköz nézetei (a `show --format` egy része).
+// Az `outline` eszköz nézetei (a `show --format` egy része).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum OutlineFormat {
@@ -17,7 +18,7 @@ pub(crate) enum OutlineFormat {
     Stats,
 }
 
-/// A `search` eszköz keresési módja.
+// A `search` eszköz keresési módja.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum SearchKind {
@@ -25,7 +26,7 @@ pub(crate) enum SearchKind {
     Constants,
 }
 
-/// A framework-nézetek (a `show --format` framework-formátumai).
+// A framework-nézetek (a `show --format` framework-formátumai).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum FrameworkView {
@@ -40,7 +41,7 @@ pub(crate) enum FrameworkView {
     Views,
 }
 
-/// `outline`: egy fájl / mappa szerkezete vagy egy metódus hívás-gráfja.
+// `outline`: egy fájl / mappa szerkezete vagy egy metódus hívás-gráfja.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, JsonSchema)]
 pub(crate) struct OutlineParams {
     /// File or directory, relative to the project root.
@@ -64,8 +65,8 @@ pub(crate) struct OutlineParams {
     pub full: bool,
 }
 
-/// Egy név vagy névlista: az LLM-kliensek gyakran sima stringet küldenek tömb helyett (`"method": "parse"`).
-/// A séma `anyOf` string | string-tömb.
+// Egy név vagy névlista: az LLM-kliensek gyakran sima stringet küldenek tömb helyett (`"method": "parse"`).
+// A séma `anyOf` string | string-tömb.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, JsonSchema)]
 #[serde(untagged)]
 pub(crate) enum OneOrMany {
@@ -88,7 +89,7 @@ impl OneOrMany {
     }
 }
 
-/// `method_body`: egy vagy több metódus forrása sorszámozva.
+// `method_body`: egy vagy több metódus forrása sorszámozva.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, JsonSchema)]
 pub(crate) struct MethodBodyParams {
     /// File path, relative to the project root.
@@ -109,11 +110,11 @@ pub(crate) struct MethodBodyParams {
     pub full: bool,
 }
 
-/// `find_callers`: hívók / hatáselemzés.
+// `find_callers`: hívók / hatáselemzés.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, JsonSchema)]
 pub(crate) struct FindCallersParams {
-    /// What is called (regex on the callee): start with `(^|::|\.|->)cancel$` (every call of the name);
-    /// `Order::cancel` = only calls resolved to that type; JS keys: `useForm.js::submit`, `route::orders.show`.
+    /// Regex on the callee: `(^|::|\.|->)cancel$` (every call), `Order::cancel` (resolved to that type); JS keys:
+    /// `useForm.js::submit`, `route::orders.show`.
     pub pattern: String,
     /// Search scope (file or directory) relative to the project root; default: the whole root.
     #[serde(default)]
@@ -130,7 +131,7 @@ pub(crate) struct FindCallersParams {
     /// Search only files of this layer (level 1), e.g. `controller`.
     #[serde(default)]
     pub layer: Option<String>,
-    /// Group callers by layer (closest to the callee first), each group under a `[service]  3 callers` header.
+    /// Group callers by layer (closest to the callee first).
     #[serde(default)]
     pub by_layer: bool,
     /// Disable the 400-line output cap.
@@ -138,7 +139,7 @@ pub(crate) struct FindCallersParams {
     pub full: bool,
 }
 
-/// `search`: string-literál vagy konstans keresése.
+// `search`: string-literál vagy konstans keresése.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, JsonSchema)]
 pub(crate) struct SearchParams {
     /// strings: string literals (messages, keys); constants: constant references and definitions.
@@ -159,7 +160,7 @@ pub(crate) struct SearchParams {
     pub full: bool,
 }
 
-/// `framework_view`: framework-nézet egy mappára.
+// `framework_view`: framework-nézet egy mappára.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, JsonSchema)]
 pub(crate) struct FrameworkViewParams {
     /// Which view.
@@ -174,7 +175,7 @@ pub(crate) struct FrameworkViewParams {
     pub full: bool,
 }
 
-/// `notes` (pilot): a fájlokhoz / metódusokhoz írt jegyzetek keresése (csak olvas).
+// `notes` (pilot): a fájlokhoz / metódusokhoz írt jegyzetek keresése (csak olvas).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, JsonSchema)]
 pub(crate) struct NotesParams {
     /// Regex on the note text or its `path::method` anchor (case-insensitive); default: all notes.
@@ -188,14 +189,13 @@ pub(crate) struct NotesParams {
     pub project: Option<String>,
 }
 
-/// `locate`: kiindulópont-kereső — a feladat nevei és fogalmai egy hívásban.
+// `locate`: kiindulópont-kereső — a feladat nevei és fogalmai egy hívásban.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, JsonSchema)]
 pub(crate) struct LocateParams {
-    /// Names and domain terms from the task, in code form: function / class / file names, columns, routes, and the
-    /// English code name of a non-English domain word (`["RefundController", "processRefund", "refund",
-    /// "payment_status", "checkout.vue"]`); a single string works too. An element with spaces is one phrase,
-    /// matched as a whole against string literals (a UI label); `route::events.show` finds a route's definition
-    /// and its `route()` calls; `--orange-500` a CSS custom property.
+    /// The task's names and terms in code form (function / class / file names, columns, routes, English code names
+    /// of non-English words); a string works too. An element with spaces = one phrase matched against string
+    /// literals (a UI label); `route::events.show` = a route's definition and `route()` calls; `--orange-500` = a
+    /// CSS custom property.
     pub terms: OneOrMany,
     /// Registered project alias; default: the server's working directory.
     #[serde(default)]
@@ -205,7 +205,7 @@ pub(crate) struct LocateParams {
     pub all: bool,
 }
 
-/// `next`: egy korábbi eredmény javasolt következő lépése az azonosítójával.
+// `next`: egy korábbi eredmény javasolt következő lépése az azonosítójával.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, JsonSchema)]
 pub(crate) struct NextParams {
     /// The result id from the `↪ rN …` line, e.g. `"r7"`.
@@ -217,7 +217,7 @@ pub(crate) struct NextParams {
     pub project: Option<String>,
 }
 
-/// Egy vagy több választás: szám, string (`"1,3"`) vagy tömb.
+// Egy vagy több választás: szám, string (`"1,3"`) vagy tömb.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, JsonSchema)]
 #[serde(untagged)]
 pub(crate) enum Choice {
@@ -226,7 +226,7 @@ pub(crate) enum Choice {
     List(Vec<ChoiceItem>),
 }
 
-/// A tömb egy eleme: szám vagy string.
+// A tömb egy eleme: szám vagy string.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, JsonSchema)]
 #[serde(untagged)]
 pub(crate) enum ChoiceItem {
@@ -258,7 +258,7 @@ impl Choice {
     }
 }
 
-/// `project_profile`: a projekt architektúrája, rétegei és mintái.
+// `project_profile`: a projekt architektúrája, rétegei és mintái.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, JsonSchema)]
 pub(crate) struct ProfileParams {
     /// Registered project alias; default: the server's working directory.
@@ -267,10 +267,22 @@ pub(crate) struct ProfileParams {
     /// Per-folder details, confidence counts and the call pairs between layers.
     #[serde(default)]
     pub full: bool,
-    /// Also list every direct composer / npm dependency per package root: installed version (from the lock),
-    /// declared range, dev flag.
+    /// Also list every direct composer / npm dependency: installed and declared version, dev flag.
     #[serde(default)]
     pub packages: bool,
+}
+
+// `package_usage`: egy függőség használata (a CLI `uses`).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, JsonSchema)]
+pub(crate) struct PackageUsageParams {
+    /// Package name or short name: `guzzlehttp/guzzle`, `guzzle`, `@vueuse/core`.
+    pub package: String,
+    /// Every call line per file instead of the per-symbol summary.
+    #[serde(default)]
+    pub calls: bool,
+    /// Registered project alias; default: the server's working directory.
+    #[serde(default)]
+    pub project: Option<String>,
 }
 
 impl OutlineFormat {
@@ -333,6 +345,35 @@ mod tests {
         assert!(many.all && many.project.is_none());
         assert_eq!(many.terms.into_vec().len(), 2);
         assert!(serde_json::from_value::<LocateParams>(serde_json::json!({})).is_err());
+    }
+
+    #[test]
+    fn package_usage_needs_a_package_and_defaults_to_the_summary() {
+        let plain: PackageUsageParams =
+            serde_json::from_value(serde_json::json!({"package": "guzzle"})).unwrap();
+        assert!(!plain.calls && plain.project.is_none());
+        let calls: PackageUsageParams = serde_json::from_value(
+            serde_json::json!({"package": "@vueuse/core", "calls": true, "project": "shop"}),
+        )
+        .unwrap();
+        assert!(calls.calls);
+        assert_eq!(calls.project.as_deref(), Some("shop"));
+        assert!(serde_json::from_value::<PackageUsageParams>(serde_json::json!({})).is_err());
+    }
+
+    /// A típusok fölötti (magyar) megjegyzés nem kerül a sémába: csak a mezők angol leírása (`tools/list` hossza).
+    #[test]
+    fn type_comments_stay_out_of_the_schema() {
+        for schema in [
+            serde_json::to_string(&schemars::schema_for!(OutlineParams)).unwrap(),
+            serde_json::to_string(&schemars::schema_for!(MethodBodyParams)).unwrap(),
+            serde_json::to_string(&schemars::schema_for!(NextParams)).unwrap(),
+            serde_json::to_string(&schemars::schema_for!(PackageUsageParams)).unwrap(),
+        ] {
+            for hungarian in ["eszköz", "nézet", "választás", "metódus", "függőség"] {
+                assert!(!schema.contains(hungarian), "{hungarian}: {schema}");
+            }
+        }
     }
 
     #[test]
