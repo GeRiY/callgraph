@@ -23,6 +23,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   command transition (`hit1` / `hit5` / `hit` / `miss`, symbol `hit` / `miss`) — still no names, paths, code or
   hashes. You are told once; `callgraph.sh telemetry preview` shows exactly what would be sent.
 - The session-start check may suggest sharing usage counts up to 10 times (every 2 days), never after you said no.
+- **MCP tools say they only read:** every MCP tool now declares `readOnlyHint: true`, `destructiveHint: false`,
+  `idempotentHint: true` and `openWorldHint: false`, since none of them changes anything or reaches outside the
+  project, so directories that require these hints (e.g. OpenAI's) accept the server.
+
+### Fixed
+
+- `callgraph.sh telemetry status` now lists `DO_NOT_TRACK` among the reasons sending is blocked.
 
 ## [0.9.4] — 2026-11-12
 

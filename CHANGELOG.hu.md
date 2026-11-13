@@ -27,6 +27,14 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   menne el.
 - Az indításkori ellenőrzés legfeljebb 10-szer (2 naponta) javasolja a használati számok megosztását, nemleges válasz
   után soha.
+- **Az MCP-eszközök jelzik, hogy csak olvasnak:** mostantól minden MCP-eszköz kifejezetten megadja a
+  `readOnlyHint: true`, `destructiveHint: false`, `idempotentHint: true` és `openWorldHint: false` jelzést, mert egyik
+  sem módosít semmit, és nem nyúl ki a projektből, így az ezeket a jelzéseket megkövetelő katalógusok (pl. az OpenAI-é)
+  is elfogadják a szervert.
+
+### Javítás
+
+- A `callgraph.sh telemetry status` mostantól a `DO_NOT_TRACK`-et is felsorolja a beküldést tiltó okok között.
 
 ## [0.9.4] — 2026-11-12
 

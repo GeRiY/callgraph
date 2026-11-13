@@ -136,6 +136,20 @@ fn initialize_list_and_call_outline() {
             "search"
         ]
     );
+    // minden eszköz csak olvas: a négy annotáció explicit (katalógusok, pl. az OpenAI-é, enélkül elutasítják)
+    for tool in list["result"]["tools"].as_array().unwrap() {
+        let a = &tool["annotations"];
+        assert_eq!(
+            (
+                &a["readOnlyHint"],
+                &a["destructiveHint"],
+                &a["idempotentHint"],
+                &a["openWorldHint"]
+            ),
+            (&json!(true), &json!(false), &json!(true), &json!(false)),
+            "{tool}"
+        );
+    }
 
     // `guide`: a teljes SKILL.md a beállított nyelven, frontmatter és jelölők nélkül
     let guide = s.call(30, "guide", json!({}));
