@@ -415,7 +415,7 @@ Details (Hungarian): [`docs/PROJECT-GRAPH.md`](docs/PROJECT-GRAPH.md).
 recommended setting is off — the refresh hook above, the MCP server with `--auto-update`, opting in to the shared
 usage counts — or a newer callgraph is out, and if so shows one short note and asks your agent to ask you. Nothing is
 changed without your yes; telemetry can only be turned on by you in a terminal. Each item at most every 2 days and 3
-times in total; `callgraph.sh hook never hook|mcp|telemetry` silences one (`hook reset [item]` brings it back),
+times in total (the usage-counts suggestion up to 10 times, never after you said no); `callgraph.sh hook never hook|mcp|telemetry` silences one (`hook reset [item]` brings it back),
 `CALLGRAPH_RECOMMEND=0` all; never in CI.
 Remove: `callgraph.sh hook uninstall`.
 
@@ -423,7 +423,10 @@ Remove: `callgraph.sh hook uninstall`.
 
 callgraph keeps a small usage summary on your computer: how often each command or MCP tool ran, whether it
 failed, and how long it took and how big its output was, in ranges. For `locate` over MCP it also notes whether the
-file the agent opened next was the first result. It never records paths, file or symbol names, search terms,
+file the agent opened next was the first result, and per day which command followed which (with the gap and whether
+the target was the same file, folder or project, and whether the next call's file / symbol appeared in the previous
+call's output — only its position band), session-length bands, and the target file's language and size band.
+`stats --events` shows the local per-call log (kept 14 days, never sent; it also has no names). It never records paths, file or symbol names, search terms,
 project names or error texts, and **nothing is sent** unless you turn sending on (below). See it with
 `bash ~/.claude/skills/callgraph/callgraph.sh stats [--days N]` (last 7 days by default). The data lives in
 `~/.claude/skills/callgraph/stats/` (one small file per month, kept for about 90 days); turn it off with
@@ -439,7 +442,7 @@ internal errors are also in `errors.jsonl` with an error id.
 Off by default, and only you can turn it on: `bash ~/.claude/skills/callgraph/callgraph.sh telemetry on` asks for a
 y/N confirmation in a terminal (an agent cannot answer it). `telemetry preview` prints exactly the JSON that would be
 sent, `telemetry status` shows the state, `telemetry off` stops it. **What is sent:** the closed days' counts from
-above (no paths, file, symbol or project names, no search terms or code), at most the last 7 days, the callgraph
+above, including the command-order counts and session bands (no paths, file, symbol or project names, no search terms or code), at most the last 7 days, the callgraph
 version, the OS / architecture, a random batch id per day and the schema version — once a day, in the background, to
 `https://telemetry.callgraph.eu/v1`. Never in CI, with `CALLGRAPH_STATS=0`, with `DO_NOT_TRACK=1` or with
 `CALLGRAPH_TELEMETRY=0` (a hard off switch). `telemetry reset` makes it undecided again (still off). Controller: Makra Gergő (mgeri1993@gmail.com); the raw daily records are

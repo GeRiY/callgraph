@@ -136,6 +136,20 @@ fn initialize_list_and_call_outline() {
             "search"
         ]
     );
+    // minden eszköz csak olvas: a négy annotáció explicit (katalógusok, pl. az OpenAI-é, enélkül elutasítják)
+    for tool in list["result"]["tools"].as_array().unwrap() {
+        let a = &tool["annotations"];
+        assert_eq!(
+            (
+                &a["readOnlyHint"],
+                &a["destructiveHint"],
+                &a["idempotentHint"],
+                &a["openWorldHint"]
+            ),
+            (&json!(true), &json!(false), &json!(true), &json!(false)),
+            "{tool}"
+        );
+    }
 
     // `guide`: a teljes SKILL.md a beállított nyelven, frontmatter és jelölők nélkül
     let guide = s.call(30, "guide", json!({}));
@@ -520,8 +534,18 @@ fn locate_hit_rank_is_recorded_in_the_local_stats() {
         report.contains("first result was the one opened: 1 of 1, top 5: 1 of 1"),
         "{report}"
     );
+    // a havi fájl, a munkamenet-állapot és az eseménynapló (`events/`) sem tartalmaz utat vagy nevet
+    let mut paths: Vec<std::path::PathBuf> = Vec::new();
     for entry in std::fs::read_dir(&stats).unwrap() {
-        let text = std::fs::read_to_string(entry.unwrap().path()).unwrap();
+        let path = entry.unwrap().path();
+        if path.is_dir() {
+            paths.extend(std::fs::read_dir(&path).unwrap().map(|e| e.unwrap().path()));
+        } else {
+            paths.push(path);
+        }
+    }
+    for path in paths {
+        let text = std::fs::read_to_string(path).unwrap();
         assert!(
             !text.contains('/') && !text.contains("RefundService"),
             "{text}"

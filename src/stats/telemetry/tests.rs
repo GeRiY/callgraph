@@ -15,6 +15,7 @@ use crate::stats::day::Day;
 use crate::stats::event::{Client, CommandKind, ErrorKind, Event, Outcome};
 use crate::stats::policy::StatsEnv;
 use crate::stats::store::StatsStore;
+use crate::stats::target::{Call, Target};
 
 /// 2026-11-10 01:00 UTC.
 const NOW: u64 = 1_794_268_800 + 3600;
@@ -158,7 +159,7 @@ fn turned_on_sends_closed_days_once_a_day() {
         .map(|d| d["day"].as_str().unwrap())
         .collect();
     assert_eq!(days, ["2026-11-08", "2026-11-09"]);
-    assert_eq!(body["schema"], 1);
+    assert_eq!(body["schema"], 2);
     let consent = telemetry.consent();
     assert_eq!(consent.last_sent_day.as_deref(), Some("2026-11-09"));
     // a következő nap: csak az új lezárt nap menne (ma nincs új adat: nincs mit küldeni)
@@ -305,5 +306,130 @@ fn turning_on_needs_a_terminal_and_a_yes() {
         Ok(true)
     );
     assert!(telemetry.consent().enabled);
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+/// A tegnapi napra két munkamenet (40 perc szünettel), fájl-céllal: élek és egy lezárt munkamenet.
+fn populate_flow(dir: &std::path::Path) {
+    let store = StatsStore::new(dir.to_path_buf());
+    let yesterday_ms = (NOW - 86_400) * 1000;
+    let call = |command, end_ms: u64| Call {
+        event: event(command, Outcome::Ok),
+        end_ms,
+        ms: 20,
+        target: Target::from_text(Some("SecretShop"), "app/Http/RefundController.php"),
+        symbols: vec!["processRefund".to_owned()],
+        output: crate::stats::reuse::OutputItems::from_text(
+            "1. app/Http/RefundController.php  ★★★\n   processRefund (exact method)\n",
+        ),
+    };
+    store.record_call(&call(CommandKind::Locate, yesterday_ms));
+    store.record_call(&call(CommandKind::Show, yesterday_ms + 3_000));
+    store.record_call(&call(
+        CommandKind::Show,
+        yesterday_ms + 3_000 + 40 * 60 * 1000,
+    ));
+}
+
+#[test]
+fn payload_schema_2_adds_edges_and_sessions_without_names() {
+    let dir = temp_dir("schema2");
+    populate(&dir, 2);
+    populate_flow(&dir);
+    let telemetry = Telemetry::new(env(&dir, "http://127.0.0.1:1/"), dir.clone());
+    let text = telemetry.preview(NOW);
+    let body: serde_json::Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(body["schema"], 2);
+    let days = body["days"].as_array().unwrap();
+    let yesterday = days
+        .iter()
+        .find(|d| d["day"] == "2026-11-09")
+        .expect("yesterday is a closed day");
+    let edges = yesterday["edges"].as_object().unwrap();
+    for key in [
+        "start>locate|none|-",
+        "locate>show|same_file|<5s",
+        "show>end|none|-",
+        "start>show|none|-",
+    ] {
+        assert_eq!(edges.get(key), Some(&serde_json::json!(1)), "{key}: {text}");
+    }
+    for key in edges.keys() {
+        assert!(crate::stats::tracking_tests::is_edge_key(key), "{key}");
+    }
+    assert_eq!(yesterday["sessions"]["count"], 1);
+    assert_eq!(
+        yesterday["sessions"]["len"],
+        serde_json::json!([0, 1, 0, 0, 0])
+    );
+    assert_eq!(yesterday["commands"]["show"]["lang"]["php"], 2);
+    // az előző kimenet felhasználása: csak sávnevek (a munkamenet első hívása nem számít)
+    let uses = yesterday["uses"].as_object().unwrap();
+    assert_eq!(
+        uses.get("locate>show|f:hit1|s:hit"),
+        Some(&serde_json::json!(1)),
+        "{text}"
+    );
+    assert_eq!(uses.len(), 1, "{text}");
+    for key in uses.keys() {
+        assert!(crate::stats::tracking_tests::is_use_key(key), "{key}");
+    }
+    assert!(!text.contains("processRefund"), "{text}");
+    // a napbejegyzés mezői; az élek nélküli nap nem kap üres `edges`-t
+    for day in days {
+        for key in day.as_object().unwrap().keys() {
+            assert!(
+                ["day", "batch", "commands", "edges", "sessions", "uses"].contains(&key.as_str()),
+                "{key}"
+            );
+        }
+    }
+    let before = days.iter().find(|d| d["day"] == "2026-11-08").unwrap();
+    assert!(before.get("edges").is_none() && before.get("sessions").is_none());
+    // út, név, hash nincs benne (a munkamenet-állapot és az eseménynapló nem megy el)
+    assert!(!text.contains('/') && !text.contains('\\'), "{text}");
+    for secret in ["SecretShop", "RefundController", "Http", ".php"] {
+        assert!(!text.contains(secret), "{secret}: {text}");
+    }
+    let session = std::fs::read_to_string(dir.join("session.json")).unwrap();
+    let key: serde_json::Value = serde_json::from_str(&session).unwrap();
+    assert!(!text.contains(key["key"].as_str().unwrap()));
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn the_command_order_notice_is_shown_once_and_only_when_already_on() {
+    // már bekapcsolt beküldés: egyszer
+    let dir = temp_dir("order-on");
+    let telemetry = turned_on(&dir, "http://127.0.0.1:1/");
+    let notice = telemetry.order_notice().unwrap();
+    assert!(
+        notice.contains("callgraph.sh telemetry preview"),
+        "{notice}"
+    );
+    assert!(notice.contains("callgraph.sh telemetry off"), "{notice}");
+    assert!(telemetry.order_notice().is_none());
+    let _ = std::fs::remove_dir_all(dir);
+
+    // nem döntött: semmi, és később bekapcsolva sem (az új leírást már látta)
+    let dir = temp_dir("order-off");
+    let telemetry = Telemetry::new(env(&dir, "http://127.0.0.1:1/"), dir.clone());
+    assert!(telemetry.order_notice().is_none());
+    telemetry.decide(Choice::Yes, NOW).unwrap();
+    assert!(telemetry.order_notice().is_none());
+    let _ = std::fs::remove_dir_all(dir);
+
+    // tiltott környezetben a jelző sem jön létre
+    let dir = temp_dir("order-killed");
+    turned_on(&dir, "http://127.0.0.1:1/");
+    let mut killed = env(&dir, "http://127.0.0.1:1/");
+    killed.killed = true;
+    assert!(Telemetry::new(killed, dir.clone()).order_notice().is_none());
+    assert!(!dir.join(super::ORDER_NOTICE_MARKER).exists());
+    assert!(
+        Telemetry::new(env(&dir, "http://127.0.0.1:1/"), dir.clone())
+            .order_notice()
+            .is_some()
+    );
     let _ = std::fs::remove_dir_all(dir);
 }

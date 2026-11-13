@@ -230,6 +230,7 @@ impl HookCommand {
             current: crate::update::Version::current().to_string(),
             update: format!("{script} update"),
             telemetry_on: format!("{script} telemetry on"),
+            telemetry_preview: format!("{script} telemetry preview"),
         }
     }
 

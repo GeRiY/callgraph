@@ -129,10 +129,10 @@ pub fn build_command(args: CliArgs) -> Result<Box<dyn Command>> {
         ))),
         CliArgs::Version => Ok(Box::new(commands::VersionCommand)),
         CliArgs::Help => Ok(Box::new(commands::HelpCommand)),
-        CliArgs::Stats { days } => Ok(Box::new(commands::StatsCommand::new(
-            days,
-            crate::skill::SkillHome::from_env(),
-        ))),
+        CliArgs::Stats { days, events } => Ok(Box::new(
+            commands::StatsCommand::new(days, crate::skill::SkillHome::from_env())
+                .with_events(events),
+        )),
         CliArgs::Profile {
             project,
             full,

@@ -10,7 +10,8 @@
 //!   nem kapcsolhatja be helyette (a hozzájárulásnak a felhasználótól kell jönnie),
 //! - frissítés-értesítés (a meglévő napi háttér-ellenőrzés eredménye, `update::check`).
 //!
-//! Ritkítás: egy tétel legfeljebb 2 naponta egyszer, összesen legfeljebb 3-szor; a `hook never <tétel>` után soha.
+//! Ritkítás: egy tétel legfeljebb 2 naponta egyszer, összesen legfeljebb 3-szor (a telemetria 10-szer, és csak amíg
+//! a döntés nyitott: nem döntött / „most nem”; `Never` / `Off` után soha); a `hook never <tétel>` után soha.
 //! Kikapcsolás: `CALLGRAPH_RECOMMEND=0`; `CI` mellett soha. Az állapot: `<skill>/recommend.json`.
 
 use std::collections::BTreeMap;
@@ -20,8 +21,10 @@ use serde::{Deserialize, Serialize};
 
 /// Egy tétel legfeljebb ennyi naponta jelenik meg.
 pub(crate) const INTERVAL_DAYS: i64 = 2;
-/// Egy tétel összesen legfeljebb ennyiszer jelenik meg.
+/// Egy tétel összesen legfeljebb ennyiszer jelenik meg (alapból; tételenként: `Item::max_shown`).
 pub(crate) const MAX_SHOWN: u32 = 3;
+/// A telemetria-ajánlás összesen legfeljebb ennyiszer jelenik meg.
+pub(crate) const MAX_SHOWN_TELEMETRY: u32 = 10;
 /// Az állapotfájl neve a skill-mappában.
 pub(crate) const STATE_FILE: &str = "recommend.json";
 
@@ -46,6 +49,14 @@ impl Item {
 
     pub(crate) fn parse(text: &str) -> Option<Self> {
         Self::ALL.into_iter().find(|i| i.key() == text.trim())
+    }
+
+    /// Összesen legfeljebb ennyiszer jelenik meg.
+    pub(crate) fn max_shown(self) -> u32 {
+        match self {
+            Self::Telemetry => MAX_SHOWN_TELEMETRY,
+            Self::Hook | Self::Mcp => MAX_SHOWN,
+        }
     }
 }
 
@@ -132,9 +143,9 @@ fn needed(item: Item, facts: &Facts) -> bool {
 }
 
 /// Esedékes-e a tétel a számlálója szerint (nem tiltott, nem fogyott el, és eltelt az intervallum).
-fn due(counter: &Counter, today: i64) -> bool {
+fn due(item: Item, counter: &Counter, today: i64) -> bool {
     !counter.never
-        && counter.shown < MAX_SHOWN
+        && counter.shown < item.max_shown()
         && counter
             .last_day
             .is_none_or(|last| (today - last).abs() >= INTERVAL_DAYS)
@@ -145,7 +156,7 @@ pub(crate) fn decide(state: &State, facts: &Facts, today: i64) -> (Vec<Item>, St
     let mut next = state.clone();
     let mut show = Vec::new();
     for item in Item::ALL {
-        if needed(item, facts) && due(&state.counter(item), today) {
+        if needed(item, facts) && due(item, &state.counter(item), today) {
             let counter = next.items.entry(item.key().to_owned()).or_default();
             counter.shown += 1;
             counter.last_day = Some(today);
@@ -208,10 +219,11 @@ pub(crate) fn render(items: &[Item], facts: &Facts, commands: &Commands) -> Opti
                 ));
             }
             Item::Telemetry => {
+                let telemetry_on = &commands.telemetry_on;
+                let preview = &commands.telemetry_preview;
                 user.push(crate::tf!(
-                    "• Optional: share anonymous usage counts to help improve callgraph — only you can turn it on, in a terminal: {}",
-                    "• Opcionális: névtelen használati számok megosztása a callgraph fejlesztéséhez — csak te kapcsolhatod be, terminálban: {}",
-                    commands.telemetry_on
+                    "⭐ Help callgraph get better for your stack: share anonymous usage counts (which commands, in which order, how fast — never code, file names or paths). It directly tunes locate ranking and next-step suggestions for the languages and frameworks you use. One command, off any time: {telemetry_on} · see exactly what is sent: {preview}",
+                    "⭐ Segíts, hogy a callgraph a te stackedben legyen jobb: oszd meg a névtelen használati számokat (melyik parancs, milyen sorrendben, milyen gyorsan — kód, fájlnév és útvonal soha). Ezekből közvetlenül a locate rangsorát és a javasolt következő lépéseket hangoljuk a nyelveidre és keretrendszereidre. Egy parancs, bármikor kikapcsolható: {telemetry_on} · pontosan mi menne el: {preview}"
                 ));
                 agent.push(format!(
                     "- telemetry: do NOT turn it on yourself and do not run `telemetry on`. Just mention that the user \
@@ -252,6 +264,8 @@ pub(crate) struct Commands {
     pub(crate) hook_install: String,
     pub(crate) mcp_register: String,
     pub(crate) telemetry_on: String,
+    /// `<script> telemetry preview`: pontosan mi menne el.
+    pub(crate) telemetry_preview: String,
 }
 
 impl Commands {

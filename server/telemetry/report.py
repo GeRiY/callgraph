@@ -25,6 +25,36 @@ def main() -> None:
     tel = q("SELECT COUNT(*), COUNT(DISTINCT platform) FROM days WHERE received>=?")[0]
     print(f"telemetry: {tel[0]} daily batches received ({tel[1]} platforms)")
     usage(con, since)
+    graph(con, since)
+
+
+def graph(con: sqlite3.Connection, since: str) -> None:
+    """Az opt-in telemetria parancs-gráfja: a leggyakoribb átmenetek és a sessionök száma."""
+    try:
+        rows = con.execute(
+            "SELECT src, dst, err, rel, SUM(count) n FROM edges WHERE day>=? GROUP BY src, dst, err, rel "
+            "ORDER BY n DESC LIMIT 10", (since,)).fetchall()
+        sessions = con.execute("SELECT COALESCE(SUM(count),0) FROM session_stats WHERE day>=?", (since,)).fetchone()[0]
+    except sqlite3.Error:
+        return
+    if not rows and not sessions:
+        return
+    print(f"command graph (opt-in telemetry): {sessions} sessions; top transitions:")
+    for src, dst, err, rel, n in rows:
+        print(f"  {src}{'!' if err else ''} → {dst} ({rel}): {n}")
+    try:
+        uses = con.execute(
+            "SELECT src, dst, f, SUM(count) n FROM uses WHERE day>=? AND f!='-' GROUP BY src, dst, f "
+            "ORDER BY src, dst, n DESC", (since,)).fetchall()
+    except sqlite3.Error:
+        return
+    if uses:
+        print("target from previous output (file band):")
+        by_pair: dict = {}
+        for src, dst, f, n in uses:
+            by_pair.setdefault((src, dst), []).append(f"{f} {n}")
+        for (src, dst), parts in sorted(by_pair.items(), key=lambda kv: -sum(int(p.split()[1]) for p in kv[1]))[:10]:
+            print(f"  {src} → {dst}: " + ", ".join(parts))
 
 
 def usage(con: sqlite3.Connection, since: str) -> None:

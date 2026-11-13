@@ -417,14 +417,18 @@ Code `SessionStart` hookot (`callgraph.sh hook install-session`). Új session el
 kapcsolva egy ajánlott beállítás — a fenti frissítő hook, az MCP-szerver `--auto-update`-tel, a használati számok
 megosztása —, vagy van-e újabb callgraph; ha igen, egy rövid sort mutat, és megkéri az agentet, hogy kérdezzen meg.
 Az igened nélkül semmi nem változik; a telemetriát csak te kapcsolhatod be, terminálban. Egy tétel legfeljebb 2
-naponta és összesen 3-szor; a `callgraph.sh hook never hook|mcp|telemetry` egyet (a `hook reset [tétel]` visszahozza),
+naponta és összesen 3-szor (a használati számok megosztását legfeljebb 10-szer, nemleges válasz után soha); a `callgraph.sh hook never hook|mcp|telemetry` egyet (a `hook reset [tétel]` visszahozza),
 a `CALLGRAPH_RECOMMEND=0` mindet elhallgattatja; CI-ban soha. Eltávolítás: `callgraph.sh hook uninstall`.
 
 ### Helyi használati statisztika
 
 A callgraph a gépeden egy kis használati összesítőt vezet: melyik parancs vagy MCP-eszköz hányszor futott, volt-e
 hiba, és sávokban mennyi ideig tartott és mekkora volt a kimenete. Az MCP-n futó `locate`-nél azt is, hogy az agent
-utána az első találatot nyitotta-e meg. Utat, fájl- és szimbólumnevet, keresési kifejezést, projektnevet és
+utána az első találatot nyitotta-e meg; naponként azt is, melyik parancs után melyik jött (a szünettel, és hogy
+ugyanarra a fájlra, mappára vagy projektre vonatkozott-e, és hogy a következő hívás fájlja / szimbóluma benne volt-e
+az előző hívás kimenetében — csak a hely sávja), a munkamenet-hossz sávjait, és a célfájl nyelvét és
+méretsávját. A `stats --events` a helyi, hívásonkénti naplót mutatja (14 napig marad, soha nem megy el, és ebben sincs
+név). Utat, fájl- és szimbólumnevet, keresési kifejezést, projektnevet és
 hibaszöveget soha nem rögzít, és **semmit nem küld el**, hacsak be nem kapcsolod a beküldést (lent). Megtekintés:
 `bash ~/.claude/skills/callgraph/callgraph.sh stats [--days N]` (alapból az elmúlt 7 nap). Az adat helye:
 `~/.claude/skills/callgraph/stats/` (havonta egy kis fájl, kb. 90 napig marad meg); kikapcsolás:
@@ -440,7 +444,7 @@ error-id-vel az `errors.jsonl`-ben is ott vannak.
 Alapból ki van kapcsolva, és csak te kapcsolhatod be: a `bash ~/.claude/skills/callgraph/callgraph.sh telemetry on`
 terminálban y/N megerősítést kér (agent nem tud rá válaszolni). A `telemetry preview` pontosan azt a JSON-t írja ki,
 ami elmenne, a `telemetry status` az állapotot mutatja, a `telemetry off` leállítja. **Mi megy el:** a fenti számok a
-lezárt napokra (út, fájl-, szimbólum- és projektnév, keresési kifejezés és kód nélkül), legfeljebb az utolsó 7 napra, a
+lezárt napokra, a parancs-sorrend számaival és a munkamenet-sávokkal együtt (út, fájl-, szimbólum- és projektnév, keresési kifejezés és kód nélkül), legfeljebb az utolsó 7 napra, a
 callgraph verziója, az operációs rendszer / architektúra, naponta egy véletlen kötegazonosító és a séma verziója —
 naponta egyszer, a háttérben, ide: `https://telemetry.callgraph.eu/v1`. CI-ben, `CALLGRAPH_STATS=0`, `DO_NOT_TRACK=1`
 vagy `CALLGRAPH_TELEMETRY=0` (végleges tiltás) mellett soha. A `telemetry reset` újra döntetlenre állítja (kikapcsolva). Adatkezelő: Makra Gergő (mgeri1993@gmail.com); a nyers napi

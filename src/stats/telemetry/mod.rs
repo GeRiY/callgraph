@@ -10,6 +10,9 @@
 //! - Beküldés (`send.rs`): a normál futásokra ráülve (CLI, MCP indulás + óránként), ha be van kapcsolva, az utolsó
 //!   sikeres beküldés > 24 órája volt és van lezárt, be nem küldött nap → leválasztott háttérfolyamat
 //!   (`callgraph telemetry send`), 5 s időkorlát, zárfájl; a napok csak HTTP 2xx után számítanak beküldöttnek.
+//! - Tartalom (`payload.rs`, 2-es séma): a lezárt napok számlálói, és mellettük a parancs-sorrend élei és a
+//!   munkamenet-sávok — út, név, szöveg, hash nélkül. A már bekapcsolt beküldésnél erről egyszer szól a CLI
+//!   (`order_notice`). A helyi eseménynapló és a munkamenet-állapot soha nem megy el.
 //! - Soha: CI-ban, `CALLGRAPH_STATS=0` mellett, `CALLGRAPH_TELEMETRY=0` vagy `DO_NOT_TRACK=1` (kemény tiltás)
 //!   mellett, kikapcsolt állapotban.
 
@@ -39,6 +42,8 @@ pub(crate) const URL_ENV: &str = "CALLGRAPH_TELEMETRY_URL";
 pub(crate) const DEFAULT_URL: &str = "https://telemetry.callgraph.eu/v1";
 /// Az állapotfájl neve a stats-mappában.
 pub(crate) const CONSENT_FILE: &str = "telemetry.json";
+/// Az egyszeri „mostantól a parancs-sorrend is megy” tájékoztatás (2-es séma) jelzőfájlja a stats-mappában.
+pub(crate) const ORDER_NOTICE_MARKER: &str = "telemetry-order-notice-shown";
 
 const DAY_SECS: u64 = 24 * 60 * 60;
 /// Két beküldés között legalább ennyi.
@@ -219,8 +224,8 @@ impl Telemetry {
         );
         if !self.env.allowed() {
             text.push_str(crate::t!(
-                "Sending is blocked here (CALLGRAPH_TELEMETRY=0, CALLGRAPH_STATS=0, CI, or not a skill install).\n",
-                "A beküldés itt tiltva (CALLGRAPH_TELEMETRY=0, CALLGRAPH_STATS=0, CI, vagy nem skill-telepítés).\n"
+                "Sending is blocked here (DO_NOT_TRACK, CALLGRAPH_TELEMETRY=0, CALLGRAPH_STATS=0, CI, or not a skill install).\n",
+                "A beküldés itt tiltva (DO_NOT_TRACK, CALLGRAPH_TELEMETRY=0, CALLGRAPH_STATS=0, CI, vagy nem skill-telepítés).\n"
             ));
         }
         text
@@ -231,6 +236,26 @@ impl Telemetry {
         let mut consent = self.consent();
         consent.decide(choice, now);
         self.save(&consent)
+    }
+
+    /// Az egyszeri tájékoztatás (CLI stderr) azoknak, akiknél a beküldés MÁR be van kapcsolva: mostantól a
+    /// parancs-sorrend napi számai is mennek (2-es séma). A jelzőfájl az első vizsgálatkor létrejön akkor is, ha a
+    /// beküldés nincs bekapcsolva (aki később kapcsolja be, már az új leírást látta), így legfeljebb egyszer jelenik
+    /// meg. Tiltott környezetben semmit nem csinál.
+    pub(crate) fn order_notice(&self) -> Option<String> {
+        if !self.env.allowed() {
+            return None;
+        }
+        let marker = self.dir.join(ORDER_NOTICE_MARKER);
+        if marker.exists() || std::fs::create_dir_all(&self.dir).is_err() {
+            return None;
+        }
+        let claimed = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&marker)
+            .is_ok();
+        (claimed && self.consent().enabled).then(order_notice_text)
     }
 
     /// Vissza a „még nem döntött” állapotba: a beküldés ki, a döntés és a kérdezés-számlálók törölve (bekapcsolni
@@ -245,6 +270,15 @@ impl Telemetry {
         consent.hint_at = None;
         self.save(&consent)
     }
+}
+
+/// Az egyszeri tájékoztatás szövege (`Telemetry::order_notice`).
+pub(crate) fn order_notice_text() -> String {
+    crate::t!(
+        "ℹ callgraph telemetry now also sends daily command-order counts (which command followed which, timing bands, whether the next file / symbol was in the previous output — no names or paths). Preview: callgraph.sh telemetry preview · off: callgraph.sh telemetry off",
+        "ℹ a callgraph telemetria mostantól a parancsok sorrendjének napi számait is küldi (melyik parancs után melyik jött, időzítési sávok, benne volt-e a következő fájl / szimbólum az előző kimenetben — név és útvonal nélkül). Előnézet: callgraph.sh telemetry preview · kikapcsolás: callgraph.sh telemetry off"
+    )
+    .to_owned()
 }
 
 /// Unix-másodperc most.

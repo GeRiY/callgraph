@@ -70,7 +70,37 @@ def db() -> sqlite3.Connection:
         """
     )
     con.executescript(counts.SCHEMA)
+    con.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS edges (
+            day TEXT NOT NULL, version TEXT NOT NULL, platform TEXT NOT NULL,
+            src TEXT NOT NULL, dst TEXT NOT NULL, err INTEGER NOT NULL, rel TEXT NOT NULL, gap TEXT NOT NULL,
+            count INTEGER NOT NULL,
+            PRIMARY KEY (day, version, platform, src, dst, err, rel, gap)
+        );
+        CREATE TABLE IF NOT EXISTS uses (
+            day TEXT NOT NULL, version TEXT NOT NULL, platform TEXT NOT NULL,
+            src TEXT NOT NULL, dst TEXT NOT NULL, err INTEGER NOT NULL, f TEXT NOT NULL, s TEXT NOT NULL,
+            count INTEGER NOT NULL,
+            PRIMARY KEY (day, version, platform, src, dst, err, f, s)
+        );
+        CREATE TABLE IF NOT EXISTS session_stats (
+            batch TEXT PRIMARY KEY, day TEXT NOT NULL, version TEXT NOT NULL, platform TEXT NOT NULL,
+            count INTEGER NOT NULL, len TEXT NOT NULL, dur TEXT NOT NULL, rep_max TEXT NOT NULL
+        );
+        """
+    )
     return con
+
+
+def split_edge(key: str) -> tuple[str, str, int, str, str]:
+    """`from>to|rel|gap` → (src, dst, err, rel, gap); az `other` gyűjtő-kulcs külön sor."""
+    if key == "other":
+        return "other", "other", 0, "-", "-"
+    pair, rel, gap = key.split("|")
+    src, dst = pair.split(">")
+    err = 1 if src.endswith("!") else 0
+    return src.rstrip("!"), dst, err, rel, gap
 
 
 def _short(value, limit=40) -> bool:
@@ -97,9 +127,62 @@ def _counts_only(obj, depth=0) -> bool:
     return False
 
 
+# schema 2 (v0.9.5): „melyik parancs után melyik jött” élek — csak zárt nevek és sávok, név / út nem férhet bele
+EDGE_RE = re.compile(
+    r"^(start|[a-z_]{1,20}!?)>(end|[a-z_]{1,20})\|(same_file|same_dir|same_project|other_project|none)"
+    r"\|(<5s|5-60s|1-10m|10-30m|-)$"
+)
+MAX_EDGES = 600
+# „az előző kimenetből jött-e” (v0.9.5): `from>to|f:<fájl-sáv>|s:<szimbólum-sáv>` — csak sávok
+USE_RE = re.compile(r"^([a-z_]{1,20}!?)>([a-z_]{1,20})\|f:(hit1|hit5|hit|miss|-)\|s:(hit|miss|-)$")
+SESSION_BANDS = {"len": 5, "dur": 4, "rep_max": 3}
+
+
+def _count(v) -> bool:
+    return isinstance(v, int) and not isinstance(v, bool) and 0 <= v <= MAX_COUNT
+
+
+def validate_edges(edges) -> bool:
+    if edges is None:
+        return True
+    return (isinstance(edges, dict) and len(edges) <= MAX_EDGES
+            and all((k == "other" or EDGE_RE.match(k)) and _count(v) for k, v in edges.items()))
+
+
+def validate_uses(uses) -> bool:
+    if uses is None:
+        return True
+    return (isinstance(uses, dict) and len(uses) <= MAX_EDGES
+            and all((k == "other" or (USE_RE.match(k) and not k.startswith("start>") and ">end|" not in k))
+                    and _count(v) for k, v in uses.items()))
+
+
+def split_use(key: str) -> tuple[str, str, int, str, str]:
+    """`from>to|f:sáv|s:sáv` → (src, dst, err, f, s); az `other` gyűjtő-kulcs külön sor."""
+    if key == "other":
+        return "other", "other", 0, "-", "-"
+    src, dst, f, s = USE_RE.match(key).groups()
+    return src.rstrip("!"), dst, int(src.endswith("!")), f, s
+
+
+def validate_sessions(sessions) -> bool:
+    if sessions is None:
+        return True
+    if not isinstance(sessions, dict) or set(sessions) - {"count", *SESSION_BANDS}:
+        return False
+    if not _count(sessions.get("count", 0)):
+        return False
+    for key, n in SESSION_BANDS.items():
+        band = sessions.get(key, [0] * n)
+        if not isinstance(band, list) or len(band) != n or not all(_count(v) for v in band):
+            return False
+    return True
+
+
 def validate(payload) -> list[dict] | None:
-    if not isinstance(payload, dict) or payload.get("schema") != 1:
+    if not isinstance(payload, dict) or payload.get("schema") not in (1, 2):
         return None
+    schema = payload["schema"]
     if not _short(payload.get("version"), 32) or not _short(payload.get("platform"), 32):
         return None
     days = payload.get("days")
@@ -108,7 +191,8 @@ def validate(payload) -> list[dict] | None:
     today = date.today()
     out = []
     for d in days:
-        if not isinstance(d, dict) or set(d) - {"day", "batch", "commands"}:
+        allowed = {"day", "batch", "commands"} | ({"edges", "sessions", "uses"} if schema == 2 else set())
+        if not isinstance(d, dict) or set(d) - allowed:
             return None
         try:
             day = date.fromisoformat(d.get("day", ""))
@@ -122,7 +206,12 @@ def validate(payload) -> list[dict] | None:
             return None
         if not _counts_only(d.get("commands")):
             return None
-        out.append({"day": day.isoformat(), "batch": batch, "commands": d["commands"]})
+        if not validate_edges(d.get("edges")) or not validate_sessions(d.get("sessions")) \
+                or not validate_uses(d.get("uses")):
+            return None
+        out.append({"day": day.isoformat(), "batch": batch, "commands": d["commands"],
+                    "edges": d.get("edges") or {}, "sessions": d.get("sessions"),
+                    "uses": d.get("uses") or {}})
     return out
 
 
@@ -345,11 +434,34 @@ class Handler(BaseHTTPRequestHandler):
             con = db()
             try:
                 for d in days:
-                    con.execute(
+                    cur = con.execute(
                         "INSERT OR IGNORE INTO days(batch, day, version, platform, commands, received) VALUES (?,?,?,?,?,?)",
                         (d["batch"], d["day"], payload["version"], payload["platform"],
                          json.dumps(d["commands"], separators=(",", ":")), received),
                     )
+                    if cur.rowcount != 1:
+                        continue  # ugyanaz a köteg már megjött: az élek se duplázódjanak
+                    for key, n in d["edges"].items():
+                        con.execute(
+                            "INSERT INTO edges(day, version, platform, src, dst, err, rel, gap, count) VALUES (?,?,?,?,?,?,?,?,?) "
+                            "ON CONFLICT(day, version, platform, src, dst, err, rel, gap) DO UPDATE SET count=count+excluded.count",
+                            (d["day"], payload["version"], payload["platform"], *split_edge(key), n),
+                        )
+                    for key, n in d["uses"].items():
+                        con.execute(
+                            "INSERT INTO uses(day, version, platform, src, dst, err, f, s, count) VALUES (?,?,?,?,?,?,?,?,?) "
+                            "ON CONFLICT(day, version, platform, src, dst, err, f, s) DO UPDATE SET count=count+excluded.count",
+                            (d["day"], payload["version"], payload["platform"], *split_use(key), n),
+                        )
+                    s = d["sessions"]
+                    if s:
+                        con.execute(
+                            "INSERT OR IGNORE INTO session_stats(batch, day, version, platform, count, len, dur, rep_max) "
+                            "VALUES (?,?,?,?,?,?,?,?)",
+                            (d["batch"], d["day"], payload["version"], payload["platform"], s.get("count", 0),
+                             json.dumps(s.get("len", [0] * 5)), json.dumps(s.get("dur", [0] * 4)),
+                             json.dumps(s.get("rep_max", [0] * 3))),
+                        )
                 con.commit()
                 fold_old_days(con)
             finally:

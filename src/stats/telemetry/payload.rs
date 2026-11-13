@@ -2,6 +2,12 @@
 //! azonosító nincs bennük), csak LEZÁRT napok (a mai nem), legfeljebb 7 nap visszamenőleg, és mellé a verzió, az
 //! os/arch, napónként egy véletlen kötegazonosító (a szerveroldali duplikátum-szűréshez; nem tároljuk) és a séma
 //! verziója.
+//!
+//! A 2-es séma naponként a parancs-sorrend számait is hordozza: `edges` (`{előző}[!]>{ez}|{rel}|{szünet}` → darab;
+//! csak parancsnevek, a cél-viszony neve és sávok) és `sessions` (a lezárt munkamenetek hossz-, időtartam- és
+//! ismétlés-sávjai), és `uses` (`{előző}[!]>{ez}|f:{sáv}|s:{sáv}` → darab: a következő hívás célfájlja / szimbóluma
+//! benne volt-e az előző kimenetben, és a fájl hányadikként; csak sávnevek). A helyi eseménynapló és a
+//! munkamenet-állapot (a kulcsolt hash-ekkel) SOHA nem megy el.
 
 use std::collections::BTreeMap;
 
@@ -9,10 +15,11 @@ use serde::Serialize;
 
 use crate::stats::day::Day;
 use crate::stats::event::CommandKind;
+use crate::stats::session::Sessions;
 use crate::stats::store::{Counters, StatsStore};
 
-/// A séma verziója.
-pub(crate) const SCHEMA: u32 = 1;
+/// A séma verziója (2: `edges` és `sessions` naponként).
+pub(crate) const SCHEMA: u32 = 2;
 /// Ennyi lezárt napot küld legfeljebb visszamenőleg.
 pub(crate) const MAX_DAYS: u32 = 7;
 
@@ -32,6 +39,15 @@ pub(crate) struct DayEntry {
     /// Véletlen kötegazonosító (UUID v4 alakú), naponként új.
     pub batch: String,
     pub commands: BTreeMap<CommandKind, Counters>,
+    /// Az átmenet-élek (melyik parancs után melyik jött) → darab.
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub edges: BTreeMap<String, u64>,
+    /// A lezárt munkamenetek sávjai.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sessions: Option<Sessions>,
+    /// Az előző kimenet felhasználása (`{előző}[!]>{ez}|f:{sáv}|s:{sáv}`) → darab.
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub uses: BTreeMap<String, u64>,
 }
 
 /// A beküldésre váró lezárt napok (régebbi elöl): a `today` előtti legfeljebb 7 nap, az utolsó beküldött nap után,
@@ -54,10 +70,16 @@ pub(crate) fn build(store: &StatsStore, days: &[Day]) -> Payload {
         platform: crate::update::Platform::current().dir(),
         days: days
             .iter()
-            .map(|day| DayEntry {
-                day: day.to_string(),
-                batch: batch_id(),
-                commands: store.day_counters(*day),
+            .map(|day| {
+                let (edges, sessions) = store.day_flow(*day);
+                DayEntry {
+                    day: day.to_string(),
+                    batch: batch_id(),
+                    commands: store.day_counters(*day),
+                    edges,
+                    sessions,
+                    uses: store.day_uses(*day),
+                }
             })
             .collect(),
     }

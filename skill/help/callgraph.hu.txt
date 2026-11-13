@@ -110,6 +110,7 @@ kifejezés nélkül):
                                                 hívások parancsonként / MCP-eszközönként, felhasználói és belső hibák, idő
                                                 és kimenet-méret sávokban, locate-találati arány; az elmúlt 7 nap (max. 90);
                                                 kikapcsolás: CALLGRAPH_STATS=0
+  bash ~/.claude/skills/callgraph/callgraph.sh stats --events [--days N]   helyi eseménynapló (hívásonként egy sor, max. 14 nap, soha nem megy el) + leggyakoribb parancs-átmenetek, és hogy a következő hívás fájlja / szimbóluma benne volt-e az előző kimenetben
   bash ~/.claude/skills/callgraph/callgraph.sh telemetry status|preview|on|off
                                                 e napi számok opt-in beküldése (csak lezárt napok); preview: a pontos JSON;
                                                 on: terminálban y/N megerősítést kér (csak a felhasználó kapcsolhatja be);

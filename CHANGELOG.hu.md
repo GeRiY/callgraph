@@ -6,6 +6,41 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ## [Unreleased]
 
+## [0.9.5] — 2026-11-13
+
+### Új
+
+- **Helyi parancsnapló**: a `callgraph.sh stats --events [--days N]` kilistázza a legutóbbi hívásaidat (parancs, kliens,
+  eredmény, idő- és méretsáv, hogyan viszonyul az előző híváshoz, és benne volt-e a fájlja / szimbóluma az előző hívás
+  kimenetében) és a leggyakoribb parancs-átmeneteket. Az „az előző kimenet felhasználása” összesítő átmenetenként
+  mutatja, hányszor volt a következő hívás fájlja az első felsorolt fájl (`hit1`), a 2.–5. (`hit5`), egy későbbi
+  (`hit`), vagy nem volt benne (`miss`), és benne volt-e a szimbóluma (`hit` / `miss`). A napló ezen a gépen marad
+  (14 nap), és nincs benne név, útvonal vagy kód; az ellenőrzéshez csak az utolsó hívás kimenetének elemei maradnak meg,
+  kulcsolt hash-ként a helyi `session.json`-ban, minden hívásnál felülírva, és soha nem mennek el. Kikapcsolás:
+  `CALLGRAPH_STATS=0`.
+
+### Változás
+
+- **Opt-in telemetria (schema 2)**: ha bekapcsoltad a telemetriát, a napi számokban mostantól a parancsok sorrendjének
+  számai (melyik után melyik jött, mennyi idő telt el köztük, ugyanarra a fájlra, mappára vagy projektre irányult-e),
+  a munkamenet-hossz sávjai, a célfájl nyelve és méretsávja, valamint parancs-átmenetenként az előző kimenet
+  felhasználásának sávjai (`hit1` / `hit5` / `hit` / `miss`, szimbólumnál `hit` / `miss`) is benne vannak — név,
+  útvonal, kód és hash továbbra sem. Egyszer szólunk róla; a `callgraph.sh telemetry preview` pontosan megmutatja, mi
+  menne el.
+- Az indításkori ellenőrzés legfeljebb 10-szer (2 naponta) javasolja a használati számok megosztását, nemleges válasz
+  után soha.
+- **Az MCP-eszközök jelzik, hogy csak olvasnak, és hogy melyiket mikor érdemes használni:** mostantól minden
+  MCP-eszköz kifejezetten megadja a `readOnlyHint: true`, `destructiveHint: false`, `idempotentHint: true` és
+  `openWorldHint: false` jelzést, mert egyik sem módosít semmit, és nem nyúl ki a projektből, így az ezeket a
+  jelzéseket megkövetelő katalógusok (pl. az OpenAI-é) is elfogadják a szervert. A `locate`, az `outline`, a `search`
+  és a `framework_view` leírása most megmondja az agentnek, melyik való az adott feladatra: az `outline` `method`-dal
+  felsorolja, mit hív az a metódus (ezért nincs külön callees eszköz), a fordított irányhoz (ki hívja) pedig a
+  `find_callers`-t ajánlja.
+
+### Javítás
+
+- A `callgraph.sh telemetry status` mostantól a `DO_NOT_TRACK`-et is felsorolja a beküldést tiltó okok között.
+
 ## [0.9.4] — 2026-11-12
 
 ### Új
@@ -23,6 +58,8 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 - A frissítés-ellenőrzés és a letöltés az `update.callgraph.eu`-n át megy (tartalék: GitHub); névtelen napi
   használat-számlálás — lásd a README „Névtelen napi számlálás” részét.
+- `telemetry reset` (újra döntetlen, kikapcsolva) és `hook reset [tétel]` (a `hook never` visszavonása); a
+  `DO_NOT_TRACK=1` mostantól a telemetriát is leállítja.
 
 ### Javítás
 
@@ -600,7 +637,8 @@ Első kiadás.
 - Beépített frissítés: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Előre fordított csomagok macOS-re (arm64, x86_64), Linuxra (x86_64, ARM64, statikus musl) és Windowsra.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.9.4...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.9.5...develop
+[0.9.5]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.5
 [0.9.4]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.4
 [0.9.3]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.3
 [0.9.2]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.2

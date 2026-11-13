@@ -5,13 +5,16 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use super::Recorder;
-use super::buckets::RankBucket;
+use super::buckets::{InputBucket, RankBucket, SizeBucket};
 use super::cli_probe::{Meter, classify};
 use super::day::Day;
 use super::event::{Client, CommandKind, ErrorKind, truncated};
 use super::locate_hits::{LocateHits, WINDOW, ranked_files};
 use super::mcp_probe::{McpStats, ToolCall};
+use super::reuse::USE_BANDS;
+use super::session::{GAP_BANDS, REP_LABELS, Rel};
 use super::store::MonthFile;
+use super::target::LANGUAGES;
 use super::tests::temp_dir;
 
 #[test]
@@ -146,8 +149,9 @@ fn recognizes_truncated_output_and_meters_characters() {
 }
 
 /// A napi fájl csak a rögzített szótárból áll: kulcsok és szöveges értékek a parancs-, kliens- és hiba-nevek,
-/// a mezőnevek és a napok; út-elválasztó és a fixture-projekt egyetlen neve sem kerülhet bele — akkor sem, ha az
-/// MCP-hívások utat, projekt-aliast és nevekkel teli kimenetet kapnak.
+/// a mezőnevek, a nyelvek, a sávok, a napok és az átmenet-élek kulcsai; út-elválasztó és a fixture-projekt egyetlen
+/// neve sem kerülhet bele — akkor sem, ha az MCP-hívások utat, projekt-aliast és nevekkel teli kimenetet kapnak.
+/// Ugyanez igaz a helyi eseménynaplóra; a munkamenet-állapotban csak hexa hash-ek vannak.
 #[test]
 fn the_day_file_holds_no_paths_or_names() {
     let dir = temp_dir("privacy");
@@ -168,6 +172,7 @@ fn the_day_file_holds_no_paths_or_names() {
         started: Instant::now(),
         project: Some("SecretShop"),
         path,
+        symbol: Some("processRefund"),
         invalid: false,
     };
     stats.tool_call(&call(CommandKind::Locate, None), &Ok(locate_output.into()));
@@ -187,18 +192,112 @@ fn the_day_file_holds_no_paths_or_names() {
         &Err("Unknown project alias: SecretShop".into()),
     );
 
-    let files: Vec<PathBuf> = std::fs::read_dir(&dir)
+    // a havi fájl (`YYYY-MM.json`); mellette csak a helyi munkamenet-állapot és az eseménynapló mappája
+    let names: Vec<String> = std::fs::read_dir(&dir)
         .unwrap()
-        .map(|e| e.unwrap().path())
+        .map(|e| e.unwrap().file_name().into_string().unwrap())
         .collect();
-    assert_eq!(files.len(), 1, "{files:?}");
+    let files: Vec<PathBuf> = names
+        .iter()
+        .filter(|n| {
+            n.strip_suffix(".json")
+                .is_some_and(|m| Day::parse_month(m).is_some())
+        })
+        .map(|n| dir.join(n))
+        .collect();
+    assert_eq!(files.len(), 1, "{names:?}");
+    for name in &names {
+        assert!(
+            files.contains(&dir.join(name)) || name == "session.json" || name == "events",
+            "unexpected file: {name}"
+        );
+    }
     let text = std::fs::read_to_string(&files[0]).unwrap();
     assert!(!text.contains('/') && !text.contains('\\'), "{text}");
     for secret in secrets {
         assert!(!text.contains(secret), "{secret}: {text}");
     }
-    // csak a rögzített szótár: minden JSON-szöveg (kulcs vagy érték) ismert név vagy nap
-    let known: Vec<&str> = CommandKind::ALL
+    // csak a rögzített szótár: minden JSON-szöveg (kulcs vagy érték) ismert név, nap vagy él-kulcs
+    let known = known_words();
+    let value: serde_json::Value = serde_json::from_str(&text).unwrap();
+    let mut strings = Vec::new();
+    collect_strings(&value, &mut strings);
+    for s in &strings {
+        assert!(
+            known.contains(&s.as_str())
+                || Day::parse(s).is_some()
+                || is_edge_key(s)
+                || is_use_key(s),
+            "unexpected text in the day file: {s}"
+        );
+    }
+    // az átmenet-élek is rögzültek (a négy hívás egy munkamenet)
+    let edges: Vec<&String> = value["edges"]
+        .as_object()
+        .unwrap()
+        .values()
+        .flat_map(|day| day.as_object().unwrap().keys())
+        .collect();
+    assert_eq!(edges.len(), 4, "{edges:?}");
+    // az előző kimenet felhasználása: a munkamenet első hívása nem számít, a többi csak sávnevekkel
+    let uses: Vec<&String> = value["uses"]
+        .as_object()
+        .unwrap()
+        .values()
+        .flat_map(|day| day.as_object().unwrap().keys())
+        .collect();
+    assert_eq!(uses.len(), 3, "{uses:?}");
+    for key in [
+        "locate>outline|f:hit1|s:hit",
+        "outline>method_body|f:miss|s:hit",
+        "method_body!>find_callers|f:-|s:-",
+    ] {
+        assert!(uses.iter().any(|k| *k == key), "{key}: {uses:?}");
+    }
+    // a helyi eseménynapló: ugyanaz a szótár, út és név nélkül
+    let events_dir = dir.join("events");
+    let logs: Vec<PathBuf> = std::fs::read_dir(&events_dir)
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .collect();
+    assert_eq!(logs.len(), 1, "{logs:?}");
+    let log = std::fs::read_to_string(&logs[0]).unwrap();
+    assert_eq!(log.lines().count(), 4, "{log}");
+    for line in log.lines() {
+        let value: serde_json::Value = serde_json::from_str(line).unwrap();
+        let mut strings = Vec::new();
+        collect_strings(&value, &mut strings);
+        for s in &strings {
+            assert!(
+                known.contains(&s.as_str()) || (s.ends_with('Z') && s.contains('T')),
+                "unexpected text in the event log: {s}"
+            );
+        }
+        for secret in secrets {
+            assert!(!line.contains(secret), "{secret}: {line}");
+        }
+    }
+    // a munkamenet-állapot: csak hexa hash-ek (és a kulcs), név és út nélkül
+    let session = std::fs::read_to_string(dir.join("session.json")).unwrap();
+    assert!(
+        !session.contains('/') && !session.contains('\\'),
+        "{session}"
+    );
+    for secret in secrets {
+        assert!(!session.contains(secret), "{secret}: {session}");
+    }
+    // a találat is rögzült: az outline a lista első fájlját nyitotta meg
+    let file = MonthFile::load(&files[0]);
+    let locate = &file.days.values().next().unwrap()[&CommandKind::Locate];
+    assert_eq!(locate.hits, [1, 0, 0, 0]);
+    let errors = &file.days.values().next().unwrap()[&CommandKind::MethodBody].errors;
+    assert_eq!(errors.get(&ErrorKind::NotFound), Some(&1));
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+/// A napi fájl, az eseménynapló és a beküldés rögzített szótára.
+pub(super) fn known_words() -> Vec<&'static str> {
+    CommandKind::ALL
         .iter()
         .map(|c| c.name())
         .chain(Client::ALL.iter().map(|c| c.name()))
@@ -215,24 +314,75 @@ fn the_day_file_holds_no_paths_or_names() {
             "hits",
             "next_shown",
             "next_used",
+            "in_size",
+            "lang",
+            "edges",
+            "sessions",
+            "count",
+            "len",
+            "dur",
+            "rep_max",
+            "uses",
         ])
-        .collect();
-    let value: serde_json::Value = serde_json::from_str(&text).unwrap();
-    let mut strings = Vec::new();
-    collect_strings(&value, &mut strings);
-    for s in &strings {
-        assert!(
-            known.contains(&s.as_str()) || Day::parse(s).is_some(),
-            "unexpected text in the day file: {s}"
-        );
+        // az eseménynapló mezői és sávjai
+        .chain([
+            "t0", "ms", "cmd", "via", "ok", "err", "in", "out", "rel", "rep", "sess", "seq",
+            "use_file", "use_sym",
+        ])
+        .chain(USE_BANDS)
+        .chain(InputBucket::LABELS)
+        .chain(SizeBucket::LABELS)
+        .chain(REP_LABELS)
+        .chain(Rel::ALL.iter().map(|r| r.name()))
+        .chain(LANGUAGES)
+        .collect()
+}
+
+/// Egy átmenet-él kulcsa a rögzített szerkezetben: `{előző}[!]>{ez}|{rel}|{szünet}` vagy `other`.
+pub(super) fn is_edge_key(key: &str) -> bool {
+    if key == "other" {
+        return true;
     }
-    // a találat is rögzült: az outline a lista első fájlját nyitotta meg
-    let file = MonthFile::load(&files[0]);
-    let locate = &file.days.values().next().unwrap()[&CommandKind::Locate];
-    assert_eq!(locate.hits, [1, 0, 0, 0]);
-    let errors = &file.days.values().next().unwrap()[&CommandKind::MethodBody].errors;
-    assert_eq!(errors.get(&ErrorKind::NotFound), Some(&1));
-    let _ = std::fs::remove_dir_all(dir);
+    let mut parts = key.split('|');
+    let (Some(pair), Some(rel), Some(gap), None) =
+        (parts.next(), parts.next(), parts.next(), parts.next())
+    else {
+        return false;
+    };
+    let Some((from, to)) = pair.split_once('>') else {
+        return false;
+    };
+    let names: Vec<&str> = CommandKind::ALL.iter().map(|c| c.name()).collect();
+    let from = from.strip_suffix('!').unwrap_or(from);
+    (from == "start" || names.contains(&from))
+        && (to == "end" || names.contains(&to))
+        && Rel::ALL.iter().any(|r| r.name() == rel)
+        && GAP_BANDS.contains(&gap)
+}
+
+/// Egy újrahasznosítás-kulcs a rögzített szerkezetben: `{előző}[!]>{ez}|f:{sáv}|s:{sáv}` vagy `other`.
+pub(super) fn is_use_key(key: &str) -> bool {
+    if key == "other" {
+        return true;
+    }
+    let mut parts = key.split('|');
+    let (Some(pair), Some(file), Some(sym), None) =
+        (parts.next(), parts.next(), parts.next(), parts.next())
+    else {
+        return false;
+    };
+    let Some((from, to)) = pair.split_once('>') else {
+        return false;
+    };
+    let names: Vec<&str> = CommandKind::ALL.iter().map(|c| c.name()).collect();
+    let from = from.strip_suffix('!').unwrap_or(from);
+    let file_ok = file
+        .strip_prefix("f:")
+        .is_some_and(|b| USE_BANDS.contains(&b));
+    let sym_ok = sym
+        .strip_prefix("s:")
+        .is_some_and(|b| ["hit", "miss", "-"].contains(&b));
+    names.contains(&from) && names.contains(&to) && file_ok && sym_ok
 }
 
 fn collect_strings(value: &serde_json::Value, out: &mut Vec<String>) {
