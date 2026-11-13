@@ -162,14 +162,15 @@ impl Command for ShowCommand {
         if !self.body
             && matches!(
                 self.format.as_str(),
-                "outline" | "json" | "jsonl" | "inertia"
+                "outline" | "json" | "jsonl" | "inertia" | "ziggy"
             )
             && self.lines.is_none()
             && self.strings.is_none()
             && self.const_filter.is_none()
         {
-            // framework-kötések (Inertia): a render-hívás page-fájlja, a page-fájl `rendered by:` sora és az
-            // `inertia` nézet; Inertia nélkül a kimenet változatlan
+            // framework-kötések (Inertia, Laravel): a render-hívás page-fájlja, a page-fájl `rendered by:` sora, a
+            // `inertia` nézet, a JS `route('név')` link, a controller `route:` sora és a `ziggy` nézet; framework
+            // nélkül a kimenet változatlan
             crate::packages::annotate_frameworks(&mut rows, engine.root(), &self.format);
         }
         let text = match self.render(&rows) {

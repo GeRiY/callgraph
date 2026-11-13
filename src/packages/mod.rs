@@ -42,7 +42,9 @@ use crate::model::Call;
 use crate::query::QueryResult;
 
 pub(crate) use deps::{DepsQuery, user_ignores};
-pub(crate) use frameworks::{DiskProjectFiles, Inertia, PageLink, annotate as annotate_frameworks};
+pub(crate) use frameworks::{
+    DiskProjectFiles, Inertia, Laravel, PageLink, annotate as annotate_frameworks,
+};
 pub(crate) use model::Package;
 pub(crate) use project::ProjectPackages;
 pub(crate) use resolve::Attribution;

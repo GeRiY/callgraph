@@ -176,6 +176,12 @@ fn outline(
                 }
             }
             crate::notes::method_lines(&mut s, &row.notes, m.container.as_deref(), &m.name, "    ");
+            // Laravel route-akció: egy sor a route-okkal (route-tábla / route nélkül nincs sor)
+            if let Some(route) = row.laravel.as_ref().and_then(|laravel| {
+                laravel.route_line(g.namespace.as_deref(), m.container.as_deref()?, &m.name)
+            }) {
+                writeln!(s, "    {route}").unwrap();
+            }
             for cat in categories(row, m, lang) {
                 writeln!(s, "    {:<18}{}", cat.0, cat.1).unwrap();
             }
@@ -333,9 +339,14 @@ pub(super) fn categories(row: &QueryResult, m: &Method, lang: Lang) -> Vec<(Stri
 }
 
 /// A hívás kiírt célja: a feloldott (különben a nyers) cél; Inertia render-hívásnál utána a page-fájl rövid alakja
-/// (`Inertia\Inertia::render → Pages/Board.vue`, nem létező fájlnál `(missing)`). Kötések nélkül a régi.
+/// (`Inertia\Inertia::render → Pages/Board.vue`, nem létező fájlnál `(missing)`); Ziggy `route('név')` hívásnál a
+/// route linkje (`route::register → POST /register · RegisteredUserController@store`). Kötések nélkül a régi.
 pub(super) fn shown_target(row: &QueryResult, call: &Call, lang: Lang) -> String {
     let target = call.resolved.as_deref().unwrap_or(&call.target);
+    // Ziggy `route('név')` hívásnál a Laravel route-tábla linkje (` → POST /uri · X@m`, vagy ` ⚠ no route`)
+    if let Some(link) = row.route_link(call, lang) {
+        return format!("{target}{link}");
+    }
     match row.inertia_page(call) {
         Some(page) if page.exists => format!("{target} → {}", page.short),
         Some(page) => format!(

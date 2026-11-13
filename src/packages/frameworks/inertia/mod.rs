@@ -4,7 +4,7 @@
 //! `rendered by:` sora, az `inertia` nézet (`view.rs`) és a `locate` page-indoklása.
 
 mod pages;
-mod render;
+pub(super) mod render;
 mod view;
 
 #[cfg(test)]

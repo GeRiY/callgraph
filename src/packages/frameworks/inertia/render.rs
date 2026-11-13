@@ -221,11 +221,16 @@ pub(crate) fn prop_keys(arg: &str) -> Option<Vec<String>> {
 /// A hívás argumentumai a forrásból: a `line`. sorban az első `<név>(` (a render-hívás neve), onnan a záró `)`-ig, a
 /// legfelső szintű vesszők mentén. Nem található / lezáratlan hívás: `None`.
 pub(crate) fn source_args(text: &str, line: u32, kind: RenderKind) -> Option<Vec<String>> {
+    source_args_named(text, line, kind.name())
+}
+
+/// A hívás argumentumai a forrásból, tetszőleges hívott névvel (kisbetűs `name`): a `line`. sorban az első
+/// `<name>(` — a Laravel-kötések a `route(` / `to_route(` hívásokhoz is ezt használják.
+pub(crate) fn source_args_named(text: &str, line: u32, name: &str) -> Option<Vec<String>> {
     let start = line_start(text, line)?;
     let rest = &text[start..];
     let first = &rest[..rest.find('\n').unwrap_or(rest.len())];
     let lower = first.to_ascii_lowercase();
-    let name = kind.name();
     let mut from = 0;
     while let Some(found) = lower[from..].find(name) {
         let at = from + found;
@@ -332,7 +337,7 @@ fn skip_line(chars: &mut std::iter::Peekable<std::str::CharIndices<'_>>) {
 }
 
 /// A szöveg darabjai a legfelső szintű (stringeken és zárójeleken kívüli) `sep` mentén.
-fn split_top<'a>(text: &'a str, sep: &str) -> Vec<&'a str> {
+pub(crate) fn split_top<'a>(text: &'a str, sep: &str) -> Vec<&'a str> {
     let mut parts = Vec::new();
     let mut depth = 0usize;
     let mut quote: Option<char> = None;

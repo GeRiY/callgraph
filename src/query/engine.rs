@@ -31,6 +31,9 @@ pub struct QueryResult {
     /// A framework-kötések (`crate::packages::annotate_frameworks`): csak Inertia-projektben, az outline, a json és
     /// az `inertia` nézet előtt; `None` = a kimenet a régi.
     pub(crate) inertia: Option<std::sync::Arc<crate::packages::Inertia>>,
+    /// A Laravel route-tábla (`crate::packages::annotate_frameworks`): csak Laravel-projektben, és csak ha a kimenet
+    /// kéri (JS `route('név')` hívás, controller-fájl, `ziggy` nézet); `None` = a kimenet a régi.
+    pub(crate) laravel: Option<std::sync::Arc<crate::packages::Laravel>>,
 }
 
 /// Egy rokon típuson át illesztett hívás: sor + cél (a `resolved` / `target`), és a hívás típusának rövid neve.
@@ -50,12 +53,21 @@ impl QueryResult {
             notes: Vec::new(),
             packages: None,
             inertia: None,
+            laravel: None,
         }
     }
 
     /// Inertia render-hívásnál (string-literál page-névvel) a page-fájl; kötések nélkül mindig `None`.
     pub(crate) fn inertia_page(&self, call: &Call) -> Option<crate::packages::PageLink> {
         self.inertia.as_ref()?.link(call)
+    }
+
+    /// Ziggy `route('név')` hívásnál a link az outline-hoz (` → POST /register · X@store`, hiányzó névnél
+    /// ` ⚠ no route`); kötések nélkül mindig `None`.
+    pub(crate) fn route_link(&self, call: &Call, lang: crate::i18n::Lang) -> Option<String> {
+        self.laravel
+            .as_ref()?
+            .link_text(call, &self.graph.calls, self.inertia.as_deref(), lang)
     }
 
     /// A hívás csomagja (a hívás nyers minősítőjéből, a fájlhoz legközelebbi manifest szerint), ha a sorhoz
@@ -285,6 +297,7 @@ impl QueryEngine {
             kept.notes.clone_from(&row.notes);
             kept.packages.clone_from(&row.packages);
             kept.inertia.clone_from(&row.inertia);
+            kept.laravel.clone_from(&row.laravel);
             if let Some((regex, matcher)) = &via {
                 kept.via = kept
                     .graph

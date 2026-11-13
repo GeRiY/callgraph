@@ -136,6 +136,40 @@ fn js_comment<S: serde::Serializer>(c: &&crate::model::Comment, ser: S) -> Resul
 struct JsCall<'a> {
     call: &'a crate::model::Call,
     package: Option<crate::packages::Attribution>,
+    /// Laravel-kötésekkel a Ziggy `route('név')` hívásnál a route.
+    route: Option<RouteJson>,
+}
+
+/// A `route` mező: a megtalált route (`name`, `verb`, `uri`, `action`), vagy `{"missing": true}`, ha a név nem létezik.
+#[derive(serde::Serialize)]
+#[serde(untagged)]
+enum RouteJson {
+    Found {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        name: Option<String>,
+        verb: String,
+        uri: String,
+        action: String,
+    },
+    Missing {
+        missing: bool,
+    },
+}
+
+impl RouteJson {
+    /// A hívás route-ja a Laravel-kötésekből; kötések nélkül, nem route-hívásnál vagy üres route-táblánál `None`.
+    fn of(row: &QueryResult, call: &crate::model::Call) -> Option<Self> {
+        let laravel = row.laravel.as_ref()?;
+        Some(match laravel.lookup(call)? {
+            Some(route) => Self::Found {
+                name: route.name.clone(),
+                verb: route.verb.clone(),
+                uri: route.uri.clone(),
+                action: route.action.full(),
+            },
+            None => Self::Missing { missing: true },
+        })
+    }
 }
 
 impl serde::Serialize for JsCall<'_> {
@@ -174,6 +208,9 @@ impl serde::Serialize for JsCall<'_> {
         if let Some(package) = self.package.as_ref().filter(|p| !repeated(&p.name)) {
             m.serialize_entry("package", &package.name)?;
         }
+        if let Some(route) = &self.route {
+            m.serialize_entry("route", route)?;
+        }
         m.end()
     }
 }
@@ -204,6 +241,7 @@ pub(super) fn ordered_graph(row: &QueryResult) -> OrderedGraph<'_> {
                     .map(|call| JsCall {
                         call,
                         package: row.package_of(call),
+                        route: RouteJson::of(row, call),
                     })
                     .collect(),
             )
