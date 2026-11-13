@@ -288,7 +288,11 @@ fn json_calls_carry_the_full_package_name_and_version() {
             .iter()
             .find(|call| call["resolved"] == resolved)
             .unwrap_or_else(|| panic!("{resolved}: {text}"));
-        (call["package"].clone(), call["package_version"].clone())
+        // a verzió nem ismétlődik hívásonként: a fájl `packages` táblájában van, egyszer
+        assert!(call.get("package_version").is_none(), "{call}");
+        let name = call["package"].clone();
+        let version = json[0]["packages"][name.as_str().unwrap_or_default()].clone();
+        (name, version)
     };
     assert_eq!(
         package_of("GuzzleHttp\\Client::request"),

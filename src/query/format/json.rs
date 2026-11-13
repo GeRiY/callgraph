@@ -10,6 +10,9 @@ pub(super) struct OrderedGraph<'a> {
     framework: &'a Option<String>,
     namespace: &'a Option<String>,
     imports: &'a crate::model::Imports,
+    /// A fájl hívásaiban hivatkozott csomagok verziója egyszer (név → verzió); a hívásokon csak a név áll, hogy
+    /// a verzió ne ismétlődjön hívásonként. Üres: nem kerül a kimenetbe.
+    packages: std::collections::BTreeMap<String, String>,
     containers: &'a [crate::model::Container],
     properties: &'a [crate::model::Property],
     constants: &'a [crate::model::Constant],
@@ -37,6 +40,9 @@ impl serde::Serialize for OrderedGraph<'_> {
         m.serialize_entry("framework", self.framework)?;
         m.serialize_entry("namespace", self.namespace)?;
         m.serialize_entry("imports", self.imports)?;
+        if !self.packages.is_empty() {
+            m.serialize_entry("packages", &self.packages)?;
+        }
         m.serialize_entry("containers", self.containers)?;
         m.serialize_entry("properties", self.properties)?;
         m.serialize_entry("constants", self.constants)?;
@@ -66,7 +72,7 @@ impl serde::Serialize for OrderedGraph<'_> {
 }
 
 /// A hívások mezősorrendje nyelvfüggő: a JS-motor `category`-t a `resolved` elé teszi. Csomagtérképpel (a
-/// projektnek van manifestje) a hívás végén a csomag: `package` (teljes név) és `package_version` (a lock verziója);
+/// projektnek van manifestje) a hívás végén a csomag: `package` (teljes név; a verzió a fájl `packages` táblájában);
 /// Inertia-kötésekkel a render-hívásnál a page-fájl: `inertia_page` (és ha nem létezik, `inertia_page_missing`).
 #[derive(serde::Serialize)]
 #[serde(untagged)]
@@ -83,8 +89,6 @@ struct PhpCall<'a> {
     call: &'a crate::model::Call,
     #[serde(skip_serializing_if = "Option::is_none")]
     package: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    package_version: Option<String>,
     /// Inertia render-hívásnál a page-fájl a gyökérhez relatívan (`resources/js/Pages/Board.vue`).
     #[serde(skip_serializing_if = "Option::is_none")]
     inertia_page: Option<String>,
@@ -95,16 +99,12 @@ struct PhpCall<'a> {
 
 impl<'a> PhpCall<'a> {
     fn new(row: &QueryResult, call: &'a crate::model::Call) -> Self {
-        let (package, package_version) = match row.package_of(call) {
-            Some(found) => (Some(found.name), found.version),
-            None => (None, None),
-        };
+        let package = row.package_of(call).map(|found| found.name);
         let page = row.inertia_page(call);
         let inertia_page_missing = page.as_ref().filter(|page| !page.exists).map(|_| true);
         Self {
             call,
             package,
-            package_version,
             inertia_page: page.map(|page| page.rel),
             inertia_page_missing,
         }
@@ -164,11 +164,15 @@ impl serde::Serialize for JsCall<'_> {
         if let Some(v) = &c.handler {
             m.serialize_entry("handler", v)?;
         }
-        if let Some(package) = &self.package {
+        // ha a `resolved` már a csomag nevével kezdődik (`vue::computed`), a `package` csak ismétlés lenne
+        let repeated = |name: &str| {
+            c.resolved.as_deref().is_some_and(|r| {
+                r.strip_prefix(name)
+                    .is_some_and(|rest| rest.starts_with("::"))
+            })
+        };
+        if let Some(package) = self.package.as_ref().filter(|p| !repeated(&p.name)) {
             m.serialize_entry("package", &package.name)?;
-            if let Some(version) = &package.version {
-                m.serialize_entry("package_version", version)?;
-            }
         }
         m.end()
     }
@@ -182,6 +186,12 @@ pub(super) fn ordered_graph(row: &QueryResult) -> OrderedGraph<'_> {
         framework: &graph.framework,
         namespace: &graph.namespace,
         imports: &graph.imports,
+        packages: graph
+            .calls
+            .iter()
+            .filter_map(|call| row.package_of(call))
+            .filter_map(|found| Some((found.name, found.version?)))
+            .collect(),
         containers: &graph.containers,
         properties: &graph.properties,
         constants: &graph.constants,
