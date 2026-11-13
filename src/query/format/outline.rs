@@ -116,6 +116,12 @@ fn outline(
             c.kind, c.name, extends, implements, traits, c.line, c.end_line
         )
         .unwrap();
+        // Eloquent-modell: a tábla oszlopai a migrációkból, fillable / casts, figyelmeztetések (nem modellnél nincs sor)
+        if let Some(laravel) = row.laravel.as_ref() {
+            for line in laravel.model_lines(g.namespace.as_deref(), &c.name, lang) {
+                writeln!(s, "  {line}").unwrap();
+            }
+        }
         let cons: Vec<_> = g
             .constants
             .iter()
@@ -196,8 +202,24 @@ fn outline(
                     writeln!(s, "    {form}").unwrap();
                 }
             }
-            for cat in categories(row, m, lang) {
-                writeln!(s, "    {:<18}{}", cat.0, cat.1).unwrap();
+            for (category, list) in categories(row, m, lang) {
+                // Eloquent-reláció: a cél az `orm_relation` sor végén (`belongsToMany → Role`)
+                let target = row
+                    .laravel
+                    .as_ref()
+                    .filter(|_| category == "orm_relation")
+                    .and_then(|laravel| {
+                        laravel.relation_target(
+                            g.namespace.as_deref(),
+                            m.container.as_deref()?,
+                            &m.name,
+                        )
+                    });
+                match target {
+                    Some(target) => writeln!(s, "    {category:<18}{list} → {target}"),
+                    None => writeln!(s, "    {category:<18}{list}"),
+                }
+                .unwrap();
             }
             if let Some(lines) = source {
                 call_lines(&mut s, row, &method_calls(g, m), lines, lang, "    ");

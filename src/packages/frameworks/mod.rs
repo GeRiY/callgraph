@@ -56,7 +56,11 @@ pub(crate) fn annotate(rows: &mut [QueryResult], root: &Path, format: &str) {
         && (format == "ziggy"
             || scan_forms
             || (matches!(format, "outline" | "json" | "jsonl") && rows.iter().any(needs_routes)));
-    if scan_inertia || scan_laravel {
+    // az Eloquent-modell összefoglaló (modellek + migrációk) csak modell-fájlnál és a `models` nézetnél
+    let scan_models = laravel.is_some()
+        && (format == "models"
+            || (matches!(format, "outline" | "json" | "jsonl") && rows.iter().any(needs_models)));
+    if scan_inertia || scan_laravel || scan_models {
         let analyzer = Analyzer::with_defaults();
         // a projekt-gráf hibája csak a render-helyeket / route-táblát hagyja üresen
         let _ = ProjectSource::new(root, &analyzer).with_files(|files| {
@@ -69,16 +73,23 @@ pub(crate) fn annotate(rows: &mut [QueryResult], root: &Path, format: &str) {
             if let Some(inertia) = inertia.as_mut().filter(|_| scan_inertia) {
                 inertia.scan(code(), &DiskProjectFiles);
             }
-            if let Some(laravel) = laravel.as_mut().filter(|_| scan_laravel) {
-                laravel.scan(code(), &DiskProjectFiles, format == "ziggy");
-                if scan_forms {
-                    laravel.scan_forms(code(), &DiskProjectFiles);
+            if let Some(laravel) = laravel.as_mut() {
+                if scan_laravel {
+                    laravel.scan(code(), &DiskProjectFiles, format == "ziggy");
+                    if scan_forms {
+                        laravel.scan_forms(code(), &DiskProjectFiles);
+                    }
+                }
+                if scan_models {
+                    laravel.scan_models(code(), &DiskProjectFiles);
                 }
             }
         });
     }
     let shared_inertia = inertia.map(Arc::new);
-    let shared_laravel = laravel.filter(|_| scan_laravel).map(Arc::new);
+    let shared_laravel = laravel
+        .filter(|_| scan_laravel || scan_models)
+        .map(Arc::new);
     for row in rows {
         row.inertia.clone_from(&shared_inertia);
         row.laravel.clone_from(&shared_laravel);
@@ -115,4 +126,18 @@ fn needs_forms(row: &QueryResult) -> bool {
                 .as_deref()
                 .is_some_and(|r| r.starts_with("@inertiajs/vue3::useForm"))
         })
+}
+
+/// Kell-e a modell-összefoglaló a sorhoz: PHP-fájl, amelyben Eloquent-alaposztályból öröklő osztály van (vagy a
+/// `Models/` mappában áll — a közvetett örökléshez).
+fn needs_models(row: &QueryResult) -> bool {
+    let graph = &row.graph;
+    graph.file.ends_with(".php")
+        && (graph.file.contains("Models/")
+            || graph.containers.iter().any(|c| {
+                c.extends
+                    .iter()
+                    .flatten()
+                    .any(|name| laravel::extends_model_base(name))
+            }))
 }

@@ -42,6 +42,7 @@ pub(crate) enum FrameworkView {
     Inertia,
     Ziggy,
     Forms,
+    Models,
 }
 
 // `outline`: egy fájl / mappa szerkezete vagy egy metódus hívás-gráfja.
@@ -373,6 +374,7 @@ impl FrameworkView {
             Self::Inertia => "inertia",
             Self::Ziggy => "ziggy",
             Self::Forms => "forms",
+            Self::Models => "models",
         }
     }
 }

@@ -4,15 +4,21 @@
 //! JS-hívásnál (hiányzó névnél `⚠ no route`), a controller-metódus `route:` sora, a json `route` mezője és a `ziggy`
 //! nézet (`view.rs`: ismeretlen route-nevek). Az Inertia `useForm` űrlap-szerződés (`forms.rs` + `rules.rs`): a küldött
 //! mezők ↔ a controller validációja — `form:` sor az outline-ban, `form` mező a json-ban, `forms` nézet. Nem új
-//! szekció: link — ezért kevés token.
+//! szekció: link — ezért kevés token. Az Eloquent-modell összefoglaló (`models.rs` + `schema.rs`): a tábla oszlopai a
+//! migrációkból, fillable / casts / relációk — `table:` sor az outline-ban, a reláció célja, json `model` mező és a
+//! `models` nézet.
 
 mod forms;
+mod models;
 mod routes;
 mod rules;
+mod schema;
 mod view;
 
 #[cfg(test)]
 mod forms_tests;
+#[cfg(test)]
+mod models_tests;
 #[cfg(test)]
 mod tests;
 
@@ -25,6 +31,8 @@ use crate::i18n::Lang;
 use crate::model::{Call, FileGraph};
 use crate::packages::Packages;
 use forms::Form;
+use models::ModelData;
+pub(crate) use models::extends_model_base;
 use routes::{Action, Route};
 
 /// A framework neve a `FRAMEWORKS` regiszterben (`laravel/framework`): ez kapcsolja be a stratégiát.
@@ -60,6 +68,8 @@ pub(crate) struct Laravel {
     refs: Vec<Reference>,
     /// Az ellenőrzött `useForm` küldések (csak a `scan_forms` után).
     forms: Vec<Form>,
+    /// Az Eloquent-modellek és a migrációk sémája (csak a `scan_models` után).
+    models: Option<ModelData>,
 }
 
 /// A hívás route-neve: Ziggy `route('név')` JS-hívás string-literál névvel (a gráf `resolved`-je `route::név`);
@@ -113,6 +123,7 @@ impl Laravel {
             by_name: HashMap::new(),
             refs: Vec::new(),
             forms: Vec::new(),
+            models: None,
         }
     }
 

@@ -13,7 +13,7 @@ pub(super) struct OrderedGraph<'a> {
     /// A fájl hívásaiban hivatkozott csomagok verziója egyszer (név → verzió); a hívásokon csak a név áll, hogy
     /// a verzió ne ismétlődjön hívásonként. Üres: nem kerül a kimenetbe.
     packages: std::collections::BTreeMap<String, String>,
-    containers: &'a [crate::model::Container],
+    containers: Containers<'a>,
     properties: &'a [crate::model::Property],
     constants: &'a [crate::model::Constant],
     methods: &'a [crate::model::Method],
@@ -43,7 +43,7 @@ impl serde::Serialize for OrderedGraph<'_> {
         if !self.packages.is_empty() {
             m.serialize_entry("packages", &self.packages)?;
         }
-        m.serialize_entry("containers", self.containers)?;
+        m.serialize_entry("containers", &self.containers)?;
         m.serialize_entry("properties", self.properties)?;
         m.serialize_entry("constants", self.constants)?;
         m.serialize_entry("methods", self.methods)?;
@@ -68,6 +68,45 @@ impl serde::Serialize for OrderedGraph<'_> {
             m.serialize_entry("protected", &true)?;
         }
         m.end()
+    }
+}
+
+/// A konténerek: Laravel-modellel (az Eloquent-összefoglaló futott és van modell a fájlban) a modell osztályán a
+/// `model` mező (`table`, `columns`, `fillable`, `casts`, `relations`, `issues`); különben a régi alak.
+#[derive(serde::Serialize)]
+#[serde(untagged)]
+enum Containers<'a> {
+    Plain(&'a [crate::model::Container]),
+    Models(Vec<ContainerJson<'a>>),
+}
+
+#[derive(serde::Serialize)]
+struct ContainerJson<'a> {
+    #[serde(flatten)]
+    container: &'a crate::model::Container,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    model: Option<serde_json::Value>,
+}
+
+impl<'a> Containers<'a> {
+    fn of(row: &'a QueryResult) -> Self {
+        let graph = &row.graph;
+        let Some(laravel) = row.laravel.as_ref() else {
+            return Self::Plain(&graph.containers);
+        };
+        let items: Vec<ContainerJson<'a>> = graph
+            .containers
+            .iter()
+            .map(|container| ContainerJson {
+                container,
+                model: laravel.model_json(graph.namespace.as_deref(), &container.name),
+            })
+            .collect();
+        if items.iter().any(|item| item.model.is_some()) {
+            Self::Models(items)
+        } else {
+            Self::Plain(&graph.containers)
+        }
     }
 }
 
@@ -258,7 +297,7 @@ pub(super) fn ordered_graph(row: &QueryResult) -> OrderedGraph<'_> {
             .filter_map(|call| row.package_of(call))
             .filter_map(|found| Some((found.name, found.version?)))
             .collect(),
-        containers: &graph.containers,
+        containers: Containers::of(row),
         properties: &graph.properties,
         constants: &graph.constants,
         methods: &graph.methods,

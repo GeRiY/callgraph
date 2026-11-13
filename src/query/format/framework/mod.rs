@@ -6,6 +6,7 @@
 
 mod forms;
 mod inertia;
+mod models;
 mod routes;
 mod rules;
 mod ziggy;
@@ -120,6 +121,7 @@ pub(super) fn register(registry: &mut FormatterRegistry) {
     registry.register("inertia", Box::new(inertia::InertiaView));
     registry.register("ziggy", Box::new(ziggy::ZiggyView));
     registry.register("forms", Box::new(forms::FormsView));
+    registry.register("models", Box::new(models::ModelsView));
 }
 
 /// `<ns><container|__top__>::<caller>` — a hívás helye.
