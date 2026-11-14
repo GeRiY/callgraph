@@ -24,6 +24,15 @@ pub(crate) struct Column {
     pub unique: bool,
     /// Idegen kulcs célja (tábla).
     pub fk: Option<String>,
+    /// Van-e alapértéke (`default(..)`, `useCurrent()`, generált oszlop): beszúráskor elhagyható.
+    pub default: bool,
+}
+
+impl Column {
+    /// Beszúráskor kötelező-e: nem nullable, nincs alapértéke, és nem automatikus kulcs (`id`, `increments`).
+    pub(crate) fn required_on_insert(&self) -> bool {
+        !self.nullable && !self.default && self.ty != "id"
+    }
 }
 
 /// Tábla neve → oszlopai (a létrehozás / hozzáadás sorrendjében).
@@ -257,6 +266,7 @@ fn column(name: &str, ty: &str) -> Column {
         nullable: false,
         unique: false,
         fk: None,
+        default: false,
     }
 }
 
@@ -438,6 +448,11 @@ fn run(columns: &mut Vec<Column>, steps: &[Step]) {
             "unique" => {
                 for def in &mut defs {
                     def.unique = true;
+                }
+            }
+            "default" | "useCurrent" | "storedAs" | "virtualAs" | "autoIncrement" => {
+                for def in &mut defs {
+                    def.default = true;
                 }
             }
             "constrained" => {

@@ -583,8 +583,28 @@ fn model_warnings_for_a_field_that_is_not_a_column_or_not_fillable() {
         "{out}"
     );
     assert!(out.contains("⚠ Fee: not in $fillable: ghost"), "{out}");
+    // az `amount` NOT NULL, alapérték nélkül, és az űrlap nem küldi
+    assert!(
+        out.contains("⚠ Fee: required column not sent: amount (NOT NULL"),
+        "{out}"
+    );
     // figyelmeztetés nem hiba: a fájlok megvannak
     assert!(fs.get("app/Http/Requests/StoreFeeRequest.php").is_some());
+}
+
+/// Az alapértékes (`paid`), a nullable (`note`) és az automatikus (`id`, timestamps) oszlop nem kötelező.
+#[test]
+fn defaults_nullables_and_keys_are_not_required_columns() {
+    let fs = project();
+    let clock = FixedClock(Cell::new(T0));
+    let out = run(
+        &fs,
+        &clock,
+        "laravel:Fee>create(name:str,amount:int)",
+        false,
+    )
+    .unwrap();
+    assert!(!out.contains("required column not sent"), "{out}");
 }
 
 #[test]

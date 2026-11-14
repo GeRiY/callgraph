@@ -119,6 +119,21 @@ pub fn model_notes(env: Env<'_>, plan: &Plan, names: &Names, fields: &[Field]) -
                     missing.join(", ")
                 ));
             }
+            // NOT NULL, alapérték nélküli oszlop, amit az űrlap nem küld: a `create()` futáskor elbukna
+            let unsent: Vec<&str> = facts
+                .required
+                .iter()
+                .map(String::as_str)
+                .filter(|column| !fields.iter().any(|f| f.name == *column))
+                .collect();
+            if !unsent.is_empty() {
+                notes.push(crate::tf!(
+                    "⚠ {}: required column not sent: {} (NOT NULL, no default — create() would fail; set it in the controller or add it to the form)",
+                    "⚠ {}: kötelező oszlop, amit nem küld: {} (NOT NULL, nincs alapérték — a create() elbukna; állítsd be a controllerben, vagy vedd fel az űrlapra)",
+                    model,
+                    unsent.join(", ")
+                ));
+            }
         }
         None => notes.push(crate::tf!(
             "⚠ table `{}` is not created by any migration",

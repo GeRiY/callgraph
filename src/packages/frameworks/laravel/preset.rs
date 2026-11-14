@@ -103,6 +103,8 @@ pub(crate) struct ModelFacts {
     pub guarded: bool,
     /// A tábla oszlopai a migrációkból; `None`, ha a tábla nincs a migrációkban.
     pub columns: Option<Vec<String>>,
+    /// A beszúráskor kötelező oszlopok (nem nullable, nincs alapérték, nem automatikus kulcs).
+    pub required: Vec<String>,
 }
 
 /// A modell tényei: `migrations`: a migrációk szövege fájlnév-sorrendben.
@@ -115,10 +117,18 @@ pub(crate) fn model_facts(
     let clean = strip_comments(text);
     let model = parse_model(class, file, &clean);
     let schema = build(migrations.iter().map(String::as_str));
+    let table = schema.get(&model.table);
     ModelFacts {
-        columns: schema
-            .get(&model.table)
-            .map(|columns| columns.iter().map(|c| c.name.clone()).collect()),
+        columns: table.map(|columns| columns.iter().map(|c| c.name.clone()).collect()),
+        required: table
+            .map(|columns| {
+                columns
+                    .iter()
+                    .filter(|c| c.required_on_insert())
+                    .map(|c| c.name.clone())
+                    .collect()
+            })
+            .unwrap_or_default(),
         guarded: clean.contains("$guarded"),
         table: model.table,
         fillable: model.fillable,
