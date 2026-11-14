@@ -150,10 +150,11 @@ impl<'a, E: Emitter> Generator<'a, E> {
             ))
         };
         let path = Path::new(file);
-        let relative = if path.is_absolute() {
-            path.strip_prefix(self.env.root).map_err(|_| outside())?
-        } else {
-            path
+        // a gyökér levágása az abszolútság vizsgálata előtt (Windows-on a `/p/x` nem abszolút, de a gyökér alatt van)
+        let relative = match path.strip_prefix(self.env.root) {
+            Ok(rel) => rel,
+            Err(_) if path.is_absolute() => return Err(outside()),
+            Err(_) => path,
         };
         let mut parts = Vec::new();
         for component in relative.components() {

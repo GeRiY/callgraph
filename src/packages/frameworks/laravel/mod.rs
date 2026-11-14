@@ -285,12 +285,16 @@ impl Laravel {
     }
 
     fn relative_path(&self, path: &Path) -> Option<String> {
-        let rel = if path.is_absolute() {
-            path.strip_prefix(&self.root)
-                .ok()
-                .or_else(|| path.strip_prefix(self.canonical.as_ref()?).ok())?
-        } else {
-            path
+        // a gyökér levágása az abszolútság vizsgálata előtt: Windows-on a `/p/x` nem abszolút (nincs meghajtó), de
+        // ugyanúgy a gyökér alatt van
+        let stripped = path
+            .strip_prefix(&self.root)
+            .ok()
+            .or_else(|| path.strip_prefix(self.canonical.as_ref()?).ok());
+        let rel = match stripped {
+            Some(rel) => rel,
+            None if path.is_absolute() => return None,
+            None => path,
         };
         let text = rel.to_string_lossy().replace('\\', "/");
         let mut text = text.as_str();
