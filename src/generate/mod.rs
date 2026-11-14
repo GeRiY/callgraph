@@ -41,6 +41,7 @@ pub mod parser;
 pub mod php;
 pub mod project;
 pub mod resolve;
+pub mod vue;
 
 #[cfg(test)]
 mod tests;
@@ -50,6 +51,7 @@ pub use error::{GenError, GenResult};
 pub use fs::{Clock, Env, FileSystem, RealFs, SystemClock};
 pub use generator::{GenRequest, Generator, Output, ReplaceAt, Target};
 pub use php::PhpEmitter;
+pub use vue::{VueGenerator, wants_vue};
 
 /// A globális kapcsoló (`callgraph mcp --generate`).
 pub const GENERATE_FLAG: &str = "--generate";

@@ -40,6 +40,8 @@ enum Item {
 struct Parser {
     lexer: Lexer,
     pending: Option<Tok>,
+    /// Vue-nyelvjárás: a `style` alatti elemek szelektorok (szóközzel).
+    style_aware: bool,
 }
 
 /// A kifejezés értelmezése: tokenizálás → fa → kifejtés → `Program`.
@@ -53,6 +55,7 @@ pub fn parse(source: &str) -> GenResult<Program> {
     let mut parser = Parser {
         lexer: Lexer::new(source),
         pending: None,
+        style_aware: false,
     };
     let (nodes, end) = parser.seq()?;
     if end != Tok::End {
@@ -72,6 +75,25 @@ fn level<'a>(roots: &'a mut Vec<Node>, path: &[usize]) -> &'a mut Vec<Node> {
     current
 }
 
+/// A `path` által kijelölt szülők között van-e `style` szakasz (`style`, `style!`, `style:scoped`, …).
+fn under_style(roots: &[Node], path: &[usize]) -> bool {
+    let mut current = roots;
+    for &i in path {
+        let Some(node) = current.get(i) else {
+            return false;
+        };
+        if let NodeKind::Elem(e) = &node.kind {
+            let style =
+                e.head == "style" || e.head.starts_with("style!") || e.head.starts_with("style:");
+            if style {
+                return true;
+            }
+        }
+        current = &node.children;
+    }
+    false
+}
+
 impl Parser {
     fn take_op(&mut self) -> GenResult<Tok> {
         match self.pending.take() {
@@ -85,6 +107,10 @@ impl Parser {
         let mut roots: Vec<Node> = Vec::new();
         let mut path: Vec<usize> = Vec::new();
         loop {
+            if self.style_aware {
+                let under_style = under_style(&roots, &path);
+                self.lexer.set_selector(under_style);
+            }
             let node = self.item()?;
             level(&mut roots, &path).push(node);
             let mut tok = self.take_op()?;
@@ -345,4 +371,96 @@ fn assemble(items: Vec<Item>) -> GenResult<Program> {
         ));
     }
     Ok(program)
+}
+
+/// Egy kifejtett elem a nyelvfüggetlen fában (a Vue-nyelvjárás kimenete): a fej a `$` számlálóval behelyettesítve,
+/// a nyers törzs / lista még nyers; az értelmezés a célnyelv dolga (`generate::vue`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Expanded {
+    pub head: String,
+    pub raw: Option<String>,
+    pub list: Option<String>,
+    /// A fej kezdő oszlopa (1-alapú) a hibaüzenetekhez.
+    pub col: usize,
+    /// Az ismétlés sorszáma (`*3` → 1, 2, 3), ha az elem vagy egy őse ismétlődik.
+    pub counter: Option<u32>,
+    pub children: Vec<Expanded>,
+}
+
+/// Vue-nyelvjárású értelmezés: tokenizálás → fa → kifejtés, a PHP-s elem-értelmezés nélkül (az értelmezést a hívó
+/// végzi az `Expanded` fán).
+pub fn parse_tree(source: &str) -> GenResult<Vec<Expanded>> {
+    if source.trim().is_empty() {
+        return Err(GenError::new(crate::t!(
+            "empty expression (e.g. `vue:Card > script > props(title:str) + template > div.card > h1{{ title }}`)",
+            "üres kifejezés (pl. `vue:Card > script > props(title:str) + template > div.card > h1{{ title }}`)"
+        )));
+    }
+    let mut parser = Parser {
+        lexer: Lexer::vue(source),
+        pending: None,
+        style_aware: true,
+    };
+    let (nodes, end) = parser.seq()?;
+    if end != Tok::End {
+        return Err(parser.lexer.error_at(
+            parser.lexer.token_col(),
+            crate::t!("unmatched `)`", "nincs párja a `)` jelnek"),
+        ));
+    }
+    expand_tree(&nodes, None)
+}
+
+/// A fej minden (zárójelen kívüli) `$`-sorozata a számláló értékére (`$$` kitöltve); csak ismétlésen belül.
+fn apply_counter_any(head: &str, counter: Option<u32>) -> String {
+    let Some(n) = counter else {
+        return head.to_owned();
+    };
+    let chars: Vec<char> = head.chars().collect();
+    let mut out = String::new();
+    let (mut depth, mut i) = (0i32, 0usize);
+    while i < chars.len() {
+        match chars[i] {
+            '(' => depth += 1,
+            ')' => depth -= 1,
+            _ => {}
+        }
+        if chars[i] == '$' && depth == 0 {
+            let mut width = 0usize;
+            while chars.get(i + width) == Some(&'$') {
+                width += 1;
+            }
+            out.push_str(&format!("{n:0width$}"));
+            i += width;
+            continue;
+        }
+        out.push(chars[i]);
+        i += 1;
+    }
+    out
+}
+
+fn expand_tree(nodes: &[Node], counter: Option<u32>) -> GenResult<Vec<Expanded>> {
+    let mut out = Vec::new();
+    for node in nodes {
+        for i in 1..=node.repeat.unwrap_or(1) {
+            let count = if node.repeat.is_some() {
+                Some(i)
+            } else {
+                counter
+            };
+            match &node.kind {
+                NodeKind::Group => out.extend(expand_tree(&node.children, count)?),
+                NodeKind::Elem(e) => out.push(Expanded {
+                    head: apply_counter_any(&e.head, count),
+                    raw: e.raw.clone(),
+                    list: e.list.clone(),
+                    col: e.col,
+                    counter: count,
+                    children: expand_tree(&node.children, count)?,
+                }),
+            }
+        }
+    }
+    Ok(out)
 }

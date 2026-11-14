@@ -6,7 +6,9 @@ use std::io::Write;
 
 use crate::cli::Command;
 use crate::error::Result;
-use crate::generate::{Env, GenRequest, Generator, PhpEmitter, RealFs, SystemClock};
+use crate::generate::{
+    Env, GenRequest, Generator, PhpEmitter, RealFs, SystemClock, VueGenerator, wants_vue,
+};
 use crate::skill::SkillHome;
 
 /// A `gen` parancs.
@@ -34,7 +36,13 @@ impl Command for GenerateCommand {
             fs: &RealFs,
             clock: &SystemClock,
         };
-        match Generator::new(env, PhpEmitter).run(&self.request) {
+        // Vue / JS / TS: a cél-fájl kiterjesztése (vagy cél nélkül a kifejezés feje) dönt; minden más a PHP-generátoré
+        let result = if wants_vue(&self.request) {
+            VueGenerator::new(env).run(&self.request)
+        } else {
+            Generator::new(env, PhpEmitter).run(&self.request)
+        };
+        match result {
             Ok(output) => {
                 write!(out, "{}", output.render())?;
                 Ok(0)

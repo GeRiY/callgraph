@@ -60,13 +60,13 @@ pub fn split_top(text: &str, sep: char) -> Vec<String> {
 }
 
 /// Az első legfelső szintű `sep` két oldala.
-fn split_once_top(text: &str, sep: char) -> Option<(&str, &str)> {
+pub fn split_once_top(text: &str, sep: char) -> Option<(&str, &str)> {
     let i = *top_level_indices(text, sep).first()?;
     Some((&text[..i], &text[i + sep.len_utf8()..]))
 }
 
 /// A `open`-nel kezdődő szöveg párjának bájt-pozíciója (idézőjelek között nem számol).
-fn matching(text: &str, open: char, close: char) -> Option<usize> {
+pub fn matching(text: &str, open: char, close: char) -> Option<usize> {
     let mut depth = 0i32;
     let mut quote: Option<char> = None;
     let mut escaped = false;
@@ -95,7 +95,7 @@ fn matching(text: &str, open: char, close: char) -> Option<usize> {
     None
 }
 
-fn is_ident(text: &str) -> bool {
+pub fn is_ident(text: &str) -> bool {
     let mut chars = text.chars();
     chars.next().is_some_and(|c| c.is_alphabetic() || c == '_')
         && chars.all(|c| c.is_alphanumeric() || c == '_')

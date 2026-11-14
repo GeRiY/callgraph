@@ -32,6 +32,11 @@ pub struct Lexer {
     chars: Vec<char>,
     pos: usize,
     start: usize,
+    /// Vue / JS / CSS nyelvjárás: a `#` nem megjegyzés, a `//` az `://` után nem megjegyzés, a magányos aposztróf
+    /// szövegnek számít, a visszaidézőjel (`` ` ``) is sztring.
+    vue: bool,
+    /// Szelektor-mód (a `style` alatt): a szóköz a szón belül marad (`.card h1`), a szót a `{` zárja.
+    selector: bool,
 }
 
 impl Lexer {
@@ -40,7 +45,22 @@ impl Lexer {
             chars: source.chars().collect(),
             pos: 0,
             start: 0,
+            vue: false,
+            selector: false,
         }
+    }
+
+    /// A Vue-nyelvjárású tokenizáló (`generate::vue`).
+    pub fn vue(source: &str) -> Self {
+        Self {
+            vue: true,
+            ..Self::new(source)
+        }
+    }
+
+    /// Szelektor-mód be / ki (csak a Vue-nyelvjárásban számít).
+    pub fn set_selector(&mut self, on: bool) {
+        self.selector = on && self.vue;
     }
 
     /// Az utolsó token kezdő oszlopa (1-alapú) a hibaüzenetekhez.
@@ -187,8 +207,11 @@ impl Lexer {
         while let Some(c) = self.peek() {
             match c {
                 '\'' | '"' => self.skip_string(c)?,
-                '/' if self.peek_at(1) == Some('/') => self.skip_line(),
-                '#' if open == '{' && self.peek_at(1) != Some('[') => self.skip_line(),
+                '`' if self.vue => self.skip_string(c)?,
+                '/' if self.peek_at(1) == Some('/') && !self.after_colon() => self.skip_line(),
+                '#' if open == '{' && !self.vue && self.peek_at(1) != Some('[') => {
+                    self.skip_line();
+                }
                 '/' if self.peek_at(1) == Some('*') => self.skip_block_comment(),
                 c if c == open => {
                     depth += 1;
@@ -210,16 +233,34 @@ impl Lexer {
         ))
     }
 
+    /// A `//` előtt `:` áll-e (`https://…`: nem megjegyzés).
+    fn after_colon(&self) -> bool {
+        self.vue
+            && self
+                .pos
+                .checked_sub(1)
+                .is_some_and(|p| self.chars[p] == ':')
+    }
+
     fn skip_string(&mut self, quote: char) -> GenResult<()> {
         let from = self.pos;
         self.pos += 1;
+        let loose = self.vue && quote != '`';
         while let Some(c) = self.peek() {
+            if loose && c == '\n' {
+                break;
+            }
             self.pos += 1;
             if c == '\\' {
                 self.pos += 1;
             } else if c == quote {
                 return Ok(());
             }
+        }
+        if loose {
+            // Vue-nyelvjárás: a lezáratlan aposztróf (`{Don't}`) szöveg, nem sztring
+            self.pos = from + 1;
+            return Ok(());
         }
         Err(self.error_at(
             from + 1,
@@ -271,7 +312,7 @@ impl Lexer {
                 }
                 '>' | '+' | '^' | '*' | ')' => break,
                 c if c.is_whitespace() => {
-                    if angle > 0 || self.continues_over_space(list_form) {
+                    if angle > 0 || self.selector || self.continues_over_space(list_form) {
                         self.pos += 1;
                     } else {
                         break;
