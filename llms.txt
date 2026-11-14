@@ -1,6 +1,6 @@
 # callgraph
 
-> A token-efficient code map for AI coding agents: structure, categorized call graph, method bodies, "who calls this?" and impact analysis from the AST, without reading whole files. PHP, JavaScript / TypeScript, Vue, Rust, Swift / SwiftUI, Python, Go, CSS / SCSS, JSON, Markdown, HTML. One static binary (MIT), used as a CLI, a Claude Code skill or a local MCP server (`callgraph mcp`). Latest release: v0.9.5.
+> A token-efficient code map for AI coding agents: structure, categorized call graph, method bodies, "who calls this?" and impact analysis from the AST, without reading whole files. PHP, JavaScript / TypeScript, Vue, Rust, Swift / SwiftUI, Python, Go, CSS / SCSS, JSON, Markdown, HTML. One static binary (MIT), used as a CLI, a Claude Code skill or a local MCP server (`callgraph mcp`). Latest release: v0.10.0.
 
 Install (macOS / Linux):
 
@@ -19,6 +19,8 @@ claude mcp add -s user callgraph -- ~/.claude/skills/callgraph/bin/$(uname -s | 
 - [Home](https://callgraph.eu/index.md): Show AI agents a file's structure, call graph and callers without reading it. PHP, JS/TS, Vue, Rust, Swift, Python, Go. Free, MIT, one binary: CLI or MCP server.
 - [MCP server](https://callgraph.eu/mcp/index.md): Run callgraph as a local MCP server: setup for Claude Code, Claude Desktop, Cursor and VS Code, --auto-update, the ten tools and troubleshooting.
 - [PHP](https://callgraph.eu/php/index.md): Outline PHP classes, methods and categorized calls, find every caller and run Laravel / Yii views (routes, validation, events) without reading files.
+- [Laravel & Inertia](https://callgraph.eu/laravel/index.md): In Laravel + Inertia (Vue) projects callgraph links route() calls to controllers, checks forms against validation, summarises models and tables and finds Inertia pages — in the outline, without reading files.
+- [Generator & rename](https://callgraph.eu/gen/index.md): Write PHP, Vue, JS / TS modules, HTML pages and whole Laravel features from a short expression, in the project's style — syntax-checked, backed up, undoable. Rename routes, classes and methods across the project.
 - [Rust](https://callgraph.eu/rust/index.md): Map Rust crates for AI agents: structs, traits, impl blocks, use trees and macro calls, framework detection from Cargo.toml and who calls what.
 - [TypeScript / Vue](https://callgraph.eu/typescript/index.md): Outline JS, TS and Vue single-file components: imports with alias resolution, props, emits, setup, template components and typed-receiver calls.
 - [Swift / SwiftUI](https://callgraph.eu/swift/index.md): Map Swift and SwiftUI code: View types as components, body and computed properties, property wrappers, SwiftUI views and modifiers as call categories.

@@ -1,6 +1,6 @@
 # callgraph
 
-> Token-hatékony kód-térkép AI kódoló agenteknek: szerkezet, kategorizált hívás-gráf, metódus-törzs, „ki hívja?” és hatáselemzés az AST-ből, a teljes fájlok beolvasása nélkül. PHP, JavaScript / TypeScript, Vue, Rust, Swift / SwiftUI, Python, Go, CSS / SCSS, JSON, Markdown, HTML. Egyetlen statikus bináris (MIT): parancssorból, Claude Code skillként vagy helyi MCP-szerverként (`callgraph mcp`). Legújabb kiadás: v0.9.5.
+> Token-hatékony kód-térkép AI kódoló agenteknek: szerkezet, kategorizált hívás-gráf, metódus-törzs, „ki hívja?” és hatáselemzés az AST-ből, a teljes fájlok beolvasása nélkül. PHP, JavaScript / TypeScript, Vue, Rust, Swift / SwiftUI, Python, Go, CSS / SCSS, JSON, Markdown, HTML. Egyetlen statikus bináris (MIT): parancssorból, Claude Code skillként vagy helyi MCP-szerverként (`callgraph mcp`). Legújabb kiadás: v0.10.0.
 
 Telepítés (macOS / Linux):
 
@@ -19,6 +19,8 @@ claude mcp add -s user callgraph -- ~/.claude/skills/callgraph/bin/$(uname -s | 
 - [Kezdőlap](https://callgraph.eu/hu/index.md): Szerkezet, hívás-gráf és hívók AI agenteknek a fájl beolvasása nélkül. PHP, JS/TS, Vue, Rust, Swift, Python, Go. Ingyenes, MIT, egy bináris: CLI vagy MCP-szerver.
 - [MCP-szerver](https://callgraph.eu/hu/mcp/index.md): A callgraph helyi MCP-szerverként: beállítás Claude Code-hoz, Claude Desktophoz, Cursorhoz és VS Code-hoz, --auto-update, a tíz eszköz, hibakeresés.
 - [PHP](https://callgraph.eu/hu/php/index.md): PHP-osztályok, metódusok és kategorizált hívások, minden hívó és Laravel / Yii nézetek (routes, validation, events) a fájlok beolvasása nélkül.
+- [Laravel & Inertia](https://callgraph.eu/hu/laravel/index.md): Laravel + Inertia (Vue) projektekben a callgraph a route() hívásokat a controllerhez köti, az űrlapokat a validációval veti össze, összefoglalja a modelleket és táblákat, és megtalálja az Inertia-oldalakat — az outline-ban, fájlolvasás nélkül.
+- [Generátor és rename](https://callgraph.eu/hu/gen/index.md): PHP, Vue, JS / TS modul, HTML-oldal és teljes Laravel-funkció egy rövid kifejezésből, a projekt stílusában — szintaxis-ellenőrizve, mentéssel, visszavonhatóan. Route, osztály és metódus átnevezése az egész projektben.
 - [Rust](https://callgraph.eu/hu/rust/index.md): Rust-crate-ek térképe AI agenteknek: structok, traitek, impl-blokkok, use-fák, makróhívások, framework a Cargo.toml-ból, és hogy ki mit hív.
 - [TypeScript / Vue](https://callgraph.eu/hu/typescript/index.md): JS, TS és Vue SFC outline: importok alias-feloldással, props, emits, setup, template-komponensek, típusos fogadón át hívott metódusok és hívóik.
 - [Swift / SwiftUI](https://callgraph.eu/hu/swift/index.md): Swift és SwiftUI térkép: View-típusok komponensként, body és computed property-k, property wrapperek, SwiftUI view-k és modifierek kategóriaként.

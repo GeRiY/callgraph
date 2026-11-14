@@ -107,6 +107,10 @@ A `--const` a definíciót, a hivatkozásokat és a továbbexportálásokat (pl.
 
 Ez statikus elemzés: a dinamikus hívások (`$this->$method()`), a magic metódusok és a futásidőben összerakott osztálynevek nem oldhatók fel. A `--depth` alapból csak a feloldott hívókat követi; a `--guess` a csak név szerintieket is mutatja. A pontos vezérlési logikához olvasd a metódust a `--body`-val.
 
+## Laravel, Inertia és a generátor
+
+Egy Laravel + Inertia projektben az outline a `route('x')` hívásokat a controllerekhez is köti, az űrlapokat a validációval veti össze, és összefoglalja a modelleket és táblákat — lásd: [Laravel & Inertia](https://callgraph.eu/hu/laravel/). A `gen` PHP-osztályokat, tagokat és teljes Laravel-funkciókat ír a projekted stílusában, a `rename` pedig route-okat, osztályokat és metódusokat nevez át mindenhol — lásd: [Generátor & rename](https://callgraph.eu/hu/gen/).
+
 ## Kapcsolódó oldalak
 
 [

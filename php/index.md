@@ -107,6 +107,10 @@ bash ~/.claude/skills/callgraph/callgraph.sh --project shop app --const STATUS_A
 
 This is static analysis: dynamic calls (`$this->$method()`), magic methods and class names assembled at runtime cannot be resolved. By default `--depth` follows only resolved callers; `--guess` shows the name-only ones. For exact control logic, read the method with `--body`.
 
+## Laravel, Inertia and the generator
+
+In a Laravel + Inertia project the outline also links `route('x')` calls to controllers, checks forms against validation and summarises models and tables — see [Laravel & Inertia](https://callgraph.eu/laravel/). `gen` writes PHP classes, members and whole Laravel features in your project's style, and `rename` renames routes, classes and methods everywhere — see [Generator & rename](https://callgraph.eu/gen/).
+
 ## Related
 
 [

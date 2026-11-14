@@ -41,7 +41,7 @@
 <header class="top">
   <a class="brand" href="/"><img src="/assets/favicon.svg" alt="" width="32" height="32">callgraph</a>
   <nav class="links" aria-label="Main">
-    <details class="menu"><summary>Usage</summary><div class="menu-list"><a href="/#usage">All commands</a><a href="/locate/">locate</a><a href="/profile/">Profile</a></div></details>
+    <details class="menu"><summary>Usage</summary><div class="menu-list"><a href="/#usage">All commands</a><a href="/locate/">locate</a><a href="/profile/">Profile</a><a href="/laravel/">Laravel &amp; Inertia</a><a href="/gen/">Generator</a></div></details>
     <details class="menu"><summary class="current">Languages</summary><div class="menu-list"><a href="/php/" aria-current="page">PHP</a><a href="/rust/">Rust</a><a href="/typescript/">TS / Vue</a><a href="/swift/">Swift</a><a href="/python/">Python</a><a href="/go/">Go</a><a href="/#languages">All languages</a></div></details>
     <a href="/mcp/">MCP</a>
     <a href="/changelog/">Changelog</a>
@@ -170,6 +170,11 @@ class Dispatcher  L4-12
     shows the name-only ones. For exact control logic, read the method with <code>--body</code>.</p>
 </section>
 
+<section id="laravel-gen" aria-labelledby="h-laravel-gen">
+  <h2 id="h-laravel-gen">Laravel, Inertia and the generator</h2>
+  <p>In a Laravel + Inertia project the outline also links <code>route('x')</code> calls to controllers, checks forms against validation and summarises models and tables — see <a href="/laravel/">Laravel &amp; Inertia</a>. <code>gen</code> writes PHP classes, members and whole Laravel features in your project's style, and <code>rename</code> renames routes, classes and methods everywhere — see <a href="/gen/">Generator &amp; rename</a>.</p>
+</section>
+
 <section id="related" aria-labelledby="h-related">
   <h2 id="h-related">Related</h2>
   <div class="grid">
@@ -182,7 +187,7 @@ class Dispatcher  L4-12
 </main>
 
 <footer>
-  <nav class="foot" aria-label="Pages"><a href="/">Home</a> · <a href="/mcp/">MCP</a> · <a href="/php/">PHP</a> · <a href="/rust/">Rust</a> · <a href="/typescript/">TypeScript / Vue</a> · <a href="/swift/">Swift</a> · <a href="/python/">Python</a> · <a href="/go/">Go</a> · <a href="/locate/">locate</a> · <a href="/profile/">Profile</a> · <a href="/changelog/">Changelog</a></nav>
+  <nav class="foot" aria-label="Pages"><a href="/">Home</a> · <a href="/mcp/">MCP</a> · <a href="/php/">PHP</a> · <a href="/rust/">Rust</a> · <a href="/typescript/">TypeScript / Vue</a> · <a href="/swift/">Swift</a> · <a href="/python/">Python</a> · <a href="/go/">Go</a> · <a href="/locate/">locate</a> · <a href="/profile/">Profile</a> · <a href="/laravel/">Laravel &amp; Inertia</a> · <a href="/gen/">Generator</a> · <a href="/changelog/">Changelog</a></nav>
   <div>callgraph · made by <a href="https://www.linkedin.com/in/gergomakra/" rel="author me">Gergő Makra</a> · MIT license · <a href="https://github.com/GeRiY/callgraph">GitHub</a> · <a href="https://github.com/GeRiY/callgraph/releases/latest">Releases</a> · <a href="/hu/php/" hreflang="hu" lang="hu">Magyar</a></div>
   <div class="sub">Privacy: no cookies. Page views are counted per day (page, referring site, download clicks) — no IP address, no identifiers. The callgraph tool sends one anonymous count a day (version, platform, three yes/no flags; no ID, no IP stored; off: CALLGRAPH_COUNT=0 or DO_NOT_TRACK=1). Controller: Makra Gergő, mgeri1993@gmail.com.</div>
 </footer>

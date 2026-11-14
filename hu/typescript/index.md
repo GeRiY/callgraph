@@ -107,6 +107,10 @@ Ha a típus nem egyértelmű — nincs típus, `any`, unió, mint a `Repo | null
 
 - A hivatkozott típusnévvel megadott `defineProps<Props>()` nem listáz propsot (a típus nincs feloldva).
 
+## Generátor Vue-hoz, JS-hez, TS-hez és HTML-hez
+
+A `gen` Vue egyfájlos komponenst és composable-t, sima JS / TS modult és teljes HTML-oldalt ír egy rövid kifejezésből, a projekted stílusában (TypeScript vagy JavaScript, pontosvessző, behúzás) — szintaxis-ellenőrizve, mentéssel, visszavonhatóan. Egy Laravel + Inertia alkalmazásban a Vue outline a route-, űrlap- és oldal-kapcsolatokat is mutatja: lásd: [Generátor & rename](https://callgraph.eu/hu/gen/) és [Laravel & Inertia](https://callgraph.eu/hu/laravel/).
+
 ## Kapcsolódó oldalak
 
 [

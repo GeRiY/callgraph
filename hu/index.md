@@ -2,13 +2,13 @@
 
 Source: https://callgraph.eu/hu/
 
-[v0.9.5 — újdonságok →](https://callgraph.eu/hu/changelog/)
+[v0.10.0 — újdonságok →](https://callgraph.eu/hu/changelog/)
 
 # Értsd meg a kódot, olvasás nélkül.
 
 A **callgraph** token-hatékony kód-térkép AI kódoló agenteknek. Megmutatja a szerkezetet, a kategorizált hívás-gráfot, egy-egy metódus törzsét, hogy *„ki hívja?”*, és a hatáselemzést — pár tucat sorban, a teljes fájlok helyett.
 
-[Telepítés egy sorral](https://callgraph.eu/hu/#install) [Letöltés: v0.9.5](https://github.com/GeRiY/callgraph/releases/latest) [Megnézem a GitHubon](https://github.com/GeRiY/callgraph)
+[Telepítés egy sorral](https://callgraph.eu/hu/#install) [Letöltés: v0.10.0](https://github.com/GeRiY/callgraph/releases/latest) [Megnézem a GitHubon](https://github.com/GeRiY/callgraph)
 
 ```
 $ callgraph.sh --project shop app/Models/Order.php
@@ -40,6 +40,14 @@ A `locate` egy hívásban megkapja a feladat neveit és fogalmait, és felsorolj
 ### [Projekt-profil](https://callgraph.eu/hu/profile/)
 
 A `profile` megmondja az agentnek, hogyan épül fel egy ismeretlen projekt: architektúra, melyik mappában melyik réteg, tervezési minták, és a rétegek közti hívásirány.
+
+### [Laravel + Inertia ellenőrzések](https://callgraph.eu/hu/laravel/)
+
+Route-kapcsolatok a Vue-tól a controllerig, űrlap-validáció összevetés, modell- és táblaösszefoglaló és Inertia-oldalak — közvetlenül az outline-ban.
+
+### [Generátor és rename](https://callgraph.eu/hu/gen/)
+
+PHP, Vue, JS / TS és HTML vagy egy teljes Laravel-funkció egy rövid kifejezésből; route, osztály vagy metódus átnevezése mindenhol. Szintaxis-ellenőrizve, mentéssel, visszavonhatóan.
 
 ### Kevesebb token, gyorsabb válasz
 
@@ -313,6 +321,18 @@ Osztályok, dekorátorok, szignatúrák, Django / Flask / FastAPI felismerés.
 Structok, interfészek, receiveres metódusok, több visszatérési érték.
 
 ](https://callgraph.eu/hu/go/) [
+
+### Laravel és Inertia
+
+Route-ok, űrlapok, modellek és Inertia-oldalak összekötve az outline-ban.
+
+](https://callgraph.eu/hu/laravel/) [
+
+### Generátor és rename
+
+Kód írása rövid kifejezésből, átnevezés az egész projektben, undo.
+
+](https://callgraph.eu/hu/gen/) [
 
 ### locate
 

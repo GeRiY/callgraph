@@ -2,13 +2,13 @@
 
 Source: https://callgraph.eu/
 
-[v0.9.5 — what's new →](https://callgraph.eu/changelog/)
+[v0.10.0 — what's new →](https://callgraph.eu/changelog/)
 
 # Understand code without reading it.
 
 **callgraph** is a token-efficient code map for AI coding agents. It shows the structure, a categorized call graph, single method bodies, *“who calls this?”* and impact analysis — in a few dozen lines instead of whole files.
 
-[Install in one line](https://callgraph.eu/#install) [Download v0.9.5](https://github.com/GeRiY/callgraph/releases/latest) [View on GitHub](https://github.com/GeRiY/callgraph)
+[Install in one line](https://callgraph.eu/#install) [Download v0.10.0](https://github.com/GeRiY/callgraph/releases/latest) [View on GitHub](https://github.com/GeRiY/callgraph)
 
 ```
 $ callgraph.sh --project shop app/Models/Order.php
@@ -40,6 +40,14 @@ Every answer comes from the syntax tree, so it is exact, compact and cheap to re
 ### [Project profile](https://callgraph.eu/profile/)
 
 `profile` tells an agent how an unfamiliar project is built: architecture, which folder holds which layer, design patterns, and the call direction between layers.
+
+### [Laravel + Inertia checks](https://callgraph.eu/laravel/)
+
+Route links from Vue to the controller, a form-versus-validation check, a model and table summary and Inertia pages — right in the outline.
+
+### [Generator and rename](https://callgraph.eu/gen/)
+
+Write PHP, Vue, JS / TS and HTML or a whole Laravel feature from a short expression; rename a route, class or method everywhere. Syntax-checked, backed up, undoable.
 
 ### Fewer tokens, faster answers
 
@@ -313,6 +321,18 @@ Classes, decorators, signatures, Django / Flask / FastAPI detection.
 Structs, interfaces, receiver methods, several return values.
 
 ](https://callgraph.eu/go/) [
+
+### Laravel and Inertia
+
+Routes, forms, models and Inertia pages linked in the outline.
+
+](https://callgraph.eu/laravel/) [
+
+### Generator and rename
+
+Write code from a short expression, rename across the project, undo.
+
+](https://callgraph.eu/gen/) [
 
 ### locate
 

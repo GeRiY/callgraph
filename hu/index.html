@@ -37,7 +37,7 @@
 {"@context": "https://schema.org", "@graph": [{"@type": "Organization", "@id": "https://callgraph.eu/#org", "name": "callgraph", "url": "https://callgraph.eu/", "logo": "https://callgraph.eu/assets/og-image.png", "sameAs": ["https://github.com/GeRiY/callgraph"]}, {"@type": "WebSite", "@id": "https://callgraph.eu/hu/#website", "name": "callgraph", "url": "https://callgraph.eu/hu/", "inLanguage": "hu", "publisher": {"@id": "https://callgraph.eu/#org"}}]}
 </script>
 <script type="application/ld+json">
-{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "callgraph", "applicationCategory": "DeveloperApplication", "operatingSystem": "macOS, Linux, Windows", "softwareVersion": "0.9.5", "license": "https://opensource.org/licenses/MIT", "url": "https://callgraph.eu/hu/", "downloadUrl": "https://github.com/GeRiY/callgraph/releases/latest", "codeRepository": "https://github.com/GeRiY/callgraph", "author": {"@type": "Person", "name": "Makra Gergő", "url": "https://www.linkedin.com/in/gergomakra/", "sameAs": ["https://www.linkedin.com/in/gergomakra/"]}, "inLanguage": ["hu", "en"], "description": "Token-hatékony kód-térkép AI kódoló agenteknek: szerkezet, kategorizált hívás-gráf, metódus-törzs, ki hívja és hatáselemzés a teljes fájlok beolvasása nélkül, parancssorból, Claude Code skillként és helyi MCP-szerverként. PHP, JavaScript, TypeScript, Vue, Rust, Swift/SwiftUI, Python, Go, CSS/SCSS, JSON, Markdown és HTML.", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "EUR"}}
+{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "callgraph", "applicationCategory": "DeveloperApplication", "operatingSystem": "macOS, Linux, Windows", "softwareVersion": "0.10.0", "license": "https://opensource.org/licenses/MIT", "url": "https://callgraph.eu/hu/", "downloadUrl": "https://github.com/GeRiY/callgraph/releases/latest", "codeRepository": "https://github.com/GeRiY/callgraph", "author": {"@type": "Person", "name": "Makra Gergő", "url": "https://www.linkedin.com/in/gergomakra/", "sameAs": ["https://www.linkedin.com/in/gergomakra/"]}, "inLanguage": ["hu", "en"], "description": "Token-hatékony kód-térkép AI kódoló agenteknek: szerkezet, kategorizált hívás-gráf, metódus-törzs, ki hívja és hatáselemzés a teljes fájlok beolvasása nélkül, parancssorból, Claude Code skillként és helyi MCP-szerverként. PHP, JavaScript, TypeScript, Vue, Rust, Swift/SwiftUI, Python, Go, CSS/SCSS, JSON, Markdown és HTML.", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "EUR"}}
 </script>
 <script type="application/ld+json">
 {"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Mi a callgraph?", "acceptedAnswer": {"@type": "Answer", "text": "Parancssori kód-térkép AI kódoló agenteknek. Elemzi a fájlt vagy mappát, és megmondja, mi van benne, melyik metódus melyik sorokon él, mit hív, ki hívja, és mit érint egy változtatás — pár tucat sorban a teljes fájl helyett."}}, {"@type": "Question", "name": "Milyen nyelveket támogat?", "acceptedAnswer": {"@type": "Answer", "text": "PHP (Laravel- és Yii-ismerettel), JavaScript, TypeScript, Vue single-file komponensek, Rust, Swift és SwiftUI, Python, Go, CSS, SCSS, JSON, Markdown és HTML. Részletek: PHP, Rust, TypeScript / Vue, Swift, Python, Go."}}, {"@type": "Question", "name": "Kell hozzá PHP, Node vagy Rust?", "acceptedAnswer": {"@type": "Answer", "text": "Nem. A callgraph egyetlen statikus bináris, futtatáshoz csak bash kell."}}, {"@type": "Question", "name": "Működik Claude Code nélkül is?", "acceptedAnswer": {"@type": "Answer", "text": "Igen. Claude Code skillként érkezik, de minden parancs bármilyen terminálból vagy szkriptből használható, és bármely MCP-kliens (Claude Desktop, Cursor, VS Code…) is használhatja a callgraph mcp-vel — lásd az MCP-beállítást."}}, {"@type": "Question", "name": "Elküldi valahova a kódomat?", "acceptedAnswer": {"@type": "Answer", "text": "Nem. Minden helyben fut; a kódod sehova nem töltődik fel. Az egyetlen hálózati hívás a frissítés-ellenőrzés a GitHub Release-ek felé (legfeljebb naponta egyszer; kikapcsolás: CALLGRAPH_UPDATE_CHECK=0)."}}, {"@type": "Question", "name": "Hogyan frissíthető?", "acceptedAnswer": {"@type": "Answer", "text": "A callgraph.sh update letölti a legfrissebb kiadást a GitHubról, ellenőrzi a kiadás SHA256SUMS fájlja szerint, a projektek és a beállítások megmaradnak. Mi változott: változásnapló."}}, {"@type": "Question", "name": "Hol jelezhetek hibát vagy kérhetek új funkciót?", "acceptedAnswer": {"@type": "Answer", "text": "A GitHubon: hibajelentés vagy ötlet / észrevétel. Biztonsági hibát privátban jelezz."}}, {"@type": "Question", "name": "Mennyibe kerül?", "acceptedAnswer": {"@type": "Answer", "text": "Semmibe. A callgraph nyílt forrású, MIT licenccel."}}]}
@@ -55,7 +55,7 @@
 <header class="top">
   <a class="brand" href="/hu/" aria-current="page"><img src="/assets/favicon.svg" alt="" width="32" height="32">callgraph</a>
   <nav class="links" aria-label="Fő navigáció">
-    <details class="menu"><summary>Használat</summary><div class="menu-list"><a href="/hu/#usage">Minden parancs</a><a href="/hu/locate/">locate</a><a href="/hu/profile/">Profil</a></div></details>
+    <details class="menu"><summary>Használat</summary><div class="menu-list"><a href="/hu/#usage">Minden parancs</a><a href="/hu/locate/">locate</a><a href="/hu/profile/">Profil</a><a href="/hu/laravel/">Laravel &amp; Inertia</a><a href="/hu/gen/">Generátor</a></div></details>
     <details class="menu"><summary>Nyelvek</summary><div class="menu-list"><a href="/hu/php/">PHP</a><a href="/hu/rust/">Rust</a><a href="/hu/typescript/">TS / Vue</a><a href="/hu/swift/">Swift</a><a href="/hu/python/">Python</a><a href="/hu/go/">Go</a><a href="/hu/#languages">Minden nyelv</a></div></details>
     <a href="/hu/mcp/">MCP</a>
     <a href="/hu/changelog/">Változásnapló</a>
@@ -66,14 +66,14 @@
 <main id="main">
 <section class="hero" aria-labelledby="title">
   <div>
-    <a class="badge" href="/hu/changelog/">v0.9.5 — újdonságok →</a>
+    <a class="badge" href="/hu/changelog/">v0.10.0 — újdonságok →</a>
     <h1 id="title">Értsd meg a kódot, olvasás nélkül.</h1>
     <p class="lead">A <b>callgraph</b> token-hatékony kód-térkép AI kódoló agenteknek. Megmutatja a szerkezetet,
       a kategorizált hívás-gráfot, egy-egy metódus törzsét, hogy <i>„ki hívja?”</i>, és a hatáselemzést —
       pár tucat sorban, a teljes fájlok helyett.</p>
     <div class="cta">
       <a class="btn primary" href="#install">Telepítés egy sorral</a>
-      <a class="btn" href="https://github.com/GeRiY/callgraph/releases/latest">Letöltés: v0.9.5</a>
+      <a class="btn" href="https://github.com/GeRiY/callgraph/releases/latest">Letöltés: v0.10.0</a>
       <a class="btn" href="https://github.com/GeRiY/callgraph">Megnézem a GitHubon</a>
     </div>
   </div>
@@ -108,6 +108,8 @@ class Order extends Model  <span class="d">L7-23</span>
       és fogalmait, és felsorolja azt a pár fájlt, amit érdemes először megnyitni, a legjobbal kezdve, indoklással.</p></div>
     <div class="card"><h3><a href="/hu/profile/">Projekt-profil</a></h3><p>A <code>profile</code> megmondja az agentnek, hogyan épül fel egy ismeretlen
       projekt: architektúra, melyik mappában melyik réteg, tervezési minták, és a rétegek közti hívásirány.</p></div>
+    <div class="card"><h3><a href="/hu/laravel/">Laravel + Inertia ellenőrzések</a></h3><p>Route-kapcsolatok a Vue-tól a controllerig, űrlap-validáció összevetés, modell- és táblaösszefoglaló és Inertia-oldalak — közvetlenül az outline-ban.</p></div>
+    <div class="card"><h3><a href="/hu/gen/">Generátor és rename</a></h3><p>PHP, Vue, JS / TS és HTML vagy egy teljes Laravel-funkció egy rövid kifejezésből; route, osztály vagy metódus átnevezése mindenhol. Szintaxis-ellenőrizve, mentéssel, visszavonhatóan.</p></div>
     <div class="card"><h3>Kevesebb token, gyorsabb válasz</h3><p>Egy outline pár tucat sor. Az agent előbb a térképet olvassa, utána csak a szükséges sorokat.</p></div>
     <div class="card"><h3>Kategorizált hívás-gráf</h3><p>Minden hívás címkét kap — ORM-reláció, modell, framework, natív, belső segéd, SwiftUI view vagy modifier —, így a szándék első ránézésre látszik.</p></div>
     <div class="card"><h3>„Ki hívja?”</h3><p>A <code>--grep</code> megtalál minden hívót a projektben; a <code>--depth N</code> a hívók hívóit is bejárja hatáselemzéshez.</p></div>
@@ -303,6 +305,8 @@ callgraph.sh set-lang hu        # magyar kimenet (vissza: set-lang en)</code></p
     <a class="card" href="/hu/swift/"><h3>Swift és SwiftUI</h3><p>View-típusok komponensként, property wrapperek, SwiftUI view-k és modifierek.</p></a>
     <a class="card" href="/hu/python/"><h3>Python</h3><p>Osztályok, dekorátorok, szignatúrák, Django / Flask / FastAPI felismerés.</p></a>
     <a class="card" href="/hu/go/"><h3>Go</h3><p>Structok, interfészek, receiveres metódusok, több visszatérési érték.</p></a>
+    <a class="card" href="/hu/laravel/"><h3>Laravel és Inertia</h3><p>Route-ok, űrlapok, modellek és Inertia-oldalak összekötve az outline-ban.</p></a>
+    <a class="card" href="/hu/gen/"><h3>Generátor és rename</h3><p>Kód írása rövid kifejezésből, átnevezés az egész projektben, undo.</p></a>
     <a class="card" href="/hu/locate/"><h3>locate</h3><p>Az a pár fájl, amit egy feladatnál először érdemes megnyitni, indoklással.</p></a>
     <a class="card" href="/hu/profile/"><h3>Projekt-profil</h3><p>Architektúra, rétegek és a köztük lévő hívásirány, kb. 15 sorban.</p></a>
     <a class="card" href="/hu/changelog/"><h3>Változásnapló</h3><p>Mit hozott, mit változtatott és mit javított minden kiadás.</p></a>
@@ -340,7 +344,7 @@ callgraph.sh set-lang hu        # magyar kimenet (vissza: set-lang en)</code></p
 </main>
 
 <footer>
-  <nav class="foot" aria-label="Oldalak"><a href="/hu/">Kezdőlap</a> · <a href="/hu/mcp/">MCP</a> · <a href="/hu/php/">PHP</a> · <a href="/hu/rust/">Rust</a> · <a href="/hu/typescript/">TypeScript / Vue</a> · <a href="/hu/swift/">Swift</a> · <a href="/hu/python/">Python</a> · <a href="/hu/go/">Go</a> · <a href="/hu/locate/">locate</a> · <a href="/hu/profile/">Profil</a> · <a href="/hu/changelog/">Változásnapló</a></nav>
+  <nav class="foot" aria-label="Oldalak"><a href="/hu/">Kezdőlap</a> · <a href="/hu/mcp/">MCP</a> · <a href="/hu/php/">PHP</a> · <a href="/hu/rust/">Rust</a> · <a href="/hu/typescript/">TypeScript / Vue</a> · <a href="/hu/swift/">Swift</a> · <a href="/hu/python/">Python</a> · <a href="/hu/go/">Go</a> · <a href="/hu/locate/">locate</a> · <a href="/hu/profile/">Profil</a> · <a href="/hu/laravel/">Laravel &amp; Inertia</a> · <a href="/hu/gen/">Generátor</a> · <a href="/hu/changelog/">Változásnapló</a></nav>
   <div>callgraph · készítette: <a href="https://www.linkedin.com/in/gergomakra/" rel="author me">Makra Gergő</a> · MIT licenc · <a href="https://github.com/GeRiY/callgraph">GitHub</a> · <a href="https://github.com/GeRiY/callgraph/releases/latest">Kiadások</a> · <a href="/" hreflang="en" lang="en">English</a></div>
   <div class="sub">Adatvédelem: nincs cookie. Az oldalmegtekintéseket napi számként rögzítjük (oldal, hivatkozó oldal, letöltés-kattintás) — IP-cím és azonosító nélkül. A callgraph eszköz naponta egy névtelen jelzést küld (verzió, platform, három igen/nem jelző; azonosító és IP nélkül; kikapcsolás: CALLGRAPH_COUNT=0 vagy DO_NOT_TRACK=1). Adatkezelő: Makra Gergő, mgeri1993@gmail.com.</div>
 </footer>

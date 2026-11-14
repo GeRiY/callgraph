@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Laravel &amp; Inertia: routes, forms, models and pages linked — callgraph</title>
+<meta name="description" content="In Laravel + Inertia (Vue) projects callgraph links route() calls to controllers, checks forms against validation, summarises models and tables and finds Inertia pages — in the outline, without reading files.">
+<link rel="canonical" href="https://callgraph.eu/laravel/">
+<link rel="alternate" hreflang="en" href="https://callgraph.eu/laravel/">
+<link rel="alternate" hreflang="hu" href="https://callgraph.eu/hu/laravel/">
+<link rel="alternate" hreflang="x-default" href="https://callgraph.eu/laravel/">
+<meta name="author" content="Gergő Makra">
+<meta name="robots" content="index,follow">
+<meta name="theme-color" content="#0c152a">
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/style.css">
+<script>document.documentElement.className += ' js';</script>
+<link rel="alternate" type="text/markdown" href="/laravel/index.md" title="Markdown version of this page">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="callgraph">
+<meta property="og:title" content="Laravel &amp; Inertia: routes, forms, models and pages linked — callgraph">
+<meta property="og:description" content="In Laravel + Inertia (Vue) projects callgraph links route() calls to controllers, checks forms against validation, summarises models and tables and finds Inertia pages — in the outline, without reading files.">
+<meta property="og:url" content="https://callgraph.eu/laravel/">
+<meta property="og:image" content="https://callgraph.eu/assets/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="callgraph terminal output: class outline with line ranges and categorized calls">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="hu_HU">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Laravel &amp; Inertia: routes, forms, models and pages linked — callgraph">
+<meta name="twitter:description" content="In Laravel + Inertia (Vue) projects callgraph links route() calls to controllers, checks forms against validation, summarises models and tables and finds Inertia pages — in the outline, without reading files.">
+<meta name="twitter:image" content="https://callgraph.eu/assets/og-image.png">
+<script type="application/ld+json">
+{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://callgraph.eu/"}, {"@type": "ListItem", "position": 2, "name": "Laravel & Inertia", "item": "https://callgraph.eu/laravel/"}]}
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="wrap">
+<header class="top">
+  <a class="brand" href="/"><img src="/assets/favicon.svg" alt="" width="32" height="32">callgraph</a>
+  <nav class="links" aria-label="Main">
+    <details class="menu"><summary class="current">Usage</summary><div class="menu-list"><a href="/#usage">All commands</a><a href="/locate/">locate</a><a href="/profile/">Profile</a><a href="/laravel/" aria-current="page">Laravel &amp; Inertia</a><a href="/gen/">Generator</a></div></details>
+    <details class="menu"><summary>Languages</summary><div class="menu-list"><a href="/php/">PHP</a><a href="/rust/">Rust</a><a href="/typescript/">TS / Vue</a><a href="/swift/">Swift</a><a href="/python/">Python</a><a href="/go/">Go</a><a href="/#languages">All languages</a></div></details>
+    <a href="/mcp/">MCP</a>
+    <a href="/changelog/">Changelog</a>
+    <a href="https://github.com/GeRiY/callgraph">GitHub</a>
+    <a class="lang" href="/hu/laravel/" hreflang="hu" lang="hu">Magyar</a>
+  </nav>
+</header>
+<main id="main">
+<nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="/">Home</a></li><li aria-current="page">Laravel &amp; Inertia</li></ol></nav>
+<section class="hero page" aria-labelledby="title">
+  <div>
+    <h1 id="title">Laravel and Inertia: routes, forms, models and pages linked</h1>
+    <p class="lead">In a Laravel + Inertia (Vue) project the interesting facts live in several files: the route table, the controller, the validation rules, the migrations, the Vue page. callgraph reads them for you and puts the short links into the outline of the one file your agent is looking at.</p>
+    <div class="cta">
+      <a class="btn primary" href="/#install">Install</a>
+      <a class="btn" href="/gen/">Generator &amp; rename</a>
+    </div>
+  </div>
+</section>
+
+<section id="packages" aria-labelledby="h-packages">
+  <h2 id="h-packages">Packages: what the project is built from</h2>
+  <p>callgraph reads <code>composer.json</code>, <code>package.json</code> and the lock files (composer, npm, yarn, pnpm, bun) offline. <code>profile</code> then shows a <code>stack:</code> line with the notable packages and their locked versions (the declared range when there is no lock, marked as such). Over MCP the startup profile gets a compact version of it.</p>
+<pre class="code"><code>bash ~/.claude/skills/callgraph/callgraph.sh profile --project shop
+bash ~/.claude/skills/callgraph/callgraph.sh profile --project shop --packages</code></pre>
+  <p><code>--packages</code> lists every direct composer / npm dependency: installed and declared version, dev flag.</p>
+  <ul>
+    <li>In an outline, calls into a dependency are grouped under the package's short name, e.g. <code>guzzle: GuzzleHttp\Client::request</code>. The JSON output has a <code>package</code> field, and <code>locate</code> gives a "package" reason.</li>
+    <li><code>uses &lt;package&gt; [--calls]</code> (MCP <code>package_usage</code>) shows where the code uses a dependency: per API symbol how often and in which file first. <code>(type)</code> marks an import without a call; <code>--calls</code> lists every call line.</li>
+    <li><code>deps</code> (MCP <code>project_profile</code> with <code>deps: true</code>) lists probably unused, missing and dev-only dependencies, one line each with a short reason. Silence a false alarm with <code>deps-ignore &lt;name&gt;</code> in <code>.callgraphignore</code>.</li>
+  </ul>
+<pre class="code"><code>bash ~/.claude/skills/callgraph/callgraph.sh uses guzzle --calls --project shop
+bash ~/.claude/skills/callgraph/callgraph.sh deps --project shop</code></pre>
+</section>
+
+<section id="routes" aria-labelledby="h-routes">
+  <h2 id="h-routes">Routes: from route('x') to the controller</h2>
+  <p>callgraph builds the route table from the loaded <code>routes/*.php</code> files: groups, resources, names and the <code>/api</code> prefix. In the outline of a Vue or JS file a <code>route('events.show')</code> call carries the method, URI and controller action — or <code>⚠ no route</code> when the name does not exist. A controller method gets a <code>route:</code> line in return.</p>
+  <p class="label">Outline line (shortened)</p>
+<pre class="code out"><code>route::events.update → PUT /events/{event} · EventController@update</code></pre>
+<pre class="code"><code>bash ~/.claude/skills/callgraph/callgraph.sh --project shop . --format ziggy</code></pre>
+  <p>The <code>ziggy</code> view lists unknown route names (JS, Vue and PHP) and route files that are never loaded. When some routes have dynamic names, unknown names are only marked <code>?</code>, not reported as wrong.</p>
+</section>
+
+<section id="forms" aria-labelledby="h-forms">
+  <h2 id="h-forms">Form check: fields against validation</h2>
+  <p>An Inertia <code>useForm({...})</code> form is compared with the validation of the controller action it posts to — a FormRequest or an inline <code>validate</code>. The result is a <code>form:</code> line under the sending function and under the action:</p>
+  <ul>
+    <li>fields that are sent but not validated,</li>
+    <li>required fields that are not sent,</li>
+    <li>or <code>N fields ✓</code> when everything matches.</li>
+  </ul>
+<pre class="code"><code>bash ~/.claude/skills/callgraph/callgraph.sh --project shop . --format forms</code></pre>
+  <p>The <code>forms</code> view lists them all, so a renamed field or a forgotten rule shows up before a user finds it.</p>
+</section>
+
+<section id="models" aria-labelledby="h-models">
+  <h2 id="h-models">Models: table, columns and relations</h2>
+  <p>Under an Eloquent model the outline shows a <code>table:</code> line (the columns from the migrations) and a <code>fillable:</code> line. Relation lines show their target model. A <code>⚠</code> line warns when a fillable attribute or a cast is not a column.</p>
+<pre class="code"><code>bash ~/.claude/skills/callgraph/callgraph.sh --project shop . --format models</code></pre>
+  <p>The <code>models</code> view lists the models, the tables that have no model, and a table that two migrations create without a drop in between — a fresh <code>migrate</code> would fail on it.</p>
+</section>
+
+<section id="inertia" aria-labelledby="h-inertia">
+  <h2 id="h-inertia">Inertia pages: both ends of render()</h2>
+  <p>A PHP <code>Inertia::render('Board')</code> call links to its page file (<code>Pages/Board.vue</code>). The page's outline gets a <code>rendered by:</code> line, so from the Vue file you see which controller sends it.</p>
+<pre class="code"><code>bash ~/.claude/skills/callgraph/callgraph.sh --project shop . --format inertia</code></pre>
+  <p>The <code>inertia</code> view lists each page with its render sites and props. It marks a missing page file and props the page does not declare in <code>defineProps</code>, and lists the pages that are never rendered.</p>
+</section>
+
+<section id="fast" aria-labelledby="h-fast">
+  <h2 id="h-fast">Single-file outlines stay fast</h2>
+  <p>The outline of one file reads only the route, migration and form files it needs. The results are kept in <code>.callgraph/laravel.bin</code> (only if the <code>.callgraph/</code> folder exists), checked against the files' modification time and size, rebuilt automatically and safe to delete. Route files are read in path order, so a controller's <code>route:</code> lines come in the same order in every view.</p>
+</section>
+
+<section id="agent" aria-labelledby="h-agent">
+  <h2 id="h-agent">What this means for your agent</h2>
+  <p>Instead of opening the route file, the controller, the FormRequest and the migration to answer "what does this form post to, and is it validated?", the agent reads the outline of the Vue page or the controller and gets the answer in a few lines. The same views work over MCP (<code>framework_view</code> and <code>project_profile</code>), see <a href="/mcp/">MCP server</a>.</p>
+  <p>Want callgraph to write the matching request, controller, routes and pages in one step? See <a href="/gen/#laravel">the Laravel generator</a>.</p>
+</section>
+
+<section id="related" aria-labelledby="h-related">
+  <h2 id="h-related">Related</h2>
+  <div class="grid">
+    <a class="card" href="/php/"><h3>PHP, Laravel and Yii</h3><p>Classes, categorized calls and the framework views.</p></a>
+    <a class="card" href="/typescript/"><h3>TypeScript / Vue</h3><p>The frontend side: components, props, emits.</p></a>
+    <a class="card" href="/gen/"><h3>Generator &amp; rename</h3><p>Write a Laravel feature in one step, rename a route everywhere.</p></a>
+    <a class="card" href="/profile/"><h3>Project profile</h3><p>Layers and the <code>stack:</code> line of a project.</p></a>
+  </div>
+</section>
+</main>
+
+<footer>
+  <nav class="foot" aria-label="Pages"><a href="/">Home</a> · <a href="/mcp/">MCP</a> · <a href="/php/">PHP</a> · <a href="/rust/">Rust</a> · <a href="/typescript/">TypeScript / Vue</a> · <a href="/swift/">Swift</a> · <a href="/python/">Python</a> · <a href="/go/">Go</a> · <a href="/locate/">locate</a> · <a href="/profile/">Profile</a> · <a href="/laravel/">Laravel &amp; Inertia</a> · <a href="/gen/">Generator</a> · <a href="/changelog/">Changelog</a></nav>
+  <div>callgraph · made by <a href="https://www.linkedin.com/in/gergomakra/" rel="author me">Gergő Makra</a> · MIT license · <a href="https://github.com/GeRiY/callgraph">GitHub</a> · <a href="https://github.com/GeRiY/callgraph/releases/latest">Releases</a> · <a href="/hu/laravel/" hreflang="hu" lang="hu">Magyar</a></div>
+  <div class="sub">Privacy: no cookies. Page views are counted per day (page, referring site, download clicks) — no IP address, no identifiers. The callgraph tool sends one anonymous count a day (version, platform, three yes/no flags; no ID, no IP stored; off: CALLGRAPH_COUNT=0 or DO_NOT_TRACK=1). Controller: Makra Gergő, mgeri1993@gmail.com.</div>
+</footer>
+</div>
+<script>
+// nyelv-menü: kívül kattintásra / Escape-re bezárul (JS nélkül is működik)
+document.addEventListener('click', function (e) {
+  document.querySelectorAll('details.menu[open]').forEach(function (d) { if (!d.contains(e.target)) d.open = false; });
+});
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape') return;
+  document.querySelectorAll('details.menu[open]').forEach(function (d) { d.open = false; d.querySelector('summary').focus(); });
+});
+</script>
+<script>
+(function(){try{var u="https://telemetry.callgraph.eu/hit",r="";
+try{var h=new URL(document.referrer).hostname;if(h&&h.indexOf("callgraph.eu")<0)r=h.toLowerCase()}catch(e){}
+try{var q=new URLSearchParams(location.search),t=q.get("ref")||q.get("utm_source");if(t)r=t.toLowerCase().replace(/[^a-z0-9.-]/g,"").slice(0,64)}catch(e){}
+function s(e){var d=JSON.stringify({p:location.pathname.toLowerCase().slice(0,80),r:r,e:e});
+if(navigator.sendBeacon)navigator.sendBeacon(u,d);else fetch(u,{method:"POST",body:d,keepalive:true,mode:"no-cors"})}
+s("view");document.addEventListener("click",function(ev){var a=ev.target.closest&&ev.target.closest("a");
+if(a&&/github\.com\/GeRiY\/callgraph\/releases/.test(a.href))s("download")})}catch(e){}})();
+</script>
+<script>
+// másoló gomb a parancs- és konfig-blokkokon (JS nélkül a blokk ugyanúgy olvasható)
+if (navigator.clipboard) document.querySelectorAll('pre.code:not(.out)').forEach(function (pre) {
+  var wrap = document.createElement('div'); wrap.className = 'copywrap';
+  pre.parentNode.insertBefore(wrap, pre); wrap.appendChild(pre);
+  var b = document.createElement('button'); b.type = 'button'; b.className = 'copy';
+  b.textContent = "Copy"; b.setAttribute('aria-label', "Copy code to clipboard"); wrap.appendChild(b);
+  b.addEventListener('click', function () {
+    navigator.clipboard.writeText(pre.innerText.replace(/\n$/, '')).then(function () {
+      b.textContent = "Copied"; setTimeout(function () { b.textContent = "Copy"; }, 1600);
+    });
+  });
+});
+</script>
+</body>
+</html>

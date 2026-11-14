@@ -107,6 +107,10 @@ When the type is unclear — no type, `any`, a union like `Repo | null`, a gener
 
 - `defineProps<Props>()` with a referenced type name lists no props (the type is not resolved).
 
+## Generator for Vue, JS, TS and HTML
+
+`gen` writes Vue single-file components and composables, plain JS / TS modules and full HTML pages from a short expression, in the style of your project (TypeScript or JavaScript, semicolons, indentation) — syntax-checked, backed up and undoable. In a Laravel + Inertia app the Vue outline also shows the route, form and page links: see [Generator & rename](https://callgraph.eu/gen/) and [Laravel & Inertia](https://callgraph.eu/laravel/).
+
 ## Related
 
 [

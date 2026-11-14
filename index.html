@@ -37,7 +37,7 @@
 {"@context": "https://schema.org", "@graph": [{"@type": "Organization", "@id": "https://callgraph.eu/#org", "name": "callgraph", "url": "https://callgraph.eu/", "logo": "https://callgraph.eu/assets/og-image.png", "sameAs": ["https://github.com/GeRiY/callgraph"]}, {"@type": "WebSite", "@id": "https://callgraph.eu/#website", "name": "callgraph", "url": "https://callgraph.eu/", "inLanguage": "en", "publisher": {"@id": "https://callgraph.eu/#org"}}]}
 </script>
 <script type="application/ld+json">
-{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "callgraph", "applicationCategory": "DeveloperApplication", "operatingSystem": "macOS, Linux, Windows", "softwareVersion": "0.9.5", "license": "https://opensource.org/licenses/MIT", "url": "https://callgraph.eu/", "downloadUrl": "https://github.com/GeRiY/callgraph/releases/latest", "codeRepository": "https://github.com/GeRiY/callgraph", "author": {"@type": "Person", "name": "Gergő Makra", "url": "https://www.linkedin.com/in/gergomakra/", "sameAs": ["https://www.linkedin.com/in/gergomakra/"]}, "inLanguage": ["en", "hu"], "description": "A token-efficient code map for AI coding agents: structure, categorized call graph, method bodies, who-calls-this and impact analysis without reading whole files, as a CLI, a Claude Code skill and a local MCP server. Supports PHP, JavaScript, TypeScript, Vue, Rust, Swift/SwiftUI, Python, Go, CSS/SCSS, JSON, Markdown and HTML.", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "EUR"}}
+{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "callgraph", "applicationCategory": "DeveloperApplication", "operatingSystem": "macOS, Linux, Windows", "softwareVersion": "0.10.0", "license": "https://opensource.org/licenses/MIT", "url": "https://callgraph.eu/", "downloadUrl": "https://github.com/GeRiY/callgraph/releases/latest", "codeRepository": "https://github.com/GeRiY/callgraph", "author": {"@type": "Person", "name": "Gergő Makra", "url": "https://www.linkedin.com/in/gergomakra/", "sameAs": ["https://www.linkedin.com/in/gergomakra/"]}, "inLanguage": ["en", "hu"], "description": "A token-efficient code map for AI coding agents: structure, categorized call graph, method bodies, who-calls-this and impact analysis without reading whole files, as a CLI, a Claude Code skill and a local MCP server. Supports PHP, JavaScript, TypeScript, Vue, Rust, Swift/SwiftUI, Python, Go, CSS/SCSS, JSON, Markdown and HTML.", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "EUR"}}
 </script>
 <script type="application/ld+json">
 {"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "What is callgraph?", "acceptedAnswer": {"@type": "Answer", "text": "A command-line code map for AI coding agents. It parses a file or folder and answers what is in it, which method lives on which lines, what it calls, who calls it and what is affected by a change — in a few dozen lines instead of the whole file."}}, {"@type": "Question", "name": "Which languages are supported?", "acceptedAnswer": {"@type": "Answer", "text": "PHP (with Laravel and Yii awareness), JavaScript, TypeScript, Vue single-file components, Rust, Swift and SwiftUI, Python, Go, CSS, SCSS, JSON, Markdown and HTML. See the PHP, Rust, TypeScript / Vue, Swift, Python and Go pages."}}, {"@type": "Question", "name": "Do I need PHP, Node or Rust installed?", "acceptedAnswer": {"@type": "Answer", "text": "No. callgraph is a single static binary. The only runtime requirement is bash."}}, {"@type": "Question", "name": "Does it work without Claude Code?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. It ships as a Claude Code skill, but every command works from any terminal or script, and any MCP client (Claude Desktop, Cursor, VS Code…) can use it through callgraph mcp — see MCP setup."}}, {"@type": "Question", "name": "Is my code sent anywhere?", "acceptedAnswer": {"@type": "Answer", "text": "No. Everything runs locally; your code is never uploaded. The only network call is the update check against GitHub Releases (at most once a day; off with CALLGRAPH_UPDATE_CHECK=0)."}}, {"@type": "Question", "name": "How do I update it?", "acceptedAnswer": {"@type": "Answer", "text": "Run callgraph.sh update. It downloads the newest release from GitHub, checks it against the release's SHA256SUMS and keeps your projects and settings. What changed: changelog."}}, {"@type": "Question", "name": "Where do I report a bug or suggest a feature?", "acceptedAnswer": {"@type": "Answer", "text": "On GitHub: bug report or idea / feedback. Security issues go to a private advisory."}}, {"@type": "Question", "name": "How much does it cost?", "acceptedAnswer": {"@type": "Answer", "text": "Nothing. callgraph is open source under the MIT license."}}]}
@@ -55,7 +55,7 @@
 <header class="top">
   <a class="brand" href="/" aria-current="page"><img src="/assets/favicon.svg" alt="" width="32" height="32">callgraph</a>
   <nav class="links" aria-label="Main">
-    <details class="menu"><summary>Usage</summary><div class="menu-list"><a href="/#usage">All commands</a><a href="/locate/">locate</a><a href="/profile/">Profile</a></div></details>
+    <details class="menu"><summary>Usage</summary><div class="menu-list"><a href="/#usage">All commands</a><a href="/locate/">locate</a><a href="/profile/">Profile</a><a href="/laravel/">Laravel &amp; Inertia</a><a href="/gen/">Generator</a></div></details>
     <details class="menu"><summary>Languages</summary><div class="menu-list"><a href="/php/">PHP</a><a href="/rust/">Rust</a><a href="/typescript/">TS / Vue</a><a href="/swift/">Swift</a><a href="/python/">Python</a><a href="/go/">Go</a><a href="/#languages">All languages</a></div></details>
     <a href="/mcp/">MCP</a>
     <a href="/changelog/">Changelog</a>
@@ -66,14 +66,14 @@
 <main id="main">
 <section class="hero" aria-labelledby="title">
   <div>
-    <a class="badge" href="/changelog/">v0.9.5 — what's new →</a>
+    <a class="badge" href="/changelog/">v0.10.0 — what's new →</a>
     <h1 id="title">Understand code without reading it.</h1>
     <p class="lead"><b>callgraph</b> is a token-efficient code map for AI coding agents. It shows the structure,
       a categorized call graph, single method bodies, <i>“who calls this?”</i> and impact analysis —
       in a few dozen lines instead of whole files.</p>
     <div class="cta">
       <a class="btn primary" href="#install">Install in one line</a>
-      <a class="btn" href="https://github.com/GeRiY/callgraph/releases/latest">Download v0.9.5</a>
+      <a class="btn" href="https://github.com/GeRiY/callgraph/releases/latest">Download v0.10.0</a>
       <a class="btn" href="https://github.com/GeRiY/callgraph">View on GitHub</a>
     </div>
   </div>
@@ -108,6 +108,8 @@ class Order extends Model  <span class="d">L7-23</span>
       in one call and lists the few files worth opening first, best first, each with the reason.</p></div>
     <div class="card"><h3><a href="/profile/">Project profile</a></h3><p><code>profile</code> tells an agent how an unfamiliar project is built:
       architecture, which folder holds which layer, design patterns, and the call direction between layers.</p></div>
+    <div class="card"><h3><a href="/laravel/">Laravel + Inertia checks</a></h3><p>Route links from Vue to the controller, a form-versus-validation check, a model and table summary and Inertia pages — right in the outline.</p></div>
+    <div class="card"><h3><a href="/gen/">Generator and rename</a></h3><p>Write PHP, Vue, JS / TS and HTML or a whole Laravel feature from a short expression; rename a route, class or method everywhere. Syntax-checked, backed up, undoable.</p></div>
     <div class="card"><h3>Fewer tokens, faster answers</h3><p>An outline is a few dozen lines. Your agent reads the map first, then only the exact lines it needs.</p></div>
     <div class="card"><h3>Categorized call graph</h3><p>Every call is labelled — ORM relation, model use, framework, native, internal helper, SwiftUI view or modifier — so intent is visible at a glance.</p></div>
     <div class="card"><h3>“Who calls this?”</h3><p><code>--grep</code> finds every caller across the project; <code>--depth N</code> follows callers of callers for impact analysis.</p></div>
@@ -304,6 +306,8 @@ callgraph.sh set-lang hu        # Hungarian output (back: set-lang en)</code></p
     <a class="card" href="/swift/"><h3>Swift and SwiftUI</h3><p>View types as components, property wrappers, SwiftUI views and modifiers.</p></a>
     <a class="card" href="/python/"><h3>Python</h3><p>Classes, decorators, signatures, Django / Flask / FastAPI detection.</p></a>
     <a class="card" href="/go/"><h3>Go</h3><p>Structs, interfaces, receiver methods, several return values.</p></a>
+    <a class="card" href="/laravel/"><h3>Laravel and Inertia</h3><p>Routes, forms, models and Inertia pages linked in the outline.</p></a>
+    <a class="card" href="/gen/"><h3>Generator and rename</h3><p>Write code from a short expression, rename across the project, undo.</p></a>
     <a class="card" href="/locate/"><h3>locate</h3><p>The few files worth opening first for a task, each with the reason.</p></a>
     <a class="card" href="/profile/"><h3>Project profile</h3><p>Architecture, layers and the call direction between them, in about 15 lines.</p></a>
     <a class="card" href="/changelog/"><h3>Changelog</h3><p>What every release added, changed and fixed.</p></a>
@@ -341,7 +345,7 @@ callgraph.sh set-lang hu        # Hungarian output (back: set-lang en)</code></p
 </main>
 
 <footer>
-  <nav class="foot" aria-label="Pages"><a href="/">Home</a> · <a href="/mcp/">MCP</a> · <a href="/php/">PHP</a> · <a href="/rust/">Rust</a> · <a href="/typescript/">TypeScript / Vue</a> · <a href="/swift/">Swift</a> · <a href="/python/">Python</a> · <a href="/go/">Go</a> · <a href="/locate/">locate</a> · <a href="/profile/">Profile</a> · <a href="/changelog/">Changelog</a></nav>
+  <nav class="foot" aria-label="Pages"><a href="/">Home</a> · <a href="/mcp/">MCP</a> · <a href="/php/">PHP</a> · <a href="/rust/">Rust</a> · <a href="/typescript/">TypeScript / Vue</a> · <a href="/swift/">Swift</a> · <a href="/python/">Python</a> · <a href="/go/">Go</a> · <a href="/locate/">locate</a> · <a href="/profile/">Profile</a> · <a href="/laravel/">Laravel &amp; Inertia</a> · <a href="/gen/">Generator</a> · <a href="/changelog/">Changelog</a></nav>
   <div>callgraph · made by <a href="https://www.linkedin.com/in/gergomakra/" rel="author me">Gergő Makra</a> · MIT license · <a href="https://github.com/GeRiY/callgraph">GitHub</a> · <a href="https://github.com/GeRiY/callgraph/releases/latest">Releases</a> · <a href="/hu/" hreflang="hu" lang="hu">Magyar</a></div>
   <div class="sub">Privacy: no cookies. Page views are counted per day (page, referring site, download clicks) — no IP address, no identifiers. The callgraph tool sends one anonymous count a day (version, platform, three yes/no flags; no ID, no IP stored; off: CALLGRAPH_COUNT=0 or DO_NOT_TRACK=1). Controller: Makra Gergő, mgeri1993@gmail.com.</div>
 </footer>

@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Code generator &amp; project-wide rename for AI agents — callgraph</title>
+<meta name="description" content="Write PHP, Vue, JS / TS modules, HTML pages and whole Laravel features from a short expression, in the project&#x27;s style — syntax-checked, backed up, undoable. Rename routes, classes and methods across the project.">
+<link rel="canonical" href="https://callgraph.eu/gen/">
+<link rel="alternate" hreflang="en" href="https://callgraph.eu/gen/">
+<link rel="alternate" hreflang="hu" href="https://callgraph.eu/hu/gen/">
+<link rel="alternate" hreflang="x-default" href="https://callgraph.eu/gen/">
+<meta name="author" content="Gergő Makra">
+<meta name="robots" content="index,follow">
+<meta name="theme-color" content="#0c152a">
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/style.css">
+<script>document.documentElement.className += ' js';</script>
+<link rel="alternate" type="text/markdown" href="/gen/index.md" title="Markdown version of this page">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="callgraph">
+<meta property="og:title" content="Code generator &amp; project-wide rename for AI agents — callgraph">
+<meta property="og:description" content="Write PHP, Vue, JS / TS modules, HTML pages and whole Laravel features from a short expression, in the project&#x27;s style — syntax-checked, backed up, undoable. Rename routes, classes and methods across the project.">
+<meta property="og:url" content="https://callgraph.eu/gen/">
+<meta property="og:image" content="https://callgraph.eu/assets/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="callgraph terminal output: class outline with line ranges and categorized calls">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="hu_HU">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Code generator &amp; project-wide rename for AI agents — callgraph">
+<meta name="twitter:description" content="Write PHP, Vue, JS / TS modules, HTML pages and whole Laravel features from a short expression, in the project&#x27;s style — syntax-checked, backed up, undoable. Rename routes, classes and methods across the project.">
+<meta name="twitter:image" content="https://callgraph.eu/assets/og-image.png">
+<script type="application/ld+json">
+{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://callgraph.eu/"}, {"@type": "ListItem", "position": 2, "name": "Generator & rename", "item": "https://callgraph.eu/gen/"}]}
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="wrap">
+<header class="top">
+  <a class="brand" href="/"><img src="/assets/favicon.svg" alt="" width="32" height="32">callgraph</a>
+  <nav class="links" aria-label="Main">
+    <details class="menu"><summary class="current">Usage</summary><div class="menu-list"><a href="/#usage">All commands</a><a href="/locate/">locate</a><a href="/profile/">Profile</a><a href="/laravel/">Laravel &amp; Inertia</a><a href="/gen/" aria-current="page">Generator</a></div></details>
+    <details class="menu"><summary>Languages</summary><div class="menu-list"><a href="/php/">PHP</a><a href="/rust/">Rust</a><a href="/typescript/">TS / Vue</a><a href="/swift/">Swift</a><a href="/python/">Python</a><a href="/go/">Go</a><a href="/#languages">All languages</a></div></details>
+    <a href="/mcp/">MCP</a>
+    <a href="/changelog/">Changelog</a>
+    <a href="https://github.com/GeRiY/callgraph">GitHub</a>
+    <a class="lang" href="/hu/gen/" hreflang="hu" lang="hu">Magyar</a>
+  </nav>
+</header>
+<main id="main">
+<nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="/">Home</a></li><li aria-current="page">Generator &amp; rename</li></ol></nav>
+<section class="hero page" aria-labelledby="title">
+  <div>
+    <h1 id="title">Generator and rename: write and rename code safely</h1>
+    <p class="lead"><code>gen</code> turns a short Emmet-like expression into real code — PHP classes, Vue components, JS / TS modules, HTML pages, a whole Laravel feature — in the style of your project. <code>rename</code> changes a route, class or method name everywhere it is used. Both check syntax before writing and can be undone with one command.</p>
+    <div class="cta">
+      <a class="btn primary" href="/#install">Install</a>
+      <a class="btn" href="/laravel/">Laravel &amp; Inertia</a>
+    </div>
+  </div>
+</section>
+
+<section id="php" aria-labelledby="h-php">
+  <h2 id="h-php">PHP: classes and members</h2>
+  <p>The expression says what the class is, what it extends and implements, and its members: <code>+</code> public, <code>-</code> private, <code>#</code> protected. The namespace comes from the <code>psr-4</code> section of <code>composer.json</code>, the imports from the project. Names callgraph cannot import are reported as <code>unresolved: Foo</code>.</p>
+<pre class="code"><code>bash ~/.claude/skills/callgraph/callgraph.sh gen 'c!:PaymentGateway&lt;BaseGateway&gt;[Chargeable] &gt; ctor(-Client $http, -int $retries=3) + +charge(Order $order):Receipt + -sign(array $p):string' --write app/Services/PaymentGateway.php</code></pre>
+  <p>Without a target, or with <code>--dry</code>, it only prints the code. The class above comes out roughly like this:</p>
+  <p class="label">Generated code (shortened)</p>
+<pre class="code out"><code>&lt;?php
+
+namespace App\Services;
+
+final class PaymentGateway extends BaseGateway implements Chargeable
+{
+    public function __construct(private Client $http, private int $retries = 3)
+    {
+    }
+
+    public function charge(Order $order): Receipt
+    {
+        // TODO
+    }
+
+    private function sign(array $p): string
+    {
+        // TODO
+    }
+}</code></pre>
+  <p>Add a member to an existing class, after a given method:</p>
+<pre class="code"><code>bash ~/.claude/skills/callgraph/callgraph.sh gen '+refund(Order $o):void{ $this-&gt;http-&gt;post($o-&gt;id); }' --into app/Services/PaymentGateway.php::PaymentGateway --after charge</code></pre>
+</section>
+
+<section id="vue" aria-labelledby="h-vue">
+  <h2 id="h-vue">Vue: components and composables</h2>
+  <p><code>vue:Name&gt;(script&gt;…)+(template&gt;…)+(style&gt;…)</code> writes a single-file component in TypeScript or JavaScript, like the project. In the script: <code>props(...)</code>, <code>emits(...)</code>, <code>ref:</code>, <code>computed:</code>, <code>fn:</code>, <code>use:</code> imports and more. The template uses Emmet-style elements, and components are imported automatically. <code>comp:useX&gt;…</code> writes a composable.</p>
+<pre class="code"><code>bash ~/.claude/skills/callgraph/callgraph.sh gen 'vue:Counter&gt;(script&gt;ref:n:int=0+fn:inc(){ n.value++ })+(template&gt;button[@click=inc]{Add})' --dry</code></pre>
+  <p class="label">Generated code (shortened)</p>
+<pre class="code out"><code>&lt;script setup lang="ts"&gt;
+import { ref } from 'vue'
+
+const n = ref&lt;number&gt;(0)
+
+function inc() { n.value++ }
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;button @click="inc"&gt;Add&lt;/button&gt;
+&lt;/template&gt;</code></pre>
+  <p>Extend an existing page instead of writing a new one:</p>
+<pre class="code"><code>bash ~/.claude/skills/callgraph/callgraph.sh gen 'script&gt;ref:loading:bool=false+fn:reset(){ form.reset() }' --into resources/js/Pages/Auth/Register.vue</code></pre>
+</section>
+
+<section id="js" aria-labelledby="h-js">
+  <h2 id="h-js">Plain JS / TS modules</h2>
+  <p><code>mod:</code> writes a module, <code>class:</code> a class. Everything is exported by default; <code>-fn:</code> keeps a function private, <code>!fn:</code> / <code>!class:</code> makes it <code>export default</code>. A <code>.ts</code> file gets types, a <code>.js</code> file JSDoc.</p>
+<pre class="code"><code>bash ~/.claude/skills/callgraph/callgraph.sh gen 'mod:util&gt;fn:join(p:list&lt;str&gt;):str{ return p.join("/") }+const:MAX:int=10' --write resources/js/util.ts</code></pre>
+  <p class="label">Generated code (shortened)</p>
+<pre class="code out"><code>export function join(p: string[]): string { return p.join("/") }
+
+export const MAX: number = 10</code></pre>
+  <p><code>--into x.ts[::Class]</code> adds members to an existing file; <code>--replace x.ts::fn</code> or <code>x.ts::Class::method</code> replaces one.</p>
+</section>
+
+<section id="html" aria-labelledby="h-html">
+  <h2 id="h-html">HTML documents</h2>
+  <p><code>html:Title[lang=hu]&gt;(head&gt;…)+(body&gt;…)</code> writes a full document: doctype, charset, viewport and title. The head shortcuts are <code>meta:description=…</code>, <code>link:style.css</code>, <code>script:app.js</code> and <code>base:/app/</code>. Any element and attribute works; inline <code>style{…}</code>, <code>script{…}</code> and <code>comment{…}</code> are allowed, and the CSS and JS are checked before writing.</p>
+<pre class="code"><code>bash ~/.claude/skills/callgraph/callgraph.sh gen 'html:Title[lang=hu]&gt;(head&gt;meta:description=Hi+link:style.css+script:app.js)+(body&gt;header&gt;nav&gt;a[href=/]{Home}^^main&gt;form[action=/x method=post]&gt;input[type=email name=e required]+button{Send})' --write index.html</code></pre>
+  <p><code>--into x.html</code> adds at the end of <code>&lt;body&gt;</code>, or into <code>::#id</code>, <code>::.class</code> or <code>::tag</code>; <code>--replace x.html::#id</code> replaces an element.</p>
+</section>
+
+<section id="laravel" aria-labelledby="h-laravel">
+  <h2 id="h-laravel">A Laravel feature in one step</h2>
+  <p>The <code>laravel:</code> preset writes the FormRequests, controller methods, routes and Inertia / Vue pages together:</p>
+<pre class="code"><code>bash ~/.claude/skills/callgraph/callgraph.sh gen 'laravel:Fee[auth,prefix=admin]&gt;create(name:str,amount:int,paid?:bool)+edit+index'</code></pre>
+  <ul>
+    <li>It checks that the form fields match the validation rules.</li>
+    <li>It warns about NOT NULL columns without a default that the form does not send.</li>
+    <li>One <code>undo</code> reverts all of its files.</li>
+  </ul>
+  <p>The links it relies on (routes, forms, models, pages) are described on <a href="/laravel/">Laravel &amp; Inertia</a>.</p>
+</section>
+
+<section id="targets" aria-labelledby="h-targets">
+  <h2 id="h-targets">Where the code goes</h2>
+  <ul>
+    <li><code>--write &lt;file&gt;</code>: a new file only. An existing file is never overwritten.</li>
+    <li><code>--into &lt;file&gt;[::Class] [--after &lt;method&gt;]</code>: add to an existing file or class.</li>
+    <li><code>--replace &lt;file&gt;:L&lt;a&gt;-L&lt;b&gt;</code> or <code>--replace &lt;file&gt;::&lt;method&gt;</code>: replace a line range or one member.</li>
+    <li><code>--expect &lt;sha256-prefix&gt;</code> with <code>--replace</code>: refuse the change if those lines changed in the meantime.</li>
+    <li><code>--dry</code>, or no target at all: only print the code.</li>
+  </ul>
+  <p>The answer is one line per file, so it costs the agent almost nothing to read.</p>
+</section>
+
+<section id="safety" aria-labelledby="h-safety">
+  <h2 id="h-safety">Safety: check, back up, undo</h2>
+  <ul>
+    <li>The new text is syntax-checked before writing; on an error nothing is written.</li>
+    <li>Every change to an existing file is backed up to <code>.callgraph/backups/</code> first (the newest 10 per file).</li>
+    <li><code>undo [&lt;file&gt;]</code> restores the newest backup; <code>undo</code> is itself undoable.</li>
+  </ul>
+<pre class="code"><code>bash ~/.claude/skills/callgraph/callgraph.sh undo
+bash ~/.claude/skills/callgraph/callgraph.sh undo app/Services/PaymentGateway.php</code></pre>
+</section>
+
+<section id="rename" aria-labelledby="h-rename">
+  <h2 id="h-rename">Rename a route, class or method</h2>
+  <p><code>rename route|class|method &lt;old&gt; &lt;new&gt;</code> changes the name everywhere across PHP, Blade, JS and Vue:</p>
+  <ul>
+    <li><strong>route</strong>: <code>-&gt;name()</code>, groups, <code>'profile.*'</code> patterns, resource routes via <code>-&gt;names()</code>, and every <code>route('x')</code> call.</li>
+    <li><strong>class</strong>: the declaration, the file move, namespace, <code>use</code> lines, type hints and docblocks. <code>--strings</code> also rewrites string references; <code>--keep-table</code> keeps the Eloquent table name.</li>
+    <li><strong>method</strong>: overrides, resolved calls, callable arrays and route actions.</li>
+  </ul>
+<pre class="code"><code>bash ~/.claude/skills/callgraph/callgraph.sh rename route events.show events.view --dry
+bash ~/.claude/skills/callgraph/callgraph.sh rename route events.show events.view</code></pre>
+  <p>Every changed file is syntax-checked first, <code>--dry</code> only reports, and the answer is one line per file. Dynamic references (names built at run time) are only listed, never guessed. One <code>undo</code> reverts the whole rename.</p>
+</section>
+
+<section id="mcp" aria-labelledby="h-mcp">
+  <h2 id="h-mcp">Over MCP: opt-in</h2>
+  <p>The MCP <code>generate</code> and <code>rename</code> tools write files, so they are off by default. They appear in the tool list only when the server runs with <code>--generate</code> or <code>CALLGRAPH_GENERATE=1</code>; without it the tool list is exactly as before. Unlike the read-only tools, they declare <code>readOnlyHint: false</code>.</p>
+<pre class="code"><code>claude mcp add -s user callgraph -- ~/.claude/skills/callgraph/bin/$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)/callgraph mcp --auto-update --generate</code></pre>
+  <p>Setup for the other clients: <a href="/mcp/">MCP server</a>.</p>
+</section>
+
+<section id="related" aria-labelledby="h-related">
+  <h2 id="h-related">Related</h2>
+  <div class="grid">
+    <a class="card" href="/laravel/"><h3>Laravel &amp; Inertia</h3><p>Routes, forms, models and pages linked in the outline.</p></a>
+    <a class="card" href="/typescript/"><h3>TypeScript / Vue</h3><p>Outline Vue components and JS / TS modules.</p></a>
+    <a class="card" href="/php/"><h3>PHP, Laravel and Yii</h3><p>Outline classes and find every caller before a rename.</p></a>
+    <a class="card" href="/mcp/"><h3>MCP server</h3><p>The opt-in <code>generate</code> and <code>rename</code> tools.</p></a>
+  </div>
+</section>
+</main>
+
+<footer>
+  <nav class="foot" aria-label="Pages"><a href="/">Home</a> · <a href="/mcp/">MCP</a> · <a href="/php/">PHP</a> · <a href="/rust/">Rust</a> · <a href="/typescript/">TypeScript / Vue</a> · <a href="/swift/">Swift</a> · <a href="/python/">Python</a> · <a href="/go/">Go</a> · <a href="/locate/">locate</a> · <a href="/profile/">Profile</a> · <a href="/laravel/">Laravel &amp; Inertia</a> · <a href="/gen/">Generator</a> · <a href="/changelog/">Changelog</a></nav>
+  <div>callgraph · made by <a href="https://www.linkedin.com/in/gergomakra/" rel="author me">Gergő Makra</a> · MIT license · <a href="https://github.com/GeRiY/callgraph">GitHub</a> · <a href="https://github.com/GeRiY/callgraph/releases/latest">Releases</a> · <a href="/hu/gen/" hreflang="hu" lang="hu">Magyar</a></div>
+  <div class="sub">Privacy: no cookies. Page views are counted per day (page, referring site, download clicks) — no IP address, no identifiers. The callgraph tool sends one anonymous count a day (version, platform, three yes/no flags; no ID, no IP stored; off: CALLGRAPH_COUNT=0 or DO_NOT_TRACK=1). Controller: Makra Gergő, mgeri1993@gmail.com.</div>
+</footer>
+</div>
+<script>
+// nyelv-menü: kívül kattintásra / Escape-re bezárul (JS nélkül is működik)
+document.addEventListener('click', function (e) {
+  document.querySelectorAll('details.menu[open]').forEach(function (d) { if (!d.contains(e.target)) d.open = false; });
+});
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape') return;
+  document.querySelectorAll('details.menu[open]').forEach(function (d) { d.open = false; d.querySelector('summary').focus(); });
+});
+</script>
+<script>
+(function(){try{var u="https://telemetry.callgraph.eu/hit",r="";
+try{var h=new URL(document.referrer).hostname;if(h&&h.indexOf("callgraph.eu")<0)r=h.toLowerCase()}catch(e){}
+try{var q=new URLSearchParams(location.search),t=q.get("ref")||q.get("utm_source");if(t)r=t.toLowerCase().replace(/[^a-z0-9.-]/g,"").slice(0,64)}catch(e){}
+function s(e){var d=JSON.stringify({p:location.pathname.toLowerCase().slice(0,80),r:r,e:e});
+if(navigator.sendBeacon)navigator.sendBeacon(u,d);else fetch(u,{method:"POST",body:d,keepalive:true,mode:"no-cors"})}
+s("view");document.addEventListener("click",function(ev){var a=ev.target.closest&&ev.target.closest("a");
+if(a&&/github\.com\/GeRiY\/callgraph\/releases/.test(a.href))s("download")})}catch(e){}})();
+</script>
+<script>
+// másoló gomb a parancs- és konfig-blokkokon (JS nélkül a blokk ugyanúgy olvasható)
+if (navigator.clipboard) document.querySelectorAll('pre.code:not(.out)').forEach(function (pre) {
+  var wrap = document.createElement('div'); wrap.className = 'copywrap';
+  pre.parentNode.insertBefore(wrap, pre); wrap.appendChild(pre);
+  var b = document.createElement('button'); b.type = 'button'; b.className = 'copy';
+  b.textContent = "Copy"; b.setAttribute('aria-label', "Copy code to clipboard"); wrap.appendChild(b);
+  b.addEventListener('click', function () {
+    navigator.clipboard.writeText(pre.innerText.replace(/\n$/, '')).then(function () {
+      b.textContent = "Copied"; setTimeout(function () { b.textContent = "Copy"; }, 1600);
+    });
+  });
+});
+</script>
+</body>
+</html>
