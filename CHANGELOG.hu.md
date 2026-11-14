@@ -37,14 +37,32 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   `fillable:` sort mutat, a relációs sorok mellett ott a cél, a `⚠` sorok pedig jelzik, ha egy fillable vagy cast nem
   oszlop. A `show . --format models` felsorolja a modelleket, a modell nélküli táblákat, és azt a táblát, amelyet két
   migráció is létrehoz törlés nélkül (egy friss migrate elbukna).
+- **Gyors egyfájlos outline Laravel-projektben:** egy fájl outline-ja csak a szükséges route-, migrációs és
+  űrlapfájlokat olvassa be, az eredményt pedig a `.callgraph/laravel.bin` fájlban tartja (csak ha a `.callgraph/`
+  létezik; a fájlok módosítási ideje és mérete alapján ellenőrizve, magától újraépül, nyugodtan törölhető). A
+  route-fájlokat útvonal szerinti sorrendben olvassa, így egy controller `route:` sorai minden nézetben ugyanabban a
+  sorrendben jönnek.
 - **Kódgenerátor, `callgraph.sh gen '<kifejezés>'`:** rövid, Emmet-szerű kifejezésből PHP-osztályt / -tagokat, Vue
-  egyfájlos komponenst (script setup, template, style) és composable-t ír, a projekt stílusában (névtér a
-  `composer.json`-ból, importok a projektből, TS vagy JS, pontosvessző, behúzás). Célok: `--write <fájl>` (csak új
-  fájl), `--into <fájl>[::Osztály] [--after <metódus>]`, `--replace <fájl>:L<a>-L<b>` vagy `::<metódus>`, ahol az
-  `--expect <sha256-előtag>` elutasítja a cserét, ha közben megváltoztak azok a sorok; cél nélkül vagy `--dry`-jal
-  csak kiírja a kódot. Fájlonként egy sorral válaszol. Írás előtt ellenőrzi az új szöveg szintaxisát (hibánál semmi
-  nem íródik), egy meglévő fájl minden módosítása előtt mentést készít a `.callgraph/backups/` mappába (fájlonként a
-  legutóbbi 10), a `callgraph.sh undo [<fájl>]` pedig visszaállítja a legfrissebb mentést.
+  egyfájlos komponenst (script setup, template, style), composable-t, sima JS / TS modult és teljes HTML-oldalt ír, a
+  projekt stílusában (névtér a `composer.json`-ból, importok a projektből, TS vagy JS, pontosvessző, behúzás). Vue
+  scriptben a `use:{useX}@/composables/useX` nevesített import (puszta útvonalból magától az lesz, ha a fájlban csak
+  `export function useX` van), a `type:Flag{flag:str,on?:bool}` interface (inline objektumtípus is megy, pl.
+  `list<{a:str}>`), a `raw{…}` / `const:{a,b}=useX()` pedig szó szerint kiír egy utasítást.
+  Célok: `--write <fájl>` (csak új fájl), `--into <fájl>[::Osztály] [--after <metódus>]`, `--replace <fájl>:L<a>-L<b>`
+  vagy `::<metódus>`, ahol az `--expect <sha256-előtag>` elutasítja a cserét, ha közben megváltoztak azok a sorok; cél
+  nélkül vagy `--dry`-jal csak kiírja a kódot. Fájlonként egy sorral válaszol. Írás előtt ellenőrzi az új szöveg
+  szintaxisát (hibánál semmi nem íródik), egy meglévő fájl minden módosítása előtt mentést készít a
+  `.callgraph/backups/` mappába (fájlonként a legutóbbi 10), a `callgraph.sh undo [<fájl>]` pedig visszaállítja a
+  legfrissebb mentést.
+- **Generátor: JS / TS modulok és HTML-oldalak:** a `mod:util>fn:join(p:list<str>):str{…}+const:MAX:int=10` modult
+  ír, a `class:Svc<Base>[Iface]>…` osztályt (a tagok, mint PHP-ban: `+` public, `-` private, `#` protected). Alapból
+  minden exportált, a `-fn:` privát függvényt ad, a `!fn:` / `!class:` `export default`-ot; `.ts` fájl típusokat kap,
+  `.js` fájl JSDoc-ot. Az `--into x.ts[::Osztály]` tagokat szúr be, a `--replace x.ts::fn` vagy
+  `x.ts::Osztály::metódus` egyet lecserél. A `html:Cím[lang=hu]>(head>…)+(body>…)` teljes dokumentumot ír (doctype,
+  charset, viewport, title) a `meta:description=…`, `link:style.css`, `script:app.js` és `base:/app/`
+  head-rövidítésekkel; bármilyen elem és attribútum használható, inline `style{…}`, `script{…}` és `comment{…}` is
+  (a CSS-t és a JS-t írás előtt ellenőrzi). Az `--into x.html` a `<body>` végére vagy a `::#id` / `::.class` /
+  `::tag` elembe szúr be, a `--replace x.html::#id` egy elemet cserél.
 - **Laravel-funkció egy lépésben:**
   a `gen 'laravel:Fee[auth,prefix=admin]>create(name:str,amount:int,paid?:bool)+edit+index'` együtt megírja a
   FormRequesteket, a controller-metódusokat, a route-okat és az Inertia / Vue oldalakat, ellenőrzi, hogy az űrlap

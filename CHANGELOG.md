@@ -34,14 +34,30 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   `fillable:` lines, relation lines show their target, and `⚠` lines warn about a fillable or cast that is not a
   column. `show . --format models` lists the models, the tables without a model, and a table created twice without a
   drop (a fresh migrate would fail).
+- **Fast single-file outlines in Laravel projects:** the outline of one file reads only the route, migration and form
+  files it needs and keeps the results in `.callgraph/laravel.bin` (only if `.callgraph/` exists; checked against the
+  files' modification time and size, rebuilt automatically, safe to delete). Route files are read in path order, so
+  a controller's `route:` lines come in the same order in every view.
 - **Code generator `callgraph.sh gen '<expr>'`:** writes PHP classes / members, Vue single-file components (script
-  setup, template, style) and composables from a short Emmet-like expression, in the project's style (namespace from
-  `composer.json`, imports from the project, TS or JS, semicolons, indentation). Targets: `--write <file>` (new file
-  only), `--into <file>[::Class] [--after <method>]`, `--replace <file>:L<a>-L<b>` or `::<method>`, where `--expect
-  <sha256-prefix>` refuses the change if those lines changed meanwhile; without a target, or with `--dry`, it only
-  prints the code. It answers with one line per file. The new text is syntax-checked before writing (nothing is
-  written on an error), every change to an existing file is backed up to `.callgraph/backups/` first (newest 10 per
-  file), and `callgraph.sh undo [<file>]` restores the newest backup.
+  setup, template, style), composables, plain JS / TS modules and full HTML pages from a short Emmet-like expression,
+  in the project's style (namespace from `composer.json`, imports from the project, TS or JS, semicolons,
+  indentation). In a Vue script `use:{useX}@/composables/useX` is a named import (a bare path becomes one by itself
+  when the file only has `export function useX`), `type:Flag{flag:str,on?:bool}` an interface (inline object types
+  such as `list<{a:str}>` work too), and `raw{…}` / `const:{a,b}=useX()` write a statement as is.
+  Targets: `--write <file>` (new file only), `--into <file>[::Class] [--after <method>]`, `--replace <file>:L<a>-L<b>`
+  or `::<method>`, where `--expect <sha256-prefix>` refuses the change if those lines changed meanwhile; without a
+  target, or with `--dry`, it only prints the code. It answers with one line per file. The new text is syntax-checked
+  before writing (nothing is written on an error), every change to an existing file is backed up to
+  `.callgraph/backups/` first (newest 10 per file), and `callgraph.sh undo [<file>]` restores the newest backup.
+- **Generator: JS / TS modules and HTML pages:** `mod:util>fn:join(p:list<str>):str{…}+const:MAX:int=10` writes a
+  module, `class:Svc<Base>[Iface]>…` a class (members as in PHP: `+` public, `-` private, `#` protected). Everything
+  is exported by default, `-fn:` keeps a function private, `!fn:` / `!class:` makes it `export default`; a `.ts` file
+  gets types, a `.js` file JSDoc. `--into x.ts[::Class]` adds members, `--replace x.ts::fn` or `x.ts::Class::method`
+  replaces one. `html:Title[lang=hu]>(head>…)+(body>…)` writes a full document (doctype, charset, viewport, title)
+  with the head shortcuts `meta:description=…`, `link:style.css`, `script:app.js` and `base:/app/`; any element and
+  attribute works, and inline `style{…}`, `script{…}` and `comment{…}` are allowed (CSS and JS checked before
+  writing). `--into x.html` adds at the end of `<body>` or into `::#id` / `::.class` / `::tag`,
+  `--replace x.html::#id` replaces an element.
 - **A Laravel feature in one step:**
   `gen 'laravel:Fee[auth,prefix=admin]>create(name:str,amount:int,paid?:bool)+edit+index'` writes the FormRequests,
   controller methods, routes and Inertia / Vue pages together, checks that the form fields match the rules, warns
