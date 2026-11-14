@@ -62,6 +62,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   `gen 'laravel:Fee[auth,prefix=admin]>create(name:str,amount:int,paid?:bool)+edit+index'` writes the FormRequests,
   controller methods, routes and Inertia / Vue pages together, checks that the form fields match the rules, warns
   about NOT NULL columns without a default that the form does not send, and one `undo` reverts all of its files.
+  Without Ziggy (no `tightenco/ziggy` / `ziggy-js`) the pages use plain URLs (`'/notes'`) instead of `route('…')`;
+  a `str` field with a long-text name (body, content, description, …) gets a hint to use `:text`. `--expect` without
+  `--replace` and `--after` without `--into` give a specific error (`--expect` is the sha256 prefix of the replaced
+  lines, not of the whole file), and the help lists the field types.
 - **`callgraph.sh rename route|class|method <old> <new>`:** renames across the whole project — route names
   (`->name()`, groups, `'profile.*'` patterns, resource routes via `->names()`, and every `route('x')` in PHP, Blade,
   JS and Vue), PHP classes (declaration, file move, namespace, `use`, type hints, docblocks; `--strings` also rewrites

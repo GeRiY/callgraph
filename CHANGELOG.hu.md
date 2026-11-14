@@ -68,6 +68,10 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   FormRequesteket, a controller-metódusokat, a route-okat és az Inertia / Vue oldalakat, ellenőrzi, hogy az űrlap
   mezői egyeznek-e a szabályokkal, figyelmeztet az alapérték nélküli NOT NULL oszlopokra, amelyeket az űrlap nem
   küld, és egyetlen `undo` az összes fájlját visszavonja.
+  Ziggy nélkül (nincs `tightenco/ziggy` / `ziggy-js`) az oldalak sima URL-eket (`'/notes'`) használnak `route('…')`
+  helyett; a hosszú szöveg nevű `str` mező (body, content, description, …) javaslatot kap a `:text` használatára.
+  A `--replace` nélküli `--expect` és az `--into` nélküli `--after` külön hibaüzenetet ad (az `--expect` a lecserélt
+  sorok sha256-előtagja, nem a teljes fájlé), és a súgó felsorolja a mezőtípusokat.
 - **`callgraph.sh rename route|class|method <régi> <új>`:** a teljes projektben átnevez — route-neveket (`->name()`,
   csoportok, `'profile.*'` minták, resource route-ok `->names()`-szel, és minden `route('x')` PHP-ban, Blade-ben,
   JS-ben és Vue-ban), PHP-osztályokat (deklaráció, fájl-áthelyezés, névtér, `use`, típusjelzések, docblock; a
