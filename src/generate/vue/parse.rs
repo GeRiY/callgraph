@@ -11,7 +11,7 @@ use crate::generate::error::{GenError, GenResult};
 use crate::generate::head::{is_ident, matching, split_once_top, split_top};
 use crate::generate::parser::{Expanded, parse_tree};
 
-fn located(node: &Expanded, e: &GenError) -> GenError {
+pub(super) fn located(node: &Expanded, e: &GenError) -> GenError {
     GenError::new(crate::tf!(
         "{} (col {}: `{}`)",
         "{} ({}. oszlop: `{}`)",
@@ -927,7 +927,7 @@ fn parse_uses(rest: &str) -> GenResult<(Vec<Import>, Vec<String>)> {
 }
 
 /// A számláló (`$`) cseréje a szövegben: csak az önálló `$` (nem `$emit`, nem `a$b`).
-fn number_text(text: &str, counter: Option<u32>) -> String {
+pub(super) fn number_text(text: &str, counter: Option<u32>) -> String {
     let Some(n) = counter else {
         return text.to_owned();
     };
@@ -993,7 +993,7 @@ fn element(node: &Expanded) -> GenResult<Element> {
 }
 
 /// `tag.class1.class2#id` (Emmet-fej); a tag elmaradhat (`.card` → `div`).
-fn emmet_head(head: &str) -> GenResult<(String, Option<String>, Vec<String>)> {
+pub(super) fn emmet_head(head: &str) -> GenResult<(String, Option<String>, Vec<String>)> {
     #[derive(Clone, Copy, PartialEq)]
     enum Mode {
         Tag,
@@ -1095,7 +1095,7 @@ fn split_attrs(text: &str) -> Vec<String> {
     parts
 }
 
-fn unquote(value: &str) -> String {
+pub(super) fn unquote(value: &str) -> String {
     for q in ['"', '\''] {
         if value.len() >= 2 && value.starts_with(q) && value.ends_with(q) {
             return value[1..value.len() - 1].to_owned();
@@ -1104,7 +1104,7 @@ fn unquote(value: &str) -> String {
     value.to_owned()
 }
 
-fn parse_attrs(text: &str) -> GenResult<Vec<Attr>> {
+pub(super) fn parse_attrs(text: &str) -> GenResult<Vec<Attr>> {
     split_attrs(text)
         .into_iter()
         .map(|token| match token.split_once('=') {
@@ -1125,7 +1125,7 @@ fn parse_attrs(text: &str) -> GenResult<Vec<Attr>> {
         .collect()
 }
 
-fn rule(node: &Expanded) -> GenResult<Rule> {
+pub(super) fn rule(node: &Expanded) -> GenResult<Rule> {
     no_children(node)?;
     let mut selector = node.head.trim().to_owned();
     if let Some(list) = &node.list {

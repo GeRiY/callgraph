@@ -78,11 +78,35 @@
 //! hiányzó blokkot létrehoz); a szükséges importokat a meglévő import-sorokba egyesíti. `--into useX.ts` a tagokat a
 //! `return {` elé teszi és a visszaadott objektumot bővíti. `--replace f.vue:L10-L20` / `f.vue::név` mint a PHP-nál.
 //! Írás előtt a teljes szöveget ellenőrizzük (script / composable: oxc; template: tag-egyensúly; style: CSS-parser).
+//!
+//! # HTML (`html:`, `.html` / `.htm`)
+//! `html:Cím[lang=hu]>(head>…)+(body>…)` → teljes dokumentum (`<!doctype html>`, `<html lang>`, `charset`, `viewport`,
+//! `<title>`, a head-gyerekek, a body-fa); `head>` / `body>` nélkül a gyerekek a body-ba kerülnek (a cím szóközhöz
+//! idézőjel: `html:"Új oldal"`). A csupasz Emmet-elemek `--write x.html` céllal ugyanígy dokumentumba kerülnek.
+//! - head-rövidítések (a body-ban is használhatók): `meta:description=Szöveg`, `meta:og:title=X` (→ `property=`),
+//!   `meta:charset=utf-8`, `link:style.css` (→ `rel=stylesheet`), `link:icon=/f.ico`, `link:preload=f.woff2[as=font crossorigin]`,
+//!   `script:app.js` (→ `src defer`), `script:module=main.js` (→ `type=module`), `script:async=x.js`, `base:/app/`;
+//!   általános elem is: `meta[name=robots content=noindex]`;
+//! - a body a teljes elemkészlet az Emmet-fával: `form[action=/x method=post]`, `input[type=email name=e required]`,
+//!   `select>option*3{Opt $}`, `table>thead>tr>th*3^^tbody>tr*5>td*3`, `picture>source[srcset]+img[src alt]`,
+//!   `details>summary`, `svg[viewBox="0 0 24 24"]>path[d=…]` (SVG-ben a gyerek nélküli elem önzáró), logikai /
+//!   `data-*` / `aria-*` attribútum, `#id` / `.class`; a void elem `<br>` / `<img …>` (nincs perjel);
+//! - inline blokkok: `style{ .a{color:red} }` (vagy `style>.a{…}+.b{…}`), `script{ … }`, `comment{ szöveg }` →
+//!   `<!-- szöveg -->`; a szövegben az entitások szó szerint maradnak (`{&copy; 2026}`), a `$` számláló.
+//!
+//! Szerkesztés: `--into x.html` a `<body>` végére (vagy `--after L<n>` után, vagy `--into x.html::#id` / `::.class` /
+//! `::tag`: az első egyező elem utolsó gyereke; `html_scan`: a beágyazást és a void elemeket követő tag-kereső),
+//! `--replace x.html:La-Lb` / `x.html::#id` cserél; a behúzás a fájlé. Írás előtt: tag-egyensúly (az elhagyható záró
+//! tagű `li` / `p` / `td` … megengedett), az inline `<style>` a CSS-parserrel, a `<script>` oxc-cal; a duplikált
+//! `id` csak figyelmeztetés. Hiba esetén semmi nem íródik; a mentés és az `undo` közös a többi célnyelvvel.
 
 mod builder;
 mod check;
 mod edit;
 mod generator;
+mod html;
+mod html_gen;
+mod html_scan;
 mod imports;
 mod locate;
 mod model;

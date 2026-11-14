@@ -30,7 +30,7 @@ fn newlines(text: &str, offset: usize) -> usize {
 }
 
 /// Az első szintaktikai hiba a JS / TS szövegben: (0-alapú sor, üzenet).
-fn first_js_error(path: &str, lang: Option<&str>, src: &str) -> Option<(usize, String)> {
+pub(super) fn first_js_error(path: &str, lang: Option<&str>, src: &str) -> Option<(usize, String)> {
     let allocator = Allocator::default();
     let source_type = source_type_for(Path::new(path), lang);
     let parsed = parse_program(&allocator, src, source_type);

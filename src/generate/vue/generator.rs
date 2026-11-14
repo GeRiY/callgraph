@@ -45,9 +45,12 @@ fn file_kind(rel: &str) -> GenResult<FileKind> {
     }
 }
 
-/// A Vue-generátornak szól-e a kérés: a cél-fájl `.vue` / `.ts` / `.js`, vagy (cél nélkül) a kifejezés feje
-/// `vue:` / `comp:` / `script>` / `template>` / `style>`.
+/// A Vue-generátornak szól-e a kérés: a cél-fájl `.vue` / `.ts` / `.js` / `.html`, vagy (cél nélkül) a kifejezés feje
+/// `vue:` / `comp:` / `html:` / `script>` / `template>` / `style>`.
 pub fn wants_vue(request: &GenRequest) -> bool {
+    if super::html_gen::wants_html(request) {
+        return true;
+    }
     let file = match &request.target {
         Target::Preview => {
             let e = request.expr.trim_start();
@@ -70,10 +73,10 @@ fn is_script_file(file: &str) -> bool {
 }
 
 /// Egy beolvasott fájl.
-struct Loaded {
-    text: String,
-    lines: Vec<String>,
-    eol: &'static str,
+pub(super) struct Loaded {
+    pub(super) text: String,
+    pub(super) lines: Vec<String>,
+    pub(super) eol: &'static str,
 }
 
 /// A kirajzolt szakaszok és importok.
@@ -85,7 +88,7 @@ struct Rendered {
     unresolved: Vec<String>,
 }
 
-fn problem(p: &super::check::Problem) -> GenError {
+pub(super) fn problem(p: &super::check::Problem) -> GenError {
     GenError::new(crate::tf!(
         "syntax error in {} at L{}: {} (nothing written)",
         "szintaktikai hiba itt: {} az L{}. sorban: {} (nem írtam semmit)",
@@ -105,7 +108,7 @@ fn one_line_block(name: &str) -> GenError {
 
 /// A Facade.
 pub struct VueGenerator<'a> {
-    env: Env<'a>,
+    pub(super) env: Env<'a>,
 }
 
 impl<'a> VueGenerator<'a> {
@@ -115,6 +118,10 @@ impl<'a> VueGenerator<'a> {
 
     /// A kérés végrehajtása.
     pub fn run(&self, request: &GenRequest) -> GenResult<Output> {
+        // HTML: `html:` fejű kifejezés vagy `.html` / `.htm` cél
+        if super::html_gen::wants_html(request) {
+            return self.run_html(request);
+        }
         // osztálytagok: `--into x.ts::Osztály` és `--replace x.ts::Osztály::tag` (a kifejezés osztálytag, nem modul-tag)
         match &request.target {
             Target::Into {
@@ -162,7 +169,7 @@ impl<'a> VueGenerator<'a> {
         }
     }
 
-    fn rel(&self, file: &str) -> GenResult<String> {
+    pub(super) fn rel(&self, file: &str) -> GenResult<String> {
         let outside = || {
             GenError::new(crate::tf!(
                 "{} is outside the project",
@@ -195,8 +202,10 @@ impl<'a> VueGenerator<'a> {
         VueProject::new(self.env.fs, self.env.root)
     }
 
-    fn validate(&self, rel: &str, text: &str) -> GenResult<()> {
-        let result = if rel.ends_with(".vue") {
+    pub(super) fn validate(&self, rel: &str, text: &str) -> GenResult<()> {
+        let result = if super::html_gen::is_html_file(rel) {
+            super::html_scan::check_html(text)
+        } else if rel.ends_with(".vue") {
             check_vue(text)
         } else {
             check_script_file(rel, text)
@@ -204,7 +213,7 @@ impl<'a> VueGenerator<'a> {
         result.map_err(|p| problem(&p))
     }
 
-    fn load(&self, rel: &str) -> GenResult<Loaded> {
+    pub(super) fn load(&self, rel: &str) -> GenResult<Loaded> {
         let path = self.env.root.join(rel);
         if !self.env.fs.exists(&path) {
             return Err(GenError::new(crate::tf!(
@@ -536,7 +545,7 @@ impl<'a> VueGenerator<'a> {
     }
 
     /// A szerkesztett szöveg ellenőrzése, majd (nem `--dry`-nál) kiírása mentéssel.
-    fn commit_insert(
+    pub(super) fn commit_insert(
         &self,
         rel: String,
         doc: &Doc,
@@ -925,7 +934,7 @@ fn class_span_of(rel: &str, doc: &Doc, class: &str) -> GenResult<ClassSpan> {
 }
 
 /// Az `--expect`: a `[from, to)` sorok sha256-előtagja egyezik-e (különben valaki közben módosította).
-fn check_expect(
+pub(super) fn check_expect(
     doc: &Doc,
     rel: &str,
     (from, to): (usize, usize),
@@ -1311,7 +1320,7 @@ fn bound_names(lines: &[String]) -> Vec<String> {
 }
 
 /// `L12` / `12` → 12.
-fn parse_line_ref(text: &str) -> Option<usize> {
+pub(super) fn parse_line_ref(text: &str) -> Option<usize> {
     text.trim()
         .trim_start_matches(['L', 'l'])
         .parse::<usize>()

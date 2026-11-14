@@ -1542,3 +1542,5 @@ fn module_errors_and_routing() {
         "{preview:?}"
     );
 }
+
+mod html;

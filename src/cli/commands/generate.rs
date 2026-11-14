@@ -37,7 +37,7 @@ impl Command for GenerateCommand {
             fs: &RealFs,
             clock: &SystemClock,
         };
-        // Vue / JS / TS: a cél-fájl kiterjesztése (vagy cél nélkül a kifejezés feje) dönt; minden más a PHP-generátoré
+        // Vue / JS / TS / HTML (`html:` fej, .html / .htm cél): a cél-fájl kiterjesztése (vagy cél nélkül a kifejezés feje) dönt; minden más a PHP-generátoré
         // `laravel:` fejű kifejezés: preset (több fájl, egy tranzakció)
         let result = if wants_preset(&self.request) {
             PresetGenerator::new(env).run(&self.request)
