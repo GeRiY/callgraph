@@ -37,6 +37,14 @@ pub struct FormField {
     pub default: Option<String>,
 }
 
+/// Egy `type:Név{…}` / inline objektum-típus mezője: `flag:str`, `on?:bool`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TypeField {
+    pub name: String,
+    pub optional: bool,
+    pub ty: TypeRef,
+}
+
 /// A script egy tagja.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Member {
@@ -69,6 +77,20 @@ pub enum Member {
         value: Option<String>,
         mutable: bool,
     },
+    /// `type:Név{flag:str,on?:bool}` → TS `interface`, JS-ben JSDoc `@typedef`.
+    Type {
+        name: String,
+        fields: Vec<TypeField>,
+    },
+    /// `raw{ utasítás(ok) }`: szó szerint kiírt sorok.
+    Raw(String),
+    /// `const:{ a, b }=useX()`: `names` a kötött nevek, `pattern` a kapcsos zárójelek közti szöveg.
+    Destructure {
+        names: Vec<String>,
+        pattern: String,
+        value: String,
+        mutable: bool,
+    },
     /// Életciklus-horog: `on:mounted{…}` → `onMounted(() => { … })`.
     Hook {
         name: String,
@@ -85,7 +107,22 @@ impl Member {
             | Self::Func { name, .. }
             | Self::Form { name, .. }
             | Self::Const { name, .. } => Some(name),
-            Self::Props(_) | Self::Emits(_) | Self::Hook { .. } => None,
+            Self::Props(_)
+            | Self::Emits(_)
+            | Self::Hook { .. }
+            | Self::Type { .. }
+            | Self::Raw(_)
+            | Self::Destructure { .. } => None,
+        }
+    }
+
+    /// Minden név, amit a tag a fájlban deklarál (ütközés-vizsgálathoz): a destructuring nevei és a típus neve is;
+    /// a composable `return`-jébe csak a `declared_name` kerül.
+    pub fn declares(&self) -> Vec<&str> {
+        match self {
+            Self::Destructure { names, .. } => names.iter().map(String::as_str).collect(),
+            Self::Type { name, .. } => vec![name.as_str()],
+            other => other.declared_name().into_iter().collect(),
         }
     }
 }
@@ -103,6 +140,9 @@ pub struct Import {
 pub struct Script {
     pub members: Vec<Member>,
     pub imports: Vec<Import>,
+    /// A kiterjesztés- és kapcsos zárójel nélküli `use:<út>` importok forrásai: a generátor a célfájl alapján
+    /// dönti el, hogy nevesített (`export function useX`) vagy default import kell.
+    pub guess: Vec<String>,
 }
 
 /// Elem-attribútum: érték nélkül logikai (`disabled`).

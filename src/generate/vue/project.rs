@@ -160,6 +160,67 @@ impl<'a> VueProject<'a> {
         4
     }
 
+    /// Az `@/…` import célfájlja (`.ts`, `.js`, `/index.ts`, `/index.js`), szövegestől.
+    fn read_module(&self, source: &str) -> Option<String> {
+        let rest = source.strip_prefix("@/")?;
+        if rest.ends_with(".vue") {
+            return None;
+        }
+        for root in ROOTS {
+            let base = self.root.join(root).join(rest);
+            let mut candidates = vec![base.clone()];
+            for suffix in [".ts", ".js"] {
+                let mut name = base.clone().into_os_string();
+                name.push(suffix);
+                candidates.push(PathBuf::from(name));
+            }
+            candidates.push(base.join("index.ts"));
+            candidates.push(base.join("index.js"));
+            for path in candidates {
+                // az alap-út maga (kiterjesztés nélkül) nem fájl: a `read` hibája átlépi
+                if self.fs.exists(&path)
+                    && let Ok(text) = self.fs.read(&path)
+                {
+                    return Some(text);
+                }
+            }
+        }
+        None
+    }
+
+    /// A cél modulnak nincs `export default`-ja, de van `name` nevű nevesített exportja (`export function useX`,
+    /// `export const useX`, `export async function useX`)? Ha a fájl nem található, `false` (default import marad).
+    pub fn exports_named_only(&self, source: &str, name: &str) -> bool {
+        let Some(text) = self.read_module(source) else {
+            return false;
+        };
+        let (mut has_default, mut has_named) = (false, false);
+        for line in text.lines() {
+            let t = line.trim_start();
+            if t.starts_with("export default") {
+                has_default = true;
+                continue;
+            }
+            let Some(rest) = t.strip_prefix("export ") else {
+                continue;
+            };
+            let rest = rest.trim_start();
+            let rest = rest.strip_prefix("async ").unwrap_or(rest).trim_start();
+            for keyword in ["function* ", "function ", "const ", "let "] {
+                if let Some(after) = rest.strip_prefix(keyword)
+                    && let Some(tail) = after.trim_start().strip_prefix(name)
+                    && !tail
+                        .chars()
+                        .next()
+                        .is_some_and(|c| c.is_alphanumeric() || matches!(c, '_' | '$'))
+                {
+                    has_named = true;
+                }
+            }
+        }
+        has_named && !has_default
+    }
+
     /// A `<Név>.vue` komponens import-útja (`@/Components/Card.vue`), ha a projektben van ilyen fájl.
     pub fn find_component(&self, name: &str) -> Option<String> {
         let wanted = format!("{name}.vue");

@@ -114,6 +114,16 @@ fn ident_char(c: char) -> bool {
     c.is_alphanumeric() || c == '_' || c == '$'
 }
 
+/// A `const { a, b: c = 1, ...d } = …` minta (a nyitó `{` után) köti-e a `name` nevet (egysoros mintánál).
+fn destructures(pattern: &str, name: &str) -> bool {
+    let inner = pattern.split('}').next().unwrap_or("");
+    inner.split(',').any(|piece| {
+        let piece = piece.trim().trim_start_matches("...");
+        let piece = piece.split('=').next().unwrap_or(piece);
+        piece.rsplit(':').next().unwrap_or(piece).trim() == name
+    })
+}
+
 /// A sor a `name` nevű függvényt / változót deklarálja-e (`function n(`, `async function n`, `const n =`, `export …`).
 fn declares(line: &str, name: &str) -> bool {
     let mut t = line.trim_start();
@@ -122,8 +132,18 @@ fn declares(line: &str, name: &str) -> bool {
             t = rest.trim_start();
         }
     }
-    for keyword in ["function* ", "function ", "const ", "let ", "var "] {
+    for keyword in [
+        "function* ",
+        "function ",
+        "const ",
+        "let ",
+        "var ",
+        "interface ",
+    ] {
         if let Some(rest) = t.strip_prefix(keyword) {
+            if let Some(pattern) = rest.trim_start().strip_prefix('{') {
+                return destructures(pattern, name);
+            }
             let Some(after) = rest.trim_start().strip_prefix(name) else {
                 return false;
             };

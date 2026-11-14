@@ -231,6 +231,29 @@ impl<'a> VueGenerator<'a> {
         (imports, unresolved)
     }
 
+    /// A `use:<út>` importok: ahol a célfájl a projektben megvan, nincs `export default`-ja, de van a fájlnévvel
+    /// azonos nevesített exportja (`export function useX`), ott nevesített import lesz a default helyett.
+    fn resolve_uses(&self, imports: &[Import], guess: &[String]) -> Vec<Import> {
+        let project = self.project();
+        imports
+            .iter()
+            .map(|import| {
+                let named_export = import
+                    .default
+                    .as_ref()
+                    .filter(|_| guess.contains(&import.source) && import.named.is_empty());
+                match named_export {
+                    Some(name) if project.exports_named_only(&import.source, name) => Import {
+                        source: import.source.clone(),
+                        default: None,
+                        named: vec![name.clone()],
+                    },
+                    _ => import.clone(),
+                }
+            })
+            .collect()
+    }
+
     fn render(&self, program: &Program, style: CodeStyle, bound: &[String]) -> Rendered {
         let em = ScriptEmitter {
             ts: style.ts,
@@ -241,8 +264,8 @@ impl<'a> VueGenerator<'a> {
         let mut explicit: Vec<Import> = Vec::new();
         if let Some(s) = &program.script {
             script = em.members(&s.members);
-            explicit.clone_from(&s.imports);
-            imports.extend(s.imports.iter().cloned());
+            explicit = self.resolve_uses(&s.imports, &s.guess);
+            imports.extend(explicit.iter().cloned());
             imports.extend(ScriptEmitter::needed_imports(&s.members));
         }
         let mut unresolved = Vec::new();
@@ -727,7 +750,7 @@ fn insert_script(
         semi: style.semi,
     };
     let total = doc.lines.len();
-    for name in members.iter().filter_map(Member::declared_name) {
+    for name in members.iter().flat_map(Member::declares) {
         if find_statement(&doc.lines, name, 0, total).is_some() {
             return Err(GenError::new(crate::tf!(
                 "`{}` is already declared in the file (to change it use --replace <file>::{})",
@@ -860,8 +883,9 @@ fn put_script(
             )));
         }
         let clash = m
-            .declared_name()
-            .filter(|name| find_statement(&doc.lines, name, tag + 1, close).is_some());
+            .declares()
+            .into_iter()
+            .find(|name| find_statement(&doc.lines, name, tag + 1, close).is_some());
         if let Some(name) = clash {
             return Err(GenError::new(crate::tf!(
                 "`{}` is already declared in the <script setup> (to change it use --replace <file>::{})",

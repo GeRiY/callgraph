@@ -4,8 +4,8 @@
 
 use std::collections::BTreeSet;
 
-use super::model::{Emit, FormField, Import, Member, Prop, VParam};
-use super::types::{default_literal, runtime_type, ts_type};
+use super::model::{Emit, FormField, Import, Member, Prop, TypeField, VParam};
+use super::types::{default_literal, object_ts, runtime_type, ts_type};
 use crate::generate::ast::TypeRef;
 
 /// Behúzás egy szinten.
@@ -99,7 +99,31 @@ impl ScriptEmitter {
                 mutable,
             } => self.constant(name, ty.as_ref(), value.as_deref(), *mutable),
             Member::Hook { name, body } => self.hook(name, body.as_deref()),
+            Member::Type { name, fields } => self.type_decl(name, fields),
+            Member::Raw(text) => text_lines(text),
+            Member::Destructure {
+                pattern,
+                value,
+                mutable,
+                ..
+            } => {
+                let keyword = if *mutable { "let" } else { "const" };
+                text_lines(&format!(
+                    "{keyword} {{ {pattern} }} = {value}{}",
+                    self.end()
+                ))
+            }
         }
+    }
+
+    /// `interface Név { a: string; b?: number }` (TS), JS-ben `/** @typedef {{ a: string, b?: number }} Név */`.
+    fn type_decl(&self, name: &str, fields: &[TypeField]) -> Vec<String> {
+        if self.ts {
+            let body = object_ts(fields, "; ");
+            return vec![format!("interface {name} {body}")];
+        }
+        let body = object_ts(fields, ", ");
+        vec![format!("/** @typedef {{{body}}} {name} */")]
     }
 
     fn props(&self, props: &[Prop]) -> Vec<String> {
@@ -347,6 +371,12 @@ impl ScriptEmitter {
 
     /// A teljes composable-függvény (importok nélkül): `export function useX() { … return { … } }`.
     pub fn composable(&self, name: &str, members: &[Member]) -> Vec<String> {
+        // a `type:` tagok a függvényen kívülre kerülnek (a TS `export interface` csak felső szinten érvényes)
+        let (types, rest): (Vec<Member>, Vec<Member>) = members
+            .iter()
+            .cloned()
+            .partition(|m| matches!(m, Member::Type { .. }));
+        let members = rest.as_slice();
         let mut body = self.members(members);
         let mut names: Vec<String> = Vec::new();
         for n in members.iter().filter_map(Member::declared_name) {
@@ -358,7 +388,16 @@ impl ScriptEmitter {
             body.push(String::new());
         }
         body.extend(self.return_lines(&names));
-        let mut lines = vec![format!("export function {name}() {{")];
+        let mut lines = Vec::new();
+        for t in &types {
+            let mut decl = self.member(t);
+            if self.ts {
+                decl[0].insert_str(0, "export ");
+            }
+            lines.extend(decl);
+            lines.push(String::new());
+        }
+        lines.push(format!("export function {name}() {{"));
         lines.extend(
             body.into_iter()
                 .map(|l| if l.is_empty() { l } else { format!("{IND}{l}") }),

@@ -190,6 +190,8 @@ Kódgenerátor (fájlt ír; az MCP `generate` eszköz alapból ki van, a szerver
       gen '+refund(Order $o):void{ $this->http->post($o->id); }' --into app/Services/PaymentGateway.php::PaymentGateway --after charge
     Vue (TS vagy JS a projekt szerint): vue:Név>(script>…)+(template>…)+(style>…), comp:useX>… composable;
       script: props(title:str,size?:int=3) emits(save:int,close) ref:n:T=v computed:n:T{…} fn:n(p:T):R{…} form(a,b) use:@/Components/X
+        use:{useX}@/composables/useX (nevesített; sima út = auto: nevesített, ha a fájlban csak `export function useX` van)
+        type:Flag{flag:str,on?:bool} (interface; inline list<{a:str}>) raw{ const {a} = useX() } const:{a,b}=useX()
       template: Emmet div.card#id[attr=v @click=f :key=x.id]{szöveg} {{ kifejezés }} *3; a komponens importja magától; style: .a{decl;decl}
       gen 'script>ref:loading:bool=false+fn:reset(){ form.reset() }' --into resources/js/Pages/Auth/Register.vue
     Laravel-funkció: gen 'laravel:Fee[auth]>create(name:str,amount:int,paid?:bool)+edit+index'  (request, controller,

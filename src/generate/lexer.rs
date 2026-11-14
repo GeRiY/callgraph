@@ -289,6 +289,27 @@ impl Lexer {
     fn word(&mut self) -> GenResult<String> {
         let from = self.pos;
         let list_form = self.chars[from..].starts_with(&['u', 's', 'e', ':']);
+        // Vue-nyelvjárás, script-tag: a `:` / `,` utáni `{…}` a fej része (`use:{useX}@/út`, `const:{ a, b }=f()`,
+        // `ref:x:{ a: str }=…`), nem nyers törzs
+        let braced_head = self.vue
+            && !self.selector
+            && [
+                "use:",
+                "const:",
+                "let:",
+                "ref:",
+                "fn:",
+                "async:",
+                "computed:",
+            ]
+            .iter()
+            .any(|p| {
+                self.chars[from..]
+                    .iter()
+                    .copied()
+                    .take(p.len())
+                    .eq(p.chars())
+            });
         if matches!(self.peek(), Some('+' | '-' | '#')) {
             self.pos += 1;
         }
@@ -299,6 +320,10 @@ impl Lexer {
                 '(' => self.skip_balanced('(', ')')?,
                 '\'' | '"' => self.skip_string(c)?,
                 '[' if prev == Some('=') => self.skip_balanced('[', ']')?,
+                '{' if self.vue && angle > 0 => self.skip_balanced('{', '}')?,
+                '{' if braced_head && matches!(prev, Some(':' | ',')) => {
+                    self.skip_balanced('{', '}')?;
+                }
                 '{' | '[' => break,
                 '<' => {
                     if prev.is_some_and(|p| p.is_alphanumeric() || p == '_' || p == '\\') {

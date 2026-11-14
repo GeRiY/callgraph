@@ -5,6 +5,7 @@ use super::model::{
     Attr, Element, Emit, FormField, Import, Kind, Member, Program, Prop, Rule, Script, Style,
     VParam,
 };
+use super::types::{parse_fields, parse_type};
 use crate::generate::ast::TypeRef;
 use crate::generate::error::{GenError, GenResult};
 use crate::generate::head::{is_ident, matching, split_once_top, split_top};
@@ -62,6 +63,7 @@ pub fn parse(source: &str) -> GenResult<Program> {
         let script = program.script.get_or_insert_with(Script::default);
         script.members.append(&mut loose.members);
         script.imports.append(&mut loose.imports);
+        script.guess.append(&mut loose.guess);
     }
     if program.sections() == 0 {
         return Err(GenError::new(
@@ -159,7 +161,9 @@ fn section(node: &Expanded, program: &mut Program) -> GenResult<()> {
 fn script_item(node: &Expanded, script: &mut Script) -> GenResult<()> {
     no_children(node)?;
     if let Some(rest) = node.head.strip_prefix("use:") {
-        script.imports.extend(parse_uses(rest)?);
+        let (imports, guess) = parse_uses(rest)?;
+        script.imports.extend(imports);
+        script.guess.extend(guess);
         return Ok(());
     }
     script.members.push(member(node)?);
@@ -204,8 +208,38 @@ fn member(node: &Expanded) -> GenResult<Member> {
             body: raw.map(str::to_owned),
         });
     }
+    if head == "raw" {
+        let body = raw.map(str::trim).filter(|b| !b.is_empty());
+        return body.map(|b| Member::Raw(b.to_owned())).ok_or_else(|| {
+            GenError::new(
+                crate::t!(
+                    "`raw{…}` needs its statements: `raw{ const { a } = useX() }`",
+                    "a `raw{…}`-hoz kellenek az utasítások: `raw{ const { a } = useX() }`"
+                )
+                .to_owned(),
+            )
+        });
+    }
+    if let Some(name) = head.strip_prefix("type:") {
+        let Some(body) = raw else {
+            return Err(GenError::new(
+                crate::t!(
+                    "`type:Name{…}` needs its fields: `type:Flag{flag:str,on?:bool}`",
+                    "a `type:Név{…}`-hez kellenek a mezők: `type:Flag{flag:str,on?:bool}`"
+                )
+                .to_owned(),
+            ));
+        };
+        return Ok(Member::Type {
+            name: ident(name)?,
+            fields: parse_fields(body)?,
+        });
+    }
     for (prefix, mutable) in [("const:", false), ("let:", true)] {
         if let Some(rest) = head.strip_prefix(prefix) {
+            if rest.trim_start().starts_with('{') {
+                return destructure(rest, raw, mutable);
+            }
             let (name, ty, value) = decl(rest, raw)?;
             return Ok(Member::Const {
                 name,
@@ -227,10 +261,56 @@ fn member(node: &Expanded) -> GenResult<Member> {
         });
     }
     Err(GenError::new(crate::tf!(
-        "unknown script member `{}` (props(…) emits(…) ref:n:T=v computed:n:T{{…}} fn:n(p:T):R{{…}} form(…) const:n:T=v on:mounted{{…}} use:path)",
-        "ismeretlen script-tag: `{}` (props(…) emits(…) ref:n:T=v computed:n:T{{…}} fn:n(p:T):R{{…}} form(…) const:n:T=v on:mounted{{…}} use:út)",
+        "unknown script member `{}` (props(…) emits(…) ref:n:T=v computed:n:T{{…}} fn:n(p:T):R{{…}} form(…) const:n:T=v const:{{a,b}}=f() type:N{{a:str}} raw{{…}} on:mounted{{…}} use:path)",
+        "ismeretlen script-tag: `{}` (props(…) emits(…) ref:n:T=v computed:n:T{{…}} fn:n(p:T):R{{…}} form(…) const:n:T=v const:{{a,b}}=f() type:N{{a:str}} raw{{…}} on:mounted{{…}} use:út)",
         head
     )))
+}
+
+/// `{ a, b: c, ...rest }=érték` → destructuring (a `const:` / `let:` után).
+fn destructure(rest: &str, raw: Option<&str>, mutable: bool) -> GenResult<Member> {
+    let rest = rest.trim();
+    let close = matching(rest, '{', '}')
+        .ok_or_else(|| GenError::new(crate::t!("unclosed `{`", "lezáratlan `{`").to_owned()))?;
+    let mut names = Vec::new();
+    let mut pieces = Vec::new();
+    for piece in split_top(&rest[1..close], ',') {
+        let piece = piece.trim();
+        if piece.is_empty() {
+            continue;
+        }
+        let bound = piece.strip_prefix("...").unwrap_or(piece);
+        let bound = split_once_top(bound, '=').map_or(bound, |(l, _)| l);
+        let bound = split_once_top(bound, ':').map_or(bound, |(_, r)| r);
+        names.push(ident(bound)?);
+        pieces.push(piece.to_owned());
+    }
+    let missing = || {
+        GenError::new(
+            crate::t!(
+                "the destructuring needs its source: `const:{ a, b }=useX()`",
+                "a destructuring-hoz kell a forrás: `const:{ a, b }=useX()`"
+            )
+            .to_owned(),
+        )
+    };
+    if names.is_empty() {
+        return Err(missing());
+    }
+    let tail = rest[close + 1..].trim();
+    let value = match tail.strip_prefix('=') {
+        Some(v) => v.trim().to_owned(),
+        None => raw.map(str::trim).unwrap_or_default().to_owned(),
+    };
+    if value.is_empty() {
+        return Err(missing());
+    }
+    Ok(Member::Destructure {
+        names,
+        pattern: pieces.join(", "),
+        value,
+        mutable,
+    })
 }
 
 /// `név:típus=érték` → (név, típus, érték); az érték hiányában a `{…}` törzs.
@@ -246,7 +326,7 @@ fn decl(rest: &str, raw: Option<&str>) -> GenResult<(String, Option<TypeRef>, Op
 
 fn name_type(text: &str) -> GenResult<(String, Option<TypeRef>)> {
     match split_once_top(text, ':') {
-        Some((name, ty)) => Ok((ident(name)?, Some(TypeRef::parse(ty)?))),
+        Some((name, ty)) => Ok((ident(name)?, Some(parse_type(ty)?))),
         None => Ok((ident(text)?, None)),
     }
 }
@@ -269,7 +349,7 @@ fn func(rest: &str, raw: Option<&str>, is_async: bool) -> GenResult<Member> {
     };
     let tail = tail.trim();
     let ret = match tail.strip_prefix(':') {
-        Some(ty) => Some(TypeRef::parse(ty)?),
+        Some(ty) => Some(parse_type(ty)?),
         None if tail.is_empty() => None,
         None => {
             return Err(GenError::new(crate::tf!(
@@ -305,7 +385,7 @@ fn parse_params(text: &str) -> GenResult<Vec<VParam>> {
                 None => (piece, None),
             };
             let (name, ty) = match split_once_top(lhs, ':') {
-                Some((n, t)) => (n.trim(), Some(TypeRef::parse(t)?)),
+                Some((n, t)) => (n.trim(), Some(parse_type(t)?)),
                 None => (lhs.trim(), None),
             };
             let (name, optional) = match name.strip_suffix('?') {
@@ -337,7 +417,7 @@ fn parse_props(inner: &str) -> GenResult<Vec<Prop>> {
                 None => (piece.as_str(), None),
             };
             let (name, ty) = match split_once_top(lhs, ':') {
-                Some((n, t)) => (n.trim(), Some(TypeRef::parse(t)?)),
+                Some((n, t)) => (n.trim(), Some(parse_type(t)?)),
                 None => (lhs.trim(), None),
             };
             let (name, optional) = match name.strip_suffix('?') {
@@ -404,12 +484,60 @@ fn parse_form(rest: &str) -> GenResult<Member> {
     Ok(Member::Form { name, fields })
 }
 
-/// `use:` lista: `@/Components/Card`, `@/Components/Card as C`, `vue(ref,computed)`.
-fn parse_uses(rest: &str) -> GenResult<Vec<Import>> {
+/// `{useX}@/út`, `{a,b as c}@/út` → nevesített import.
+fn braced_import(item: &str) -> GenResult<Import> {
+    let close = matching(item, '{', '}')
+        .ok_or_else(|| GenError::new(crate::t!("unclosed `{`", "lezáratlan `{`").to_owned()))?;
+    let source = item[close + 1..].trim();
+    if source.is_empty() {
+        return Err(GenError::new(
+            crate::t!(
+                "a named import needs its path: `use:{useX}@/composables/useX`",
+                "a nevesített importhoz út kell: `use:{useX}@/composables/useX`"
+            )
+            .to_owned(),
+        ));
+    }
+    let mut named = Vec::new();
+    for piece in split_top(&item[1..close], ',') {
+        let piece = piece.trim();
+        if piece.is_empty() {
+            continue;
+        }
+        named.push(match piece.split_once(" as ") {
+            Some((n, a)) => format!("{} as {}", ident(n)?, ident(a)?),
+            None => ident(piece)?,
+        });
+    }
+    if named.is_empty() {
+        return Err(GenError::new(
+            crate::t!(
+                "the braces of a named import are empty: `use:{useX}@/composables/useX`",
+                "a nevesített import kapcsos zárójele üres: `use:{useX}@/composables/useX`"
+            )
+            .to_owned(),
+        ));
+    }
+    Ok(Import {
+        source: source.to_owned(),
+        default: None,
+        named,
+    })
+}
+
+/// `use:` lista: `@/Components/Card`, `@/Components/Card as C`, `vue(ref,computed)`, `{useX}@/composables/useX`,
+/// `{a,b as c}@/út`. A második érték a kiterjesztés / alias / kapcsos zárójel nélküli importok forrásai: hogy
+/// nevesített-e, a generátor dönti el a célfájl alapján.
+fn parse_uses(rest: &str) -> GenResult<(Vec<Import>, Vec<String>)> {
     let mut out = Vec::new();
+    let mut guess = Vec::new();
     for item in split_top(rest, ',') {
         let item = item.trim();
         if item.is_empty() {
+            continue;
+        }
+        if item.starts_with('{') {
+            out.push(braced_import(item)?);
             continue;
         }
         if let Some(open) = item.find('(') {
@@ -428,14 +556,23 @@ fn parse_uses(rest: &str) -> GenResult<Vec<Import>> {
             Some((p, a)) => (p.trim(), Some(ident(a)?)),
             None => (item, None),
         };
+        if path.contains("::") {
+            return Err(GenError::new(crate::tf!(
+                "`::` is not part of an import path (`{}`): a named import is `use:{{useX}}@/composables/useX`",
+                "a `::` nem része az import-útnak (`{}`): nevesített import: `use:{{useX}}@/composables/useX`",
+                path
+            )));
+        }
         let file = path.rsplit('/').next().unwrap_or(path);
         let stem = file.rsplit_once('.').map_or(file, |(s, _)| s);
+        let guessable = alias.is_none();
         let default = match alias {
             Some(a) => a,
             None => ident(stem).map_err(|_| {
                 GenError::new(crate::tf!(
-                    "cannot name the import of `{}`: use `{} as Name`",
-                    "nem tudom elnevezni a(z) `{}` importját: használd így: `{} as Név`",
+                    "cannot name the import of `{}`: use `{{Name}}{}` (named) or `{} as Name` (default)",
+                    "nem tudom elnevezni a(z) `{}` importját: használd így: `{{Név}}{}` (nevesített) vagy `{} as Név` (default)",
+                    path,
                     path,
                     path
                 ))
@@ -447,13 +584,16 @@ fn parse_uses(rest: &str) -> GenResult<Vec<Import>> {
         } else {
             path.to_owned()
         };
+        if guessable && !component && !file.contains('.') {
+            guess.push(source.clone());
+        }
         out.push(Import {
             source,
             default: Some(default),
             named: Vec::new(),
         });
     }
-    Ok(out)
+    Ok((out, guess))
 }
 
 /// A számláló (`$`) cseréje a szövegben: csak az önálló `$` (nem `$emit`, nem `a$b`).
@@ -490,6 +630,10 @@ fn text_of(raw: &str, counter: Option<u32>) -> Option<String> {
     let text = number_text(raw, counter);
     if text.is_empty() {
         return None;
+    }
+    // `span{{{ x }}}` / `p{{{ a }} / {{ b }}}`: a törzs már maga mustache-sal kezdődik, nem kell köré újabb pár
+    if text.starts_with("{{") {
+        return Some(text);
     }
     if text.starts_with('{') && matching(&text, '{', '}') == Some(text.len() - 1) {
         return Some(format!("{{{text}}}"));

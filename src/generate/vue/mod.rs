@@ -25,13 +25,24 @@
 //! - `form(name,email,password)` / `form:login(email,remember:bool=true)` → `const form = useForm({…})`
 //!   (`@inertiajs/vue3`); `const:API:str='/api'`, `let:n:int=0`; `on:mounted{ … }` → `onMounted(() => { … })`;
 //! - `use:@/Components/Card` (default import a fájlnévvel; PascalCase fájl → `.vue`), `use:path as Név`,
-//!   `use:vue(ref,computed)` (nevesített). A `ref` / `computed` / `onX` / `useForm` importja automatikus;
-//!   a `defineProps` / `defineEmits` fordítói makró, nem kell import.
+//!   `use:vue(ref,computed)` és `use:{useX}@/composables/useX` / `use:{a,b as c}@/út` (nevesített import).
+//!   Kapcsos zárójel nélkül a `@/…` út célfájlját (`resources/js` / `src`; `.ts`, `.js`, `/index.ts`, `/index.js`)
+//!   beolvassuk: ha nincs `export default`-ja, de van a fájlnévvel azonos nevesített exportja (`export function
+//!   useX`), nevesített import lesz; különben default. A `ref` / `computed` / `onX` / `useForm` importja automatikus;
+//!   a `defineProps` / `defineEmits` fordítói makró, nem kell import;
+//! - `type:Flag{flag:str,on?:bool,tags:list<str>}` → `interface Flag { … }` (composable-fájlban a függvény előtt
+//!   `export interface`; JS-ben JSDoc `@typedef`); a név props / ref / fn típusában használható (`list<Flag>`);
+//!   inline objektum-típus bárhol: `list<{ flag: str; on?: bool }>` → `{ flag: string; on?: boolean }[]`;
+//! - `raw{ const { a, b } = useX() }` (szó szerint kiírt utasítások a tagok sorrendjében) és a rövid
+//!   `const:{ a, b }=useX(items)` → `const { a, b } = useX(items);` (a nevek deklaráltnak számítanak az `--into`
+//!   ütközés-vizsgálatnál; a composable `return`-jébe nem kerülnek).
 //!
 //! Template (Emmet): `div.card#main>h1{{ title }}+ul>li[v-for="item in items" :key=item.id]{{ item.name }}`,
 //! `button[@click=submit type=button]{Save}`, `Card[:title=title]` (PascalCase = komponens, `@/…/Név.vue` importja
 //! automatikus, ha a projektben van ilyen fájl; `Link` / `Head` az Inertiából), szöveg `{…}` (az aposztróf szabad),
-//! mustache `{{ … }}` (több mustache egy szövegben: `{a {{ x }} b {{ y }}}`), `li.item$*3` (`$` = számláló).
+//! mustache `{{ … }}` (több mustache egy szövegben: `{a {{ x }} b {{ y }}}`; a `span{{ x }}` rövidítés és a
+//! `span{{{ x }}}` / `p{{{ a }} / {{ b }}}` alak is `{{ … }}`-t ad: a `{{`-vel kezdődő szövegtörzset nem vesszük körül
+//! újabb párral), `li.item$*3` (`$` = számláló).
 //! Gyerek nélküli komponens / void elem önzáró; az attribútum-érték idézőjel nélkül is írható.
 //!
 //! Style: `style>.card{padding:1rem;gap:.5rem}+.card h1{margin:0}` (a szelektor szóközt is tartalmazhat; a `>` /

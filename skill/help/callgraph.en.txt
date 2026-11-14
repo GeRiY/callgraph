@@ -187,6 +187,8 @@ Code generator (writes files; the MCP `generate` tool is off unless the server r
       gen '+refund(Order $o):void{ $this->http->post($o->id); }' --into app/Services/PaymentGateway.php::PaymentGateway --after charge
     Vue (TS or JS like the project): vue:Name>(script>…)+(template>…)+(style>…), comp:useX>… composable;
       script: props(title:str,size?:int=3) emits(save:int,close) ref:n:T=v computed:n:T{…} fn:n(p:T):R{…} form(a,b) use:@/Components/X
+        use:{useX}@/composables/useX (named; bare path = auto: named if the file has only `export function useX`)
+        type:Flag{flag:str,on?:bool} (interface; inline list<{a:str}>) raw{ const {a} = useX() } const:{a,b}=useX()
       template: Emmet div.card#id[attr=v @click=f :key=x.id]{text} {{ expr }} *3; components auto-imported; style: .a{decl;decl}
       gen 'script>ref:loading:bool=false+fn:reset(){ form.reset() }' --into resources/js/Pages/Auth/Register.vue
     Laravel feature: gen 'laravel:Fee[auth]>create(name:str,amount:int,paid?:bool)+edit+index'  (request, controller,

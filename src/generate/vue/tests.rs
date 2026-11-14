@@ -803,3 +803,303 @@ fn only_vue_js_ts_targets_and_heads_are_routed_here() {
     assert!(wants_vue(&req("comp:useA>ref:a", Target::Preview)));
     assert!(wants_vue(&req("template>p", Target::Preview)));
 }
+
+// --- composable-bekötés: nevesített import, auto-felismerés ---
+
+#[test]
+fn named_use_imports_with_braces() {
+    let fs = MemFs::default();
+    let out = go(
+        &fs,
+        "vue:U>(script>use:{useCart}@/composables/useCart+use:{a,b as c}@/x+use:vue(ref))",
+        true,
+        write("src/U.vue"),
+    )
+    .unwrap();
+    let expected = "\
+<script setup>
+import { ref } from 'vue';
+import { useCart } from '@/composables/useCart';
+import { a, b as c } from '@/x';
+</script>";
+    assert_eq!(text(&out), expected);
+}
+
+#[test]
+fn bare_use_path_detects_named_export_versus_default() {
+    let fs = MemFs::with(&[
+        (
+            "resources/js/composables/useCart.ts",
+            "export function useCart() {}\n",
+        ),
+        (
+            "resources/js/composables/useLoad.js",
+            "export async function useLoad() {}\n",
+        ),
+        (
+            "resources/js/composables/useArrow.js",
+            "export const useArrow = () => {}\n",
+        ),
+        (
+            "resources/js/composables/useOld.ts",
+            "export default function useOld() {}\nexport function useOld2() {}\n",
+        ),
+        (
+            "resources/js/composables/useIdx/index.ts",
+            "export function useIdx() {}\n",
+        ),
+        (
+            "resources/js/Components/Card.vue",
+            "<template><div/></template>\n",
+        ),
+    ]);
+    let out = go(
+        &fs,
+        "vue:P>(script>use:@/composables/useCart+use:@/composables/useLoad+use:@/composables/useArrow+use:@/composables/useOld+use:@/composables/useIdx+use:@/composables/useMissing+use:@/Components/Card)",
+        true,
+        write("resources/js/Pages/P.vue"),
+    )
+    .unwrap();
+    let code = text(&out);
+    for line in [
+        "import Card from '@/Components/Card.vue';",
+        "import { useArrow } from '@/composables/useArrow';",
+        "import { useCart } from '@/composables/useCart';",
+        "import { useIdx } from '@/composables/useIdx';",
+        "import { useLoad } from '@/composables/useLoad';",
+        "import useMissing from '@/composables/useMissing';",
+        "import useOld from '@/composables/useOld';",
+    ] {
+        assert!(code.contains(line), "{line}\n{code}");
+    }
+}
+
+#[test]
+fn use_hint_suggests_the_brace_form() {
+    let fs = MemFs::default();
+    let err = go(
+        &fs,
+        "vue:U>(script>use:@/x/use-cart)",
+        true,
+        write("src/U.vue"),
+    )
+    .unwrap_err();
+    assert!(err.contains("{Name}@/x/use-cart"), "{err}");
+    assert!(!err.contains("::"), "{err}");
+    let err = go(
+        &fs,
+        "vue:U>(script>use:@/c/useX::useX as useX)",
+        true,
+        write("src/U.vue"),
+    )
+    .unwrap_err();
+    assert!(err.contains("{useX}@/composables/useX"), "{err}");
+}
+
+#[test]
+fn named_use_merges_into_an_existing_import_line() {
+    let existing = "<script setup>\nimport { ref } from 'vue';\nimport { useCart } from '@/composables/useCart';\n\nconst a = ref(1);\n</script>\n\n<template>\n  <div />\n</template>\n";
+    let fs = MemFs::with(&[("src/M.vue", existing)]);
+    go(
+        &fs,
+        "script>use:{useCart,useB}@/composables/useCart+ref:q:int=1",
+        false,
+        into("src/M.vue", None),
+    )
+    .unwrap();
+    let file = fs.get("src/M.vue").unwrap();
+    assert!(
+        file.contains("import { useCart, useB } from '@/composables/useCart';"),
+        "{file}"
+    );
+    assert_eq!(file.matches("import ").count(), 2, "{file}");
+}
+
+// --- inline objektum-típus, `type:` tag ---
+
+#[test]
+fn inline_object_types_in_props_and_refs() {
+    let fs = MemFs::with(TS_PROJECT);
+    let expr = "vue:L>(script>props(items:list<{ flag: str; on?: bool }>,pair:{ a: int, b: list<str> })+ref:cur:opt<{ flag: str }>)";
+    let out = go(&fs, expr, true, write("src/L.vue")).unwrap();
+    let code = text(&out);
+    assert!(
+        code.contains("  items: { flag: string; on?: boolean }[];"),
+        "{code}"
+    );
+    assert!(
+        code.contains("  pair: { a: number; b: string[] };"),
+        "{code}"
+    );
+    assert!(
+        code.contains("const cur = ref<{ flag: string } | null>(null);"),
+        "{code}"
+    );
+    let js = go(&MemFs::default(), expr, true, write("src/L.vue")).unwrap();
+    let code = text(&js);
+    assert!(
+        code.contains("items: { type: Array, required: true },"),
+        "{code}"
+    );
+    assert!(
+        code.contains("pair: { type: Object, required: true },"),
+        "{code}"
+    );
+    assert!(code.contains("const cur = ref(null);"), "{code}");
+}
+
+#[test]
+fn type_member_in_a_composable_ts_and_js() {
+    let fs = MemFs::with(TS_PROJECT);
+    let expr = "comp:useFlags>type:Flag{flag:str,on?:bool,tags:list<str>}+ref:flags:list<Flag>=[]";
+    let out = go(&fs, expr, true, write("src/composables/useFlags.ts")).unwrap();
+    let expected = "\
+import { ref } from 'vue';
+
+export interface Flag { flag: string; on?: boolean; tags: string[] }
+
+export function useFlags() {
+  const flags = ref<Flag[]>([]);
+
+  return {
+    flags,
+  };
+}";
+    assert_eq!(text(&out), expected);
+
+    let js = go(&fs, expr, true, write("src/composables/useFlags.js")).unwrap();
+    let code = text(&js);
+    assert!(
+        code.contains("/** @typedef {{ flag: string, on?: boolean, tags: string[] }} Flag */"),
+        "{code}"
+    );
+    assert!(code.contains("const flags = ref([]);"), "{code}");
+    assert!(!code.contains("interface"), "{code}");
+    assert!(!code.contains("    Flag,"), "{code}");
+}
+
+#[test]
+fn type_member_in_an_sfc_is_a_plain_interface() {
+    let fs = MemFs::with(TS_PROJECT);
+    let out = go(
+        &fs,
+        "vue:T>(script>type:Flag{flag:str}+props(items:list<Flag>))",
+        true,
+        write("src/T.vue"),
+    )
+    .unwrap();
+    let code = text(&out);
+    assert!(
+        code.contains("\ninterface Flag { flag: string }\n"),
+        "{code}"
+    );
+    assert!(!code.contains("export interface"), "{code}");
+    assert!(code.contains("  items: Flag[];"), "{code}");
+}
+
+// --- szöveg-interpoláció ---
+
+#[test]
+fn text_blocks_starting_with_a_mustache() {
+    let fs = MemFs::default();
+    let out = go(
+        &fs,
+        "vue:T>(template>span{{{ x }}}+p{{{ a }} / {{ b }}}+span{{ y }}+span{Text {{ a }}}+button{Save})",
+        true,
+        write("src/T.vue"),
+    )
+    .unwrap();
+    let code = text(&out);
+    for line in [
+        "  <span>{{ x }}</span>",
+        "  <p>{{ a }} / {{ b }}</p>",
+        "  <span>{{ y }}</span>",
+        "  <span>Text {{ a }}</span>",
+        "  <button>Save</button>",
+    ] {
+        assert!(code.contains(line), "{line}\n{code}");
+    }
+    assert!(!code.contains("{{{"), "{code}");
+}
+
+// --- raw{} és const:{}=… ---
+
+#[test]
+fn raw_and_destructuring_in_an_sfc() {
+    let fs = MemFs::default();
+    let out = go(
+        &fs,
+        "vue:R>(script>const:{ a, b: c }=useX(items)+raw{ const { d } = other() }+ref:n:int=0)",
+        true,
+        write("src/R.vue"),
+    )
+    .unwrap();
+    let code = text(&out);
+    assert!(code.contains("const { a, b: c } = useX(items);"), "{code}");
+    assert!(code.contains("\nconst { d } = other()\n"), "{code}");
+    let first = code.find("useX(items)").unwrap();
+    let second = code.find("other()").unwrap();
+    let third = code.find("ref(0)").unwrap();
+    assert!(first < second && second < third, "{code}");
+    // pontosvessző nélküli projekt: a destructuring sem kap
+    let plain = MemFs::with(&[(
+        "resources/js/A.vue",
+        "<script setup>\nconst x = 1\n</script>\n",
+    )]);
+    let out = go(&plain, "script>const:{ a }=useX()", true, Target::Preview).unwrap();
+    assert_eq!(text(&out), "const { a } = useX()");
+}
+
+#[test]
+fn raw_and_destructuring_in_a_composable_are_not_returned() {
+    let fs = MemFs::with(TS_PROJECT);
+    let out = go(
+        &fs,
+        "comp:useBox>const:{ items, total }=useCart()+ref:n:int=0+raw{ console.log(n.value) }",
+        true,
+        write("src/composables/useBox.ts"),
+    )
+    .unwrap();
+    let expected = "\
+import { ref } from 'vue';
+
+export function useBox() {
+  const { items, total } = useCart();
+
+  const n = ref<number>(0);
+
+  console.log(n.value)
+
+  return {
+    n,
+  };
+}";
+    assert_eq!(text(&out), expected);
+    let js = go(
+        &MemFs::default(),
+        "comp:useBox>const:{ items }=useCart()",
+        true,
+        write("src/composables/useBox.js"),
+    )
+    .unwrap();
+    let code = text(&js);
+    assert!(code.contains("  const { items } = useCart();"), "{code}");
+}
+
+#[test]
+fn destructured_names_count_as_declared_for_into() {
+    let existing = "<script setup>\nconst { a, b: c } = useX();\n</script>\n\n<template>\n  <div />\n</template>\n";
+    let fs = MemFs::with(&[("src/D.vue", existing)]);
+    for expr in ["script>ref:a:int=1", "script>fn:c(){}"] {
+        let err = go(&fs, expr, false, into("src/D.vue", None)).unwrap_err();
+        assert!(err.contains("already declared"), "{err}");
+    }
+    let err = go(
+        &fs,
+        "script>const:{ q, a }=useY()",
+        false,
+        into("src/D.vue", None),
+    )
+    .unwrap_err();
+    assert!(err.contains("already declared"), "{err}");
+}
