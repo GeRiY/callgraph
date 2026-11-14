@@ -116,21 +116,26 @@ pub(super) fn scan(
         return;
     };
     if need.routes {
-        // a route-tábla a forrásból épül, a gráfból csak a `use` importok kellenek: teljes elemzés helyett ezek
-        let graphs: Vec<(PathBuf, FileGraph)> = files
-            .files_under(&root.join("routes"))
-            .into_iter()
-            .filter(|path| path.extension().is_some_and(|ext| ext == "php"))
-            .filter_map(|path| {
-                let graph = imports_only(&path, &files.read(&path)?);
-                Some((path, graph))
-            })
-            .collect();
-        laravel.scan(
-            graphs.iter().map(|(path, graph)| (path.as_path(), graph)),
-            files,
-            false,
-        );
+        // a route-tábla a forrásból épül, a gráfból csak a `use` importok kellenek: teljes elemzés helyett ezek; a
+        // lemezes cache-ből (ha van), amíg a route-fájlok / belépési pontok bélyege nem változik
+        let inputs = laravel.route_fingerprint(files);
+        if !laravel.apply_cached_routes(inputs.as_ref()) {
+            let graphs: Vec<(PathBuf, FileGraph)> = files
+                .files_under(&root.join("routes"))
+                .into_iter()
+                .filter(|path| path.extension().is_some_and(|ext| ext == "php"))
+                .filter_map(|path| {
+                    let graph = imports_only(&path, &files.read(&path)?);
+                    Some((path, graph))
+                })
+                .collect();
+            laravel.scan(
+                graphs.iter().map(|(path, graph)| (path.as_path(), graph)),
+                files,
+                false,
+            );
+            laravel.store_routes(inputs);
+        }
         if need.forms {
             scan_forms(rows, laravel, root, files, analyze);
         }
@@ -180,12 +185,8 @@ fn render_graphs(
         .collect()
 }
 
-/// A `useForm` küldő fájlok (JS / Vue) elemzett gráfjai a `resources/` alól: csak amelyek szövegében szerepel.
-fn form_graphs(
-    root: &Path,
-    files: &dyn ProjectFiles,
-    analyze: &dyn Fn(&Path) -> Option<FileGraph>,
-) -> Vec<(PathBuf, FileGraph)> {
+/// A `resources/` alatti JS / Vue fájlok, amelyekben `useForm` küldés lehet (rendezve).
+fn js_paths(root: &Path, files: &dyn ProjectFiles) -> Vec<PathBuf> {
     files
         .files_under(&root.join("resources"))
         .into_iter()
@@ -194,20 +195,11 @@ fn form_graphs(
                 .and_then(|ext| ext.to_str())
                 .is_some_and(|ext| JS_EXTENSIONS.contains(&ext))
         })
-        .filter(|path| {
-            files
-                .read(path)
-                .is_some_and(|text| text.contains("useForm"))
-        })
-        .filter_map(|path| {
-            let graph = analyze(&path)?;
-            Some((path, graph))
-        })
         .collect()
 }
 
 /// Az űrlapok: a küldő (JS / Vue) fájlok és a lekérdezett PHP-fájlok gráfjából. Controller-sornál (a `form:` sor
-/// az őt küldő oldalakat sorolja) a `resources/` összes `useForm`-ot tartalmazó fájlja; különben csak a lekérdezett
+/// az őt küldő oldalakat sorolja) a `resources/` összes `useForm`-ot tartalmazó fájljának küldései; különben csak a lekérdezett
 /// JS / Vue fájlok. A controller és a FormRequest forrását a `scan_forms_for` a PSR-4-ből olvassa.
 fn scan_forms(
     rows: &[QueryResult],
@@ -218,13 +210,17 @@ fn scan_forms(
 ) {
     let is_php = |graph: &FileGraph| graph.file.ends_with(".php");
     let mut graphs = row_graphs(rows, root, is_php);
-    let owned = if rows.iter().any(is_controller) {
-        form_graphs(root, files, analyze)
-    } else {
-        graphs.extend(row_graphs(rows, root, |graph| !is_php(graph)));
-        Vec::new()
-    };
-    graphs.extend(owned.iter().map(|(path, graph)| (path.clone(), graph)));
+    if rows.iter().any(is_controller) {
+        // a `useForm` küldések fájlonként (a lemezes cache-ből, ha van): se olvasás, se elemzés a változatlan fájlokra
+        let sites = laravel.js_sites(&js_paths(root, files), files, analyze);
+        laravel.scan_forms_with_sites(
+            graphs.iter().map(|(path, graph)| (path.as_path(), *graph)),
+            sites,
+            files,
+        );
+        return;
+    }
+    graphs.extend(row_graphs(rows, root, |graph| !is_php(graph)));
     laravel.scan_forms_for(
         graphs.iter().map(|(path, graph)| (path.as_path(), *graph)),
         files,

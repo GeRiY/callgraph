@@ -15,7 +15,7 @@ use crate::model::Imports;
 const MAX_DEPTH: usize = 8;
 
 /// Egy route kezelője.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub(crate) enum Action {
     /// `[X::class, 'm']` / `'X@m'` / resource-metódus; az invokálható `X::class`: `__invoke`.
     Controller {
@@ -56,7 +56,7 @@ impl Action {
 }
 
 /// Egy route a táblában.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub(crate) struct Route {
     pub name: Option<String>,
     /// `GET`, `POST`, `PUT|PATCH`, `ANY` …

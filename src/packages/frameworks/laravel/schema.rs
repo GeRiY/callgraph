@@ -14,7 +14,7 @@ use super::routes::{matching, strip_comments};
 use super::rules::method_parts;
 
 /// Egy tábla egy oszlopa.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub(crate) struct Column {
     pub name: String,
     /// Rövid típusnév: `id`, `string`, `text`, `int`, `bigint`, `bool`, `dec`, `float`, `date`, `dt`, `ts`, `time`,

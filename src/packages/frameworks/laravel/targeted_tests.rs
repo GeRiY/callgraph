@@ -15,19 +15,19 @@ use crate::i18n::Lang;
 use crate::model::{Call, Container, FileGraph};
 use crate::query::QueryResult;
 
-const USE_FORM: &str = "@inertiajs/vue3::useForm";
-const CONTROLLERS: &str = "App\\Http\\Controllers";
-const VUE: &str = "resources/js/Pages/Auth/Register.vue";
-const OTHER_VUE: &str = "resources/js/Pages/Other.vue";
-const CONTROLLER: &str = "app/Http/Controllers/RegisterController.php";
+pub(super) const USE_FORM: &str = "@inertiajs/vue3::useForm";
+pub(super) const CONTROLLERS: &str = "App\\Http\\Controllers";
+pub(super) const VUE: &str = "resources/js/Pages/Auth/Register.vue";
+pub(super) const OTHER_VUE: &str = "resources/js/Pages/Other.vue";
+pub(super) const CONTROLLER: &str = "app/Http/Controllers/RegisterController.php";
 
-const ROUTES: &str = "<?php
+pub(super) const ROUTES: &str = "<?php
 use App\\Http\\Controllers\\RegisterController;
 Route::get('register', [RegisterController::class, 'create'])->name('register');
 Route::post('register', [RegisterController::class, 'store']);
 ";
 
-const VUE_TEXT: &str = r"<script setup>
+pub(super) const VUE_TEXT: &str = r"<script setup>
 import { useForm } from '@inertiajs/vue3';
 
 const form = useForm({
@@ -42,7 +42,7 @@ const submit = () => {
 </script>
 ";
 
-const CONTROLLER_TEXT: &str = r"<?php
+pub(super) const CONTROLLER_TEXT: &str = r"<?php
 namespace App\Http\Controllers;
 
 use App\Http\Requests\RegisterRequest;
@@ -58,7 +58,7 @@ class RegisterController extends Controller
 }
 ";
 
-const REQUEST_TEXT: &str = r"<?php
+pub(super) const REQUEST_TEXT: &str = r"<?php
 namespace App\Http\Requests;
 
 class RegisterRequest extends FormRequest
@@ -74,7 +74,7 @@ class RegisterRequest extends FormRequest
 }
 ";
 
-const COMPOSER: &str = r#"{"autoload": {"psr-4": {"App\\": "app/"}}}"#;
+pub(super) const COMPOSER: &str = r#"{"autoload": {"psr-4": {"App\\": "app/"}}}"#;
 
 fn line_of(text: &str, needle: &str) -> u32 {
     let index = text
@@ -85,7 +85,7 @@ fn line_of(text: &str, needle: &str) -> u32 {
 }
 
 /// A Vue-fájl hívásai: `useForm`, a küldés és a `route('register')` (ugyanazon a soron).
-fn vue_calls() -> Vec<Call> {
+pub(super) fn vue_calls() -> Vec<Call> {
     let post_line = line_of(VUE_TEXT, "form.post");
     let mut form = call(
         "func_call",
@@ -107,11 +107,11 @@ fn vue_calls() -> Vec<Call> {
     vec![form, post, js_route("register", post_line)]
 }
 
-fn vue_graph() -> FileGraph {
+pub(super) fn vue_graph() -> FileGraph {
     graph(&format!("/p/{VUE}"), Some(VUE), &[], vue_calls())
 }
 
-fn controller_graph() -> FileGraph {
+pub(super) fn controller_graph() -> FileGraph {
     let mut g = graph(&format!("/p/{CONTROLLER}"), None, &[], Vec::new());
     g.namespace = Some(CONTROLLERS.into());
     g.containers.push(Container {
@@ -142,7 +142,7 @@ fn files() -> MemFiles {
 }
 
 /// A fájl gráfja az elemzőtől (a route-fájl `use`-aival).
-fn analyzed() -> HashMap<PathBuf, FileGraph> {
+pub(super) fn analyzed() -> HashMap<PathBuf, FileGraph> {
     let imports = [(
         "RegisterController",
         "App\\Http\\Controllers\\RegisterController",
@@ -242,7 +242,7 @@ fn a_controller_gets_the_same_route_and_form_lines_from_the_use_form_files_only(
     assert_eq!(seen, [root().join(VUE)]);
 }
 
-const MODEL_TEXT: &str = "<?php
+pub(super) const MODEL_TEXT: &str = "<?php
 
 namespace App\\Models;
 
@@ -254,7 +254,7 @@ class Post extends Model
 }
 ";
 
-const MIGRATION: &str = "<?php
+pub(super) const MIGRATION: &str = "<?php
 use Illuminate\\Database\\Migrations\\Migration;
 
 return new class extends Migration
@@ -275,7 +275,7 @@ return new class extends Migration
 };
 ";
 
-fn model_graph(extends: &str) -> FileGraph {
+pub(super) fn model_graph(extends: &str) -> FileGraph {
     let mut g = graph("/p/app/Models/Post.php", None, &[], Vec::new());
     g.namespace = Some("App\\Models".into());
     g.containers.push(Container {

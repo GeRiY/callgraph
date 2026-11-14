@@ -15,6 +15,7 @@ use serde::ser::SerializeMap;
 use super::super::files::ProjectFiles;
 use super::super::inertia::render::{literal, split_top};
 use super::Laravel;
+use super::cache::SchemaTable;
 use super::routes::{matching, short_class, strip_comments};
 use super::rules::method_parts;
 use super::schema::{self, Column, Schema, snake, table_of_class};
@@ -22,7 +23,7 @@ use crate::i18n::Lang;
 use crate::model::FileGraph;
 
 /// A migrációk mappája a gyökérhez relatívan.
-const MIGRATIONS_DIR: &str = "database/migrations";
+pub(super) const MIGRATIONS_DIR: &str = "database/migrations";
 /// Egy felsorolásban legfeljebb ennyi név (a többi `, +N`).
 const MAX_NAMES: usize = 8;
 /// A `table:` sorban legfeljebb ennyi oszlop (a többi `, +N`).
@@ -522,10 +523,22 @@ impl Laravel {
             models.push(parse_model(full, &class.rel, &clean));
         }
         models.sort_by(|a, b| a.class.cmp(&b.class));
-        let migrations: Vec<(String, String)> = files
-            .files_under(&self.root.join(MIGRATIONS_DIR))
+        let SchemaTable { schema, duplicates } = self.schema_table(files);
+        self.models = Some(ModelData {
+            models,
+            schema,
+            duplicates,
+        });
+    }
+
+    /// A séma és a kétszeri létrehozások a migrációkból; a lemezes cache-ből, ha a migrációk bélyege nem változott.
+    fn schema_table(&self, files: &dyn ProjectFiles) -> SchemaTable {
+        let (paths, inputs) = self.schema_fingerprint(files);
+        if let Some(table) = self.cached_schema(inputs.as_ref()) {
+            return table;
+        }
+        let migrations: Vec<(String, String)> = paths
             .iter()
-            .filter(|path| path.extension().is_some_and(|ext| ext == "php"))
             .filter_map(|path| {
                 let name = path.file_name()?.to_string_lossy().into_owned();
                 Some((name, files.read(path)?))
@@ -549,11 +562,9 @@ impl Laravel {
                 }
             }
         }
-        self.models = Some(ModelData {
-            models,
-            schema,
-            duplicates,
-        });
+        let table = SchemaTable { schema, duplicates };
+        self.store_schema(inputs, table.clone());
+        table
     }
 
     /// A modell az osztály teljes neve (`namespace` + `container`) szerint, és a séma.

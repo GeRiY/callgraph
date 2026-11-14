@@ -13,7 +13,7 @@ use super::super::inertia::render::split_top;
 use super::routes::{matching, strip_comments};
 
 /// Egy szabály-kulcs tokenei, amelyek az összevetést érdeklik.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub(super) struct Flags {
     pub required: bool,
     pub nullable: bool,
@@ -32,7 +32,7 @@ impl Flags {
 
 /// Egy akció validációja: a szabály-kulcsok (felső szintű kulccsal), az explicit olvasások, és hogy találtunk-e
 /// egyáltalán szabály-forrást.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub(super) struct Validation {
     pub rules: BTreeMap<String, Flags>,
     pub reads: BTreeSet<String>,

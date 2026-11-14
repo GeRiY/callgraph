@@ -4,6 +4,8 @@
 
 use std::path::{Path, PathBuf};
 
+pub(crate) use crate::packages::files::Stamp;
+
 /// Egy mappa bejárásának felső korlátja (a page-mappa kicsi; egy rossz gyökér se járja be a fél lemezt).
 const MAX_FILES: usize = 5000;
 
@@ -13,12 +15,29 @@ pub(crate) trait ProjectFiles {
     fn read(&self, path: &Path) -> Option<String>;
     /// A mappa fájljai rekurzívan (abszolút utak), rendezve; nem létező mappára üres.
     fn files_under(&self, dir: &Path) -> Vec<PathBuf>;
+    /// A fájl változás-bélyege (mtime + méret + ctime); ha nincs ilyen fájl vagy a fájlrendszer nem ad bélyeget,
+    /// `None`. A lemezes cache (`laravel/cache.rs`) ebből dönti el, hogy a levezetett adat még él-e.
+    fn stamp(&self, _path: &Path) -> Option<Stamp> {
+        None
+    }
 }
 
 /// Az éles fájlrendszer.
 pub(crate) struct DiskProjectFiles;
 
 impl ProjectFiles for DiskProjectFiles {
+    fn stamp(&self, path: &Path) -> Option<Stamp> {
+        if !path.is_file() {
+            return None;
+        }
+        let stamp = crate::graph::FileStamp::of(path);
+        Some(Stamp {
+            mtime: stamp.mtime,
+            size: stamp.size,
+            ctime: stamp.ctime,
+        })
+    }
+
     fn read(&self, path: &Path) -> Option<String> {
         let bytes = std::fs::read(path).ok()?;
         Some(crate::io::decode_source(&bytes).into_owned())

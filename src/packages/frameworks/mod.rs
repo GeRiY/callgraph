@@ -105,6 +105,11 @@ pub(crate) fn annotate(rows: &mut [QueryResult], root: &Path, format: &str) {
                     .ok()
                     .and_then(|analysis| targeted::slim(analysis.graph))
             };
+            // a levezetett adatok (route-tábla, séma, űrlap-küldések, validáció) a `.callgraph/laravel.bin`-ből,
+            // ha a `.callgraph/` létezik; a kimenet cache nélkül bájtra ugyanaz
+            if let Some(laravel) = laravel.as_mut() {
+                laravel.attach_disk_cache();
+            }
             targeted::scan(
                 rows,
                 inertia.as_mut(),
@@ -114,6 +119,9 @@ pub(crate) fn annotate(rows: &mut [QueryResult], root: &Path, format: &str) {
                 &DiskProjectFiles,
                 &analyze,
             );
+            if let Some(laravel) = laravel.as_mut() {
+                laravel.detach_cache();
+            }
         }
     }
     let shared_inertia = inertia.map(Arc::new);

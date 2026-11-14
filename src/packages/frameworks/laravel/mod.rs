@@ -8,6 +8,7 @@
 //! migrációkból, fillable / casts / relációk — `table:` sor az outline-ban, a reláció célja, json `model` mező és a
 //! `models` nézet.
 
+mod cache;
 mod forms;
 mod models;
 pub(crate) mod preset;
@@ -16,6 +17,8 @@ mod rules;
 mod schema;
 mod view;
 
+#[cfg(test)]
+mod cache_tests;
 #[cfg(test)]
 mod forms_tests;
 #[cfg(test)]
@@ -81,6 +84,8 @@ pub(crate) struct Laravel {
     /// A `composer.json` PSR-4 leképezése (előtag, mappa) — csak a célzott `scan_forms_for` után; a teljes
     /// projekt-keresésben üres (ott a gráfokból gyűjtött osztály-térkép van).
     psr4: Vec<(String, String)>,
+    /// A lemezes cache (`cache.rs`): csak a célzott egy-fájlos betöltés alatt van bekapcsolva.
+    cache: Option<cache::Handle>,
 }
 
 /// A hívás route-neve: Ziggy `route('név')` JS-hívás string-literál névvel (a gráf `resolved`-je `route::név`);
@@ -151,6 +156,7 @@ impl Laravel {
             dynamic_names: Vec::new(),
             unloaded: Vec::new(),
             psr4: Vec::new(),
+            cache: None,
         }
     }
 
@@ -205,6 +211,11 @@ impl Laravel {
                     .map(|line| (rel.clone(), line)),
             );
         }
+        self.rebuild_names();
+    }
+
+    /// A név → route index újraépítése (az utolsó definíció nyer).
+    fn rebuild_names(&mut self) {
         self.by_name.clear();
         for (index, route) in self.routes.iter().enumerate() {
             if let Some(name) = &route.name {

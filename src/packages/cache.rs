@@ -30,12 +30,22 @@ pub(crate) struct DirCache {
 
 impl DirCache {
     pub(crate) fn at(root: &Path) -> Self {
+        Self::named(root, CACHE_FILE)
+    }
+
+    /// Egy másik cache-fájl ugyanabban a `.callgraph/` mappában (pl. `laravel.bin`).
+    pub(crate) fn named(root: &Path, file: &str) -> Self {
         let store = crate::project::ProjectStore::at_root(root);
         let dir = store.dir();
         let usable = std::fs::symlink_metadata(dir).is_ok_and(|meta| meta.is_dir());
         Self {
-            path: usable.then(|| dir.join(CACHE_FILE)),
+            path: usable.then(|| dir.join(file)),
         }
+    }
+
+    /// Van-e hova írni (a `.callgraph/` létező, közönséges mappa).
+    pub(crate) fn usable(&self) -> bool {
+        self.path.is_some()
     }
 }
 
@@ -110,13 +120,13 @@ pub(crate) fn load_or_build(
 }
 
 /// MessagePack (mezőnevekkel) + LZ4.
-fn encode<T: Serialize>(value: &T) -> Option<Vec<u8>> {
+pub(crate) fn encode<T: Serialize>(value: &T) -> Option<Vec<u8>> {
     let bytes = rmp_serde::to_vec_named(value).ok()?;
     Some(lz4_flex::block::compress_prepend_size(&bytes))
 }
 
 /// Az `encode` párja; sérült / csonka bemenetre `None`.
-fn decode<T: DeserializeOwned>(bytes: &[u8]) -> Option<T> {
+pub(crate) fn decode<T: DeserializeOwned>(bytes: &[u8]) -> Option<T> {
     let size = u32::from_le_bytes(bytes.get(..4)?.try_into().ok()?) as usize;
     // az LZ4 legfeljebb ~255-szörös tömörítést ad: ennél nagyobb állított méret sérült fejet jelent
     if size > bytes.len().saturating_mul(255).saturating_add(64) {

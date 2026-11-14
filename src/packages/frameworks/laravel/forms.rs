@@ -13,6 +13,7 @@ use regex::Regex;
 
 use super::super::files::ProjectFiles;
 use super::super::inertia::render::{literal, source_args_named, split_top};
+use super::cache::MethodInfo;
 use super::routes::{Action, Route, short_class, strip_comments};
 use super::rules::{self, Validation};
 use super::{Laravel, has_verb};
@@ -21,7 +22,7 @@ use crate::model::{Call, FileGraph};
 use std::path::Path;
 
 /// A `useForm` hívás feloldott neve a gráfban.
-const USE_FORM: &str = "@inertiajs/vue3::useForm";
+pub(super) const USE_FORM: &str = "@inertiajs/vue3::useForm";
 /// Egy csoportban legfeljebb ennyi név (a többi `+N`).
 const MAX_NAMES: usize = 5;
 /// A controller-akció `form:` sorában legfeljebb ennyi page-fájl (a többi `+N`).
@@ -130,7 +131,7 @@ fn short_file(file: &str) -> &str {
 
 /// Egy `useForm` küldés a JS / Vue fájlban (még a route-ra feloldás előtt).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct Site {
+pub(crate) struct Site {
     pub file: String,
     pub line: u32,
     pub target: String,
@@ -334,6 +335,33 @@ pub(super) fn compare(fields: &[String], validation: &Validation) -> (Vec<String
     (unvalidated, missing)
 }
 
+/// Egy controller-osztály szövegéből a metódus validációs infója; `None`: nincs ilyen metódus / törzs.
+fn method_info(text: &str, method: &str) -> Option<MethodInfo> {
+    let clean = strip_comments(text);
+    let (params, body) = rules::method_parts(&clean, method)?;
+    let (imports, namespace) = rules::imports_of(&clean);
+    let types = rules::param_types(&params)
+        .iter()
+        .filter_map(|ty| rules::qualify(ty, &imports, namespace.as_deref()))
+        .collect();
+    Some(MethodInfo {
+        validation: rules::body_validation(&body),
+        types,
+    })
+}
+
+/// A PHP-fájl osztályai (teljes név → a fájl útja).
+fn register_classes(classes: &mut HashMap<String, String>, rel: &str, graph: &FileGraph) {
+    if let Some(namespace) = graph.namespace.as_deref() {
+        for container in &graph.containers {
+            classes.insert(
+                format!("{}\\{}", namespace.trim_matches('\\'), container.name),
+                rel.to_owned(),
+            );
+        }
+    }
+}
+
 impl Laravel {
     /// Az űrlap-küldések ellenőrzése a projektre (a `scan` után, a route-táblával): a JS / Vue fájlok `useForm`
     /// küldései a route-ra, a controller-akcióra és a validációjára oldva. Ami nem oldható fel (dinamikus cél,
@@ -354,14 +382,7 @@ impl Laravel {
                 continue;
             };
             if rel.ends_with(".php") {
-                if let Some(namespace) = graph.namespace.as_deref() {
-                    for container in &graph.containers {
-                        classes.insert(
-                            format!("{}\\{}", namespace.trim_matches('\\'), container.name),
-                            rel.clone(),
-                        );
-                    }
-                }
+                register_classes(&mut classes, &rel, graph);
             } else if graph.module.is_some()
                 && graph
                     .calls
@@ -372,6 +393,38 @@ impl Laravel {
                 sites.extend(extract(&rel, &text, &graph.calls));
             }
         }
+        self.resolve_forms(&classes, sites, files);
+    }
+
+    /// Célzott változat kész küldésekkel (a `js_sites` cache-elt eredménye): a `graphs` csak a lekérdezett
+    /// PHP-fájlok. Ugyanazt adja, mint a `scan_forms_for` a küldő fájlok gráfjaival.
+    pub(crate) fn scan_forms_with_sites<'g>(
+        &mut self,
+        graphs: impl IntoIterator<Item = (&'g Path, &'g FileGraph)>,
+        sites: Vec<Site>,
+        files: &dyn ProjectFiles,
+    ) {
+        self.psr4 = composer_psr4(&self.root, files);
+        self.forms.clear();
+        if self.routes.is_empty() {
+            return;
+        }
+        let mut classes: HashMap<String, String> = HashMap::new();
+        for (path, graph) in graphs {
+            if let Some(rel) = self.relative_path(path).filter(|rel| rel.ends_with(".php")) {
+                register_classes(&mut classes, &rel, graph);
+            }
+        }
+        self.resolve_forms(&classes, sites, files);
+    }
+
+    /// A küldések a route-ra, a controller-akcióra és a validációra oldva.
+    fn resolve_forms(
+        &mut self,
+        classes: &HashMap<String, String>,
+        sites: Vec<Site>,
+        files: &dyn ProjectFiles,
+    ) {
         let mut cache: HashMap<(String, String), Option<Validation>> = HashMap::new();
         let mut forms = Vec::new();
         for site in sites {
@@ -383,7 +436,7 @@ impl Laravel {
             };
             let validation = cache
                 .entry((class.clone(), method.clone()))
-                .or_insert_with(|| self.validation_of(class, method, &classes, files))
+                .or_insert_with(|| self.validation_of(class, method, classes, files))
                 .clone();
             let Some(validation) = validation else {
                 continue;
@@ -454,13 +507,9 @@ impl Laravel {
             .or_else(|| candidates().next())
     }
 
-    /// Egy osztály forrása: a gráfokból gyűjtött térkép, különben a PSR-4 (`App\X\Y` → `app/X/Y.php`).
-    fn class_text(
-        &self,
-        class: &str,
-        classes: &HashMap<String, String>,
-        files: &dyn ProjectFiles,
-    ) -> Option<String> {
+    /// Egy osztály lehetséges forrás-útjai a gyökérhez relatívan, a keresés sorrendjében: a gráfokból gyűjtött
+    /// térkép, majd a PSR-4 (`App\X\Y` → `app/X/Y.php`).
+    fn class_rels(&self, class: &str, classes: &HashMap<String, String>) -> Vec<String> {
         let mapped = classes.get(class).cloned();
         let psr4 = class
             .strip_prefix("App\\")
@@ -469,15 +518,12 @@ impl Laravel {
             let rest = class.strip_prefix(prefix.as_str())?;
             Some(format!("{dir}/{}.php", rest.replace('\\', "/")))
         });
-        mapped
-            .into_iter()
-            .chain(psr4)
-            .chain(composer)
-            .find_map(|rel| files.read(&self.root.join(rel)))
+        mapped.into_iter().chain(psr4).chain(composer).collect()
     }
 
     /// Az akció validációja: az inline szabályok a törzsből + a FormRequest-típusú paraméterek `rules()`-a.
-    /// `None`: a controller vagy a metódus nem található.
+    /// `None`: a controller vagy a metódus nem található. A fájlonkénti részeredmények a lemezes cache-ből jöhetnek
+    /// (`cache.rs`), a fájl bélyege szerint érvényesítve.
     fn validation_of(
         &self,
         class: &str,
@@ -485,19 +531,19 @@ impl Laravel {
         classes: &HashMap<String, String>,
         files: &dyn ProjectFiles,
     ) -> Option<Validation> {
-        let text = self.class_text(class, classes, files)?;
-        let clean = strip_comments(&text);
-        let (params, body) = rules::method_parts(&clean, method)?;
-        let (imports, namespace) = rules::imports_of(&clean);
-        let mut validation = rules::body_validation(&body);
-        for ty in rules::param_types(&params) {
-            let Some(full) = rules::qualify(&ty, &imports, namespace.as_deref()) else {
+        let info =
+            self.cached_method(&self.class_rels(class, classes), files, method, |text| {
+                method_info(text, method)
+            })??;
+        let mut validation = info.validation;
+        for full in &info.types {
+            let Some(from_request) = self.cached_request(
+                &self.class_rels(full, classes),
+                files,
+                rules::request_validation,
+            ) else {
                 continue;
             };
-            let Some(request) = self.class_text(&full, classes, files) else {
-                continue;
-            };
-            let from_request = rules::request_validation(&request);
             if from_request.found {
                 validation.merge(from_request);
             }
