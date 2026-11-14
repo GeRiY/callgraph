@@ -66,26 +66,29 @@
   <h2 id="h-php">PHP: classes and members</h2>
   <p>The expression says what the class is, what it extends and implements, and its members: <code>+</code> public, <code>-</code> private, <code>#</code> protected. The namespace comes from the <code>psr-4</code> section of <code>composer.json</code>, the imports from the project. Names callgraph cannot import are reported as <code>unresolved: Foo</code>.</p>
 <pre class="code"><code>bash ~/.claude/skills/callgraph/callgraph.sh gen 'c!:PaymentGateway&lt;BaseGateway&gt;[Chargeable] &gt; ctor(-Client $http, -int $retries=3) + +charge(Order $order):Receipt + -sign(array $p):string' --write app/Services/PaymentGateway.php</code></pre>
-  <p>Without a target, or with <code>--dry</code>, it only prints the code. The class above comes out roughly like this:</p>
-  <p class="label">Generated code (shortened)</p>
+  <p>Without a target, or with <code>--dry</code>, it only prints the code. The class above comes out like this:</p>
+  <p class="label">Generated code</p>
 <pre class="code out"><code>&lt;?php
+
+declare(strict_types=1);
 
 namespace App\Services;
 
 final class PaymentGateway extends BaseGateway implements Chargeable
 {
-    public function __construct(private Client $http, private int $retries = 3)
-    {
-    }
+    public function __construct(
+        private Client $http,
+        private int $retries = 3,
+    ) {}
 
     public function charge(Order $order): Receipt
     {
-        // TODO
+        throw new \LogicException('TODO');
     }
 
     private function sign(array $p): string
     {
-        // TODO
+        throw new \LogicException('TODO');
     }
 }</code></pre>
   <p>Add a member to an existing class, after a given method:</p>
@@ -96,13 +99,15 @@ final class PaymentGateway extends BaseGateway implements Chargeable
   <h2 id="h-vue">Vue: components and composables</h2>
   <p><code>vue:Name&gt;(script&gt;…)+(template&gt;…)+(style&gt;…)</code> writes a single-file component in TypeScript or JavaScript, like the project. In the script: <code>props(...)</code>, <code>emits(...)</code>, <code>ref:</code>, <code>computed:</code>, <code>fn:</code>, <code>use:</code> imports and more. The template uses Emmet-style elements, and components are imported automatically. <code>comp:useX&gt;…</code> writes a composable.</p>
 <pre class="code"><code>bash ~/.claude/skills/callgraph/callgraph.sh gen 'vue:Counter&gt;(script&gt;ref:n:int=0+fn:inc(){ n.value++ })+(template&gt;button[@click=inc]{Add})' --dry</code></pre>
-  <p class="label">Generated code (shortened)</p>
+  <p class="label">Generated code</p>
 <pre class="code out"><code>&lt;script setup lang="ts"&gt;
 import { ref } from 'vue'
 
 const n = ref&lt;number&gt;(0)
 
-function inc() { n.value++ }
+function inc() {
+  n.value++
+}
 &lt;/script&gt;
 
 &lt;template&gt;
@@ -116,8 +121,10 @@ function inc() { n.value++ }
   <h2 id="h-js">Plain JS / TS modules</h2>
   <p><code>mod:</code> writes a module, <code>class:</code> a class. Everything is exported by default; <code>-fn:</code> keeps a function private, <code>!fn:</code> / <code>!class:</code> makes it <code>export default</code>. A <code>.ts</code> file gets types, a <code>.js</code> file JSDoc.</p>
 <pre class="code"><code>bash ~/.claude/skills/callgraph/callgraph.sh gen 'mod:util&gt;fn:join(p:list&lt;str&gt;):str{ return p.join("/") }+const:MAX:int=10' --write resources/js/util.ts</code></pre>
-  <p class="label">Generated code (shortened)</p>
-<pre class="code out"><code>export function join(p: string[]): string { return p.join("/") }
+  <p class="label">Generated code</p>
+<pre class="code out"><code>export function join(p: string[]): string {
+  return p.join("/")
+}
 
 export const MAX: number = 10</code></pre>
   <p><code>--into x.ts[::Class]</code> adds members to an existing file; <code>--replace x.ts::fn</code> or <code>x.ts::Class::method</code> replaces one.</p>
@@ -134,6 +141,18 @@ export const MAX: number = 10</code></pre>
   <h2 id="h-laravel">A Laravel feature in one step</h2>
   <p>The <code>laravel:</code> preset writes the FormRequests, controller methods, routes and Inertia / Vue pages together:</p>
 <pre class="code"><code>bash ~/.claude/skills/callgraph/callgraph.sh gen 'laravel:Fee[auth,prefix=admin]&gt;create(name:str,amount:int,paid?:bool)+edit+index'</code></pre>
+  <p class="label">The answer (one line per file)</p>
+<pre class="code out"><code>wrote app/Http/Requests/StoreFeeRequest.php (27 lines)
+wrote app/Http/Requests/UpdateFeeRequest.php (27 lines)
+wrote app/Http/Controllers/FeeController.php (48 lines)
+routes/web.php: +5 routes (admin.fees.index, admin.fees.create, admin.fees.store, +2) in auth group
+wrote resources/js/Pages/Fees/Index.vue (51 lines)
+wrote resources/js/Pages/Fees/Create.vue (45 lines)
+wrote resources/js/Pages/Fees/Edit.vue (54 lines)
+✓ form ↔ rules (2 forms, 6 fields) · route names (5)
+⚠ model Fee not found (app/Models/Fee.php) — no model or migration generated
+undo: `callgraph undo` reverts all of these in one step</code></pre>
+  <p>Without Ziggy in the project, the pages use plain URLs (<code>'/admin/fees'</code>) instead of <code>route('…')</code>.</p>
   <ul>
     <li>It checks that the form fields match the validation rules.</li>
     <li>It warns about NOT NULL columns without a default that the form does not send.</li>

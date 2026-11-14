@@ -66,26 +66,29 @@
   <h2 id="h-php">PHP: osztályok és tagok</h2>
   <p>A kifejezés megmondja, mi az osztály, mit örököl és mit valósít meg, és mik a tagjai: <code>+</code> public, <code>-</code> private, <code>#</code> protected. A névtér a <code>composer.json</code> <code>psr-4</code> részéből jön, az importok a projektből. Azokat a neveket, amelyeket a callgraph nem tud importálni, <code>unresolved: Foo</code> formában jelzi.</p>
 <pre class="code"><code>bash ~/.claude/skills/callgraph/callgraph.sh gen 'c!:PaymentGateway&lt;BaseGateway&gt;[Chargeable] &gt; ctor(-Client $http, -int $retries=3) + +charge(Order $order):Receipt + -sign(array $p):string' --write app/Services/PaymentGateway.php</code></pre>
-  <p>Cél nélkül, vagy <code>--dry</code>-jal csak kiírja a kódot. A fenti osztály nagyjából így készül el:</p>
-  <p class="label">Generált kód (rövidítve)</p>
+  <p>Cél nélkül, vagy <code>--dry</code>-jal csak kiírja a kódot. A fenti osztály így készül el:</p>
+  <p class="label">Generált kód</p>
 <pre class="code out"><code>&lt;?php
+
+declare(strict_types=1);
 
 namespace App\Services;
 
 final class PaymentGateway extends BaseGateway implements Chargeable
 {
-    public function __construct(private Client $http, private int $retries = 3)
-    {
-    }
+    public function __construct(
+        private Client $http,
+        private int $retries = 3,
+    ) {}
 
     public function charge(Order $order): Receipt
     {
-        // TODO
+        throw new \LogicException('TODO');
     }
 
     private function sign(array $p): string
     {
-        // TODO
+        throw new \LogicException('TODO');
     }
 }</code></pre>
   <p>Tag hozzáadása egy meglévő osztályhoz, egy adott metódus után:</p>
@@ -96,13 +99,15 @@ final class PaymentGateway extends BaseGateway implements Chargeable
   <h2 id="h-vue">Vue: komponensek és composable-ök</h2>
   <p>A <code>vue:Név&gt;(script&gt;…)+(template&gt;…)+(style&gt;…)</code> egyfájlos komponenst ír TypeScriptben vagy JavaScriptben, a projekt szerint. A scriptben használható a <code>props(...)</code>, <code>emits(...)</code>, <code>ref:</code>, <code>computed:</code>, <code>fn:</code>, a <code>use:</code> import és más. A template Emmet-szerű elemeket használ, a komponenseket magától importálja. A <code>comp:useX&gt;…</code> composable-t ír.</p>
 <pre class="code"><code>bash ~/.claude/skills/callgraph/callgraph.sh gen 'vue:Counter&gt;(script&gt;ref:n:int=0+fn:inc(){ n.value++ })+(template&gt;button[@click=inc]{Add})' --dry</code></pre>
-  <p class="label">Generált kód (rövidítve)</p>
+  <p class="label">Generált kód</p>
 <pre class="code out"><code>&lt;script setup lang="ts"&gt;
 import { ref } from 'vue'
 
 const n = ref&lt;number&gt;(0)
 
-function inc() { n.value++ }
+function inc() {
+  n.value++
+}
 &lt;/script&gt;
 
 &lt;template&gt;
@@ -116,8 +121,10 @@ function inc() { n.value++ }
   <h2 id="h-js">Sima JS / TS modulok</h2>
   <p>A <code>mod:</code> modult, a <code>class:</code> osztályt ír. Alapból minden exportált; a <code>-fn:</code> privát függvényt ad, a <code>!fn:</code> / <code>!class:</code> <code>export default</code>-ot. A <code>.ts</code> fájl típusokat kap, a <code>.js</code> fájl JSDoc-ot.</p>
 <pre class="code"><code>bash ~/.claude/skills/callgraph/callgraph.sh gen 'mod:util&gt;fn:join(p:list&lt;str&gt;):str{ return p.join("/") }+const:MAX:int=10' --write resources/js/util.ts</code></pre>
-  <p class="label">Generált kód (rövidítve)</p>
-<pre class="code out"><code>export function join(p: string[]): string { return p.join("/") }
+  <p class="label">Generált kód</p>
+<pre class="code out"><code>export function join(p: string[]): string {
+  return p.join("/")
+}
 
 export const MAX: number = 10</code></pre>
   <p>Az <code>--into x.ts[::Osztály]</code> tagokat szúr egy meglévő fájlba; a <code>--replace x.ts::fn</code> vagy <code>x.ts::Osztály::metódus</code> egyet lecserél.</p>
@@ -134,6 +141,18 @@ export const MAX: number = 10</code></pre>
   <h2 id="h-laravel">Laravel-funkció egy lépésben</h2>
   <p>A <code>laravel:</code> preset együtt írja meg a FormRequesteket, a controller-metódusokat, a route-okat és az Inertia / Vue oldalakat:</p>
 <pre class="code"><code>bash ~/.claude/skills/callgraph/callgraph.sh gen 'laravel:Fee[auth,prefix=admin]&gt;create(name:str,amount:int,paid?:bool)+edit+index'</code></pre>
+  <p class="label">A válasz (fájlonként egy sor)</p>
+<pre class="code out"><code>írtam: app/Http/Requests/StoreFeeRequest.php (27 sor)
+írtam: app/Http/Requests/UpdateFeeRequest.php (27 sor)
+írtam: app/Http/Controllers/FeeController.php (48 sor)
+routes/web.php: +5 route (admin.fees.index, admin.fees.create, admin.fees.store, +2) az auth csoportban
+írtam: resources/js/Pages/Fees/Index.vue (51 sor)
+írtam: resources/js/Pages/Fees/Create.vue (45 sor)
+írtam: resources/js/Pages/Fees/Edit.vue (54 sor)
+✓ form ↔ rules (2 form, 6 mező) · route-nevek (5)
+⚠ a(z) Fee modell nincs meg (app/Models/Fee.php) — modellt, migrációt nem generáltam
+visszavonás: a `callgraph undo` egy lépésben mindet visszaállítja</code></pre>
+  <p>Ha a projektben nincs Ziggy, az oldalak <code>route('…')</code> helyett sima URL-eket (<code>'/admin/fees'</code>) használnak.</p>
   <ul>
     <li>Ellenőrzi, hogy az űrlap mezői egyeznek-e a validációs szabályokkal.</li>
     <li>Figyelmeztet az alapérték nélküli NOT NULL oszlopokra, amelyeket az űrlap nem küld.</li>

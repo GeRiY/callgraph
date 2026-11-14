@@ -16,29 +16,32 @@ The expression says what the class is, what it extends and implements, and its m
 bash ~/.claude/skills/callgraph/callgraph.sh gen 'c!:PaymentGateway<BaseGateway>[Chargeable] > ctor(-Client $http, -int $retries=3) + +charge(Order $order):Receipt + -sign(array $p):string' --write app/Services/PaymentGateway.php
 ```
 
-Without a target, or with `--dry`, it only prints the code. The class above comes out roughly like this:
+Without a target, or with `--dry`, it only prints the code. The class above comes out like this:
 
-Generated code (shortened)
+Generated code
 
 ```
 <?php
+
+declare(strict_types=1);
 
 namespace App\Services;
 
 final class PaymentGateway extends BaseGateway implements Chargeable
 {
-    public function __construct(private Client $http, private int $retries = 3)
-    {
-    }
+    public function __construct(
+        private Client $http,
+        private int $retries = 3,
+    ) {}
 
     public function charge(Order $order): Receipt
     {
-        // TODO
+        throw new \LogicException('TODO');
     }
 
     private function sign(array $p): string
     {
-        // TODO
+        throw new \LogicException('TODO');
     }
 }
 ```
@@ -57,7 +60,7 @@ bash ~/.claude/skills/callgraph/callgraph.sh gen '+refund(Order $o):void{ $this-
 bash ~/.claude/skills/callgraph/callgraph.sh gen 'vue:Counter>(script>ref:n:int=0+fn:inc(){ n.value++ })+(template>button[@click=inc]{Add})' --dry
 ```
 
-Generated code (shortened)
+Generated code
 
 ```
 <script setup lang="ts">
@@ -65,7 +68,9 @@ import { ref } from 'vue'
 
 const n = ref<number>(0)
 
-function inc() { n.value++ }
+function inc() {
+  n.value++
+}
 </script>
 
 <template>
@@ -87,10 +92,12 @@ bash ~/.claude/skills/callgraph/callgraph.sh gen 'script>ref:loading:bool=false+
 bash ~/.claude/skills/callgraph/callgraph.sh gen 'mod:util>fn:join(p:list<str>):str{ return p.join("/") }+const:MAX:int=10' --write resources/js/util.ts
 ```
 
-Generated code (shortened)
+Generated code
 
 ```
-export function join(p: string[]): string { return p.join("/") }
+export function join(p: string[]): string {
+  return p.join("/")
+}
 
 export const MAX: number = 10
 ```
@@ -114,6 +121,23 @@ The `laravel:` preset writes the FormRequests, controller methods, routes and In
 ```
 bash ~/.claude/skills/callgraph/callgraph.sh gen 'laravel:Fee[auth,prefix=admin]>create(name:str,amount:int,paid?:bool)+edit+index'
 ```
+
+The answer (one line per file)
+
+```
+wrote app/Http/Requests/StoreFeeRequest.php (27 lines)
+wrote app/Http/Requests/UpdateFeeRequest.php (27 lines)
+wrote app/Http/Controllers/FeeController.php (48 lines)
+routes/web.php: +5 routes (admin.fees.index, admin.fees.create, admin.fees.store, +2) in auth group
+wrote resources/js/Pages/Fees/Index.vue (51 lines)
+wrote resources/js/Pages/Fees/Create.vue (45 lines)
+wrote resources/js/Pages/Fees/Edit.vue (54 lines)
+✓ form ↔ rules (2 forms, 6 fields) · route names (5)
+⚠ model Fee not found (app/Models/Fee.php) — no model or migration generated
+undo: `callgraph undo` reverts all of these in one step
+```
+
+Without Ziggy in the project, the pages use plain URLs (`'/admin/fees'`) instead of `route('…')`.
 
 - It checks that the form fields match the validation rules.
 

@@ -16,29 +16,32 @@ A kifejezés megmondja, mi az osztály, mit örököl és mit valósít meg, és
 bash ~/.claude/skills/callgraph/callgraph.sh gen 'c!:PaymentGateway<BaseGateway>[Chargeable] > ctor(-Client $http, -int $retries=3) + +charge(Order $order):Receipt + -sign(array $p):string' --write app/Services/PaymentGateway.php
 ```
 
-Cél nélkül, vagy `--dry`-jal csak kiírja a kódot. A fenti osztály nagyjából így készül el:
+Cél nélkül, vagy `--dry`-jal csak kiírja a kódot. A fenti osztály így készül el:
 
-Generált kód (rövidítve)
+Generált kód
 
 ```
 <?php
+
+declare(strict_types=1);
 
 namespace App\Services;
 
 final class PaymentGateway extends BaseGateway implements Chargeable
 {
-    public function __construct(private Client $http, private int $retries = 3)
-    {
-    }
+    public function __construct(
+        private Client $http,
+        private int $retries = 3,
+    ) {}
 
     public function charge(Order $order): Receipt
     {
-        // TODO
+        throw new \LogicException('TODO');
     }
 
     private function sign(array $p): string
     {
-        // TODO
+        throw new \LogicException('TODO');
     }
 }
 ```
@@ -57,7 +60,7 @@ A `vue:Név>(script>…)+(template>…)+(style>…)` egyfájlos komponenst ír T
 bash ~/.claude/skills/callgraph/callgraph.sh gen 'vue:Counter>(script>ref:n:int=0+fn:inc(){ n.value++ })+(template>button[@click=inc]{Add})' --dry
 ```
 
-Generált kód (rövidítve)
+Generált kód
 
 ```
 <script setup lang="ts">
@@ -65,7 +68,9 @@ import { ref } from 'vue'
 
 const n = ref<number>(0)
 
-function inc() { n.value++ }
+function inc() {
+  n.value++
+}
 </script>
 
 <template>
@@ -87,10 +92,12 @@ A `mod:` modult, a `class:` osztályt ír. Alapból minden exportált; a `-fn:` 
 bash ~/.claude/skills/callgraph/callgraph.sh gen 'mod:util>fn:join(p:list<str>):str{ return p.join("/") }+const:MAX:int=10' --write resources/js/util.ts
 ```
 
-Generált kód (rövidítve)
+Generált kód
 
 ```
-export function join(p: string[]): string { return p.join("/") }
+export function join(p: string[]): string {
+  return p.join("/")
+}
 
 export const MAX: number = 10
 ```
@@ -114,6 +121,23 @@ A `laravel:` preset együtt írja meg a FormRequesteket, a controller-metódusok
 ```
 bash ~/.claude/skills/callgraph/callgraph.sh gen 'laravel:Fee[auth,prefix=admin]>create(name:str,amount:int,paid?:bool)+edit+index'
 ```
+
+A válasz (fájlonként egy sor)
+
+```
+írtam: app/Http/Requests/StoreFeeRequest.php (27 sor)
+írtam: app/Http/Requests/UpdateFeeRequest.php (27 sor)
+írtam: app/Http/Controllers/FeeController.php (48 sor)
+routes/web.php: +5 route (admin.fees.index, admin.fees.create, admin.fees.store, +2) az auth csoportban
+írtam: resources/js/Pages/Fees/Index.vue (51 sor)
+írtam: resources/js/Pages/Fees/Create.vue (45 sor)
+írtam: resources/js/Pages/Fees/Edit.vue (54 sor)
+✓ form ↔ rules (2 form, 6 mező) · route-nevek (5)
+⚠ a(z) Fee modell nincs meg (app/Models/Fee.php) — modellt, migrációt nem generáltam
+visszavonás: a `callgraph undo` egy lépésben mindet visszaállítja
+```
+
+Ha a projektben nincs Ziggy, az oldalak `route('…')` helyett sima URL-eket (`'/admin/fees'`) használnak.
 
 - Ellenőrzi, hogy az űrlap mezői egyeznek-e a validációs szabályokkal.
 
