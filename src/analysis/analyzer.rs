@@ -48,7 +48,10 @@ impl Analyzer {
                 warnings: Vec::new(),
             });
         }
-        language.analyze(&source)
+        // egy nyelvi elemző hibája (pánik) egyetlen fájlt érintsen: a projekt-szintű nézetek a többi fájllal mennek
+        // tovább (a fájl kimarad), a közvetlenül kért fájl hibát ad — a teljes parancs nem omlik össze
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| language.analyze(&source)))
+            .unwrap_or_else(|_| Err(CallgraphError::Unsupported(path.to_path_buf())))
     }
 }
 

@@ -124,6 +124,36 @@ fn a_create_migration_gives_the_compact_column_line() {
     );
 }
 
+/// Két `Schema::create` ugyanarra a táblára törlés nélkül: egy friss `migrate` elbukik — a nézet jelzi; a
+/// közte lévő `dropIfExists` után az újra-létrehozás rendben van. A csomag-táblák (spatie) nem „modell nélküliek”.
+#[test]
+fn a_table_created_twice_without_a_drop_is_flagged() {
+    let first = migration(&create("fees", &["id()", "string('name')"]), "");
+    let second = migration(&create("fees", &["id()"]), "");
+    let dropped = migration(
+        &("        Schema::dropIfExists('notes');\n".to_owned() + &create("notes", &["id()"])),
+        "",
+    );
+    let notes = migration(&create("notes", &["id()"]), "");
+    let roles = migration(&create("roles", &["id()"]), "");
+    let laravel = project(
+        &[notes, dropped, first, second, roles],
+        &[model("Fee", MODEL, ""), model("Note", MODEL, "")],
+    );
+    let scope = vec![
+        "app/Models/Fee.php".to_owned(),
+        "app/Models/Note.php".to_owned(),
+    ];
+    let view = laravel.model_view_lines(&scope, Lang::En);
+    assert!(
+        view.iter().any(|l| l
+            == "⚠ table fees created twice without a drop: 2024_01_01_000002_m.php, 2024_01_01_000003_m.php — a fresh migrate fails (table already exists)"),
+        "{view:?}"
+    );
+    assert!(!view.iter().any(|l| l.contains("table notes")), "{view:?}");
+    assert!(!view.iter().any(|l| l.contains("roles")), "{view:?}");
+}
+
 #[test]
 fn the_down_method_is_ignored_and_drop_if_exists_in_up_removes_the_table() {
     let first = migration(

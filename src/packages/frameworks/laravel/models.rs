@@ -40,8 +40,9 @@ const BASES: [&str; 5] = [
 ];
 /// A fel nem oldott (importálatlan) alaposztály-nevek.
 const SHORT_BASES: [&str; 3] = ["Model", "Authenticatable", "Pivot"];
-/// A framework saját táblái: nem számítanak „modell nélküli” táblának.
-const FRAMEWORK_TABLES: [&str; 10] = [
+/// A framework és a gyakori csomagok saját táblái (a modelljük a `vendor/`-ben van): nem számítanak „modell
+/// nélküli” táblának — spatie/laravel-permission, laravel/telescope, értesítések, activitylog, medialibrary.
+const FRAMEWORK_TABLES: [&str; 21] = [
     "password_reset_tokens",
     "password_resets",
     "sessions",
@@ -52,6 +53,17 @@ const FRAMEWORK_TABLES: [&str; 10] = [
     "failed_jobs",
     "migrations",
     "personal_access_tokens",
+    "notifications",
+    "roles",
+    "permissions",
+    "model_has_roles",
+    "model_has_permissions",
+    "role_has_permissions",
+    "telescope_entries",
+    "telescope_entries_tags",
+    "telescope_monitoring",
+    "activity_log",
+    "media",
 ];
 /// A to-many relációk.
 const TO_MANY: [&str; 6] = [
@@ -131,6 +143,9 @@ impl Model {
 pub(crate) struct ModelData {
     pub models: Vec<Model>,
     pub schema: Schema,
+    /// Kétszer (közte törlés nélkül) létrehozott táblák: (tábla, első migráció, második migráció) — egy friss
+    /// `migrate` itt „table already exists” hibával áll meg.
+    pub duplicates: Vec<(String, String, String)>,
 }
 
 /// Rendezett párok JSON-objektumként (`{"email_verified_at":"datetime"}`).
@@ -507,14 +522,38 @@ impl Laravel {
             models.push(parse_model(full, &class.rel, &clean));
         }
         models.sort_by(|a, b| a.class.cmp(&b.class));
-        let migrations: Vec<String> = files
+        let migrations: Vec<(String, String)> = files
             .files_under(&self.root.join(MIGRATIONS_DIR))
             .iter()
             .filter(|path| path.extension().is_some_and(|ext| ext == "php"))
-            .filter_map(|path| files.read(path))
+            .filter_map(|path| {
+                let name = path.file_name()?.to_string_lossy().into_owned();
+                Some((name, files.read(path)?))
+            })
             .collect();
-        let schema = schema::build(migrations.iter().map(String::as_str));
-        self.models = Some(ModelData { models, schema });
+        let schema = schema::build(migrations.iter().map(|(_, text)| text.as_str()));
+        // a tábla élő-e (és melyik migráció hozta létre): a második `create` törlés nélkül hiba
+        let mut live: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+        let mut duplicates = Vec::new();
+        for (name, text) in &migrations {
+            for (create, table) in schema::table_events(text) {
+                // `if (!Schema::hasTable('t'))`-vel őrzött létrehozás szándékos, nem hiba
+                let guarded = text.contains(&format!("hasTable('{table}')"))
+                    || text.contains(&format!("hasTable(\"{table}\")"));
+                if !create {
+                    live.remove(&table);
+                } else if let Some(first) = live.get(&table).filter(|_| !guarded) {
+                    duplicates.push((table.clone(), first.clone(), name.clone()));
+                } else {
+                    live.insert(table, name.clone());
+                }
+            }
+        }
+        self.models = Some(ModelData {
+            models,
+            schema,
+            duplicates,
+        });
     }
 
     /// A modell az osztály teljes neve (`namespace` + `container`) szerint, és a séma.
@@ -679,6 +718,16 @@ impl Laravel {
                     issue.trim_start_matches("⚠ ")
                 ));
             }
+        }
+        for (table, first, second) in &data.duplicates {
+            lines.push(match lang {
+                Lang::En => format!(
+                    "⚠ table {table} created twice without a drop: {first}, {second} — a fresh migrate fails (table already exists)"
+                ),
+                Lang::Hu => format!(
+                    "⚠ a(z) {table} táblát két migráció is létrehozza törlés nélkül: {first}, {second} — egy friss migrate elbukik (table already exists)"
+                ),
+            });
         }
         let orphans = tables_without_model(data);
         let tail = if orphans.is_empty() {

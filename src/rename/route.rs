@@ -279,9 +279,11 @@ fn definitions(
                 .push(Site::replace(&leaf.rel, leaf.start, leaf.end, tail));
         }
     }
+    // `*`-os mód: a `Route::resource('projects', ..)` generált nevei (`projects.index` …) a `->names('jobs')`-szal
+    let by_resource = mapping.wildcard && resource_sites(files, &all, mapping, plan);
     let missing = names
         .iter()
-        .find(|n| mapping.map(n).is_some() && !covered.contains(n));
+        .find(|n| mapping.map(n).is_some() && !covered.contains(n) && !by_resource);
     if let Some(name) = missing {
         return Err(error(crate::tf!(
             "route {} has no ->name('..') literal in routes/ (resource / generated name) — rename it by hand",
@@ -290,6 +292,80 @@ fn definitions(
         )));
     }
     Ok(())
+}
+
+/// `*`-os mód, resource-route-ok: a `Route::resource('projects', ..)` / `apiResource` (névvel ellátott csoporton
+/// kívül), amelynek a név-alapja (`projects`, `admin/projects` → `projects`) a régi előtag: a meglévő
+/// `->names('..')` literálja cserélődik, vagy a hívás után `->names('jobs')` kerül — a Laravel így a resource
+/// összes nevét átnevezi, az URI marad. Igaz, ha volt ilyen resource.
+fn resource_sites(
+    files: &[(String, String)],
+    all: &[Literal],
+    mapping: &Mapping,
+    plan: &mut Plan,
+) -> bool {
+    static RESOURCE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r#"Route::(?:resource|apiResource)\s*\(\s*['"]([^'"]+)['"]"#)
+            .expect("érvényes regex")
+    });
+    static NAMES: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r#"^\s*->\s*names\s*\(\s*['"]([^'"]*)['"]"#).expect("érvényes regex")
+    });
+    let Some(new_base) = mapping.new.strip_suffix('.') else {
+        return false;
+    };
+    let mut found = false;
+    for (rel, text) in files {
+        let segs = lex(text);
+        let code = mask(text, &segs, |k| k != Kind::Code);
+        let with_strings = mask(text, &segs, |k| {
+            matches!(k, Kind::Html | Kind::Comment | Kind::Doc)
+        });
+        for caps in RESOURCE.captures_iter(&with_strings) {
+            let (Some(whole), Some(base)) = (caps.get(0), caps.get(1)) else {
+                continue;
+            };
+            let name_base = base
+                .as_str()
+                .trim_matches('/')
+                .rsplit('/')
+                .next()
+                .unwrap_or("");
+            if format!("{name_base}.") != mapping.old {
+                continue;
+            }
+            // névvel ellátott csoportban a név-előtag is számítana: azt nem kezeljük (marad a hiba-üzenet)
+            if all.iter().any(|l| {
+                l.rel == *rel
+                    && l.group
+                        .is_some_and(|(open, close)| open < whole.start() && whole.start() < close)
+            }) {
+                continue;
+            }
+            let Some(paren) = whole.as_str().find('(').map(|i| whole.start() + i) else {
+                continue;
+            };
+            let Some(close) = matching_paren(&code, paren) else {
+                continue;
+            };
+            let rest = &with_strings[close + 1..];
+            match NAMES.captures(rest).and_then(|c| c.get(1)) {
+                Some(lit) => plan.sites.push(Site::replace(
+                    rel,
+                    close + 1 + lit.start(),
+                    close + 1 + lit.end(),
+                    new_base,
+                )),
+                None => plan.sites.push(Site::insert(
+                    rel,
+                    close + 1,
+                    format!("->names('{new_base}')"),
+                )),
+            }
+            found = true;
+        }
+    }
+    found
 }
 
 /// `*`-os mód: az a literál módosul, amelyikben a régi előtag véget ér.
@@ -398,6 +474,18 @@ fn references(env: Env<'_>, mapping: &Mapping, plan: &mut Plan) {
                     .is_some_and(|s| text.contains(s))
         };
         if !quick {
+            continue;
+        }
+        // a `php artisan ziggy:generate` által generált route-lista: kézzel nem írjuk, újra kell generálni
+        let file = rel.rsplit('/').next().unwrap_or(&rel);
+        if matches!(file, "ziggy.js" | "ziggy.ts" | "ziggy.d.ts") {
+            if text.contains(&format!("\"{}", mapping.old)) {
+                plan.notes.push(crate::tf!(
+                    "⚠ {} is generated and still lists the old names — regenerate it: php artisan ziggy:generate",
+                    "⚠ a(z) {} generált fájl, és még a régi neveket tartalmazza — generáld újra: php artisan ziggy:generate",
+                    rel
+                ));
+            }
             continue;
         }
         let search = if rel.ends_with(".php") && !rel.ends_with(".blade.php") {

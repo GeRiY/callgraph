@@ -106,14 +106,47 @@ pub(super) fn table_of_class(short: &str) -> String {
     plural(&snake(short))
 }
 
+/// A `Schema::` hívások (a nyitó zárójelig): létrehozás, módosítás, törlés, átnevezés.
+static CALL: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"Schema::(?:connection\([^)]*\)->)?(create|table|dropIfExists|drop|rename)\s*\(")
+        .expect("valid regex")
+});
+
+/// A migráció `up()`-jának tábla-eseményei sorrendben: `(true, t)` létrehozás, `(false, t)` törlés (a
+/// `rename` a régi név törlése és az új létrehozása). A kétszer létrehozott tábla felismeréséhez.
+pub(super) fn table_events(text: &str) -> Vec<(bool, String)> {
+    let clean = strip_comments(text);
+    let Some((_, body)) = method_parts(&clean, "up") else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    let mut at = 0;
+    while let Some(caps) = CALL.captures_at(&body, at) {
+        let whole = caps.get(0).expect("group 0");
+        let open = whole.end() - 1;
+        let Some(close) = matching(&body, open, body.len()) else {
+            break;
+        };
+        at = close + 1;
+        let args = split_top(&body[open + 1..close], ",");
+        let names: Vec<String> = args.iter().filter_map(|arg| literal(arg)).collect();
+        match (&caps[1], names.as_slice()) {
+            ("create", [table, ..]) => out.push((true, table.clone())),
+            ("dropIfExists" | "drop", tables) => {
+                out.extend(tables.iter().map(|t| (false, t.clone())));
+            }
+            ("rename", [from, to, ..]) => {
+                out.push((false, from.clone()));
+                out.push((true, to.clone()));
+            }
+            _ => {}
+        }
+    }
+    out
+}
+
 /// Egy migráció `up()` metódusa a sémára alkalmazva.
 pub(super) fn apply(schema: &mut Schema, text: &str) {
-    static CALL: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(
-            r"Schema::(?:connection\([^)]*\)->)?(create|table|dropIfExists|drop|rename)\s*\(",
-        )
-        .expect("valid regex")
-    });
     let clean = strip_comments(text);
     let Some((_, body)) = method_parts(&clean, "up") else {
         return;

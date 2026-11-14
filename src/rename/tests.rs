@@ -255,6 +255,47 @@ fn route_leaf_rename_changes_the_definition_and_every_reference() {
     assert_eq!(layout, LAYOUT_VUE.replace("profile.edit", "account.edit"));
 }
 
+/// `*`-os átnevezés resource-route-okra: a `->names('..')` kerül a hívás után (vagy a meglévő cserélődik), az
+/// URI marad, a hivatkozások átíródnak.
+#[test]
+fn wildcard_rename_of_resource_routes_adds_names() {
+    let web = "<?php\n\nuse App\\Http\\Controllers\\ProjectController;\nuse Illuminate\\Support\\Facades\\Route;\n\nRoute::resource('projects', ProjectController::class);\nRoute::apiResource('tags', TagController::class)->names('tags');\n";
+    let page = "<script setup>\nconst go = () => router.get(route('projects.index'));\n</script>\n<template><a :href=\"route('projects.show', 1)\">x</a></template>\n";
+    let fs = MemFs::with(&[
+        ("composer.json", COMPOSER),
+        ("routes/web.php", web),
+        ("resources/js/Pages/P.vue", page),
+    ]);
+    run(&fs, &request(Kind::Route, "projects.*", "jobs.*")).unwrap();
+    let routes = fs.get("routes/web.php").unwrap();
+    assert!(
+        routes.contains("Route::resource('projects', ProjectController::class)->names('jobs');"),
+        "{routes}"
+    );
+    assert_eq!(
+        fs.get("resources/js/Pages/P.vue").unwrap(),
+        page.replace("projects.", "jobs.")
+    );
+    // meglévő `->names('tags')` cserélődik; a generált `ziggy.js`-t nem írjuk, csak jelezzük
+    fs.put(
+        "resources/js/ziggy.js",
+        "const Ziggy = {\"routes\":{\"tags.index\":{\"uri\":\"tags\"}}};\n",
+    );
+    let out = run(&fs, &request(Kind::Route, "tags.*", "labels.*")).unwrap();
+    let routes = fs.get("routes/web.php").unwrap();
+    assert!(routes.contains("->names('labels');"), "{routes}");
+    let text = out.render();
+    assert!(
+        text.contains("resources/js/ziggy.js is generated") && text.contains("ziggy:generate"),
+        "{text}"
+    );
+    assert!(
+        fs.get("resources/js/ziggy.js")
+            .unwrap()
+            .contains("tags.index")
+    );
+}
+
 /// Az aláírt URL-ek (`URL::temporarySignedRoute(` több soron át, `URL::signedRoute(`) és a teszt-segédek
 /// (`assertRedirectToRoute(`) is hivatkozások.
 #[test]

@@ -52,6 +52,11 @@ pub(super) fn functions(s: &str) -> Vec<(&str, Vec<String>)> {
     let mut out = Vec::new();
     let mut i = 0;
     while i < b.len() {
+        // több bájtos karakter (`á`, `ő` a megjegyzésben / sztringben) közepén nem szabad szeletelni
+        if !s.is_char_boundary(i) {
+            i += 1;
+            continue;
+        }
         if let Some(open) = s[..i].rfind("#{")
             && s[open + 2..i].find('}').is_none()
         {
@@ -244,6 +249,16 @@ mod tests {
         let src = ".a {\n  $local: 2px; // note (x\n  margin: $local;\n}\n$bg: url(http://h/a.png);\n$top: 3;\n";
         let names: Vec<String> = constants("x.scss", src).into_iter().map(|c| c.0).collect();
         assert_eq!(names, ["$local", "$bg", "$top"]);
+    }
+
+    /// Regresszió: ékezetes szöveg a függvényhívás előtt (`// Fejléc háttér`, `content: 'Kérés'`) nem pánikol.
+    #[test]
+    fn accented_text_before_a_function_call_does_not_panic() {
+        let found = super::functions("content: 'Kérés'; color: darken($ő-szín, 10%)");
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].0, "darken");
+        let source = "// Fejléc háttér árnyéka\n.fejléc {\n  box-shadow: 0 1px rgba(0, 0, 0, .2);\n  &:hover { color: lighten($kék, 5%); }\n}\n";
+        let _ = ScssScanner::new("_fejlec.scss", source).scan();
     }
 
     #[test]
