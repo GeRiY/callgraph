@@ -71,6 +71,11 @@ pub(crate) struct Laravel {
     forms: Vec<Form>,
     /// Az Eloquent-modellek és a migrációk sémája (csak a `scan_models` után).
     models: Option<ModelData>,
+    /// A dinamikus nevű route-ok helye (`->name($name)` egy ciklusban): ilyenkor az „ismeretlen név” nem biztos.
+    dynamic_names: Vec<(String, u32)>,
+    /// A `routes/` alatti, de sehonnan be nem töltött fájlok (se `withRouting`, se `require`): a route-jaik
+    /// nincsenek a táblában.
+    unloaded: Vec<String>,
 }
 
 /// A hívás route-neve: Ziggy `route('név')` JS-hívás string-literál névvel (a gráf `resolved`-je `route::név`);
@@ -81,6 +86,17 @@ pub(crate) fn route_name(call: &Call) -> Option<&str> {
     }
     let name = call.resolved.as_deref()?.strip_prefix("route::")?;
     (!name.is_empty() && !name.contains('*')).then_some(name)
+}
+
+/// A route-fájlok forrásából (`(rel, szöveg)` párok) a nevesített route-ok teljes nevei (csoport-előtaggal és a
+/// resource-ok generált neveivel); a `rename route` ezzel ellenőrzi, hogy a régi név létezik és az új szabad.
+pub(crate) fn route_names(files: &[(String, String)]) -> Vec<String> {
+    let imports = crate::model::Imports::default();
+    files
+        .iter()
+        .flat_map(|(rel, text)| routes::parse_file(rel, text, &imports))
+        .filter_map(|route| route.name)
+        .collect()
 }
 
 /// PHP-oldali route-hivatkozás hívott neve: `route(..)`, `to_route(..)`, `redirect()->route(..)`,
@@ -99,9 +115,11 @@ fn php_reference_fn(call: &Call) -> Option<&'static str> {
         "static_call" => {
             let (class, method) = target.rsplit_once("::")?;
             let class = class.rsplit('\\').next()?;
-            (method.eq_ignore_ascii_case("route")
-                && (class.eq_ignore_ascii_case("redirect") || class.eq_ignore_ascii_case("url")))
-            .then_some("route")
+            let named = ["route", "signedroute", "temporarysignedroute"]
+                .into_iter()
+                .find(|m| method.eq_ignore_ascii_case(m))?;
+            (class.eq_ignore_ascii_case("redirect") || class.eq_ignore_ascii_case("url"))
+                .then_some(named)
         }
         _ => None,
     }
@@ -125,6 +143,8 @@ impl Laravel {
             refs: Vec::new(),
             forms: Vec::new(),
             models: None,
+            dynamic_names: Vec::new(),
+            unloaded: Vec::new(),
         }
     }
 
@@ -137,18 +157,44 @@ impl Laravel {
         files: &dyn ProjectFiles,
         references: bool,
     ) {
+        // a route-fájlok előbb csak összegyűlnek: a tábla csak a ténylegesen betöltöttekből épül (`loaded`)
+        let mut route_files: Vec<(String, String, &'g FileGraph)> = Vec::new();
         for (path, graph) in graphs {
             let Some(rel) = self.relative_path(path) else {
                 continue;
             };
             if rel.starts_with(ROUTES_DIR) && rel.ends_with(".php") {
                 if let Some(text) = files.read(path) {
-                    self.routes
-                        .extend(routes::parse_file(&rel, &text, &graph.imports));
+                    route_files.push((rel, text, graph));
                 }
             } else if references {
                 self.collect_references(&rel, path, graph, files);
             }
+        }
+        let loaded = self.loaded_route_files(&route_files, files);
+        let prefix = self.api_prefix(files);
+        for (rel, text, graph) in &route_files {
+            if loaded.as_ref().is_some_and(|loaded| !loaded.contains(rel)) {
+                self.unloaded.push(rel.clone());
+                continue;
+            }
+            let mut parsed = routes::parse_file(rel, text, &graph.imports);
+            // a `routes/api.php` route-jai elé a Laravel `/api`-t tesz (vagy a `bootstrap/app.php` `apiPrefix:`-át)
+            if rel == "routes/api.php" {
+                for route in &mut parsed {
+                    route.uri = if route.uri == "/" {
+                        format!("/{prefix}")
+                    } else {
+                        format!("/{prefix}{}", route.uri)
+                    };
+                }
+            }
+            self.routes.extend(parsed);
+            self.dynamic_names.extend(
+                dynamic_name_lines(text)
+                    .into_iter()
+                    .map(|line| (rel.clone(), line)),
+            );
         }
         self.by_name.clear();
         for (index, route) in self.routes.iter().enumerate() {
@@ -195,7 +241,14 @@ impl Laravel {
         for (call, name) in candidates {
             let literal = render::source_args_named(&text, call.line, name)
                 .and_then(|args| render::literal(args.first()?));
-            if let Some(name) = literal.filter(|n| !n.contains('*')) {
+            // `->route(..)` csak a `redirect()` után route-hivatkozás (`$notifiable->route('mail', ..)`,
+            // `$request->route('id')` nem); a `Route::has('x')`-szel őrzött hivatkozás futáskor ellenőrzött
+            let real = |n: &String| {
+                !n.contains('*')
+                    && (call.kind != "method_call" || redirects_to(&text, n))
+                    && !guarded(&text, n)
+            };
+            if let Some(name) = literal.filter(real) {
                 self.refs.push(Reference {
                     file: rel.to_owned(),
                     line: call.line,
@@ -260,6 +313,11 @@ impl Laravel {
             Some(route) => format!(
                 " → {}",
                 describe(self.by_submit(route, call, siblings), inertia)
+            ),
+            // dinamikus nevű route-ok mellett csak gyanú
+            None if !self.dynamic_names.is_empty() => format!(
+                " {}",
+                lang.pick("? no static route", "? nincs statikus route")
             ),
             None => format!(" {}", lang.pick("⚠ no route", "⚠ nincs ilyen route")),
         })
@@ -361,4 +419,114 @@ fn submit_verb(call: &Call, siblings: &[Call]) -> Option<&'static str> {
 /// A route igéje (`PUT|PATCH`, `ANY`) elfogadja-e a küldés igéjét.
 fn has_verb(route_verb: &str, verb: &str) -> bool {
     route_verb == "ANY" || route_verb.split('|').any(|v| v == verb)
+}
+
+impl Laravel {
+    /// A ténylegesen betöltött route-fájlok: a belépési pontok (`bootstrap/app.php` `withRouting(web: …, api: …)`,
+    /// vagy bárhol ott / az `app/Providers` alatt `base_path('routes/x.php')`), és amit ezek `require`-ral
+    /// (`require __DIR__.'/auth.php'`, `base_path('routes/x.php')`) tranzitívan behúznak. `None`: nincs felismerhető
+    /// belépési pont (régi / szokatlan projekt) — akkor minden `routes/` fájl számít.
+    fn loaded_route_files(
+        &self,
+        route_files: &[(String, String, &FileGraph)],
+        files: &dyn ProjectFiles,
+    ) -> Option<std::collections::BTreeSet<String>> {
+        // `__DIR__.'/../routes/web.php'`, `base_path('routes/admin.php')`: a `routes/` utáni rész
+        static ENTRY: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+            regex::Regex::new(r"routes/([\w/.-]+\.php)").expect("valid regex")
+        });
+        // 1: a beemelő fájl mappájához relatív (`require __DIR__.'/auth.php'`); 2: `base_path('routes/x.php')`
+        static REQUIRE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+            regex::Regex::new(
+                r#"(?:require|include)(?:_once)?\s*\(?\s*__DIR__\s*\.\s*['"]/([\w/.-]+\.php)|base_path\(\s*['"]routes/([\w/.-]+\.php)"#,
+            )
+            .expect("valid regex")
+        });
+        let mut sources: Vec<String> = Vec::new();
+        if let Some(text) = files.read(&self.root.join("bootstrap/app.php")) {
+            sources.push(text);
+        }
+        for path in files.files_under(&self.root.join("app/Providers")) {
+            if let Some(text) = files.read(&path) {
+                sources.push(text);
+            }
+        }
+        let mut loaded: std::collections::BTreeSet<String> = sources
+            .iter()
+            .flat_map(|text| {
+                ENTRY
+                    .captures_iter(text)
+                    .map(|caps| format!("{ROUTES_DIR}{}", &caps[1]))
+            })
+            .collect();
+        if loaded.is_empty() {
+            return None;
+        }
+        // tranzitív `require`: amíg nő a halmaz
+        loop {
+            let before = loaded.len();
+            for (rel, text, _) in route_files {
+                if !loaded.contains(rel) {
+                    continue;
+                }
+                let dir = rel.rsplit_once('/').map_or("", |(dir, _)| dir);
+                let clean = routes::strip_comments(text);
+                let found: Vec<String> = REQUIRE
+                    .captures_iter(&clean)
+                    .filter_map(|caps| match (caps.get(1), caps.get(2)) {
+                        (Some(relative), _) => Some(format!("{dir}/{}", relative.as_str())),
+                        (None, Some(rooted)) => Some(format!("{ROUTES_DIR}{}", rooted.as_str())),
+                        (None, None) => None,
+                    })
+                    .collect();
+                loaded.extend(found);
+            }
+            if loaded.len() == before {
+                break;
+            }
+        }
+        Some(loaded)
+    }
+
+    /// Az API-route-ok előtagja: a `bootstrap/app.php` `apiPrefix: 'x'`-e, különben a Laravel alapértéke, `api`.
+    fn api_prefix(&self, files: &dyn ProjectFiles) -> String {
+        static PREFIX: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+            regex::Regex::new(r#"apiPrefix\s*:\s*['"]/?([^'"]+?)/?['"]"#).expect("valid regex")
+        });
+        files
+            .read(&self.root.join("bootstrap/app.php"))
+            .and_then(|text| PREFIX.captures(&text).map(|caps| caps[1].to_owned()))
+            .unwrap_or_else(|| "api".to_owned())
+    }
+}
+
+/// A route-fájl dinamikus nevű route-jainak sorai (`->name($name)`, `->name($prefix . 'x')`), kommentek nélkül.
+fn dynamic_name_lines(text: &str) -> Vec<u32> {
+    static DYNAMIC: std::sync::LazyLock<regex::Regex> =
+        std::sync::LazyLock::new(|| regex::Regex::new(r"->\s*name\(\s*\$").expect("valid regex"));
+    routes::strip_comments(text)
+        .lines()
+        .enumerate()
+        .filter(|(_, line)| DYNAMIC.is_match(line))
+        .filter_map(|(index, _)| u32::try_from(index + 1).ok())
+        .collect()
+}
+
+/// Van-e a fájlban `redirect()->route('név'` (több soron át is): a `->route(..)` metódushívás csak így
+/// route-hivatkozás.
+fn redirects_to(text: &str, name: &str) -> bool {
+    regex::Regex::new(&format!(
+        r#"redirect\(\s*\)\s*->\s*route\(\s*['"]{}['"]"#,
+        regex::escape(name)
+    ))
+    .is_ok_and(|re| re.is_match(text))
+}
+
+/// Őrzi-e a fájlban `Route::has('név')` a hivatkozást (futáskor ellenőrzött, nem hiba).
+fn guarded(text: &str, name: &str) -> bool {
+    regex::Regex::new(&format!(
+        r#"Route::has\(\s*['"]{}['"]"#,
+        regex::escape(name)
+    ))
+    .is_ok_and(|re| re.is_match(text))
 }

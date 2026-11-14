@@ -21,6 +21,7 @@ pub mod packages;
 pub mod profile;
 pub mod project;
 pub mod query;
+pub mod rename;
 pub mod skill;
 pub mod stats;
 pub mod update;

@@ -263,6 +263,52 @@ impl GenerateParams {
     }
 }
 
+// `rename` (opt-in, mint a `generate`): biztonságos átnevezés (route / osztály / metódus) az egész projekten.
+// (Típus-szintű `//` komment: a `///` a sémába kerülne.)
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, JsonSchema)]
+pub(crate) struct RenameParams {
+    /// `route` (Laravel route name; `a.*` renames a prefix), `class` (PHP FQCN or unique short name), `method` (`Class::method`).
+    pub kind: String,
+    /// Current name.
+    pub old: String,
+    /// New name.
+    pub new: String,
+    /// Only report what would change.
+    #[serde(default)]
+    pub dry: bool,
+    /// Class: also rewrite string literals holding the class name.
+    #[serde(default)]
+    pub strings: bool,
+    /// Class: keep the Eloquent table name (`protected $table`).
+    #[serde(default)]
+    pub keep_table: bool,
+    /// Registered project alias; default: the server's working directory.
+    #[serde(default)]
+    pub project: Option<String>,
+}
+
+impl RenameParams {
+    /// A CLI `rename` argumentumai (a `--project` a hívónál jön).
+    pub(crate) fn to_args(&self) -> Vec<String> {
+        let mut args = vec![
+            "rename".to_owned(),
+            self.kind.clone(),
+            self.old.clone(),
+            self.new.clone(),
+        ];
+        for (on, flag) in [
+            (self.dry, "--dry"),
+            (self.strings, "--strings"),
+            (self.keep_table, "--keep-table"),
+        ] {
+            if on {
+                args.push(flag.to_owned());
+            }
+        }
+        args
+    }
+}
+
 // `next`: egy korábbi eredmény javasolt következő lépése az azonosítójával.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, JsonSchema)]
 pub(crate) struct NextParams {
@@ -449,6 +495,7 @@ mod tests {
             serde_json::to_string(&schemars::schema_for!(NextParams)).unwrap(),
             serde_json::to_string(&schemars::schema_for!(PackageUsageParams)).unwrap(),
             serde_json::to_string(&schemars::schema_for!(GenerateParams)).unwrap(),
+            serde_json::to_string(&schemars::schema_for!(RenameParams)).unwrap(),
         ] {
             for hungarian in ["eszköz", "nézet", "választás", "metódus", "függőség"] {
                 assert!(!schema.contains(hungarian), "{hungarian}: {schema}");

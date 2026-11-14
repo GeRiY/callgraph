@@ -33,13 +33,15 @@ pub(crate) enum CommandKind {
     Generate,
     /// `undo`: a generátor utolsó módosításának visszavonása (a gráfban: generálás után jön-e visszavonás).
     Undo,
+    /// `rename` (CLI) és `rename` (MCP, opt-in): biztonságos átnevezés (route / osztály / metódus) a teljes projekten.
+    Rename,
     Other,
 }
 
 impl CommandKind {
     /// Minden változat (a tesztekhez).
     #[cfg(test)]
-    pub(crate) const ALL: [Self; 20] = [
+    pub(crate) const ALL: [Self; 21] = [
         Self::Show,
         Self::Outline,
         Self::MethodBody,
@@ -59,6 +61,7 @@ impl CommandKind {
         Self::Deps,
         Self::Generate,
         Self::Undo,
+        Self::Rename,
         Self::Other,
     ];
 
@@ -84,6 +87,7 @@ impl CommandKind {
             Self::Deps => "deps",
             Self::Generate => "generate",
             Self::Undo => "undo",
+            Self::Rename => "rename",
             Self::Other => "other",
         }
     }

@@ -10,6 +10,7 @@ use crate::query::format::BodyMode;
 use super::generate_args::{parse_gen, parse_undo};
 use super::next_args::parse_next;
 use super::profile_args::{LayerArgs, parse_profile};
+use super::rename_args::parse_rename;
 use super::stats_args::parse_stats;
 use super::telemetry_args::{TelemetryAction, parse_telemetry};
 use super::uses_args::{parse_deps, parse_uses};
@@ -217,6 +218,11 @@ pub enum CliArgs {
         request: crate::generate::GenRequest,
         project: Option<String>,
     },
+    /// `rename <route|class|method> <régi> <új> [--dry] [--strings] [--keep-table]`: biztonságos átnevezés (`crate::rename`).
+    Rename {
+        request: crate::rename::RenameRequest,
+        project: Option<String>,
+    },
     /// `undo [<fájl>]`: a legutóbbi generátor-módosítás visszavonása a `.callgraph/backups/` mappából.
     Undo {
         file: Option<String>,
@@ -297,6 +303,9 @@ impl CliArgs {
         }
         if args.first().is_some_and(|a| a == "gen") {
             return parse_gen(&args[1..]);
+        }
+        if args.first().is_some_and(|a| a == "rename") {
+            return parse_rename(&args[1..]);
         }
         if args.first().is_some_and(|a| a == "undo") {
             return parse_undo(&args[1..]);

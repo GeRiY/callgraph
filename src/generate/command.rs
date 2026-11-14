@@ -151,14 +151,34 @@ pub struct WriteGroup {
 impl WriteGroup {
     /// Kiírja a fájlokat; a visszaadott sorok a fájlok sorrendjében: `(fájl, mentés-útja)` (`None`: új fájl).
     pub fn execute_all(&self, env: Env<'_>) -> GenResult<Vec<JournalEntry>> {
-        for file in &self.files {
-            if env.fs.is_protected(&env.root.join(&file.rel)) {
-                return Err(protected(&file.rel));
+        self.execute_with_removals(env, &[])
+    }
+
+    /// Mint az `execute_all`, és a fájlok kiírása után törli a `removals` fájlokat is (fájl-áthelyezés: az új
+    /// helyre írás + a régi törlése). A törölt fájl tartalma előbb mentésre kerül, és a naplóba `edit` sorként
+    /// kerül, így az `undo` visszaállítja; az új helyen létrehozott fájlt törli.
+    pub fn execute_with_removals(
+        &self,
+        env: Env<'_>,
+        removals: &[String],
+    ) -> GenResult<Vec<JournalEntry>> {
+        for rel in self.files.iter().map(|f| &f.rel).chain(removals) {
+            if env.fs.is_protected(&env.root.join(rel)) {
+                return Err(protected(rel));
             }
         }
         let mut done: Vec<JournalEntry> = Vec::new();
         for file in &self.files {
             match write_one(env, file) {
+                Ok(entry) => done.push(entry),
+                Err(e) => {
+                    rollback(env, &done);
+                    return Err(e);
+                }
+            }
+        }
+        for rel in removals {
+            match remove_one(env, rel) {
                 Ok(entry) => done.push(entry),
                 Err(e) => {
                     rollback(env, &done);
@@ -195,6 +215,32 @@ fn write_one(env: Env<'_>, file: &GroupFile) -> GenResult<JournalEntry> {
     Ok(JournalEntry {
         rel: file.rel.clone(),
         backup: None,
+    })
+}
+
+/// Egy meglévő fájl törlése mentéssel (a naplóban `edit`: az `undo` visszaírja).
+fn remove_one(env: Env<'_>, rel: &str) -> GenResult<JournalEntry> {
+    let path = env.root.join(rel);
+    let old = env.fs.read(&path).map_err(|e| {
+        GenError::new(crate::tf!(
+            "cannot read {}: {}",
+            "nem olvasható: {}: {}",
+            rel,
+            e
+        ))
+    })?;
+    let backup = Backups::new(env).save(rel, &old)?;
+    env.fs.remove(&path).map_err(|e| {
+        GenError::new(crate::tf!(
+            "cannot remove {}: {}",
+            "nem törölhető: {}: {}",
+            rel,
+            e
+        ))
+    })?;
+    Ok(JournalEntry {
+        rel: rel.to_owned(),
+        backup: Some(backup),
     })
 }
 

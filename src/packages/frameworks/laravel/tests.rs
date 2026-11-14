@@ -498,6 +498,155 @@ fn controller_methods_list_their_routes_up_to_three() {
     );
 }
 
+/// Csak a betöltött route-fájlok számítanak: a `withRouting` belépési pontjai és a tranzitív `require`-ok; a
+/// sehonnan be nem töltött fájl route-jai kimaradnak, és a nézet megnevezi a fájlt.
+#[test]
+fn only_loaded_route_files_count() {
+    let bootstrap = "<?php\nreturn Application::configure()->withRouting(web: __DIR__.'/../routes/web.php', commands: __DIR__.'/../routes/console.php');\n";
+    let web = "<?php\nRoute::get('/', fn () => 1)->name('home');\nrequire __DIR__.'/auth.php';\n";
+    let auth = "<?php\nRoute::get('/login', fn () => 1)->name('login');\n";
+    let dead = "<?php\nRoute::get('/debug', fn () => 1)->name('debug');\n";
+    let files = MemFiles::new(&[
+        ("bootstrap/app.php", bootstrap),
+        ("routes/web.php", web),
+        ("routes/auth.php", auth),
+        ("routes/test_debug.php", dead),
+    ]);
+    let graphs: Vec<(PathBuf, FileGraph)> = ["web", "auth", "test_debug"]
+        .iter()
+        .map(|name| {
+            let rel = format!("routes/{name}.php");
+            (
+                root().join(&rel),
+                graph(&format!("/p/{rel}"), None, &[], Vec::new()),
+            )
+        })
+        .collect();
+    let mut laravel = Laravel::new(&root());
+    laravel.scan(
+        graphs.iter().map(|(path, graph)| (path.as_path(), graph)),
+        &files,
+        false,
+    );
+    let names: Vec<_> = laravel
+        .routes()
+        .iter()
+        .filter_map(|r| r.name.clone())
+        .collect();
+    assert_eq!(names, vec!["home".to_owned(), "login".to_owned()]);
+    assert_eq!(
+        laravel.view_lines(&[], Lang::En),
+        vec![
+            "? routes/test_debug.php: never loaded (no withRouting / require) — its routes are ignored"
+                .to_owned(),
+            "routes: 2 named, 0 referenced from JS".to_owned(),
+        ]
+    );
+}
+
+/// A `routes/api.php` route-jai `/api` előtagot kapnak (vagy a `bootstrap/app.php` `apiPrefix:`-ét).
+#[test]
+fn api_routes_get_the_api_prefix() {
+    let api = "<?php\nRoute::apiResource('/location', LocationController::class)->only(['index']);\nRoute::get('/', fn () => 1)->name('root');\n";
+    let routes = graph("/p/routes/api.php", None, &[], Vec::new());
+    let api_path = root().join("routes/api.php");
+    let uris = |files: &MemFiles| {
+        let mut laravel = Laravel::new(&root());
+        laravel.scan([(api_path.as_path(), &routes)], files, false);
+        laravel
+            .routes()
+            .iter()
+            .map(|r| r.uri.clone())
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        uris(&MemFiles::new(&[("routes/api.php", api)])),
+        vec!["/api/location".to_owned(), "/api".to_owned()]
+    );
+    let custom = "<?php\nreturn Application::configure()->withRouting(api: __DIR__.'/../routes/api.php', apiPrefix: 'api/v2');\n";
+    assert_eq!(
+        uris(&MemFiles::new(&[
+            ("routes/api.php", api),
+            ("bootstrap/app.php", custom)
+        ]))[0],
+        "/api/v2/location"
+    );
+}
+
+/// Téves riasztások ellen: a `$notifiable->route('mail', ..)` nem route-hivatkozás, a `redirect()->route('x')` igen;
+/// a `Route::has('x')`-szel őrzött hivatkozás nem hiba; dinamikus nevű route-ok mellett csak `?` gyanú.
+#[test]
+fn notifiable_routes_guards_and_dynamic_names_are_not_false_alarms() {
+    let web = "<?php\nRoute::get('/', [HomeController::class, 'index'])->name('home');\n";
+    let notification = "<?php\n$n = (new AnonymousNotifiable)->route('mail', 'a@b.c');\nreturn redirect()->route('gone');\nif (Route::has('register')) {\n    return route('register');\n}\n";
+    let files = MemFiles::new(&[
+        ("routes/web.php", web),
+        ("app/Notifications/N.php", notification),
+    ]);
+    let routes = graph("/p/routes/web.php", None, &[], Vec::new());
+    let expr = |line| {
+        let mut c = call("method_call", "route", None, "external_call", line);
+        c.on = Some("<expr>".into());
+        c
+    };
+    let php = graph(
+        "/p/app/Notifications/N.php",
+        None,
+        &[],
+        vec![
+            expr(2),
+            expr(3),
+            call("func_call", "route", None, "global_helper", 5),
+        ],
+    );
+    let (web_path, php_path) = (
+        root().join("routes/web.php"),
+        root().join("app/Notifications/N.php"),
+    );
+    let mut laravel = Laravel::new(&root());
+    laravel.scan(
+        [(web_path.as_path(), &routes), (php_path.as_path(), &php)],
+        &files,
+        true,
+    );
+    let scope = vec!["app/Notifications/N.php".to_owned()];
+    assert_eq!(
+        laravel.view_lines(&scope, Lang::En),
+        vec![
+            "⚠ unknown route name 'gone'  app/Notifications/N.php L3".to_owned(),
+            "routes: 1 named, 0 referenced from JS".to_owned(),
+        ]
+    );
+
+    // dinamikus név a route-fájlban: a gyanú `?`, és egy sor megmondja, hol
+    let dynamic = "<?php\nRoute::get('/', [HomeController::class, 'index'])->name('home');\nforeach ($pages as $name => $page) {\n    Route::get($page['uri'], $h)->name($name);\n}\n";
+    let files = MemFiles::new(&[
+        ("routes/web.php", dynamic),
+        ("app/Notifications/N.php", notification),
+    ]);
+    let mut laravel = Laravel::new(&root());
+    laravel.scan(
+        [(web_path.as_path(), &routes), (php_path.as_path(), &php)],
+        &files,
+        true,
+    );
+    assert_eq!(
+        laravel.view_lines(&scope, Lang::En),
+        vec![
+            "? unknown route name 'gone'  app/Notifications/N.php L3".to_owned(),
+            "? dynamic route names at routes/web.php L4: the names above may be defined there"
+                .to_owned(),
+            "routes: 1 named, 0 referenced from JS".to_owned(),
+        ]
+    );
+    assert_eq!(
+        laravel
+            .link_text(&js_route("ghost", 1), &[], None, Lang::En)
+            .as_deref(),
+        Some(" ? no static route")
+    );
+}
+
 #[test]
 fn the_ziggy_view_flags_unknown_names_and_counts_the_rest() {
     let web = "<?php\nRoute::get('/', [HomeController::class, 'index'])->name('home');\nRoute::get('/about', [HomeController::class, 'about'])->name('about');\n";

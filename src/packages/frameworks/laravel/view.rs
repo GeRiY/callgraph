@@ -22,16 +22,52 @@ impl Laravel {
             .collect();
         unknown.sort_by(|a, b| (&a.file, a.line, &a.name).cmp(&(&b.file, b.line, &b.name)));
         unknown.dedup_by(|a, b| (&a.file, a.line, &a.name) == (&b.file, b.line, &b.name));
+        // dinamikus nevű route-ok mellett az „ismeretlen” csak gyanú (`?`), és egy sor megmondja, hol vannak
+        let mark = if self.dynamic_names.is_empty() {
+            "⚠"
+        } else {
+            "?"
+        };
         let mut lines: Vec<String> = unknown
             .iter()
             .map(|r| match lang {
-                Lang::En => format!("⚠ unknown route name '{}'  {} L{}", r.name, r.file, r.line),
+                Lang::En => format!(
+                    "{mark} unknown route name '{}'  {} L{}",
+                    r.name, r.file, r.line
+                ),
                 Lang::Hu => format!(
-                    "⚠ ismeretlen route-név '{}'  {} L{}",
+                    "{mark} ismeretlen route-név '{}'  {} L{}",
                     r.name, r.file, r.line
                 ),
             })
             .collect();
+        if let Some((file, line)) = self.dynamic_names.first().filter(|_| !unknown.is_empty()) {
+            let more = self.dynamic_names.len() - 1;
+            let more = if more > 0 {
+                format!(" +{more}")
+            } else {
+                String::new()
+            };
+            lines.push(match lang {
+                Lang::En => format!(
+                    "? dynamic route names at {file} L{line}{more}: the names above may be defined there"
+                ),
+                Lang::Hu => format!(
+                    "? dinamikus route-nevek: {file} L{line}{more} — a fenti nevek ott is létrejöhetnek"
+                ),
+            });
+        }
+        // a `routes/` alatti, de be nem töltött fájl: a route-jai nem élnek (halott kód, vagy elfelejtett `require`)
+        for file in &self.unloaded {
+            lines.push(match lang {
+                Lang::En => format!(
+                    "? {file}: never loaded (no withRouting / require) — its routes are ignored"
+                ),
+                Lang::Hu => format!(
+                    "? {file}: sehonnan nincs betöltve (se withRouting, se require) — a route-jai nem élnek"
+                ),
+            });
+        }
         let named = self.by_name.len();
         let from_js = self
             .refs

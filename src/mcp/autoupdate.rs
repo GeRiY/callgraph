@@ -21,7 +21,7 @@ use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
-use super::params::GenerateParams;
+use super::params::{GenerateParams, RenameParams};
 use super::request::ShowQuery;
 use super::runner::QueryRunner;
 use crate::cli::commands::SelfUpdateCommand;
@@ -379,6 +379,10 @@ impl QueryRunner for NoticeRunner {
 
     fn generate(&self, params: &GenerateParams) -> Result<String, String> {
         self.inner.generate(params)
+    }
+
+    fn rename(&self, params: &RenameParams) -> Result<String, String> {
+        self.inner.rename(params)
     }
 }
 

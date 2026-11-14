@@ -90,6 +90,32 @@ impl Psr4 {
         (!ns.is_empty()).then_some(ns)
     }
 
+    /// Az osztály fájlja a PSR-4 térkép szerint (`App\Models\Charge` → `app/Models/Charge.php`): a leghosszabb
+    /// névtér-előtag nyer; nincs illeszkedő előtag → `None`.
+    pub fn rel_of(&self, fqcn: &str) -> Option<String> {
+        let (prefix, dir) = self
+            .entries
+            .iter()
+            .filter(|(prefix, _)| {
+                prefix.is_empty()
+                    || fqcn
+                        .strip_prefix(prefix.as_str())
+                        .is_some_and(|rest| rest.starts_with('\\'))
+            })
+            .max_by_key(|(prefix, _)| prefix.len())?;
+        let tail = if prefix.is_empty() {
+            fqcn
+        } else {
+            &fqcn[prefix.len() + 1..]
+        };
+        let path = tail.replace('\\', "/");
+        Some(if dir.is_empty() {
+            format!("{path}.php")
+        } else {
+            format!("{dir}/{path}.php")
+        })
+    }
+
     /// A fájl osztályának teljes neve (`app/Models/Order.php` → `App\Models\Order`).
     pub fn fqcn_of(&self, rel: &str) -> Option<String> {
         let ns = self.namespace_of(rel)?;

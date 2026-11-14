@@ -6,6 +6,7 @@ pub mod commands;
 mod generate_args;
 mod next_args;
 mod profile_args;
+mod rename_args;
 pub mod signatures;
 mod stats_args;
 pub mod strict;
@@ -144,6 +145,11 @@ pub fn build_command(args: CliArgs) -> Result<Box<dyn Command>> {
             crate::skill::SkillHome::from_env(),
         ))),
         CliArgs::Generate { request, project } => Ok(Box::new(commands::GenerateCommand::new(
+            request,
+            project,
+            crate::skill::SkillHome::from_env(),
+        ))),
+        CliArgs::Rename { request, project } => Ok(Box::new(commands::RenameCommand::new(
             request,
             project,
             crate::skill::SkillHome::from_env(),

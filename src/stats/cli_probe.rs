@@ -174,6 +174,7 @@ pub(crate) fn classify(args: &[String], client: Option<&str>) -> Option<(Command
         "deps" => CommandKind::Deps,
         "gen" => CommandKind::Generate,
         "undo" => CommandKind::Undo,
+        "rename" => CommandKind::Rename,
         "refresh" => CommandKind::Refresh,
         "callers" => CommandKind::Callers,
         "note" => CommandKind::Notes,

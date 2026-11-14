@@ -711,12 +711,26 @@ fn generate_tool_appears_only_when_enabled() {
     let mut off = Session::start_in(&dir);
     let tools = list(&mut off);
     assert_eq!(tools.len(), 12);
-    assert!(tools.iter().all(|t| t["name"] != "generate"));
+    assert!(
+        tools
+            .iter()
+            .all(|t| t["name"] != "generate" && t["name"] != "rename")
+    );
     drop(off);
 
     let mut on = Session::start_with(&dir, &[("CALLGRAPH_GENERATE", std::ffi::OsStr::new("1"))]);
     let tools = list(&mut on);
-    assert_eq!(tools.len(), 13);
+    assert_eq!(tools.len(), 14);
+    let rename = tools.iter().find(|t| t["name"] == "rename").unwrap();
+    assert_eq!(
+        rename["annotations"]["readOnlyHint"],
+        json!(false),
+        "{rename}"
+    );
+    assert!(
+        rename["description"].as_str().unwrap().chars().count() <= 200,
+        "{rename}"
+    );
     let generate = tools.iter().find(|t| t["name"] == "generate").unwrap();
     let a = &generate["annotations"];
     assert_eq!(

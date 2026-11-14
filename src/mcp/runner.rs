@@ -4,7 +4,7 @@
 use std::path::PathBuf;
 
 use super::guard::ProjectRoot;
-use super::params::GenerateParams;
+use super::params::{GenerateParams, RenameParams};
 use super::request::ShowQuery;
 use crate::cli::{CliArgs, build_command};
 use crate::skill::{ProjectRegistry, SkillHome};
@@ -57,6 +57,11 @@ pub(crate) trait QueryRunner: Send + Sync {
     fn generate(&self, params: &GenerateParams) -> Result<String, String> {
         let _ = params;
         Err(crate::t!("generate is not available", "a generate nem érhető el").into())
+    }
+    /// Biztonságos átnevezés (`rename` eszköz, opt-in, `crate::rename`): a CLI `rename` parancsának kimenete.
+    fn rename(&self, params: &RenameParams) -> Result<String, String> {
+        let _ = params;
+        Err(crate::t!("rename is not available", "a rename nem érhető el").into())
     }
 }
 
@@ -191,6 +196,14 @@ impl QueryRunner for ShowRunner {
     }
 
     fn generate(&self, params: &GenerateParams) -> Result<String, String> {
+        let root = self.root(params.project.as_deref())?;
+        let mut args = params.to_args();
+        args.push("--project".to_owned());
+        args.push(root.root().display().to_string());
+        Self::execute_plain(args)
+    }
+
+    fn rename(&self, params: &RenameParams) -> Result<String, String> {
         let root = self.root(params.project.as_deref())?;
         let mut args = params.to_args();
         args.push("--project".to_owned());

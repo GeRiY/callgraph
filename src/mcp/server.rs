@@ -15,7 +15,8 @@ use rmcp::{ServerHandler, tool, tool_handler, tool_router};
 
 use super::params::{
     FindCallersParams, FrameworkViewParams, GenerateParams, LocateParams, MethodBodyParams,
-    NextParams, NotesParams, OutlineParams, PackageUsageParams, ProfileParams, SearchParams,
+    NextParams, NotesParams, OutlineParams, PackageUsageParams, ProfileParams, RenameParams,
+    SearchParams,
 };
 use super::request::ShowQuery;
 use super::runner::QueryRunner;
@@ -39,6 +40,7 @@ impl CallgraphServer {
         // az egyetlen író eszköz alapból nincs a listán (a „csak olvas” ígéret a meglévő telepítéseknél változatlan)
         if !crate::generate::enabled() {
             tool_router.remove_route("generate");
+            tool_router.remove_route("rename");
         }
         Self {
             runner,
@@ -325,6 +327,26 @@ impl CallgraphServer {
             .await
             .unwrap_or_else(|e| Err(e.to_string()));
         let call = Self::plain(CommandKind::Generate, started, project.as_deref());
+        self.finish(&call, result)
+    }
+
+    #[tool(
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            idempotent_hint = false,
+            open_world_hint = false
+        ),
+        description = "Rename safely across the whole project: route (Laravel name or 'a.*' prefix), class (PHP FQCN, moves file) or method (Class::method). One line per file, backups, one undo. dry previews."
+    )]
+    async fn rename(&self, Parameters(p): Parameters<RenameParams>) -> CallToolResult {
+        let started = Instant::now();
+        let project = p.project.clone();
+        let runner = Arc::clone(&self.runner);
+        let result = tokio::task::spawn_blocking(move || runner.rename(&p))
+            .await
+            .unwrap_or_else(|e| Err(e.to_string()));
+        let call = Self::plain(CommandKind::Rename, started, project.as_deref());
         self.finish(&call, result)
     }
 

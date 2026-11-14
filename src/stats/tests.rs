@@ -249,12 +249,12 @@ fn report_is_short_and_shows_the_locate_hit_rate() {
     store.record_hit(today, RankBucket::NotListed);
     let totals = store.totals(today.minus(6), today);
     let text = render(&totals, today, 7, &dir, true);
-    assert!(text.lines().count() <= 26, "{text}");
+    assert!(text.lines().count() <= 27, "{text}");
     assert!(text.contains("2026-10-31"), "{text}");
     let lang = crate::i18n::lang();
     assert!(text.contains(lang.pick("1 of 2", "1 / 2")), "{text}");
     assert!(text.contains("CALLGRAPH_STATS=0"), "{text}");
-    assert!(text.contains("mcp 20, cli 1"), "{text}");
+    assert!(text.contains("mcp 21, cli 1"), "{text}");
 
     let empty = render(&Default::default(), today, 7, &dir, false);
     assert_eq!(empty.lines().count(), 3, "{empty}");

@@ -97,3 +97,8 @@ pub fn component_path(env: crate::generate::Env<'_>, name: &str) -> Option<Strin
 pub fn check_sfc(text: &str) -> Result<(), String> {
     check::check_vue(text).map_err(|p| format!("{} L{}: {}", p.section, p.line, p.message))
 }
+
+/// Egy kész `.js` / `.ts` fájl szintaxis-ellenőrzése (oxc); hiba: egy sor.
+pub fn check_script(rel: &str, text: &str) -> Result<(), String> {
+    check::check_script_file(rel, text).map_err(|p| format!("L{}: {}", p.line, p.message))
+}
