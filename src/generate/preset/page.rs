@@ -39,6 +39,8 @@ pub struct Parts {
     pub input: Option<String>,
     pub error: Option<String>,
     pub button: Option<String>,
+    /// Van-e Ziggy (`tightenco/ziggy` / `ziggy-js`): `route('név')`; különben sima URL-ek (`'/fees'`).
+    pub ziggy: bool,
 }
 
 /// Egy oldal bemenete.
@@ -122,6 +124,25 @@ impl Page<'_> {
     fn known(&self, op: Op) -> Option<String> {
         let name = self.names.route_name(op);
         self.routes.contains(&name).then_some(name)
+    }
+
+    /// A művelet címe JS-kifejezésként: Ziggy-vel `route('fees.edit', id)`, nélküle `` `/fees/${id}/edit` ``.
+    fn href(&self, op: Op, id: Option<&str>) -> String {
+        let name = self.names.route_name(op);
+        if self.parts.ziggy {
+            return match id {
+                Some(id) => format!("route('{name}', {id})"),
+                None => format!("route('{name}')"),
+            };
+        }
+        let uri = self.names.route_uri(op);
+        match id {
+            Some(id) => {
+                let param = format!("{{{}}}", self.names.var);
+                format!("`{}`", uri.replace(&param, &format!("${{{id}}}")))
+            }
+            None => format!("'{uri}'"),
+        }
     }
 
     fn is_form(&self) -> bool {
@@ -209,7 +230,7 @@ impl Page<'_> {
             Kind::Create => {
                 self.form_decl(out, None);
                 out.push(0, "");
-                self.submit_fn(out, "post", &self.names.route_name(Op::Store), None);
+                self.submit_fn(out, "post", Op::Store, None);
             }
             Kind::Edit => {
                 self.props_decl(out, true);
@@ -217,21 +238,19 @@ impl Page<'_> {
                 self.form_decl(out, Some(self.names.var.as_str()));
                 out.push(0, "");
                 let id = format!("props.{}.id", self.names.var);
-                self.submit_fn(
-                    out,
-                    "put",
-                    &self.names.route_name(Op::Update),
-                    Some(id.as_str()),
-                );
+                self.submit_fn(out, "put", Op::Update, Some(id.as_str()));
             }
             Kind::Index => {
                 self.props_decl(out, false);
-                if let Some(route) = self.known(Op::Destroy) {
+                if self.known(Op::Destroy).is_some() {
                     out.push(0, "");
                     let arg = if self.facts.ts { "id: number" } else { "id" };
                     out.push(0, format!("const destroy = ({arg}) => {{"));
                     out.push(1, "if (confirm('Delete this item?')) {");
-                    out.push(2, format!("router.delete(route('{route}', id)){e}"));
+                    out.push(
+                        2,
+                        format!("router.delete({}){e}", self.href(Op::Destroy, Some("id"))),
+                    );
                     out.push(1, "}");
                     out.push(0, format!("}}{e}"));
                 }
@@ -254,13 +273,10 @@ impl Page<'_> {
         out.push(0, format!("}}){}", self.semi()));
     }
 
-    fn submit_fn(&self, out: &mut Out, verb: &str, route: &str, id: Option<&str>) {
+    fn submit_fn(&self, out: &mut Out, verb: &str, op: Op, id: Option<&str>) {
         let e = self.semi();
         out.push(0, "const submit = () => {");
-        match id {
-            Some(id) => out.push(1, format!("form.{verb}(route('{route}', {id})){e}")),
-            None => out.push(1, format!("form.{verb}(route('{route}')){e}")),
-        }
+        out.push(1, format!("form.{verb}({}){e}", self.href(op, id)));
         out.push(0, format!("}}{e}"));
     }
 
@@ -456,12 +472,13 @@ impl Page<'_> {
 
     fn index_body(&self, out: &mut Out, level: usize) {
         let vars = &self.names.vars;
-        if let Some(route) = self.known(Op::Create) {
+        if self.known(Op::Create).is_some() {
             out.push(level, "<div class=\"mb-4 flex justify-end\">");
             out.push(
                 level + 1,
                 format!(
-                    "<Link :href=\"route('{route}')\" class=\"rounded-md bg-gray-800 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white\">New {}</Link>",
+                    "<Link :href=\"{}\" class=\"rounded-md bg-gray-800 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white\">New {}</Link>",
+                    self.href(Op::Create, None),
                     humanize_model(&self.names.model)
                 ),
             );
@@ -509,16 +526,22 @@ impl Page<'_> {
         if actions {
             out.push(level + 4, "<td class=\"px-4 py-3 text-right text-sm\">");
             let link = "class=\"ml-3 text-indigo-600 hover:text-indigo-900\"";
-            if let Some(route) = show {
+            if show.is_some() {
                 out.push(
                     level + 5,
-                    format!("<Link :href=\"route('{route}', item.id)\" {link}>Show</Link>"),
+                    format!(
+                        "<Link :href=\"{}\" {link}>Show</Link>",
+                        self.href(Op::Show, Some("item.id"))
+                    ),
                 );
             }
-            if let Some(route) = edit {
+            if edit.is_some() {
                 out.push(
                     level + 5,
-                    format!("<Link :href=\"route('{route}', item.id)\" {link}>Edit</Link>"),
+                    format!(
+                        "<Link :href=\"{}\" {link}>Edit</Link>",
+                        self.href(Op::Edit, Some("item.id"))
+                    ),
                 );
             }
             if destroy.is_some() {

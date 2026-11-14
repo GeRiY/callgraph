@@ -203,6 +203,9 @@ Kódgenerátor (fájlt ír; az MCP `generate` eszköz alapból ki van, a szerver
       --into x.html [--after L12 | ::#id | ::.class | ::tag] (alapból a <body> vége)  --replace x.html:L5-L9 | x.html::#id; duplikált id = figyelmeztetés
     Laravel-funkció: gen 'laravel:Fee[auth]>create(name:str,amount:int,paid?:bool)+edit+index'  (request, controller,
       route-ok, Inertia-oldalak; ellenőrzi az űrlap ↔ szabályok egyezését és a modell oszlopait; egy undo minden fájlt visszavon)
+      mezőtípusok: str (max:255) text (hosszú szöveg, max nélkül) int float bool date datetime email; név? = nem kötelező;
+      Ziggy (tightenco/ziggy / ziggy-js) nélkül az oldalak route('…') helyett sima URL-eket használnak
+    --expect <előtag>: csak a --replace-szel; a lecserélt sorok (nem a teljes fájl) sha256-ja; eltérésnél kiírja a jelenlegit
   bash ~/.claude/skills/callgraph/callgraph.sh rename route|class|method <régi> <új> [--dry] [--strings] [--keep-table]
     route-nevek ('profile.*' = az egész csoport, resource route-ok ->names()-szel), PHP-osztályok (fájl-áthelyezés, use,
     ::class, típusok), PHP-metódusok (feloldott hívások, felülírások, route-akciók) PHP / Blade / JS / Vue fájlokban; a

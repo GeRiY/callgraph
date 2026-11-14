@@ -200,6 +200,9 @@ Code generator (writes files; the MCP `generate` tool is off unless the server r
       --into x.html [--after L12 | ::#id | ::.class | ::tag] (default: end of <body>)  --replace x.html:L5-L9 | x.html::#id; duplicate id = warning
     Laravel feature: gen 'laravel:Fee[auth]>create(name:str,amount:int,paid?:bool)+edit+index'  (request, controller,
       routes, Inertia pages; checks form ↔ rules and the model's columns; one undo reverts all files)
+      field types: str (max:255) text (long text, no max) int float bool date datetime email; name? = optional;
+      without Ziggy (tightenco/ziggy / ziggy-js) the pages use plain URLs instead of route('…')
+    --expect <prefix>: only with --replace; sha256 of the replaced lines (not the whole file); a mismatch prints the current one
   bash ~/.claude/skills/callgraph/callgraph.sh rename route|class|method <old> <new> [--dry] [--strings] [--keep-table]
     route names ('profile.*' = whole group, resource routes via ->names()), PHP classes (file move, use, ::class, types),
     PHP methods (resolved calls, overrides, route actions) across PHP / Blade / JS / Vue; dynamic references are only

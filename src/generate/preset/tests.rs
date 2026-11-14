@@ -111,7 +111,8 @@ fn env<'a>(fs: &'a MemFs, clock: &'a FixedClock) -> Env<'a> {
     }
 }
 
-const COMPOSER: &str = r#"{"autoload":{"psr-4":{"App\\":"app/"}}}"#;
+const COMPOSER: &str =
+    r#"{"require":{"tightenco/ziggy":"^2.0"},"autoload":{"psr-4":{"App\\":"app/"}}}"#;
 
 const WEB: &str = "<?php
 
@@ -619,6 +620,68 @@ fn a_missing_model_is_reported_not_generated() {
     assert!(page.contains("<label for=\"name\""));
     assert!(page.contains("<button type=\"submit\" :disabled=\"form.processing\""));
     assert!(!page.contains("AuthenticatedLayout"));
+}
+
+#[test]
+fn without_ziggy_the_pages_use_plain_urls() {
+    let fs = project();
+    fs.put(
+        "composer.json",
+        r#"{"autoload":{"psr-4":{"App\\":"app/"}}}"#,
+    );
+    let clock = FixedClock(Cell::new(T0));
+    run(
+        &fs,
+        &clock,
+        "laravel:Fee>create(name:str)+edit+index+show+destroy",
+        false,
+    )
+    .unwrap();
+    let pages = ["Create", "Edit", "Index", "Show"]
+        .map(|p| fs.get(&format!("resources/js/Pages/Fees/{p}.vue")).unwrap());
+    for page in &pages {
+        assert!(!page.contains("route("), "{page}");
+    }
+    assert!(pages[0].contains("form.post('/fees')"), "{}", pages[0]);
+    assert!(
+        pages[1].contains("form.put(`/fees/${props.fee.id}`)"),
+        "{}",
+        pages[1]
+    );
+    let index = &pages[2];
+    assert!(index.contains("<Link :href=\"'/fees/create'\""), "{index}");
+    assert!(
+        index.contains(":href=\"`/fees/${item.id}/edit`\""),
+        "{index}"
+    );
+    assert!(index.contains(":href=\"`/fees/${item.id}`\""), "{index}");
+    assert!(index.contains("router.delete(`/fees/${id}`)"), "{index}");
+
+    // hosszú szövegnek tűnő `str` mezőre javaslat
+    let fs2 = project();
+    let out = run(
+        &fs2,
+        &clock,
+        "laravel:Fee>create(name:str,body:str,note:text)",
+        false,
+    )
+    .unwrap();
+    assert!(out.contains("body:text"), "{out}");
+    assert!(
+        !out.contains("name:text") && !out.contains("note:text"),
+        "{out}"
+    );
+
+    // a package.json `ziggy-js`-e is elég
+    let fs = project();
+    fs.put(
+        "composer.json",
+        r#"{"autoload":{"psr-4":{"App\\":"app/"}}}"#,
+    );
+    fs.put("package.json", r#"{"dependencies":{"ziggy-js":"^2.0"}}"#);
+    run(&fs, &clock, "laravel:Fee>create(name:str)", false).unwrap();
+    let page = fs.get("resources/js/Pages/Fees/Create.vue").unwrap();
+    assert!(page.contains("form.post(route('fees.store'))"), "{page}");
 }
 
 // ---- tranzakció ----

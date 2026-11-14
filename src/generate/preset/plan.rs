@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 
 use super::page::{Kind, Page, Parts};
 use super::php::{self, ControllerCtx};
-use super::spec::{Action, Field, Names, Op, Spec};
+use super::spec::{Action, Field, FieldType, Names, Op, Spec};
 use crate::generate::edit::{add_imports, insert_at_end, join_lines, split_lines};
 use crate::generate::emitter::Emitter;
 use crate::generate::error::{GenError, GenResult};
@@ -17,6 +17,20 @@ use crate::packages::frameworks::laravel::preset as laravel;
 
 /// A route-fájl, amelybe a preset a route-okat írja.
 const ROUTES_FILE: &str = "routes/web.php";
+
+/// Hosszú szövegnek szokott mezőnevek (a `str` típusukra a `:text`-et javasoljuk).
+const LONG_TEXT: &[&str] = &[
+    "body",
+    "content",
+    "description",
+    "text",
+    "notes",
+    "message",
+    "comment",
+    "bio",
+    "summary",
+    "details",
+];
 
 /// Egy érintett fájl.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -129,7 +143,18 @@ fn parts(env: Env<'_>) -> Parts {
         input: path("TextInput"),
         error: path("InputError"),
         button: path("PrimaryButton"),
+        ziggy: has_ziggy(env),
     }
+}
+
+/// Ziggy a projektben: `tightenco/ziggy` a composer.json-ban vagy `ziggy-js` a package.json-ban.
+fn has_ziggy(env: Env<'_>) -> bool {
+    let mentions = |rel: &str, needle: &str| {
+        env.fs
+            .read(&env.root.join(rel))
+            .is_ok_and(|text| text.contains(needle))
+    };
+    mentions("composer.json", "\"tightenco/ziggy\"") || mentions("package.json", "\"ziggy-js\"")
 }
 
 /// Az utolsó nem üres sor után, egy üres sorral elválasztva; a záró újsor megmarad.
@@ -409,6 +434,21 @@ pub fn build(env: Env<'_>, spec: &Spec) -> GenResult<Plan> {
         model_class,
         ..Plan::default()
     };
+
+    // hosszú szövegnek tűnő `str` mező: a `max:255` valószínűleg nem kell
+    let long: BTreeSet<&str> = [Action::Create, Action::Edit]
+        .into_iter()
+        .filter_map(|action| spec.fields_of(action))
+        .flatten()
+        .filter(|f| f.ty == FieldType::Str && LONG_TEXT.contains(&f.name.as_str()))
+        .map(|f| f.name.as_str())
+        .collect();
+    for name in long {
+        plan.notes.push(crate::tf!(
+            "{name}:str means max:255; for long text use {name}:text",
+            "{name}:str = max:255; hosszú szöveghez {name}:text"
+        ));
+    }
 
     // 1. kérés-osztályok
     let pipe = pipe_style(env);
