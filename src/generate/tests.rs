@@ -468,12 +468,15 @@ fn walk_is_lazy_and_skips_vendor() {
         ("app/Z/C.php", ""),
         ("app/readme.md", ""),
     ]);
+    // az elválasztó platformfüggő (Windows: `\`): normalizált összevetés
     let found: Vec<String> = walk_php(&fs, Path::new(ROOT).join("app"))
-        .map(|p| p.display().to_string())
+        .map(|p| p.display().to_string().replace('\\', "/"))
         .collect();
     assert_eq!(found, ["/p/app/A.php", "/p/app/Z/C.php"]);
-    let first = walk_php(&fs, Path::new(ROOT).join("app")).next();
-    assert_eq!(first, Some(PathBuf::from("/p/app/A.php")));
+    let first = walk_php(&fs, Path::new(ROOT).join("app"))
+        .next()
+        .map(|p| p.display().to_string().replace('\\', "/"));
+    assert_eq!(first.as_deref(), Some("/p/app/A.php"));
 }
 
 #[test]

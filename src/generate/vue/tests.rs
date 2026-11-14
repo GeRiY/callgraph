@@ -32,11 +32,16 @@ impl MemFs {
     }
 
     fn has_backup_of(&self, rel: &str) -> bool {
-        let prefix = Path::new(ROOT).join(".callgraph/backups").join(rel);
+        // az elválasztó platformfüggő (Windows: `\`): normalizált összevetés
+        let prefix = Path::new(ROOT)
+            .join(".callgraph/backups")
+            .join(rel)
+            .to_string_lossy()
+            .replace('\\', "/");
         self.files
             .borrow()
             .keys()
-            .any(|p| p.to_string_lossy().starts_with(&*prefix.to_string_lossy()))
+            .any(|p| p.to_string_lossy().replace('\\', "/").starts_with(&prefix))
     }
 }
 

@@ -235,7 +235,12 @@ fn locate_gives_the_render_site_a_page_reason() {
     let project = board(COMPOSER_JSON, PACKAGE_JSON);
     let out = project.run(&["locate", "Board", "--all"]);
     assert!(out.contains("page ← BoardController::show"), "{out}");
-    assert!(out.contains("resources/js/Pages/Board.vue"), "{out}");
+    // Windows-on a locate `\`-rel írja az utat
+    assert!(
+        out.replace('\\', "/")
+            .contains("resources/js/Pages/Board.vue"),
+        "{out}"
+    );
     let users = project.run(&["locate", "Users/Index", "--all"]);
     assert!(users.contains("page ← BoardController::index"), "{users}");
 }
