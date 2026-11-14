@@ -2,6 +2,7 @@
 //! yyyymmddThhmmss>.bak` fájlba kerül (a projekt mappái között nem marad szemét, és a `.callgraph/` gitignore-olt);
 //! fájlonként az utolsó 10 marad. Az `undo` ugyanebből állít vissza.
 
+use std::fmt::Write;
 use std::path::{Path, PathBuf};
 
 use super::error::{GenError, GenResult};
@@ -11,6 +12,25 @@ use crate::project::STORE_DIR;
 
 /// Fájlonként ennyi mentés marad.
 pub const KEEP: usize = 10;
+
+/// A legutóbbi csoportos írás (preset) naplója a mentések mappájában; a neve nem `.bak`, ezért a mentés-listák
+/// nem látják.
+const JOURNAL: &str = ".last-group";
+
+/// A csoportos írás egy fájlja: új fájl (`backup: None`) vagy meglévő felülírása (a mentés projekt-relatív útja).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct JournalEntry {
+    pub rel: String,
+    pub backup: Option<String>,
+}
+
+/// A csoportos írás naplója: az `undo` ebből állítja vissza egy lépésben az összes fájlt.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Journal {
+    /// Az írás időbélyege (a csak új fájlokat író csoportnál a „mikor” jelzője).
+    pub mark: String,
+    pub entries: Vec<JournalEntry>,
+}
 
 /// A mentések kezelője.
 pub struct Backups<'a> {
@@ -27,6 +47,12 @@ fn valid_stamp(text: &str) -> bool {
                 b.is_ascii_digit()
             }
         })
+}
+
+/// A mentés útjának időbélyege.
+fn stamp_of(path: &str) -> Option<String> {
+    let name = path.rsplit('/').next()?;
+    split_name(name).map(|(_, s)| s.to_owned())
 }
 
 /// A mentés-fájl nevéből a `(fájlnév, időbélyeg)` pár.
@@ -141,6 +167,88 @@ impl<'a> Backups<'a> {
         })?;
         self.prune(rel);
         Ok(relative(self.env.root, &target).unwrap_or_else(|| target.display().to_string()))
+    }
+
+    /// A csoportos írás naplójának mentése (a `Written` sorok: `(fájl, mentés)`).
+    pub fn write_journal(&self, entries: &[JournalEntry]) -> GenResult<()> {
+        let mark = entries
+            .iter()
+            .filter_map(|e| e.backup.as_deref().and_then(stamp_of))
+            .max()
+            .unwrap_or_else(|| stamp(self.env.clock.now_secs()));
+        let mut text = format!("{mark}\n");
+        for entry in entries {
+            match &entry.backup {
+                Some(backup) => {
+                    let _ = writeln!(text, "edit\t{}\t{backup}", entry.rel);
+                }
+                None => {
+                    let _ = writeln!(text, "new\t{}", entry.rel);
+                }
+            }
+        }
+        self.env
+            .fs
+            .write(&self.dir().join(JOURNAL), &text)
+            .map_err(|e| {
+                GenError::new(crate::tf!(
+                    "cannot write the undo journal under {}: {}",
+                    "nem írható az undo-napló ide: {}: {}",
+                    STORE_DIR,
+                    e
+                ))
+            })
+    }
+
+    fn read_journal(&self) -> Option<Journal> {
+        let text = self.env.fs.read(&self.dir().join(JOURNAL)).ok()?;
+        let mut lines = text.lines();
+        let mark = lines.next()?.trim().to_owned();
+        if !valid_stamp(&mark) {
+            return None;
+        }
+        let mut entries = Vec::new();
+        for line in lines {
+            let mut parts = line.split('\t');
+            match (parts.next(), parts.next(), parts.next()) {
+                (Some("new"), Some(rel), None) => entries.push(JournalEntry {
+                    rel: rel.to_owned(),
+                    backup: None,
+                }),
+                (Some("edit"), Some(rel), Some(backup)) => entries.push(JournalEntry {
+                    rel: rel.to_owned(),
+                    backup: Some(backup.to_owned()),
+                }),
+                _ => {}
+            }
+        }
+        (!entries.is_empty()).then_some(Journal { mark, entries })
+    }
+
+    /// A napló, ha még „aktuális”: a legutóbbi mentés a csoporté (vagy az utolsó mentés nem újabb a csoportnál).
+    /// Egy későbbi, egyfájlos szerkesztés új mentést hagy maga után, ettől a napló lejár, és az `undo` újra a
+    /// legutóbbi egyetlen fájlt állítja vissza.
+    pub fn current_journal(&self) -> Option<Journal> {
+        let journal = self.read_journal()?;
+        let Some((_, newest)) = self.newest_overall() else {
+            return Some(journal);
+        };
+        let newest = relative(self.env.root, &newest)?;
+        let own = journal.entries.iter().any(|e| e.backup.is_some());
+        let current = if own {
+            journal
+                .entries
+                .iter()
+                .any(|e| e.backup.as_deref() == Some(newest.as_str()))
+        } else {
+            stamp_of(&newest).is_none_or(|s| s <= journal.mark)
+        };
+        current.then_some(journal)
+    }
+
+    /// A napló törlése (a visszaállítás után).
+    pub fn clear_journal(&self) {
+        let _ = self.env.fs.remove(&self.dir().join(JOURNAL));
     }
 
     /// A régi mentések törlése: fájlonként a legújabb `KEEP` marad.

@@ -401,7 +401,7 @@ fn relations_of(clean: &str) -> Vec<Relation> {
 }
 
 /// Egy osztály modell-tényei a (megtisztított) osztálytörzsből.
-fn parse_model(class: &str, file: &str, clean: &str) -> Model {
+pub(super) fn parse_model(class: &str, file: &str, clean: &str) -> Model {
     static TABLE: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(r#"(?:protected|public|private)\s+(?:\?string\s+|string\s+)?\$table\s*=\s*['"]([^'"]+)['"]"#)
             .expect("valid regex")

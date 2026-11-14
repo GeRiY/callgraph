@@ -4,6 +4,8 @@
 
 use std::path::{Path, PathBuf};
 
+use super::edit::indent_unit;
+use crate::generate::edit::split_lines;
 use crate::generate::fs::FileSystem;
 
 /// Hány `.vue` fájlt mintázunk a stílushoz.
@@ -136,6 +138,26 @@ impl<'a> VueProject<'a> {
             ts,
             semi: with >= without,
         }
+    }
+
+    /// A projekt behúzás-egysége (2 vagy 4): az első olyan `.vue` fájlból, amelyben van behúzott sor; minta nélkül 4
+    /// (a Laravel / Breeze alapértéke).
+    pub fn indent(&self) -> usize {
+        let files = self
+            .sample_roots()
+            .into_iter()
+            .flat_map(|dir| walk_vue(self.fs, dir))
+            .take(SAMPLE);
+        for file in files {
+            let Ok(text) = self.fs.read(&file) else {
+                continue;
+            };
+            let (lines, _) = split_lines(&text);
+            if lines.iter().any(|l| l.starts_with(' ')) {
+                return indent_unit(&lines);
+            }
+        }
+        4
     }
 
     /// A `<Név>.vue` komponens import-útja (`@/Components/Card.vue`), ha a projektben van ilyen fájl.

@@ -227,7 +227,7 @@ pub(super) fn extract(rel: &str, text: &str, calls: &[Call]) -> Vec<Site> {
 
 /// Egy objektum-literál felső szintű kulcsai: `{ name: '', 'e-mail': '', password }`; ha az argumentum nem
 /// literál, vagy egy elem spread / számított kulcs: `None`.
-fn object_keys(arg: &str) -> Option<Vec<String>> {
+pub(super) fn object_keys(arg: &str) -> Option<Vec<String>> {
     let inner = arg.trim().strip_prefix('{')?.strip_suffix('}')?;
     let mut keys = Vec::new();
     for entry in split_top(inner, ",") {
@@ -267,7 +267,7 @@ fn uri_matches(uri: &str, segments: &[&str]) -> bool {
 }
 
 /// Az összevetés: (validálatlan mezők, kötelező, de nem küldött kulcsok).
-fn compare(fields: &[String], validation: &Validation) -> (Vec<String>, Vec<String>) {
+pub(super) fn compare(fields: &[String], validation: &Validation) -> (Vec<String>, Vec<String>) {
     let unvalidated = fields
         .iter()
         .filter(|field| {

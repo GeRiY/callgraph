@@ -569,7 +569,7 @@ impl<'a, E: Emitter> Generator<'a, E> {
 }
 
 /// A `--into` célosztálya: a megnevezett, vagy az egyetlen a fájlban.
-fn pick_container<'g>(
+pub(super) fn pick_container<'g>(
     graph: &'g FileGraph,
     class: Option<&str>,
     rel: &str,

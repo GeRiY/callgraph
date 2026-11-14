@@ -21,7 +21,7 @@ mod builder;
 mod cache;
 mod deps;
 mod files;
-mod frameworks;
+pub(crate) mod frameworks;
 mod model;
 mod project;
 mod registry;

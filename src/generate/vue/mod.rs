@@ -68,3 +68,32 @@ mod types;
 mod tests;
 
 pub use generator::{VueGenerator, wants_vue};
+
+/// A projekt Vue-stílusa a preset számára: TypeScript-e, pontosvesszős-e, és a behúzás-egység.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ProjectFacts {
+    pub ts: bool,
+    pub semi: bool,
+    pub unit: usize,
+}
+
+/// A projekt kódstílusa és behúzása (a meglévő `.vue` fájlokból).
+pub fn project_facts(env: crate::generate::Env<'_>) -> ProjectFacts {
+    let project = project::VueProject::new(env.fs, env.root);
+    let style = project.code_style();
+    ProjectFacts {
+        ts: style.ts,
+        semi: style.semi,
+        unit: project.indent(),
+    }
+}
+
+/// A `<név>.vue` komponens import-útja (`@/Components/Név.vue`), ha a projektben van ilyen fájl.
+pub fn component_path(env: crate::generate::Env<'_>, name: &str) -> Option<String> {
+    project::VueProject::new(env.fs, env.root).find_component(name)
+}
+
+/// Egy kész `.vue` szöveg ellenőrzése (script: oxc, template: tag-egyensúly, style: CSS-parser); hiba: egy sor.
+pub fn check_sfc(text: &str) -> Result<(), String> {
+    check::check_vue(text).map_err(|p| format!("{} L{}: {}", p.section, p.line, p.message))
+}

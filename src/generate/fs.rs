@@ -80,7 +80,13 @@ impl FileSystem for RealFs {
     }
 
     fn remove(&self, path: &Path) -> io::Result<()> {
-        std::fs::remove_file(path)
+        std::fs::remove_file(path)?;
+        // a generálás által létrehozott, most kiürült mappa (`Pages/Fees/`) is megy; nem üres mappánál a
+        // `remove_dir` hibát ad, azt elnyeljük
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::remove_dir(parent);
+        }
+        Ok(())
     }
 
     fn is_protected(&self, path: &Path) -> bool {

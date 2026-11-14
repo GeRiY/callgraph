@@ -7,7 +7,8 @@ use std::io::Write;
 use crate::cli::Command;
 use crate::error::Result;
 use crate::generate::{
-    Env, GenRequest, Generator, PhpEmitter, RealFs, SystemClock, VueGenerator, wants_vue,
+    Env, GenRequest, Generator, PhpEmitter, PresetGenerator, RealFs, SystemClock, VueGenerator,
+    wants_preset, wants_vue,
 };
 use crate::skill::SkillHome;
 
@@ -37,7 +38,10 @@ impl Command for GenerateCommand {
             clock: &SystemClock,
         };
         // Vue / JS / TS: a cél-fájl kiterjesztése (vagy cél nélkül a kifejezés feje) dönt; minden más a PHP-generátoré
-        let result = if wants_vue(&self.request) {
+        // `laravel:` fejű kifejezés: preset (több fájl, egy tranzakció)
+        let result = if wants_preset(&self.request) {
+            PresetGenerator::new(env).run(&self.request)
+        } else if wants_vue(&self.request) {
             VueGenerator::new(env).run(&self.request)
         } else {
             Generator::new(env, PhpEmitter).run(&self.request)

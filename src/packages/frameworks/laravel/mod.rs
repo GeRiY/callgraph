@@ -10,6 +10,7 @@
 
 mod forms;
 mod models;
+pub(crate) mod preset;
 mod routes;
 mod rules;
 mod schema;

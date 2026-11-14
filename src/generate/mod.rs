@@ -24,6 +24,8 @@
 //!   `név(Típus $p=3):Típus{törzs}`, `ctor(-Client $http)` (a láthatóság-előtagos paraméter promoted property),
 //!   `$név:Típus=érték`, `K=érték`
 //! - direktíva: `ns:App\Services`, `use:Foo\Bar,Baz\Qux as Q`
+//! - preset: `laravel:Fee[auth]>create(name:str,amount:int,paid?:bool)+edit+index` — egy kifejezésből FormRequest +
+//!   controller + route-ok + Inertia / Vue oldalak, egy tranzakcióban és egy `undo` lépéssel (lásd `preset`)
 //! - típusok: `int float bool str bytes void mixed`, `list<T>`, `map<K,V>`, `opt<T>` / `?T`, `iter<T>`, `A|B`,
 //!   felhasználói és natív PHP-nevek (`string`, `array`, `self` …)
 
@@ -39,6 +41,7 @@ pub mod head;
 pub mod lexer;
 pub mod parser;
 pub mod php;
+pub mod preset;
 pub mod project;
 pub mod resolve;
 pub mod vue;
@@ -51,6 +54,7 @@ pub use error::{GenError, GenResult};
 pub use fs::{Clock, Env, FileSystem, RealFs, SystemClock};
 pub use generator::{GenRequest, Generator, Output, ReplaceAt, Target};
 pub use php::PhpEmitter;
+pub use preset::{PresetGenerator, wants_preset};
 pub use vue::{VueGenerator, wants_vue};
 
 /// A globális kapcsoló (`callgraph mcp --generate`).
