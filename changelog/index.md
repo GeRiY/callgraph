@@ -8,9 +8,9 @@ Every release with its date, newest first: what was added, changed and fixed. Do
 
 [Install the latest version](https://callgraph.eu/#install)[Latest release on GitHub](https://github.com/GeRiY/callgraph/releases/latest)
 
-## v0.10.0 — 2026-11-16
+## v1.0.0 — 2026-11-16
 
-[Release notes and downloads on GitHub](https://github.com/GeRiY/callgraph/releases/tag/v0.10.0)
+[Release notes and downloads on GitHub](https://github.com/GeRiY/callgraph/releases/tag/v1.0.0)
 
 ### Added
 
