@@ -45,6 +45,82 @@ pub struct TypeField {
     pub ty: TypeRef,
 }
 
+/// Egy modul-szintű tag exportja: `-fn:x` nem exportált, `!fn:x` `export default`, egyébként nevesített export.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Export {
+    Named,
+    None,
+    Default,
+}
+
+/// Osztálytag láthatósága: `+` public, `-` private, `#` protected.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Vis {
+    Public,
+    Private,
+    Protected,
+}
+
+/// Konstruktor-paraméter: a láthatóság-előtagos (`-dep:Repo`, `+n:int=3`) TS-ben paraméter-property, JS-ben
+/// `this.x = x` értékadás.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CtorParam {
+    pub param: VParam,
+    pub vis: Option<Vis>,
+    pub readonly: bool,
+}
+
+/// Az osztálytag fajtája.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ClassKind {
+    Ctor {
+        params: Vec<CtorParam>,
+        body: Option<String>,
+    },
+    Field {
+        name: String,
+        ty: Option<TypeRef>,
+        init: Option<String>,
+    },
+    Method {
+        name: String,
+        params: Vec<VParam>,
+        ret: Option<TypeRef>,
+        body: Option<String>,
+        is_async: bool,
+    },
+}
+
+/// Egy osztálytag: `+name(a:int):R{…}`, `-$secret:str`, `%$id:str`, `::make()`, `~run()`, `ctor(-dep:Repo)`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ClassMember {
+    pub vis: Vis,
+    pub is_static: bool,
+    pub is_abstract: bool,
+    pub readonly: bool,
+    pub kind: ClassKind,
+}
+
+impl ClassMember {
+    /// A tag neve (a konstruktoré `constructor`).
+    pub fn name(&self) -> &str {
+        match &self.kind {
+            ClassKind::Ctor { .. } => "constructor",
+            ClassKind::Field { name, .. } | ClassKind::Method { name, .. } => name,
+        }
+    }
+}
+
+/// `class:Név<Ős>[A,B]>…`: osztály-deklaráció.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ClassDecl {
+    pub name: String,
+    pub is_abstract: bool,
+    pub extends: Option<String>,
+    pub implements: Vec<String>,
+    pub members: Vec<ClassMember>,
+}
+
 /// A script egy tagja.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Member {
@@ -82,6 +158,18 @@ pub enum Member {
         name: String,
         fields: Vec<TypeField>,
     },
+    /// `type:Név=A|B` → TS `type Név = A | B`, JS-ben JSDoc `@typedef {A|B} Név`.
+    Alias {
+        name: String,
+        ty: TypeRef,
+    },
+    /// `class:Név<Ős>[A,B]>…` (modul-szintű osztály).
+    Class(Box<ClassDecl>),
+    /// Modul-szintű export-módosító: `-…` (nem exportált) vagy `!…` (`export default`).
+    Exported {
+        export: Export,
+        member: Box<Member>,
+    },
     /// `raw{ utasítás(ok) }`: szó szerint kiírt sorok.
     Raw(String),
     /// `const:{ a, b }=useX()`: `names` a kötött nevek, `pattern` a kapcsos zárójelek közti szöveg.
@@ -99,9 +187,25 @@ pub enum Member {
 }
 
 impl Member {
+    /// Csak Vue-komponensben / composable-ben értelmes tag (props, emits, ref, computed, form, `on:`).
+    pub fn is_vue_only(&self) -> bool {
+        match self {
+            Self::Props(_)
+            | Self::Emits(_)
+            | Self::Ref { .. }
+            | Self::Computed { .. }
+            | Self::Form { .. }
+            | Self::Hook { .. } => true,
+            Self::Exported { member, .. } => member.is_vue_only(),
+            _ => false,
+        }
+    }
+
     /// A tag által bevezetett név (a composable `return { … }`-jához); a props / emits / horog nem ad nevet.
     pub fn declared_name(&self) -> Option<&str> {
         match self {
+            Self::Class(c) => Some(c.name.as_str()),
+            Self::Exported { member, .. } => member.declared_name(),
             Self::Ref { name, .. }
             | Self::Computed { name, .. }
             | Self::Func { name, .. }
@@ -111,6 +215,7 @@ impl Member {
             | Self::Emits(_)
             | Self::Hook { .. }
             | Self::Type { .. }
+            | Self::Alias { .. }
             | Self::Raw(_)
             | Self::Destructure { .. } => None,
         }
@@ -121,7 +226,8 @@ impl Member {
     pub fn declares(&self) -> Vec<&str> {
         match self {
             Self::Destructure { names, .. } => names.iter().map(String::as_str).collect(),
-            Self::Type { name, .. } => vec![name.as_str()],
+            Self::Type { name, .. } | Self::Alias { name, .. } => vec![name.as_str()],
+            Self::Exported { member, .. } => member.declares(),
             other => other.declared_name().into_iter().collect(),
         }
     }
@@ -184,6 +290,8 @@ pub enum Kind {
     Sfc,
     /// `comp:useCart > tagok`.
     Composable,
+    /// `mod:név > tagok`: általános JS / TS modul (exportált függvények, konstansok, típusok, osztályok).
+    Module,
     /// Fej nélküli szakaszok (`script>…`, `template>…`) vagy csupasz tagok (`--into` célra).
     #[default]
     Parts,
@@ -200,6 +308,32 @@ pub struct Program {
 }
 
 impl Program {
+    /// Modul-szintű (osztály / export-módosítós) tag van-e a csupasz tagok között, vagy `mod:` a fej.
+    pub fn module_like(&self) -> bool {
+        self.kind == Kind::Module
+            || (self.kind == Kind::Parts
+                && self.script.as_ref().is_some_and(|s| {
+                    s.members
+                        .iter()
+                        .any(|m| matches!(m, Member::Class(_) | Member::Exported { .. }))
+                }))
+    }
+
+    /// Modulként írandó-e: `mod:` fej, vagy csupasz tagok Vue-specifikus tag (ref / computed / props …) nélkül.
+    pub fn is_module(&self) -> bool {
+        match self.kind {
+            Kind::Module => true,
+            Kind::Parts => {
+                self.template.is_none()
+                    && self.style.is_none()
+                    && self.script.as_ref().is_some_and(|s| {
+                        !s.members.is_empty() && !s.members.iter().any(Member::is_vue_only)
+                    })
+            }
+            _ => false,
+        }
+    }
+
     /// Hány szakasz van benne (script / template / style).
     pub fn sections(&self) -> usize {
         usize::from(self.script.is_some())

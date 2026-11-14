@@ -11,13 +11,15 @@ use super::edit::{
     reindent,
 };
 use super::imports::{ImportSet, plan, scan};
+use super::locate::{ClassSpan, class_names, find_class};
 use super::model::{Element, Import, Kind, Member, Program};
+use super::parse::parse_class_members;
 use super::project::{CodeStyle, VueProject, script_is_ts, uses_semicolons};
-use super::script::ScriptEmitter;
+use super::script::{ScriptEmitter, is_doc_line};
 use super::template::{components, opens_element};
 use super::{style, template};
 use crate::generate::command::{EditCommand, InsertInto, ReplaceRange, WriteNew};
-use crate::generate::edit::{range_text, split_lines};
+use crate::generate::edit::{extend_over_docs, range_text, split_lines};
 use crate::generate::error::{GenError, GenResult};
 use crate::generate::fs::Env;
 use crate::generate::generator::{GenRequest, Output, ReplaceAt, Target};
@@ -51,6 +53,9 @@ pub fn wants_vue(request: &GenRequest) -> bool {
             let e = request.expr.trim_start();
             return e.starts_with("vue:")
                 || e.starts_with("comp:")
+                || e.starts_with("mod:")
+                || e.starts_with("class:")
+                || e.starts_with("class~:")
                 || ["script>", "template>", "style>", "style!", "style:"]
                     .iter()
                     .any(|p| e.starts_with(p));
@@ -58,6 +63,10 @@ pub fn wants_vue(request: &GenRequest) -> bool {
         Target::Write { file } | Target::Into { file, .. } | Target::Replace { file, .. } => file,
     };
     file_kind(file).is_ok()
+}
+
+fn is_script_file(file: &str) -> bool {
+    matches!(file_kind(file), Ok(FileKind::Script { .. }))
 }
 
 /// Egy beolvasott fájl.
@@ -106,6 +115,40 @@ impl<'a> VueGenerator<'a> {
 
     /// A kérés végrehajtása.
     pub fn run(&self, request: &GenRequest) -> GenResult<Output> {
+        // osztálytagok: `--into x.ts::Osztály` és `--replace x.ts::Osztály::tag` (a kifejezés osztálytag, nem modul-tag)
+        match &request.target {
+            Target::Into {
+                file,
+                class: Some(class),
+                after,
+            } if is_script_file(file) => {
+                return self.insert_class(
+                    &request.expr,
+                    file,
+                    class,
+                    after.as_deref(),
+                    request.dry,
+                );
+            }
+            Target::Replace {
+                file,
+                at:
+                    ReplaceAt::Method {
+                        class: Some(class),
+                        name,
+                    },
+                expect,
+            } if is_script_file(file) => {
+                return self.replace_member(
+                    &request.expr,
+                    file,
+                    (class.as_str(), name.as_str()),
+                    expect.as_deref(),
+                    request.dry,
+                );
+            }
+            _ => {}
+        }
         let program = super::parse::parse(&request.expr)?;
         match &request.target {
             Target::Preview => self.preview(&program),
@@ -343,20 +386,27 @@ impl<'a> VueGenerator<'a> {
 
     fn preview(&self, program: &Program) -> GenResult<Output> {
         let style = self.project().code_style();
+        let as_module = program.module_like();
         let (text, unresolved) = match program.kind {
+            Kind::Module => (self.module_text(program, style)?, Vec::new()),
             Kind::Composable => (
                 self.composable_text(program, "preview.ts", style)?,
                 Vec::new(),
             ),
             Kind::Sfc => self.sfc_file(program, style),
             Kind::Parts => {
-                if program.template.is_none() && program.style.is_none() {
-                    return self.preview_members(program, style);
+                if as_module {
+                    (self.module_text(program, style)?, Vec::new())
+                } else {
+                    if program.template.is_none() && program.style.is_none() {
+                        return self.preview_members(program, style);
+                    }
+                    self.sfc_file(program, style)
                 }
-                self.sfc_file(program, style)
             }
         };
-        let rel = if program.kind == Kind::Composable {
+        let script_file = matches!(program.kind, Kind::Composable | Kind::Module) || as_module;
+        let rel = if script_file {
             if style.ts { "preview.ts" } else { "preview.js" }
         } else {
             "preview.vue"
@@ -366,6 +416,20 @@ impl<'a> VueGenerator<'a> {
             lines: text.lines().map(str::to_owned).collect(),
             unresolved,
         })
+    }
+
+    /// A teljes új modul-fájl: importok, majd a tagok `export`-tal (JS-ben JSDoc-kal).
+    fn module_text(&self, program: &Program, style: CodeStyle) -> GenResult<String> {
+        let members = module_members(program)?;
+        let rendered = self.render(program, style, &[]);
+        let em = ScriptEmitter {
+            ts: style.ts,
+            semi: style.semi,
+        };
+        Ok(composable_file(
+            &rendered.imports.lines(style.semi),
+            &em.module(members),
+        ))
     }
 
     /// Csupasz tagok előnézete: a tagok sorai (egy ideiglenes függvénybe csomagolva ellenőrizve).
@@ -401,6 +465,15 @@ impl<'a> VueGenerator<'a> {
                         .to_owned(),
                     ));
                 }
+                if program.kind == Kind::Module {
+                    return Err(GenError::new(
+                        crate::t!(
+                            "`mod:` writes a module: use a .ts / .js file (a .vue file takes `vue:Name > script + template + style`)",
+                            "a `mod:` modult ír: .ts / .js fájl kell (a .vue fájlhoz `vue:Név > script + template + style` való)"
+                        )
+                        .to_owned(),
+                    ));
+                }
                 self.sfc_file(program, project)
             }
             FileKind::Script { ts } => {
@@ -414,7 +487,12 @@ impl<'a> VueGenerator<'a> {
                     ));
                 }
                 let style = CodeStyle { ts, ..project };
-                (self.composable_text(program, &rel, style)?, Vec::new())
+                let text = if program.is_module() {
+                    self.module_text(program, style)?
+                } else {
+                    self.composable_text(program, &rel, style)?
+                };
+                (text, Vec::new())
             }
         };
         self.validate(&rel, &text)?;
@@ -449,14 +527,30 @@ impl<'a> VueGenerator<'a> {
         let rendered = self.render(program, style, &bound);
         let block = match kind {
             FileKind::Vue => insert_vue(&mut doc, program, &rendered, style, after)?,
+            FileKind::Script { .. } if module_target(program, &doc.lines) => {
+                insert_module(&mut doc, program, &rendered, style, after)?
+            }
             FileKind::Script { .. } => insert_script(&mut doc, program, &rendered, style, after)?,
         };
+        self.commit_insert(rel, &doc, eol, block, rendered.unresolved, dry)
+    }
+
+    /// A szerkesztett szöveg ellenőrzése, majd (nem `--dry`-nál) kiírása mentéssel.
+    fn commit_insert(
+        &self,
+        rel: String,
+        doc: &Doc,
+        eol: &str,
+        block: Vec<String>,
+        unresolved: Vec<String>,
+        dry: bool,
+    ) -> GenResult<Output> {
         let text = doc.lines.join(eol);
         self.validate(&rel, &text)?;
         if dry {
             return Ok(Output {
                 lines: block,
-                unresolved: rendered.unresolved,
+                unresolved,
             });
         }
         let places: Vec<String> = doc
@@ -473,7 +567,197 @@ impl<'a> VueGenerator<'a> {
         let line = InsertInto { rel, text, summary }.execute(self.env)?;
         Ok(Output {
             lines: vec![line],
-            unresolved: rendered.unresolved,
+            unresolved,
+        })
+    }
+
+    /// `--into x.ts::Osztály [--after tag]`: osztálytagok az osztály törzsébe (a hely az oxc-span alapján).
+    fn insert_class(
+        &self,
+        expr: &str,
+        file: &str,
+        class: &str,
+        after: Option<&str>,
+        dry: bool,
+    ) -> GenResult<Output> {
+        let parts = parse_class_members(expr)?;
+        let rel = self.rel(file)?;
+        let kind = file_kind(&rel)?;
+        let Loaded { text, lines, eol } = self.load(&rel)?;
+        let style = self.style_of(kind, &text);
+        let mut doc = Doc::new(lines);
+        let span = class_span_of(&rel, &doc, class)?;
+        if span.open == span.close {
+            return Err(GenError::new(crate::tf!(
+                "the body of `{}` is on one line: put its braces on separate lines first",
+                "a(z) `{}` törzse egy sorban van: előbb tedd külön sorba a kapcsos zárójeleit",
+                class
+            )));
+        }
+        for m in &parts.members {
+            if span.members.iter().any(|x| x.name == m.name()) {
+                return Err(GenError::new(crate::tf!(
+                    "`{}` is already a member of {} (to change it use --replace <file>::{}::{})",
+                    "a(z) `{}` már tagja a(z) {} osztálynak (módosításhoz: --replace <fájl>::{}::{})",
+                    m.name(),
+                    class,
+                    class,
+                    m.name()
+                )));
+            }
+        }
+        let em = ScriptEmitter {
+            ts: style.ts,
+            semi: style.semi,
+        };
+        let unit = indent_unit(&doc.lines);
+        let body_indent = span.members.first().map_or_else(
+            || indent_of(&doc.lines[span.start]) + unit,
+            |m| indent_of(&doc.lines[m.start]),
+        );
+        let block = indent_block(
+            &reindent(&em.class_members(&parts.members), unit),
+            body_indent,
+        );
+        let at = match after {
+            Some(name) => {
+                let found = span.members.iter().find(|m| m.name == name);
+                let found = found.ok_or_else(|| {
+                    GenError::new(crate::tf!(
+                        "no `{}` in {} (members: {})",
+                        "nincs `{}` a(z) {} osztályban (tagok: {})",
+                        name,
+                        class,
+                        span.members
+                            .iter()
+                            .map(|m| m.name.as_str())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    ))
+                })?;
+                found.end + 1
+            }
+            None => span.close,
+        };
+        let spaced = at > span.open + 1 && !doc.lines[at - 1].trim().is_empty();
+        let mut ins = Vec::new();
+        if spaced {
+            ins.push(String::new());
+        }
+        ins.extend(block.iter().cloned());
+        let next_is_member = doc
+            .lines
+            .get(at)
+            .is_some_and(|l| !l.trim().is_empty() && !l.trim_start().starts_with('}'));
+        if after.is_some() && next_is_member {
+            ins.push(String::new());
+        }
+        doc.insert(at, ins);
+        doc.mark("members", at + usize::from(spaced), block.len());
+        let mut wanted = ImportSet::new();
+        wanted.extend(self.resolve_uses(&parts.imports, &parts.guess));
+        if !wanted.is_empty() {
+            let end = doc.lines.len();
+            for e in plan(&doc.lines, 0, end, &wanted, style.semi) {
+                doc.splice(e.start, e.end, e.lines);
+            }
+        }
+        self.commit_insert(rel, &doc, eol, block, Vec::new(), dry)
+    }
+
+    /// `--replace x.ts::Osztály::tag`: egy osztálytag (és a JSDoc-ja) cseréje.
+    fn replace_member(
+        &self,
+        expr: &str,
+        file: &str,
+        (class, name): (&str, &str),
+        expect: Option<&str>,
+        dry: bool,
+    ) -> GenResult<Output> {
+        let parts = parse_class_members(expr)?;
+        if parts.members.len() != 1 {
+            return Err(GenError::new(
+                crate::t!(
+                    "--replace takes exactly one class member",
+                    "a --replace pontosan egy osztálytagot vár"
+                )
+                .to_owned(),
+            ));
+        }
+        let rel = self.rel(file)?;
+        let kind = file_kind(&rel)?;
+        let Loaded { text, lines, eol } = self.load(&rel)?;
+        let style = self.style_of(kind, &text);
+        let mut doc = Doc::new(lines);
+        let span = class_span_of(&rel, &doc, class)?;
+        let found = span.members.iter().find(|m| m.name == name);
+        let found = found.ok_or_else(|| {
+            GenError::new(crate::tf!(
+                "no `{}` in {} (members: {})",
+                "nincs `{}` a(z) {} osztályban (tagok: {})",
+                name,
+                class,
+                span.members
+                    .iter()
+                    .map(|m| m.name.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ))
+        })?;
+        let (from, to) = (found.start, found.end + 1);
+        check_expect(&doc, &rel, (from, to), expect)?;
+        let from = if style.ts {
+            from
+        } else {
+            extend_over_docs(&doc.lines, from + 1) - 1
+        };
+        let em = ScriptEmitter {
+            ts: style.ts,
+            semi: style.semi,
+        };
+        let indent = indent_of(&doc.lines[found.start]);
+        let block = indent_block(
+            &reindent(&em.class_members(&parts.members), indent_unit(&doc.lines)),
+            indent,
+        );
+        doc.splice(from, to, block.clone());
+        doc.mark("members", from, block.len());
+        let mut wanted = ImportSet::new();
+        wanted.extend(self.resolve_uses(&parts.imports, &parts.guess));
+        if !wanted.is_empty() {
+            let end = doc.lines.len();
+            for e in plan(&doc.lines, 0, end, &wanted, style.semi) {
+                doc.splice(e.start, e.end, e.lines);
+            }
+        }
+        let new_text = doc.lines.join(eol);
+        self.validate(&rel, &new_text)?;
+        if dry {
+            return Ok(Output {
+                lines: block,
+                unresolved: Vec::new(),
+            });
+        }
+        let summary = crate::tf!(
+            "replaced {} L{}-{} → L{}-{} ({}::{})",
+            "kicserélve: {} L{}-{} → L{}-{} ({}::{})",
+            rel,
+            from + 1,
+            to,
+            from + 1,
+            from + block.len(),
+            class,
+            name
+        );
+        let line = ReplaceRange {
+            rel,
+            text: new_text,
+            summary,
+        }
+        .execute(self.env)?;
+        Ok(Output {
+            lines: vec![line],
+            unresolved: Vec::new(),
         })
     }
 
@@ -493,26 +777,30 @@ impl<'a> VueGenerator<'a> {
         let style = self.style_of(kind, &text);
         let mut doc = Doc::new(lines);
         let (from, to, label) = replace_range(&doc, kind, at, &rel)?;
-        if let Some(prefix) = expect {
-            let current = crate::update::checksum::sha256_hex(
-                range_text(&doc.lines, from + 1, to).as_bytes(),
-            );
-            let wanted = prefix.trim().to_ascii_lowercase();
-            if wanted.len() < 4 || !current.starts_with(&wanted) {
-                return Err(GenError::new(crate::tf!(
-                    "L{}-{} of {} changed (expected sha256 {}…, current {}…): read it again before replacing",
-                    "L{}-{} tartalma megváltozott ebben: {} (várt sha256 {}…, jelenlegi {}…): cserélés előtt olvasd újra",
-                    from + 1,
-                    to,
-                    rel,
-                    wanted,
-                    &current[..12]
-                )));
-            }
-        }
+        check_expect(&doc, &rel, (from, to), expect)?;
         let bound = bound_names(&doc.lines);
         let rendered = self.render(program, style, &bound);
-        let (section, block) = self.replacement_block(program, kind, &rendered)?;
+        let module_mode =
+            matches!(kind, FileKind::Script { .. }) && module_target(program, &doc.lines);
+        let (section, block) = if module_mode {
+            let exported = doc
+                .lines
+                .get(from)
+                .is_some_and(|l| l.trim_start().starts_with("export "));
+            self.module_replacement(program, style, exported)?
+        } else {
+            self.replacement_block(program, kind, &rendered)?
+        };
+        // a JS-modul új JSDoc-ja a régi helyére kerül (nem kétszereződik)
+        let docs_first = module_mode
+            && block
+                .first()
+                .is_some_and(|l| l.trim_start().starts_with("/**"));
+        let from = if docs_first {
+            extend_over_docs(&doc.lines, from + 1) - 1
+        } else {
+            from
+        };
         let indent = doc.lines.get(from).map_or(0, |l| indent_of(l));
         let block = indent_block(&reindent(&block, indent_unit(&doc.lines)), indent);
         doc.splice(from, to, block.clone());
@@ -566,6 +854,32 @@ impl<'a> VueGenerator<'a> {
         })
     }
 
+    /// Modul-tag cseréje: a sima tag megtartja az eredeti export-állapotot (`-` / `!` előtaggal felülírható).
+    fn module_replacement(
+        &self,
+        program: &Program,
+        style: CodeStyle,
+        exported: bool,
+    ) -> GenResult<(&'static str, Vec<String>)> {
+        let members = module_members(program)?;
+        let em = ScriptEmitter {
+            ts: style.ts,
+            semi: style.semi,
+        };
+        let mut lines = em.module(members);
+        let plain = members.len() == 1 && !matches!(members[0], Member::Exported { .. });
+        if plain && !exported {
+            let at = lines.iter().position(|l| !is_doc_line(l));
+            if let Some(at) = at {
+                let stripped = lines[at].strip_prefix("export ").map(str::to_owned);
+                if let Some(first) = stripped {
+                    lines[at] = first;
+                }
+            }
+        }
+        Ok(("members", lines))
+    }
+
     /// A csere tartalma: pontosan egy szakasz (script-tagok / template / style).
     fn replacement_block(
         &self,
@@ -596,6 +910,165 @@ impl<'a> VueGenerator<'a> {
     }
 }
 
+/// Az osztály helye a fájlban, vagy hiba a meglévő osztályok felsorolásával.
+fn class_span_of(rel: &str, doc: &Doc, class: &str) -> GenResult<ClassSpan> {
+    let text = doc.text();
+    find_class(rel, &text, class).ok_or_else(|| {
+        GenError::new(crate::tf!(
+            "no class `{}` in {} (classes: {})",
+            "nincs `{}` osztály ebben: {} (osztályok: {})",
+            class,
+            rel,
+            class_names(rel, &text).join(", ")
+        ))
+    })
+}
+
+/// Az `--expect`: a `[from, to)` sorok sha256-előtagja egyezik-e (különben valaki közben módosította).
+fn check_expect(
+    doc: &Doc,
+    rel: &str,
+    (from, to): (usize, usize),
+    expect: Option<&str>,
+) -> GenResult<()> {
+    let Some(prefix) = expect else {
+        return Ok(());
+    };
+    let current =
+        crate::update::checksum::sha256_hex(range_text(&doc.lines, from + 1, to).as_bytes());
+    let wanted = prefix.trim().to_ascii_lowercase();
+    if wanted.len() < 4 || !current.starts_with(&wanted) {
+        return Err(GenError::new(crate::tf!(
+            "L{}-{} of {} changed (expected sha256 {}…, current {}…): read it again before replacing",
+            "L{}-{} tartalma megváltozott ebben: {} (várt sha256 {}…, jelenlegi {}…): cserélés előtt olvasd újra",
+            from + 1,
+            to,
+            rel,
+            wanted,
+            &current[..12]
+        )));
+    }
+    Ok(())
+}
+
+/// Modulként kezelendő-e a kifejezés a meglévő fájlnál: `mod:` / osztály / export-módosító, vagy Vue-specifikus
+/// tag nélküli csupasz tagok egy nem composable fájlba.
+fn module_target(program: &Program, lines: &[String]) -> bool {
+    program.module_like() || (program.is_module() && !is_composable_file(lines))
+}
+
+/// Composable-fájl-e: van `return {`, és a legfelső szintű, azt tartalmazó deklaráció neve `use…`.
+fn is_composable_file(lines: &[String]) -> bool {
+    let Some(ret) = find_return(lines) else {
+        return false;
+    };
+    let top = lines[..ret]
+        .iter()
+        .rev()
+        .find(|l| !l.trim().is_empty() && indent_of(l) == 0);
+    top.is_some_and(|l| {
+        ["function use", "const use", "let use"]
+            .iter()
+            .any(|p| l.contains(p))
+    })
+}
+
+/// A modul tagjai: csak script-tagok (Vue-specifikus tag nélkül).
+fn module_members(program: &Program) -> GenResult<&[Member]> {
+    if program.template.is_some() || program.style.is_some() {
+        return Err(GenError::new(
+            crate::t!(
+                "a .ts / .js file takes members only (no template / style): use a .vue file for those",
+                "a .ts / .js fájl csak tagokat vár (template / style nélkül): azokhoz .vue fájl való"
+            )
+            .to_owned(),
+        ));
+    }
+    let members = program
+        .script
+        .as_ref()
+        .map_or(&[][..], |s| s.members.as_slice());
+    if members.is_empty() {
+        return Err(GenError::new(
+            crate::t!(
+                "the expression has no members (e.g. `mod:util>fn:slug(s:str):str{ … }`)",
+                "a kifejezésben nincs tag (pl. `mod:util>fn:slug(s:str):str{ … }`)"
+            )
+            .to_owned(),
+        ));
+    }
+    if members.iter().any(Member::is_vue_only) {
+        return Err(GenError::new(
+            crate::t!(
+                "props / emits / ref / computed / form / on: belong to a Vue component or a `comp:` composable, not to a module",
+                "a props / emits / ref / computed / form / on: Vue-komponensbe vagy `comp:` composable-be való, nem modulba"
+            )
+            .to_owned(),
+        ));
+    }
+    Ok(members)
+}
+
+/// `--into x.ts`: a modul új tagjai az utolsó utasítás után (vagy `--after név` után); duplikált nevet nem fogad el.
+fn insert_module(
+    doc: &mut Doc,
+    program: &Program,
+    rendered: &Rendered,
+    style: CodeStyle,
+    after: Option<&str>,
+) -> GenResult<Vec<String>> {
+    let members = module_members(program)?;
+    let em = ScriptEmitter {
+        ts: style.ts,
+        semi: style.semi,
+    };
+    let total = doc.lines.len();
+    for name in members.iter().flat_map(Member::declares) {
+        if find_statement(&doc.lines, name, 0, total).is_some() {
+            return Err(GenError::new(crate::tf!(
+                "`{}` is already declared in the file (to change it use --replace <file>::{})",
+                "a(z) `{}` már deklarálva van a fájlban (módosításhoz: --replace <fájl>::{})",
+                name,
+                name
+            )));
+        }
+    }
+    let unit = indent_unit(&doc.lines);
+    let block = reindent(&em.module(members), unit);
+    let at = match after {
+        Some(name) => {
+            let (_, end) = find_statement(&doc.lines, name, 0, total).ok_or_else(|| {
+                GenError::new(crate::tf!(
+                    "no `{}` in the file (declared: {})",
+                    "nincs `{}` a fájlban (deklarált: {})",
+                    name,
+                    declared_names(&doc.lines, 0, total).join(", ")
+                ))
+            })?;
+            end + 1
+        }
+        None => last_nonblank(&doc.lines, 0, total).map_or(0, |i| i + 1),
+    };
+    let spaced = at > 0 && !doc.lines[at - 1].trim().is_empty();
+    let mut inserted = Vec::new();
+    if spaced {
+        inserted.push(String::new());
+    }
+    inserted.extend(block.iter().cloned());
+    if after.is_some() && doc.lines.get(at).is_some_and(|l| !l.trim().is_empty()) {
+        inserted.push(String::new());
+    }
+    doc.insert(at, inserted);
+    doc.mark("members", at + usize::from(spaced), block.len());
+    if !rendered.imports.is_empty() {
+        let end = doc.lines.len();
+        for e in plan(&doc.lines, 0, end, &rendered.imports, style.semi) {
+            doc.splice(e.start, e.end, e.lines);
+        }
+    }
+    Ok(block)
+}
+
 /// A composable tagjai: csak script-tagok, props / emits nélkül.
 fn composable_members(program: &Program) -> GenResult<&[Member]> {
     if program.template.is_some() || program.style.is_some() {
@@ -616,6 +1089,18 @@ fn composable_members(program: &Program) -> GenResult<&[Member]> {
             crate::t!(
                 "the expression has no members (e.g. `comp:useCart > ref:items:list<Item>=[]`)",
                 "a kifejezésben nincs tag (pl. `comp:useCart > ref:items:list<Item>=[]`)"
+            )
+            .to_owned(),
+        ));
+    }
+    if members
+        .iter()
+        .any(|m| matches!(m, Member::Class(_) | Member::Exported { .. }))
+    {
+        return Err(GenError::new(
+            crate::t!(
+                "`class:` / `-` / `!` members belong to a module: use `mod:name>…` (or a file without composable members)",
+                "a `class:` / `-` / `!` tagok modulba valók: használd a `mod:név>…` alakot (vagy composable-tag nélküli fájlt)"
             )
             .to_owned(),
         ));

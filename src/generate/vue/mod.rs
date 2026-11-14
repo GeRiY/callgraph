@@ -51,6 +51,23 @@
 //! Composable: `comp:useCart>ref:items:list<Item>=[]+computed:total:int{ items.value.length }+fn:add(item:Item):void{ … }`
 //! → `export function useCart() { …; return { items, total, add }; }`.
 //!
+//! # Általános JS / TS modul (`mod:`, `class:`)
+//! `mod:strings>type:Opts{sep?:str}+fn:join(p:list<str>,o?:Opts):str{ … }+const:LIMIT:int=10+-fn:clean(s:str):str{ … }`
+//! — a `.ts` / `.js` / `.mjs` / … fájl a kiterjesztés szerinti nyelven (TS: típusok; JS: JSDoc `@param` / `@returns` /
+//! `@typedef`, típus nélküli kód); cél nélkül (`--dry`) a projekt stílusa. A `--write x.ts` csupasz tagjai is modult
+//! adnak (kivéve, ha `ref:` / `computed:` / `props` van köztük: az `comp:` composable marad).
+//! - tagok: `fn:` / `async:` → `export function` / `export async function`; `const:` / `let:` → `export const`;
+//!   `type:Név{…}` → `export interface` (JS: `@typedef`); `type:Név=A|B` → `export type Név = A | B;` (idézőjeles
+//!   literál is: `type:Mode='a'|'b'`); `class:` (lent); `use:` és `raw{…}` mint máshol;
+//! - export: alapból exportált; `-fn:x` (előtag `-`) modul-privát; `!fn:x` / `!class:X` / `!const:X` → `export default`;
+//! - osztály: `class:Név<Ős>[A,B]>tagok` (`class~:` absztrakt); a tagok a PHP-s nyelvtant követik: `+` public, `-` private,
+//!   `#` protected, majd `::` static, `~` abstract, `%` readonly; `$mező:típus=érték`, `ctor(-dep:Repo,+n:int=3)` (TS:
+//!   `private readonly dep: Repo` / `public n: number = 3` paraméter-property; JS: `this.dep = dep;`),
+//!   `+név(p:T):R{…}` / `async:név():R{…}`; JS-ben a láthatóság nincs kiírva, a típusok JSDoc-ban;
+//! - szerkesztés: `--into x.ts` a tagokat a fájl végére (vagy `--after név` után) teszi, az importokat egyesíti, a már
+//!   deklarált nevet visszautasítja; `--into x.ts::Osztály [--after tag]` osztálytagot szúr be (az oxc-span szerint);
+//!   `--replace x.ts::név` / `x.ts::Osztály::tag` / `x.ts:La-Lb` cserél (a sima tag megtartja az eredeti `export`-ot).
+//!
 //! Nyelv / stílus: TypeScript (`<script setup lang="ts">`, típusos `defineProps<{…}>()`, `ref<T>()`), ha a projektben
 //! van `tsconfig.json` vagy valamelyik `.vue` fájl `lang="ts"`-t használ (`.ts` / `.js` fájlnál a kiterjesztés dönt;
 //! meglévő fájlnál a fájl); egyébként sima JS (`defineProps({ title: { type: String, required: true } })`). A
@@ -67,6 +84,7 @@ mod check;
 mod edit;
 mod generator;
 mod imports;
+mod locate;
 mod model;
 mod parse;
 mod project;

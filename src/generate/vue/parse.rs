@@ -2,8 +2,8 @@
 //! (script-tagok, template-elemek, stílus-szabályok). A fej-szintaxis a modul-dokumentációban (`vue/mod.rs`).
 
 use super::model::{
-    Attr, Element, Emit, FormField, Import, Kind, Member, Program, Prop, Rule, Script, Style,
-    VParam,
+    Attr, ClassDecl, ClassKind, ClassMember, CtorParam, Element, Emit, Export, FormField, Import,
+    Kind, Member, Program, Prop, Rule, Script, Style, VParam, Vis,
 };
 use super::types::{parse_fields, parse_type};
 use crate::generate::ast::TypeRef;
@@ -94,6 +94,13 @@ fn top(
         for child in &node.children {
             section(child, program).map_err(|e| located(child, &e))?;
         }
+    } else if let Some(name) = head.strip_prefix("mod:") {
+        program.kind = Kind::Module;
+        program.name = Some(name.trim().to_owned());
+        let script = program.script.get_or_insert_with(Script::default);
+        for child in &node.children {
+            script_item(child, script).map_err(|e| located(child, &e))?;
+        }
     } else if let Some(name) = head.strip_prefix("comp:") {
         program.kind = Kind::Composable;
         program.name = Some(ident(name)?);
@@ -159,15 +166,317 @@ fn section(node: &Expanded, program: &mut Program) -> GenResult<()> {
 }
 
 fn script_item(node: &Expanded, script: &mut Script) -> GenResult<()> {
-    no_children(node)?;
     if let Some(rest) = node.head.strip_prefix("use:") {
+        no_children(node)?;
         let (imports, guess) = parse_uses(rest)?;
         script.imports.extend(imports);
         script.guess.extend(guess);
         return Ok(());
     }
-    script.members.push(member(node)?);
+    script.members.push(member_node(node)?);
     Ok(())
+}
+
+/// A fej az export-előtag nélkül és az export módja: `-fn:x` nem exportált, `!fn:x` `export default`.
+fn split_export(head: &str) -> (Export, &str) {
+    if let Some(rest) = head.strip_prefix('-') {
+        (Export::None, rest)
+    } else if let Some(rest) = head.strip_prefix('!') {
+        (Export::Default, rest)
+    } else {
+        (Export::Named, head)
+    }
+}
+
+/// Egy script-tag a gyerekeivel együtt: az export-előtag (`-` / `!`) és az osztály (`class:Név>…`) itt dől el;
+/// minden más tag a `member`-é.
+fn member_node(node: &Expanded) -> GenResult<Member> {
+    let (export, bare) = split_export(&node.head);
+    let inner = if bare.starts_with("class:") || bare.starts_with("class~:") {
+        Member::Class(Box::new(class_decl(bare, node)?))
+    } else {
+        no_children(node)?;
+        let plain = Expanded {
+            head: bare.to_owned(),
+            ..node.clone()
+        };
+        member(&plain)?
+    };
+    match export {
+        Export::Named => Ok(inner),
+        Export::None => Ok(Member::Exported {
+            export,
+            member: Box::new(inner),
+        }),
+        Export::Default => {
+            if matches!(
+                inner,
+                Member::Func { .. } | Member::Const { .. } | Member::Class(_) | Member::Type { .. }
+            ) {
+                Ok(Member::Exported {
+                    export,
+                    member: Box::new(inner),
+                })
+            } else {
+                Err(GenError::new(
+                    crate::t!(
+                        "`!` (export default) takes fn: / async: / const: / class: / type:Name{…}",
+                        "a `!` (export default) fn: / async: / const: / class: / type:Név{…} előtt állhat"
+                    )
+                    .to_owned(),
+                ))
+            }
+        }
+    }
+}
+
+fn unclosed(open: char) -> GenError {
+    GenError::new(crate::tf!("unclosed `{}`", "lezáratlan `{}`", open))
+}
+
+/// `class:Név<Ős>[A,B]` / `class~:Név` (absztrakt) és a gyerekei (osztálytagok).
+fn class_decl(bare: &str, node: &Expanded) -> GenResult<ClassDecl> {
+    let (is_abstract, rest) = match bare.strip_prefix("class~:") {
+        Some(r) => (true, r),
+        None => (false, bare.strip_prefix("class:").unwrap_or(bare)),
+    };
+    if node.raw.is_some() {
+        return Err(GenError::new(
+            crate::t!(
+                "a class has no `{…}` body: its members follow after `>`",
+                "az osztálynak nincs `{…}` törzse: a tagjai a `>` után jönnek"
+            )
+            .to_owned(),
+        ));
+    }
+    let name_end = rest.find(['<', '[']).unwrap_or(rest.len());
+    let name = ident(&rest[..name_end])?;
+    let mut tail = rest[name_end..].trim();
+    let mut extends = None;
+    let mut implements: Vec<String> = Vec::new();
+    if tail.starts_with('<') {
+        let end = matching(tail, '<', '>').ok_or_else(|| unclosed('<'))?;
+        extends = Some(tail[1..end].trim().to_owned()).filter(|e| !e.is_empty());
+        tail = tail[end + 1..].trim();
+    }
+    if tail.starts_with('[') {
+        let end = matching(tail, '[', ']').ok_or_else(|| unclosed('['))?;
+        implements.extend(type_names(&tail[1..end]));
+        tail = tail[end + 1..].trim();
+    }
+    if !tail.is_empty() {
+        return Err(GenError::new(crate::tf!(
+            "unexpected `{}` in the class head (e.g. `class:Pay<Base>[Chargeable]`)",
+            "váratlan `{}` az osztály-fejben (pl. `class:Pay<Base>[Chargeable]`)",
+            tail
+        )));
+    }
+    if let Some(list) = &node.list {
+        implements.extend(type_names(list));
+    }
+    let members = node
+        .children
+        .iter()
+        .map(|c| class_member(c).map_err(|e| located(c, &e)))
+        .collect::<GenResult<Vec<_>>>()?;
+    Ok(ClassDecl {
+        name,
+        is_abstract,
+        extends,
+        implements,
+        members,
+    })
+}
+
+/// Vesszővel tagolt típusnevek (üres darabok nélkül).
+fn type_names(text: &str) -> Vec<String> {
+    split_top(text, ',')
+        .iter()
+        .map(|p| p.trim().to_owned())
+        .filter(|p| !p.is_empty())
+        .collect()
+}
+
+/// Egy osztálytag feje: `+` / `-` / `#` láthatóság, majd `::` static, `~` abstract, `%` readonly, végül
+/// `ctor(…)`, `$mező:típus=érték` vagy `név(paraméterek):Típus{törzs}` (`fn:` / `async:` előtaggal is).
+fn class_member(node: &Expanded) -> GenResult<ClassMember> {
+    no_children(node)?;
+    if node.list.is_some() {
+        return Err(GenError::new(
+            crate::t!(
+                "`[…]` belongs to a class head (`class:Name[Iface]`)",
+                "a `[…]` az osztály-fejhez tartozik (`class:Név[Interfész]`)"
+            )
+            .to_owned(),
+        ));
+    }
+    let raw = node.raw.as_deref();
+    let mut s = node.head.as_str();
+    let mut vis = Vis::Public;
+    if let Some(rest) = s.strip_prefix('+') {
+        s = rest;
+    } else if let Some(rest) = s.strip_prefix('-') {
+        vis = Vis::Private;
+        s = rest;
+    } else if let Some(rest) = s.strip_prefix('#') {
+        vis = Vis::Protected;
+        s = rest;
+    }
+    let (mut is_static, mut is_abstract, mut readonly) = (false, false, false);
+    loop {
+        if let Some(rest) = s.strip_prefix("::") {
+            is_static = true;
+            s = rest;
+        } else if let Some(rest) = s.strip_prefix('~') {
+            is_abstract = true;
+            s = rest;
+        } else if let Some(rest) = s.strip_prefix('%') {
+            readonly = true;
+            s = rest;
+        } else {
+            break;
+        }
+    }
+    let kind = if let Some(rest) = s.strip_prefix('$') {
+        let (name, ty, init) = decl(rest, raw)?;
+        ClassKind::Field { name, ty, init }
+    } else if s == "ctor" || call_args(s, "ctor").is_some() {
+        ClassKind::Ctor {
+            params: ctor_params(call_args(s, "ctor").unwrap_or(""))?,
+            body: raw.map(str::to_owned),
+        }
+    } else {
+        let (is_async, rest) = if let Some(r) = s.strip_prefix("async:") {
+            (true, r)
+        } else {
+            (false, s.strip_prefix("fn:").unwrap_or(s))
+        };
+        let Member::Func {
+            name,
+            params,
+            ret,
+            body,
+            is_async,
+        } = func(rest, raw, is_async)?
+        else {
+            return Err(GenError::new(crate::tf!(
+                "bad class member `{}`",
+                "hibás osztálytag: `{}`",
+                s
+            )));
+        };
+        ClassKind::Method {
+            name,
+            params,
+            ret,
+            body,
+            is_async,
+        }
+    };
+    Ok(ClassMember {
+        vis,
+        is_static,
+        is_abstract,
+        readonly,
+        kind,
+    })
+}
+
+/// A konstruktor paraméterei: a `+` / `-` / `#` (és `%`) előtagos paraméter property lesz; a `-` / `#` readonly is.
+fn ctor_params(text: &str) -> GenResult<Vec<CtorParam>> {
+    let mut out = Vec::new();
+    for piece in split_top(text, ',') {
+        let piece = piece.trim();
+        if piece.is_empty() {
+            continue;
+        }
+        let (vis, rest) = if let Some(r) = piece.strip_prefix('+') {
+            (Some(Vis::Public), r)
+        } else if let Some(r) = piece.strip_prefix('-') {
+            (Some(Vis::Private), r)
+        } else if let Some(r) = piece.strip_prefix('#') {
+            (Some(Vis::Protected), r)
+        } else {
+            (None, piece)
+        };
+        let (forced, rest) = match rest.strip_prefix('%') {
+            Some(r) => (true, r),
+            None => (false, rest),
+        };
+        let mut parsed = parse_params(rest)?;
+        let Some(param) = parsed.pop().filter(|_| parsed.is_empty()) else {
+            return Err(GenError::new(crate::tf!(
+                "bad constructor parameter: `{}`",
+                "hibás konstruktor-paraméter: `{}`",
+                piece
+            )));
+        };
+        let readonly = vis.is_some() && (forced || vis != Some(Vis::Public));
+        out.push(CtorParam {
+            param,
+            vis,
+            readonly,
+        });
+    }
+    Ok(out)
+}
+
+/// Osztálytagok kifejezése az `--into x.ts::Osztály` / `--replace x.ts::Osztály::tag` célra (csupasz tagok és `use:`).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ClassParts {
+    pub members: Vec<ClassMember>,
+    pub imports: Vec<Import>,
+    pub guess: Vec<String>,
+}
+
+pub fn parse_class_members(source: &str) -> GenResult<ClassParts> {
+    let tree = parse_tree(source)?;
+    let mut parts = ClassParts::default();
+    for node in &tree {
+        if let Some(rest) = node.head.strip_prefix("use:") {
+            let (imports, guess) = parse_uses(rest).map_err(|e| located(node, &e))?;
+            parts.imports.extend(imports);
+            parts.guess.extend(guess);
+        } else {
+            parts
+                .members
+                .push(class_member(node).map_err(|e| located(node, &e))?);
+        }
+    }
+    if parts.members.is_empty() {
+        return Err(GenError::new(
+            crate::t!(
+                "nothing to insert: the expression has no class member (e.g. `+run(n:int):void{ … }`)",
+                "nincs mit beszúrni: a kifejezésben nincs osztálytag (pl. `+run(n:int):void{ … }`)"
+            )
+            .to_owned(),
+        ));
+    }
+    Ok(parts)
+}
+
+/// Alias-típus (`type:Név=A|B`): a `|` darabjai lehetnek idézőjeles / számliterálok (`'a'|'b'`) is.
+fn alias_type(text: &str) -> GenResult<TypeRef> {
+    let one = |p: &str| -> GenResult<TypeRef> {
+        let p = p.trim();
+        let literal =
+            p.starts_with(['\'', '"', '`']) || p.starts_with(|c: char| c.is_ascii_digit());
+        if literal {
+            Ok(TypeRef::Named(p.to_owned()))
+        } else {
+            parse_type(p)
+        }
+    };
+    let parts = split_top(text, '|');
+    if parts.len() > 1 {
+        let members = parts
+            .iter()
+            .map(|p| one(p))
+            .collect::<GenResult<Vec<_>>>()?;
+        Ok(TypeRef::Union(members))
+    } else {
+        one(text)
+    }
 }
 
 /// `kw(…)` alak: a zárójelek közti szöveg.
@@ -220,7 +529,28 @@ fn member(node: &Expanded) -> GenResult<Member> {
             )
         });
     }
-    if let Some(name) = head.strip_prefix("type:") {
+    if let Some(rest) = head.strip_prefix("type:") {
+        if let Some((name, rhs)) = split_once_top(rest, '=') {
+            let text = if rhs.trim().is_empty() {
+                raw.map(|r| format!("{{{r}}}")).unwrap_or_default()
+            } else {
+                rhs.trim().to_owned()
+            };
+            if text.is_empty() {
+                return Err(GenError::new(
+                    crate::t!(
+                        "`type:Name=…` needs its type: `type:Id=str|int`",
+                        "a `type:Név=…`-hez kell a típus: `type:Id=str|int`"
+                    )
+                    .to_owned(),
+                ));
+            }
+            return Ok(Member::Alias {
+                name: ident(name)?,
+                ty: alias_type(&text)?,
+            });
+        }
+        let name = rest;
         let Some(body) = raw else {
             return Err(GenError::new(
                 crate::t!(

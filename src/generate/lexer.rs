@@ -291,6 +291,13 @@ impl Lexer {
         let list_form = self.chars[from..].starts_with(&['u', 's', 'e', ':']);
         // Vue-nyelvjárás, script-tag: a `:` / `,` utáni `{…}` a fej része (`use:{useX}@/út`, `const:{ a, b }=f()`,
         // `ref:x:{ a: str }=…`), nem nyers törzs
+        // az export-előtag (`-fn:…`, `!fn:…`) nem számít bele
+        let head_from = from
+            + self.chars[from..]
+                .iter()
+                .take_while(|&&c| matches!(c, '-' | '!'))
+                .take(1)
+                .count();
         let braced_head = self.vue
             && !self.selector
             && [
@@ -304,7 +311,7 @@ impl Lexer {
             ]
             .iter()
             .any(|p| {
-                self.chars[from..]
+                self.chars[head_from..]
                     .iter()
                     .copied()
                     .take(p.len())

@@ -1103,3 +1103,442 @@ fn destructured_names_count_as_declared_for_into() {
     .unwrap_err();
     assert!(err.contains("already declared"), "{err}");
 }
+
+// --- általános JS / TS modulok: mod:, class:, export-módosítók ---
+
+fn into_class(file: &str, class: &str, after: Option<&str>) -> Target {
+    Target::Into {
+        file: file.to_owned(),
+        class: Some(class.to_owned()),
+        after: after.map(str::to_owned),
+    }
+}
+
+fn replace_at(file: &str, class: Option<&str>, name: &str) -> Target {
+    Target::Replace {
+        file: file.to_owned(),
+        at: ReplaceAt::Method {
+            class: class.map(str::to_owned),
+            name: name.to_owned(),
+        },
+        expect: None,
+    }
+}
+
+const MODULE_EXPR: &str = "mod:strings>type:Opts{sep?:str,max:int}+fn:join(parts:list<str>,o?:Opts):str{ return parts.join(o?.sep ?? ',') }+const:LIMIT:int=10+-fn:clean(s:str):str{ return s.trim() }";
+
+#[test]
+fn module_in_typescript_with_type_function_const_and_private_helper() {
+    let fs = MemFs::with(TS_PROJECT);
+    let out = go(&fs, MODULE_EXPR, true, write("src/strings.ts")).unwrap();
+    let expected = "\
+export interface Opts { sep?: string; max: number }
+
+export function join(parts: string[], o?: Opts): string {
+  return parts.join(o?.sep ?? ',')
+}
+
+export const LIMIT: number = 10;
+
+function clean(s: string): string {
+  return s.trim()
+}";
+    assert_eq!(text(&out), expected);
+}
+
+#[test]
+fn module_in_javascript_gets_jsdoc_and_no_types() {
+    let fs = MemFs::with(TS_PROJECT);
+    let out = go(&fs, MODULE_EXPR, true, write("src/strings.js")).unwrap();
+    let code = text(&out);
+    assert!(
+        code.starts_with("/** @typedef {{ sep?: string, max: number }} Opts */\n\n/**\n"),
+        "{code}"
+    );
+    assert!(
+        code.contains(
+            " * @param {string[]} parts\n * @param {Opts} [o]\n * @returns {string}\n */\nexport function join(parts, o) {"
+        ),
+        "{code}"
+    );
+    assert!(code.contains("export const LIMIT = 10;"), "{code}");
+    assert!(code.contains("\nfunction clean(s) {"), "{code}");
+    assert!(!code.contains("export function clean"), "{code}");
+    // a fájlba is megy, és a kiterjesztés a nyelv
+    let written = go(&fs, MODULE_EXPR, false, write("src/strings2.mjs")).unwrap();
+    assert!(written.lines[0].starts_with("wrote src/strings2.mjs"));
+}
+
+#[test]
+fn bare_members_to_a_ts_target_are_a_module_but_ref_stays_a_composable() {
+    let fs = MemFs::with(TS_PROJECT);
+    let out = go(
+        &fs,
+        "fn:add(a:int,b:int):int{ return a + b }",
+        true,
+        write("src/math.ts"),
+    )
+    .unwrap();
+    assert!(
+        text(&out).starts_with("export function add(a: number, b: number): number {"),
+        "{out:?}"
+    );
+    let out = go(&fs, "ref:n:int=0", true, write("src/composables/useN.ts")).unwrap();
+    assert!(text(&out).contains("export function useN() {"), "{out:?}");
+}
+
+#[test]
+fn type_alias_default_export_and_private_const() {
+    let fs = MemFs::default();
+    let expr =
+        "mod:m>type:Id=str|int+type:Mode='a'|'b'+-const:SECRET:str='x'+!fn:main():void{ run() }";
+    let out = go(&fs, expr, true, write("src/m.ts")).unwrap();
+    let code = text(&out);
+    assert!(code.contains("export type Id = string | number;"), "{code}");
+    assert!(code.contains("export type Mode = 'a' | 'b';"), "{code}");
+    assert!(code.contains("\nconst SECRET: string = 'x';"), "{code}");
+    assert!(
+        code.contains("export default function main(): void {\n  run()\n}"),
+        "{code}"
+    );
+    let js = text(&go(&fs, expr, true, write("src/m.js")).unwrap());
+    assert!(js.contains("/** @typedef {string | number} Id */"), "{js}");
+    assert!(js.contains("/** @typedef {'a' | 'b'} Mode */"), "{js}");
+    assert!(js.contains("export default function main() {"), "{js}");
+
+    let out = go(&fs, "!const:X:int=1", true, write("src/x.ts")).unwrap();
+    assert_eq!(text(&out), "const X: number = 1;\nexport default X;");
+    let err = go(&fs, "!type:Id=str|int", true, write("src/x.ts")).unwrap_err();
+    assert!(err.contains("export default"), "{err}");
+}
+
+#[test]
+fn class_in_typescript_has_parameter_properties_fields_and_modifiers() {
+    let fs = MemFs::default();
+    let expr = "class:UserService<BaseService>[Disposable,Loggable]>$count:int=0+-$secret:str+%$id:str+ctor(-repo:Repo,+retries:int=3)+ +load(id:int):User{ return this.repo.find(id) }+-::make(r:Repo):UserService{ return new UserService(r) }+#touch():void{ this.count++ }+ +async:fetch():list<User>{ return [] }";
+    let out = go(&fs, expr, true, write("src/UserService.ts")).unwrap();
+    let expected = "\
+export class UserService extends BaseService implements Disposable, Loggable {
+  count: number = 0;
+  private secret: string;
+  readonly id: string;
+
+  constructor(private readonly repo: Repo, public retries: number = 3) {}
+
+  load(id: number): User {
+    return this.repo.find(id)
+  }
+
+  private static make(r: Repo): UserService {
+    return new UserService(r)
+  }
+
+  protected touch(): void {
+    this.count++
+  }
+
+  async fetch(): Promise<User[]> {
+    return []
+  }
+}";
+    assert_eq!(text(&out), expected);
+
+    let abs = go(
+        &fs,
+        "class~:Shape>~area():float+ +name():str{ return 'x' }",
+        true,
+        write("src/Shape.ts"),
+    )
+    .unwrap();
+    let code = text(&abs);
+    assert!(
+        code.starts_with(
+            "export abstract class Shape {\n  abstract area(): number;\n\n  name(): string {"
+        ),
+        "{code}"
+    );
+}
+
+#[test]
+fn class_in_javascript_assigns_constructor_params_and_uses_jsdoc() {
+    let fs = MemFs::default();
+    let expr = "class:Counter>$count:int=0+ctor(-step:int=1)+ +inc():void{ this.count += this.step }+::create():Counter{ return new Counter() }+-hidden():int{ return 1 }";
+    let out = go(&fs, expr, true, write("src/Counter.js")).unwrap();
+    let code = text(&out);
+    assert!(
+        code.starts_with("export class Counter {\n  /** @type {number} */\n  count = 0;"),
+        "{code}"
+    );
+    assert!(
+        code.contains("   * @param {number} [step=1]\n   */\n  constructor(step = 1) {\n    this.step = step;\n  }"),
+        "{code}"
+    );
+    assert!(
+        code.contains("\n  inc() {\n    this.count += this.step\n  }"),
+        "{code}"
+    );
+    assert!(
+        code.contains("   * @returns {Counter}\n   */\n  static create() {"),
+        "{code}"
+    );
+    // JS-ben nincs láthatósági módosító
+    assert!(code.contains("\n  hidden() {"), "{code}");
+    assert!(!code.contains("private"), "{code}");
+}
+
+const SERVICE_TS: &str = "\
+export class Svc {
+  private n = 0;
+
+  run(): void {
+    this.n++;
+  }
+
+  stop(): void {
+    this.n = 0;
+  }
+}
+";
+
+#[test]
+fn into_class_inserts_members_after_a_method_or_at_the_end() {
+    let fs = MemFs::with(&[("src/svc.ts", SERVICE_TS)]);
+    let out = go(
+        &fs,
+        "+pause():void{ this.n = -1 }",
+        false,
+        into_class("src/svc.ts", "Svc", Some("run")),
+    )
+    .unwrap();
+    assert!(
+        out.lines[0].starts_with("inserted into src/svc.ts"),
+        "{out:?}"
+    );
+    let file = fs.get("src/svc.ts").unwrap();
+    assert!(
+        file.contains("  run(): void {\n    this.n++;\n  }\n\n  pause(): void {\n    this.n = -1\n  }\n\n  stop(): void {"),
+        "{file}"
+    );
+    assert!(fs.has_backup_of("src/svc.ts"));
+
+    go(
+        &fs,
+        "+extra():int{ return 1 }",
+        false,
+        into_class("src/svc.ts", "Svc", None),
+    )
+    .unwrap();
+    let file = fs.get("src/svc.ts").unwrap();
+    assert!(
+        file.ends_with("    this.n = 0;\n  }\n\n  extra(): number {\n    return 1\n  }\n}\n"),
+        "{file}"
+    );
+
+    let err = go(
+        &fs,
+        "+run():void{}",
+        false,
+        into_class("src/svc.ts", "Svc", None),
+    )
+    .unwrap_err();
+    assert!(err.contains("already a member"), "{err}");
+    let err = go(
+        &fs,
+        "+x():void{}",
+        false,
+        into_class("src/svc.ts", "Nope", None),
+    )
+    .unwrap_err();
+    assert!(err.contains("no class `Nope`"), "{err}");
+    let err = go(
+        &fs,
+        "+x():void{}",
+        false,
+        into_class("src/svc.ts", "Svc", Some("zzz")),
+    )
+    .unwrap_err();
+    assert!(err.contains("no `zzz`"), "{err}");
+}
+
+const UTIL_TS: &str = "\
+import { ref } from 'vue';
+
+export function one(): number {
+  return 1;
+}
+
+export function three(): number {
+  return 3;
+}
+";
+
+#[test]
+fn into_module_appends_merges_imports_and_refuses_duplicates() {
+    let fs = MemFs::with(&[("src/util.ts", UTIL_TS)]);
+    go(
+        &fs,
+        "use:vue(ref,computed)+fn:two():int{ return 2 }",
+        false,
+        into("src/util.ts", None),
+    )
+    .unwrap();
+    let file = fs.get("src/util.ts").unwrap();
+    assert!(
+        file.starts_with("import { ref, computed } from 'vue';\n"),
+        "{file}"
+    );
+    assert!(
+        file.ends_with("export function three(): number {\n  return 3;\n}\n\nexport function two(): number {\n  return 2\n}\n"),
+        "{file}"
+    );
+    assert!(fs.has_backup_of("src/util.ts"));
+
+    let err = go(
+        &fs,
+        "fn:one():int{ return 9 }",
+        false,
+        into("src/util.ts", None),
+    )
+    .unwrap_err();
+    assert!(err.contains("already declared"), "{err}");
+    let err = go(&fs, "type:three=int", false, into("src/util.ts", None)).unwrap_err();
+    assert!(err.contains("already declared"), "{err}");
+
+    go(
+        &fs,
+        "const:MID:int=5",
+        false,
+        into("src/util.ts", Some("one")),
+    )
+    .unwrap();
+    let file = fs.get("src/util.ts").unwrap();
+    let (one, mid, three) = (
+        file.find("function one").unwrap(),
+        file.find("export const MID: number = 5;").unwrap(),
+        file.find("function three").unwrap(),
+    );
+    assert!(one < mid && mid < three, "{file}");
+}
+
+#[test]
+fn replace_a_module_function_a_private_helper_and_a_class_method() {
+    let util = "\
+export function run(a: number): number {
+  return a;
+}
+
+function helper(): number {
+  return 1;
+}
+";
+    let fs = MemFs::with(&[("src/u.ts", util), ("src/svc.ts", SERVICE_TS)]);
+    let out = go(
+        &fs,
+        "fn:run(a:int):int{ return a * 2 }",
+        false,
+        replace_at("src/u.ts", None, "run"),
+    )
+    .unwrap();
+    assert!(
+        out.lines[0].starts_with("replaced src/u.ts L1-3"),
+        "{out:?}"
+    );
+    let file = fs.get("src/u.ts").unwrap();
+    assert!(
+        file.starts_with(
+            "export function run(a: number): number {\n  return a * 2\n}\n\nfunction helper()"
+        ),
+        "{file}"
+    );
+
+    // a nem exportált marad nem exportált
+    go(
+        &fs,
+        "fn:helper():int{ return 2 }",
+        false,
+        replace_at("src/u.ts", None, "helper"),
+    )
+    .unwrap();
+    let file = fs.get("src/u.ts").unwrap();
+    assert!(
+        file.contains("\nfunction helper(): number {\n  return 2\n}\n"),
+        "{file}"
+    );
+
+    let out = go(
+        &fs,
+        "+run():void{ this.n += 2 }",
+        false,
+        replace_at("src/svc.ts", Some("Svc"), "run"),
+    )
+    .unwrap();
+    assert!(out.lines[0].contains("Svc::run"), "{out:?}");
+    let file = fs.get("src/svc.ts").unwrap();
+    assert!(
+        file.contains("  run(): void {\n    this.n += 2\n  }\n\n  stop(): void {"),
+        "{file}"
+    );
+    assert!(!file.contains("this.n++"), "{file}");
+
+    let err = go(
+        &fs,
+        "+nope():void{}",
+        false,
+        replace_at("src/svc.ts", Some("Svc"), "nope"),
+    )
+    .unwrap_err();
+    assert!(err.contains("no `nope`"), "{err}");
+}
+
+#[test]
+fn replace_a_whole_class_by_name() {
+    let fs = MemFs::with(&[("src/svc.ts", SERVICE_TS)]);
+    go(
+        &fs,
+        "class:Svc>+ping():void{ }",
+        false,
+        replace_at("src/svc.ts", None, "Svc"),
+    )
+    .unwrap();
+    let file = fs.get("src/svc.ts").unwrap();
+    assert!(
+        file.starts_with("export class Svc {\n  ping(): void {"),
+        "{file}"
+    );
+    assert!(!file.contains("stop"), "{file}");
+}
+
+#[test]
+fn module_errors_and_routing() {
+    let fs = MemFs::default();
+    let err = go(&fs, "mod:x>fn:f(){ if ( }", false, write("src/x.ts")).unwrap_err();
+    assert!(err.contains("syntax error in src/x.ts at L"), "{err}");
+    assert!(fs.get("src/x.ts").is_none());
+    let err = go(&fs, "mod:x>ref:a:int=1", true, write("src/x.ts")).unwrap_err();
+    assert!(err.contains("not to a module"), "{err}");
+    let err = go(&fs, "mod:x>fn:f(){}", true, write("src/X.vue")).unwrap_err();
+    assert!(err.contains("`mod:`"), "{err}");
+    let err = go(
+        &fs,
+        "comp:useA>class:A>+x():int{ return 1 }",
+        true,
+        write("src/useA.ts"),
+    )
+    .unwrap_err();
+    assert!(err.contains("belong to a module"), "{err}");
+
+    let req = |expr: &str, target: Target| GenRequest {
+        expr: expr.to_owned(),
+        dry: false,
+        target,
+    };
+    assert!(wants_vue(&req("mod:x>fn:a", Target::Preview)));
+    assert!(wants_vue(&req("class:A>+x():int", Target::Preview)));
+    assert!(wants_vue(&req("class~:A", Target::Preview)));
+    assert!(!wants_vue(&req("c:A", Target::Preview)));
+    let preview = go(&fs, "mod:x>fn:f():int{ return 1 }", true, Target::Preview).unwrap();
+    assert!(
+        text(&preview).contains("export function f()"),
+        "{preview:?}"
+    );
+}

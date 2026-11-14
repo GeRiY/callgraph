@@ -4,7 +4,10 @@
 
 use std::collections::BTreeSet;
 
-use super::model::{Emit, FormField, Import, Member, Prop, TypeField, VParam};
+use super::model::{
+    ClassDecl, ClassKind, ClassMember, CtorParam, Emit, Export, FormField, Import, Member, Prop,
+    TypeField, VParam, Vis,
+};
 use super::types::{default_literal, object_ts, runtime_type, ts_type};
 use crate::generate::ast::TypeRef;
 
@@ -100,6 +103,10 @@ impl ScriptEmitter {
             } => self.constant(name, ty.as_ref(), value.as_deref(), *mutable),
             Member::Hook { name, body } => self.hook(name, body.as_deref()),
             Member::Type { name, fields } => self.type_decl(name, fields),
+            Member::Alias { name, ty } => self.alias_decl(name, ty),
+            Member::Class(class) => self.class_decl(class),
+            // az export-módosító csak a modul-szintű kiírásban (`module`) számít
+            Member::Exported { member, .. } => self.member(member),
             Member::Raw(text) => text_lines(text),
             Member::Destructure {
                 pattern,
@@ -375,7 +382,7 @@ impl ScriptEmitter {
         let (types, rest): (Vec<Member>, Vec<Member>) = members
             .iter()
             .cloned()
-            .partition(|m| matches!(m, Member::Type { .. }));
+            .partition(|m| matches!(m, Member::Type { .. } | Member::Alias { .. }));
         let members = rest.as_slice();
         let mut body = self.members(members);
         let mut names: Vec<String> = Vec::new();
@@ -402,6 +409,347 @@ impl ScriptEmitter {
             body.into_iter()
                 .map(|l| if l.is_empty() { l } else { format!("{IND}{l}") }),
         );
+        lines.push("}".to_owned());
+        lines
+    }
+}
+
+/// A JSDoc-blokk sora-e (az export-előtag a deklarációs sorra kerül, nem a megjegyzésre).
+pub fn is_doc_line(line: &str) -> bool {
+    let t = line.trim_start();
+    t.starts_with("/**") || t.starts_with('*')
+}
+
+/// Az export-módosítón belüli tag.
+fn unwrapped(m: &Member) -> &Member {
+    match m {
+        Member::Exported { member, .. } => member.as_ref(),
+        other => other,
+    }
+}
+
+/// Modul-szintű kiírás (`mod:`, `.ts` / `.js` fájl): exportok, JSDoc, osztályok.
+impl ScriptEmitter {
+    /// A modul tagjai export-tal, egy-egy üres sorral elválasztva (az egymás melletti egysoros konstansok kivétel).
+    pub fn module(&self, members: &[Member]) -> Vec<String> {
+        let mut out = Vec::new();
+        let mut previous_const = false;
+        for (i, m) in members.iter().enumerate() {
+            let lines = self.module_member(m);
+            let single_const = lines.len() == 1 && matches!(unwrapped(m), Member::Const { .. });
+            if i > 0 && !(single_const && previous_const) {
+                out.push(String::new());
+            }
+            previous_const = single_const;
+            out.extend(lines);
+        }
+        out
+    }
+
+    /// Egy modul-szintű tag sorai (`export` előtaggal, ha kell).
+    pub fn module_member(&self, m: &Member) -> Vec<String> {
+        let (export, inner) = match m {
+            Member::Exported { export, member } => (*export, member.as_ref()),
+            other => (Export::Named, other),
+        };
+        let lines = match inner {
+            Member::Func {
+                name,
+                params,
+                ret,
+                body,
+                is_async,
+            } => {
+                let mut lines = Vec::new();
+                if !self.ts {
+                    lines.extend(self.jsdoc(params, ret.as_ref(), *is_async));
+                }
+                lines.extend(self.function(name, params, ret.as_ref(), body.as_deref(), *is_async));
+                lines
+            }
+            other => self.member(other),
+        };
+        self.exported(lines, export, inner)
+    }
+
+    /// Az `export` / `export default` előtag a deklarációs sorra; JS-ben a típusok (`@typedef`) eleve exportáltak.
+    fn exported(&self, mut lines: Vec<String>, export: Export, m: &Member) -> Vec<String> {
+        let declares = matches!(
+            m,
+            Member::Func { .. }
+                | Member::Const { .. }
+                | Member::Type { .. }
+                | Member::Alias { .. }
+                | Member::Class(_)
+        );
+        let typedef = !self.ts && matches!(m, Member::Type { .. } | Member::Alias { .. });
+        if export == Export::None || !declares || typedef {
+            return lines;
+        }
+        let Some(at) = lines.iter().position(|l| !is_doc_line(l)) else {
+            return lines;
+        };
+        match (export, m) {
+            (Export::Default, Member::Const { name, .. }) => {
+                lines.push(format!("export default {name}{}", self.end()));
+            }
+            (Export::Default, _) => {
+                let first = format!("export default {}", lines[at]);
+                lines[at] = first;
+            }
+            _ => {
+                let first = format!("export {}", lines[at]);
+                lines[at] = first;
+            }
+        }
+        lines
+    }
+
+    /// JS: `/** @param {number} a … @returns {R} */` a típusos paraméterekből / visszatérési típusból.
+    fn jsdoc(&self, params: &[VParam], ret: Option<&TypeRef>, is_async: bool) -> Vec<String> {
+        let mut tags: Vec<String> = Vec::new();
+        for p in params {
+            let Some(t) = &p.ty else { continue };
+            let ty = ts_type(t);
+            let name = match (&p.default, p.optional) {
+                (Some(d), _) => format!("[{}={d}]", p.name),
+                (None, true) => format!("[{}]", p.name),
+                (None, false) => p.name.clone(),
+            };
+            tags.push(format!("@param {{{ty}}} {name}"));
+        }
+        match ret {
+            Some(TypeRef::Void) if !is_async => {}
+            Some(t) => {
+                let ty = ts_type(t);
+                tags.push(if is_async {
+                    format!("@returns {{Promise<{ty}>}}")
+                } else {
+                    format!("@returns {{{ty}}}")
+                });
+            }
+            None => {}
+        }
+        if tags.is_empty() {
+            return Vec::new();
+        }
+        let mut lines = vec!["/**".to_owned()];
+        lines.extend(tags.into_iter().map(|t| format!(" * {t}")));
+        lines.push(" */".to_owned());
+        lines
+    }
+
+    /// `type Név = A | B;` (TS), `/** @typedef {A | B} Név */` (JS).
+    fn alias_decl(&self, name: &str, ty: &TypeRef) -> Vec<String> {
+        let text = ts_type(ty);
+        if self.ts {
+            vec![format!("type {name} = {text}{}", self.end())]
+        } else {
+            vec![format!("/** @typedef {{{text}}} {name} */")]
+        }
+    }
+
+    fn ret_suffix(&self, ret: Option<&TypeRef>, is_async: bool) -> String {
+        match (self.ts, ret) {
+            (true, Some(t)) if is_async => format!(": Promise<{}>", ts_type(t)),
+            (true, Some(t)) => format!(": {}", ts_type(t)),
+            (true, None) if is_async => ": Promise<void>".to_owned(),
+            _ => String::new(),
+        }
+    }
+
+    /// Az osztály (export nélkül): `class Név extends Ős implements A, B { … }`.
+    fn class_decl(&self, c: &ClassDecl) -> Vec<String> {
+        let mut lines = Vec::new();
+        if !self.ts {
+            for iface in &c.implements {
+                lines.push(format!("/** @implements {{{iface}}} */"));
+            }
+        }
+        let mut head = String::new();
+        if self.ts && c.is_abstract {
+            head.push_str("abstract ");
+        }
+        head.push_str(&format!("class {}", c.name));
+        if let Some(base) = &c.extends {
+            head.push_str(&format!(" extends {base}"));
+        }
+        if self.ts && !c.implements.is_empty() {
+            head.push_str(&format!(" implements {}", c.implements.join(", ")));
+        }
+        let body = self.class_members(&c.members);
+        if body.is_empty() {
+            lines.push(format!("{head} {{}}"));
+            return lines;
+        }
+        lines.push(format!("{head} {{"));
+        lines.extend(
+            body.into_iter()
+                .map(|l| if l.is_empty() { l } else { format!("{IND}{l}") }),
+        );
+        lines.push("}".to_owned());
+        lines
+    }
+
+    /// Az osztálytagok sorai (behúzás nélkül): üres sorral elválasztva, az egymás melletti egysoros mezők kivétel.
+    pub fn class_members(&self, members: &[ClassMember]) -> Vec<String> {
+        let mut out = Vec::new();
+        let mut previous_field = false;
+        for (i, m) in members.iter().enumerate() {
+            let lines = self.class_member(m);
+            let single_field = lines.len() == 1 && matches!(m.kind, ClassKind::Field { .. });
+            if i > 0 && !(single_field && previous_field) {
+                out.push(String::new());
+            }
+            previous_field = single_field;
+            out.extend(lines);
+        }
+        out
+    }
+
+    fn class_member(&self, m: &ClassMember) -> Vec<String> {
+        match &m.kind {
+            ClassKind::Ctor { params, body } => self.ctor(params, body.as_deref()),
+            ClassKind::Field { name, ty, init } => {
+                self.field(m, name, ty.as_ref(), init.as_deref())
+            }
+            ClassKind::Method {
+                name,
+                params,
+                ret,
+                body,
+                is_async,
+            } => self.method(m, name, params, ret.as_ref(), body.as_deref(), *is_async),
+        }
+    }
+
+    /// TS-módosítók: láthatóság, `static`, `abstract`, `readonly` (JS-ben csak a `static`).
+    fn modifiers(&self, m: &ClassMember, readonly: bool) -> String {
+        let mut text = String::new();
+        if self.ts {
+            match m.vis {
+                Vis::Private => text.push_str("private "),
+                Vis::Protected => text.push_str("protected "),
+                Vis::Public => {}
+            }
+        }
+        if m.is_static {
+            text.push_str("static ");
+        }
+        if self.ts && m.is_abstract {
+            text.push_str("abstract ");
+        }
+        if self.ts && readonly {
+            text.push_str("readonly ");
+        }
+        text
+    }
+
+    fn field(
+        &self,
+        m: &ClassMember,
+        name: &str,
+        ty: Option<&TypeRef>,
+        init: Option<&str>,
+    ) -> Vec<String> {
+        let mods = self.modifiers(m, m.readonly);
+        let annotation = match (self.ts, ty) {
+            (true, Some(t)) => format!(": {}", ts_type(t)),
+            _ => String::new(),
+        };
+        let value = init.map(|v| format!(" = {v}")).unwrap_or_default();
+        let mut lines = Vec::new();
+        if let (false, Some(t)) = (self.ts, ty) {
+            lines.push(format!("/** @type {{{}}} */", ts_type(t)));
+        }
+        lines.extend(text_lines(&format!(
+            "{mods}{name}{annotation}{value}{}",
+            self.end()
+        )));
+        lines
+    }
+
+    fn method(
+        &self,
+        m: &ClassMember,
+        name: &str,
+        params: &[VParam],
+        ret: Option<&TypeRef>,
+        body: Option<&str>,
+        is_async: bool,
+    ) -> Vec<String> {
+        let mut lines = Vec::new();
+        if !self.ts {
+            lines.extend(self.jsdoc(params, ret, is_async));
+        }
+        let mods = self.modifiers(m, false);
+        let list: Vec<String> = params.iter().map(|p| self.param(p)).collect();
+        let list = list.join(", ");
+        let ret = self.ret_suffix(ret, is_async);
+        if self.ts && m.is_abstract {
+            lines.push(format!("{mods}{name}({list}){ret}{}", self.end()));
+            return lines;
+        }
+        let prefix = if is_async { "async " } else { "" };
+        lines.push(format!("{mods}{prefix}{name}({list}){ret} {{"));
+        if !self.ts && m.is_abstract {
+            lines.push(format!(
+                "{IND}throw new Error('Not implemented'){}",
+                self.end()
+            ));
+        } else {
+            lines.extend(body_lines(body, IND));
+        }
+        lines.push("}".to_owned());
+        lines
+    }
+
+    fn ctor_param(&self, c: &CtorParam) -> String {
+        let base = self.param(&c.param);
+        if !self.ts {
+            return base;
+        }
+        let mut mods = String::new();
+        match c.vis {
+            Some(Vis::Private) => mods.push_str("private "),
+            Some(Vis::Protected) => mods.push_str("protected "),
+            Some(Vis::Public) => mods.push_str("public "),
+            None => {}
+        }
+        if c.readonly {
+            mods.push_str("readonly ");
+        }
+        format!("{mods}{base}")
+    }
+
+    /// `constructor(private readonly dep: Repo)` (TS paraméter-property) / `this.dep = dep;` (JS).
+    fn ctor(&self, params: &[CtorParam], body: Option<&str>) -> Vec<String> {
+        let mut lines = Vec::new();
+        if !self.ts {
+            let plain: Vec<VParam> = params.iter().map(|c| c.param.clone()).collect();
+            lines.extend(self.jsdoc(&plain, None, false));
+        }
+        let list: Vec<String> = params.iter().map(|c| self.ctor_param(c)).collect();
+        let list = list.join(", ");
+        let has_body = body.is_some_and(|b| !b.trim().is_empty());
+        let assigns: Vec<String> = if self.ts {
+            Vec::new()
+        } else {
+            params
+                .iter()
+                .filter(|c| c.vis.is_some())
+                .map(|c| format!("this.{0} = {0}{1}", c.param.name, self.end()))
+                .collect()
+        };
+        if !has_body && assigns.is_empty() {
+            lines.push(format!("constructor({list}) {{}}"));
+            return lines;
+        }
+        lines.push(format!("constructor({list}) {{"));
+        lines.extend(assigns.into_iter().map(|a| format!("{IND}{a}")));
+        if has_body {
+            lines.extend(body_lines(body, IND));
+        }
         lines.push("}".to_owned());
         lines
     }

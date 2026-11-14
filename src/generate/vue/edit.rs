@@ -127,7 +127,12 @@ fn destructures(pattern: &str, name: &str) -> bool {
 /// A sor a `name` nevű függvényt / változót deklarálja-e (`function n(`, `async function n`, `const n =`, `export …`).
 fn declares(line: &str, name: &str) -> bool {
     let mut t = line.trim_start();
-    for prefix in ["export ", "default ", "async "] {
+    // JS típus-deklaráció: `/** @typedef {…} Név */`
+    if t.starts_with("/**") && t.contains("@typedef") {
+        let inner = t.trim_end().trim_end_matches("*/").trim_end();
+        return inner.ends_with(&format!(" {name}"));
+    }
+    for prefix in ["export ", "default ", "async ", "abstract "] {
         if let Some(rest) = t.strip_prefix(prefix) {
             t = rest.trim_start();
         }
@@ -139,6 +144,9 @@ fn declares(line: &str, name: &str) -> bool {
         "let ",
         "var ",
         "interface ",
+        "class ",
+        "enum ",
+        "type ",
     ] {
         if let Some(rest) = t.strip_prefix(keyword) {
             if let Some(pattern) = rest.trim_start().strip_prefix('{') {
@@ -224,12 +232,21 @@ pub fn declared_names(lines: &[String], from: usize, to: usize) -> Vec<String> {
     let mut out = Vec::new();
     for line in &lines[from.min(to)..to] {
         let mut t = line.trim_start();
-        for prefix in ["export ", "default ", "async "] {
+        for prefix in ["export ", "default ", "async ", "abstract "] {
             if let Some(rest) = t.strip_prefix(prefix) {
                 t = rest.trim_start();
             }
         }
-        for keyword in ["function ", "const ", "let ", "var "] {
+        for keyword in [
+            "function ",
+            "const ",
+            "let ",
+            "var ",
+            "class ",
+            "interface ",
+            "enum ",
+            "type ",
+        ] {
             if let Some(rest) = t.strip_prefix(keyword) {
                 let name: String = rest
                     .trim_start()
