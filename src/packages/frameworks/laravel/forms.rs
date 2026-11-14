@@ -256,6 +256,42 @@ pub(super) fn object_keys(arg: &str) -> Option<Vec<String>> {
     Some(keys)
 }
 
+/// A `composer.json` `autoload` / `autoload-dev` PSR-4 leképezése: (előtag `\\`-rel a végén, mappa `/` nélkül).
+fn composer_psr4(root: &std::path::Path, files: &dyn ProjectFiles) -> Vec<(String, String)> {
+    let Some(text) = files.read(&root.join("composer.json")) else {
+        return Vec::new();
+    };
+    let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for section in ["autoload", "autoload-dev"] {
+        let Some(map) = json
+            .get(section)
+            .and_then(|autoload| autoload.get("psr-4"))
+            .and_then(serde_json::Value::as_object)
+        else {
+            continue;
+        };
+        for (prefix, dirs) in map {
+            let dirs: Vec<&str> = match dirs {
+                serde_json::Value::String(dir) => vec![dir.as_str()],
+                serde_json::Value::Array(list) => {
+                    list.iter().filter_map(serde_json::Value::as_str).collect()
+                }
+                _ => Vec::new(),
+            };
+            for dir in dirs {
+                let dir = dir.trim_start_matches("./").trim_end_matches('/');
+                if !prefix.is_empty() && !dir.is_empty() {
+                    out.push((prefix.clone(), dir.to_owned()));
+                }
+            }
+        }
+    }
+    out
+}
+
 /// Egy route uri-ja illeszkedik-e az URL szegmenseire (`{param}` bármely szegmenst elfogad).
 fn uri_matches(uri: &str, segments: &[&str]) -> bool {
     let route: Vec<&str> = uri.trim_matches('/').split('/').collect();
@@ -377,6 +413,18 @@ impl Laravel {
         self.forms = forms;
     }
 
+    /// Célzott változat: a `graphs` csak a (JS / Vue) küldő fájlok és a lekérdezett PHP-fájlok; a controller és a
+    /// FormRequest forrása a `composer.json` PSR-4 leképezéséből (és az `App\` → `app/` alapból) jön, nem a
+    /// projekt-gráfból. Ugyanazokat a `form:` sorokat adja, mint a teljes `scan_forms`.
+    pub(crate) fn scan_forms_for<'g>(
+        &mut self,
+        graphs: impl IntoIterator<Item = (&'g Path, &'g FileGraph)>,
+        files: &dyn ProjectFiles,
+    ) {
+        self.psr4 = composer_psr4(&self.root, files);
+        self.scan_forms(graphs, files);
+    }
+
     /// A küldés célja a route-táblában: `route('név')` (a küldés igéjével egyező route) vagy `'/uri'` literál
     /// (`{param}` bármely szegmens); más cél (sablon-literál, változó): `None`.
     fn form_route(&self, arg: &str, verb: &str) -> Option<&Route> {
@@ -417,9 +465,14 @@ impl Laravel {
         let psr4 = class
             .strip_prefix("App\\")
             .map(|rest| format!("app/{}.php", rest.replace('\\', "/")));
+        let composer = self.psr4.iter().filter_map(|(prefix, dir)| {
+            let rest = class.strip_prefix(prefix.as_str())?;
+            Some(format!("{dir}/{}.php", rest.replace('\\', "/")))
+        });
         mapped
             .into_iter()
             .chain(psr4)
+            .chain(composer)
             .find_map(|rel| files.read(&self.root.join(rel)))
     }
 

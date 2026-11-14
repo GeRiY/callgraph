@@ -533,7 +533,7 @@ fn only_loaded_route_files_count() {
         .iter()
         .filter_map(|r| r.name.clone())
         .collect();
-    assert_eq!(names, vec!["home".to_owned(), "login".to_owned()]);
+    assert_eq!(names, vec!["login".to_owned(), "home".to_owned()]);
     assert_eq!(
         laravel.view_lines(&[], Lang::En),
         vec![

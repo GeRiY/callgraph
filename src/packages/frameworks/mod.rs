@@ -12,6 +12,7 @@
 mod files;
 mod inertia;
 pub(crate) mod laravel;
+mod targeted;
 
 use std::path::Path;
 use std::sync::Arc;
@@ -29,7 +30,8 @@ pub(crate) use laravel::Laravel;
 /// tényein) csak akkor töltődnek, ha kellenek: az `inertia` nézetnél, és az outline-nál, ha egy sor oldal-fájl
 /// (`rendered by:`). Laravel-projektben a route-tábla (a `routes/*.php` forrásából) csak akkor, ha kell: a `ziggy`
 /// nézetnél, és az outline / json-nál, ha egy sor Ziggy `route(..)` hívást tartalmaz vagy controller-fájl. Framework
-/// nélkül a sorok érintetlenek.
+/// nélkül a sorok érintetlenek. A projekt-szintű nézetek (`ziggy`, `forms`, `models`, `inertia`) a teljes
+/// projekt-gráfot töltik; az egy-fájlos outline / json csak a szükséges fájlokat (`targeted.rs`).
 pub(crate) fn annotate(rows: &mut [QueryResult], root: &Path, format: &str) {
     let Some(first) = rows.first() else {
         return;
@@ -62,29 +64,57 @@ pub(crate) fn annotate(rows: &mut [QueryResult], root: &Path, format: &str) {
             || (matches!(format, "outline" | "json" | "jsonl") && rows.iter().any(needs_models)));
     if scan_inertia || scan_laravel || scan_models {
         let analyzer = Analyzer::with_defaults();
-        // a projekt-gráf hibája csak a render-helyeket / route-táblát hagyja üresen
-        let _ = ProjectSource::new(root, &analyzer).with_files(|files| {
-            let code = || {
-                files
-                    .iter()
-                    .filter(|file| file.code)
-                    .map(|file| (file.path, file.graph))
-            };
-            if let Some(inertia) = inertia.as_mut().filter(|_| scan_inertia) {
-                inertia.scan(code(), &DiskProjectFiles);
-            }
-            if let Some(laravel) = laravel.as_mut() {
-                if scan_laravel {
-                    laravel.scan(code(), &DiskProjectFiles, format == "ziggy");
-                    if scan_forms {
-                        laravel.scan_forms(code(), &DiskProjectFiles);
+        // a projekt-szintű nézetek (és a közvetett modell-öröklés) a teljes projekt-gráfot kérik; az egy-fájlos
+        // outline / json csak a szükséges fájlokat tölti (`targeted`)
+        let project_wide = matches!(format, "ziggy" | "forms" | "models" | "inertia")
+            || (scan_models && rows.iter().any(targeted::maybe_indirect_model));
+        if project_wide {
+            // a projekt-gráf hibája csak a render-helyeket / route-táblát hagyja üresen
+            let _ = ProjectSource::new(root, &analyzer).with_files(|files| {
+                let code = || {
+                    files
+                        .iter()
+                        .filter(|file| file.code)
+                        .map(|file| (file.path, file.graph))
+                };
+                if let Some(inertia) = inertia.as_mut().filter(|_| scan_inertia) {
+                    inertia.scan(code(), &DiskProjectFiles);
+                }
+                if let Some(laravel) = laravel.as_mut() {
+                    if scan_laravel {
+                        laravel.scan(code(), &DiskProjectFiles, format == "ziggy");
+                        if scan_forms {
+                            laravel.scan_forms(code(), &DiskProjectFiles);
+                        }
+                    }
+                    if scan_models {
+                        laravel.scan_models(code(), &DiskProjectFiles);
                     }
                 }
-                if scan_models {
-                    laravel.scan_models(code(), &DiskProjectFiles);
-                }
-            }
-        });
+            });
+        } else {
+            let need = targeted::Need {
+                inertia: scan_inertia,
+                routes: scan_laravel,
+                forms: scan_forms,
+                models: scan_models,
+            };
+            let analyze = |path: &Path| {
+                analyzer
+                    .analyze_path(path)
+                    .ok()
+                    .and_then(|analysis| targeted::slim(analysis.graph))
+            };
+            targeted::scan(
+                rows,
+                inertia.as_mut(),
+                laravel.as_mut(),
+                need,
+                root,
+                &DiskProjectFiles,
+                &analyze,
+            );
+        }
     }
     let shared_inertia = inertia.map(Arc::new);
     let shared_laravel = laravel

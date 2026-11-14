@@ -21,6 +21,8 @@ mod forms_tests;
 #[cfg(test)]
 mod models_tests;
 #[cfg(test)]
+mod targeted_tests;
+#[cfg(test)]
 mod tests;
 
 use std::collections::HashMap;
@@ -76,6 +78,9 @@ pub(crate) struct Laravel {
     /// A `routes/` alatti, de sehonnan be nem töltött fájlok (se `withRouting`, se `require`): a route-jaik
     /// nincsenek a táblában.
     unloaded: Vec<String>,
+    /// A `composer.json` PSR-4 leképezése (előtag, mappa) — csak a célzott `scan_forms_for` után; a teljes
+    /// projekt-keresésben üres (ott a gráfokból gyűjtött osztály-térkép van).
+    psr4: Vec<(String, String)>,
 }
 
 /// A hívás route-neve: Ziggy `route('név')` JS-hívás string-literál névvel (a gráf `resolved`-je `route::név`);
@@ -145,6 +150,7 @@ impl Laravel {
             models: None,
             dynamic_names: Vec::new(),
             unloaded: Vec::new(),
+            psr4: Vec::new(),
         }
     }
 
@@ -171,6 +177,9 @@ impl Laravel {
                 self.collect_references(&rel, path, graph, files);
             }
         }
+        // út szerinti sorrend: a teljes projekt-bejárás és a célzott beolvasás ugyanazt a táblát (és a controller
+        // `route:` sorában ugyanazt a sorrendet) adja
+        route_files.sort_by(|a, b| a.0.cmp(&b.0));
         let loaded = self.loaded_route_files(&route_files, files);
         let prefix = self.api_prefix(files);
         for (rel, text, graph) in &route_files {
