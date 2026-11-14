@@ -5,6 +5,74 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+### Added
+
+- **Package recognition (composer, npm, yarn, pnpm, bun):** callgraph reads the manifests and lock files (offline) and
+  `callgraph.sh profile` shows a `stack:` line with the notable packages and their locked versions (the declared range
+  without a lock, marked); the MCP startup profile gets a compact version of it. `profile --packages` lists every
+  direct composer / npm dependency (installed and declared version, dev flag).
+- **See which package a call goes to, and where a package is used:** in the outline, calls into a dependency are
+  grouped under the package's short name (`guzzle: GuzzleHttp\Client::request`), the JSON output has a `package`
+  field (versions once per file), and `locate` gives a "package" reason. `callgraph.sh uses <package> [--calls]` (MCP
+  `package_usage`) lists per API symbol how often it is used and the first file; `(type)` marks an import without a
+  call, `--calls` lists every call line.
+- **`callgraph.sh deps`** (MCP `project_profile` with `deps: true`): probably unused, missing and dev-only composer /
+  npm dependencies, one line each with a short reason. A false alarm can be silenced with `deps-ignore <name>` in
+  `.callgraphignore`.
+- **Inertia pages:** a PHP `Inertia::render('Board')` call links to its page file (`Pages/Board.vue`), the page's
+  outline gets a `rendered by:` line, and `show . --format inertia` lists each page with its render sites and props,
+  marking a missing page file or props the page does not declare in `defineProps`, plus the pages never rendered.
+- **Laravel routes and Ziggy:** callgraph reads the route table from the loaded `routes/*.php` files (groups,
+  resources, names, the `/api` prefix). A Vue / JS `route('events.show')` call in the outline shows the method, URI and
+  controller action (or `⚠ no route`), and a controller method gets a `route:` line. `show . --format ziggy` lists
+  unknown route names and route files that are never loaded; when some routes have dynamic names, unknown names are
+  only marked `?`.
+- **Laravel form check:** an Inertia `useForm({...})` form is compared with the validation of the controller action
+  it posts to (FormRequest or inline `validate`): a `form:` line under the sending function and under the action
+  (fields sent but not validated, required fields not sent, or `N fields ✓`); `show . --format forms` lists them all.
+- **Laravel model summary:** under an Eloquent model the outline shows `table:` (the columns from the migrations) and
+  `fillable:` lines, relation lines show their target, and `⚠` lines warn about a fillable or cast that is not a
+  column. `show . --format models` lists the models, the tables without a model, and a table created twice without a
+  drop (a fresh migrate would fail).
+- **Code generator `callgraph.sh gen '<expr>'`:** writes PHP classes / members, Vue single-file components (script
+  setup, template, style) and composables from a short Emmet-like expression, in the project's style (namespace from
+  `composer.json`, imports from the project, TS or JS, semicolons, indentation). Targets: `--write <file>` (new file
+  only), `--into <file>[::Class] [--after <method>]`, `--replace <file>:L<a>-L<b>` or `::<method>`, where `--expect
+  <sha256-prefix>` refuses the change if those lines changed meanwhile; without a target, or with `--dry`, it only
+  prints the code. It answers with one line per file. The new text is syntax-checked before writing (nothing is
+  written on an error), every change to an existing file is backed up to `.callgraph/backups/` first (newest 10 per
+  file), and `callgraph.sh undo [<file>]` restores the newest backup.
+- **A Laravel feature in one step:**
+  `gen 'laravel:Fee[auth,prefix=admin]>create(name:str,amount:int,paid?:bool)+edit+index'` writes the FormRequests,
+  controller methods, routes and Inertia / Vue pages together, checks that the form fields match the rules, warns
+  about NOT NULL columns without a default that the form does not send, and one `undo` reverts all of its files.
+- **`callgraph.sh rename route|class|method <old> <new>`:** renames across the whole project — route names
+  (`->name()`, groups, `'profile.*'` patterns, resource routes via `->names()`, and every `route('x')` in PHP, Blade,
+  JS and Vue), PHP classes (declaration, file move, namespace, `use`, type hints, docblocks; `--strings` also rewrites
+  string references, `--keep-table` keeps the Eloquent table name) and PHP methods (overrides, resolved calls,
+  callable arrays, route actions). Every changed file is syntax-checked first, `--dry` only reports, and one `undo`
+  reverts the whole rename.
+- **MCP `generate` and `rename` tools (opt-in):** listed only when the server runs with `--generate` or
+  `CALLGRAPH_GENERATE=1`; without it the tool list stays exactly as before.
+
+### Changed
+
+- **MCP tool hints:** unlike every other tool, the opt-in `generate` and `rename` tools write files, so they declare
+  `readOnlyHint: false` (and `idempotentHint: false`); all other tools still declare `readOnlyHint: true`.
+- **Local stats and opt-in telemetry: new command kinds.** `uses` / `package_usage`, `deps`, `generate`, `undo` and
+  `rename` are counted as their own commands in the local stats and event log (on this machine, `callgraph.sh
+  stats`), and — only if you turned telemetry on — in the daily counts that are sent, still without names, paths or
+  code. `callgraph.sh telemetry preview` shows what would be sent; off: `CALLGRAPH_STATS=0` (local),
+  `callgraph.sh telemetry off` or `CALLGRAPH_TELEMETRY=0` (sending).
+
+### Fixed
+
+- PHP: a fully qualified name such as `\LogicException` or `\Helper` now resolves to the global namespace, not to the
+  current namespace or an import.
+- An SCSS file with accented characters before a function call (`// Fejléc háttér`) no longer crashes project-wide
+  views such as `locate`, `profile` or the framework views (also in 0.9.5). If a language analyzer crashes on a file,
+  only that file is skipped instead of the whole command failing.
+
 ## [0.9.5] — 2026-11-13
 
 ### Added

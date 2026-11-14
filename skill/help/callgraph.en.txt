@@ -97,6 +97,11 @@ Project profile (architecture, layers and patterns from folder / file names, che
                                                 --packages: every direct composer / npm dependency (installed, declared)
   bash ~/.claude/skills/callgraph/callgraph.sh uses <package> [--calls] [--project alias]   where the code uses a dependency (guzzle, @vueuse/core): per API symbol the count, first file, +N; (type) = import without a call; --calls: every call line per file
   bash ~/.claude/skills/callgraph/callgraph.sh deps [--project alias]   probably unused / missing / dev-only composer / npm dependencies (one line each; .callgraphignore: deps-ignore <name>)
+  Laravel / Inertia project views (run on the project root, e.g. `. --format ziggy`; outlines also get the short links):
+    --format ziggy     unknown route('x') names (JS / Vue / PHP), never-loaded route files; outline: route::x → POST /x · Ctrl@m
+    --format forms     useForm fields vs the action's FormRequest / validate rules; outline: form: … · N fields ✓ / ⚠ …
+    --format models    models: table, columns from the migrations, relations; fillable / cast not a column, table created twice
+    --format inertia   pages: render sites, props the page does not declare, pages never rendered
   bash ~/.claude/skills/callgraph/callgraph.sh <dir> --layer service           only the files of that layer (name,name...;
                                                 one ecosystem: controller:php, controller:js, …:swift, …:rust)
   bash ~/.claude/skills/callgraph/callgraph.sh <dir> --layers                  summary grouped by layer, [role] on FILE lines
@@ -180,7 +185,17 @@ Code generator (writes files; the MCP `generate` tool is off unless the server r
     Examples:
       gen 'c!:PaymentGateway<BaseGateway>[Chargeable] > ctor(-Client $http, -int $retries=3) + +charge(Order $order):Receipt + -sign(array $p):string' --write app/Services/PaymentGateway.php
       gen '+refund(Order $o):void{ $this->http->post($o->id); }' --into app/Services/PaymentGateway.php::PaymentGateway --after charge
-  bash ~/.claude/skills/callgraph/callgraph.sh undo [<file>]    restore the newest backup (of the file, or of the last changed one); itself undoable
+    Vue (TS or JS like the project): vue:Name>(script>…)+(template>…)+(style>…), comp:useX>… composable;
+      script: props(title:str,size?:int=3) emits(save:int,close) ref:n:T=v computed:n:T{…} fn:n(p:T):R{…} form(a,b) use:@/Components/X
+      template: Emmet div.card#id[attr=v @click=f :key=x.id]{text} {{ expr }} *3; components auto-imported; style: .a{decl;decl}
+      gen 'script>ref:loading:bool=false+fn:reset(){ form.reset() }' --into resources/js/Pages/Auth/Register.vue
+    Laravel feature: gen 'laravel:Fee[auth]>create(name:str,amount:int,paid?:bool)+edit+index'  (request, controller,
+      routes, Inertia pages; checks form ↔ rules and the model's columns; one undo reverts all files)
+  bash ~/.claude/skills/callgraph/callgraph.sh rename route|class|method <old> <new> [--dry] [--strings] [--keep-table]
+    route names ('profile.*' = whole group, resource routes via ->names()), PHP classes (file move, use, ::class, types),
+    PHP methods (resolved calls, overrides, route actions) across PHP / Blade / JS / Vue; dynamic references are only
+    listed; one line per file; one undo reverts the whole rename
+  bash ~/.claude/skills/callgraph/callgraph.sh undo [<file>]    restore the newest backup (of the file, or of the last changed one / group); itself undoable
 
 Output limit: above 400 lines the directory outline switches to summary, the single-file one to a method index;
 

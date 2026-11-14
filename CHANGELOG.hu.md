@@ -6,6 +6,78 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ## [Unreleased]
 
+### Új
+
+- **Csomagfelismerés (composer, npm, yarn, pnpm, bun):** a callgraph beolvassa a manifesteket és a lock-fájlokat
+  (offline), a `callgraph.sh profile` pedig egy `stack:` sorban mutatja a fontosabb csomagokat a lockolt verziójukkal
+  (lock nélkül a deklarált tartománnyal, jelölve); az MCP indításkori profilja ennek tömör változatát kapja. A
+  `profile --packages` minden közvetlen composer / npm függőséget felsorol (telepített és deklarált verzió, dev jelzés).
+- **Látszik, melyik csomagot hívja a kód, és hol használ egy csomagot:** az outline a függőségbe menő hívásokat a
+  csomag rövid neve alatt csoportosítja (`guzzle: GuzzleHttp\Client::request`), a JSON-kimenetben `package` mező van
+  (a verziók fájlonként egyszer), a `locate` pedig „csomag” indoklást ad. A `callgraph.sh uses <csomag> [--calls]`
+  (MCP `package_usage`) API-szimbólumonként megmutatja, hányszor használja a projekt, és melyik fájlban először; a
+  `(type)` hívás nélküli importot jelöl, a `--calls` minden hívássort felsorol.
+- **`callgraph.sh deps`** (MCP `project_profile` `deps: true`-val): a valószínűleg fölösleges, a hiányzó és a csak dev
+  composer / npm függőségek, soronként egy, rövid indoklással. Téves jelzés a `.callgraphignore`-ban
+  `deps-ignore <név>` sorral némítható.
+- **Inertia-oldalak:** a PHP `Inertia::render('Board')` hívás az oldal fájljára mutat (`Pages/Board.vue`), az oldal
+  outline-ja `rendered by:` sort kap, a `show . --format inertia` pedig oldalanként felsorolja a render-helyeket és a
+  props-okat, jelölve a hiányzó oldalfájlt és azt a props-ot, amelyet az oldal `defineProps`-a nem deklarál, valamint
+  a sehol nem renderelt oldalakat.
+- **Laravel route-ok és Ziggy:** a callgraph a betöltött `routes/*.php` fájlokból felépíti a route-táblát (csoportok,
+  resource-ok, nevek, `/api` előtag). Az outline-ban egy Vue / JS `route('events.show')` hívás mellett ott a metódus,
+  az URI és a controller-akció (vagy `⚠ no route`), a controller-metódus pedig `route:` sort kap. A
+  `show . --format ziggy` kilistázza az ismeretlen route-neveket és a sehonnan be nem töltött route-fájlokat; ha
+  vannak dinamikus nevű route-ok, az ismeretlen neveket csak `?` jelöli.
+- **Laravel űrlap-ellenőrzés:** egy Inertia `useForm({...})` űrlapot összevet annak a controller-akciónak a
+  validációjával, ahová küld (FormRequest vagy inline `validate`): `form:` sor a küldő függvény és az akció alatt
+  (küldött, de nem validált mezők, nem küldött kötelező mezők, vagy `N fields ✓`); a `show . --format forms` mindet
+  felsorolja.
+- **Laravel modell-összefoglaló:** egy Eloquent-modell alatt az outline `table:` (az oszlopok a migrációkból) és
+  `fillable:` sort mutat, a relációs sorok mellett ott a cél, a `⚠` sorok pedig jelzik, ha egy fillable vagy cast nem
+  oszlop. A `show . --format models` felsorolja a modelleket, a modell nélküli táblákat, és azt a táblát, amelyet két
+  migráció is létrehoz törlés nélkül (egy friss migrate elbukna).
+- **Kódgenerátor, `callgraph.sh gen '<kifejezés>'`:** rövid, Emmet-szerű kifejezésből PHP-osztályt / -tagokat, Vue
+  egyfájlos komponenst (script setup, template, style) és composable-t ír, a projekt stílusában (névtér a
+  `composer.json`-ból, importok a projektből, TS vagy JS, pontosvessző, behúzás). Célok: `--write <fájl>` (csak új
+  fájl), `--into <fájl>[::Osztály] [--after <metódus>]`, `--replace <fájl>:L<a>-L<b>` vagy `::<metódus>`, ahol az
+  `--expect <sha256-előtag>` elutasítja a cserét, ha közben megváltoztak azok a sorok; cél nélkül vagy `--dry`-jal
+  csak kiírja a kódot. Fájlonként egy sorral válaszol. Írás előtt ellenőrzi az új szöveg szintaxisát (hibánál semmi
+  nem íródik), egy meglévő fájl minden módosítása előtt mentést készít a `.callgraph/backups/` mappába (fájlonként a
+  legutóbbi 10), a `callgraph.sh undo [<fájl>]` pedig visszaállítja a legfrissebb mentést.
+- **Laravel-funkció egy lépésben:**
+  a `gen 'laravel:Fee[auth,prefix=admin]>create(name:str,amount:int,paid?:bool)+edit+index'` együtt megírja a
+  FormRequesteket, a controller-metódusokat, a route-okat és az Inertia / Vue oldalakat, ellenőrzi, hogy az űrlap
+  mezői egyeznek-e a szabályokkal, figyelmeztet az alapérték nélküli NOT NULL oszlopokra, amelyeket az űrlap nem
+  küld, és egyetlen `undo` az összes fájlját visszavonja.
+- **`callgraph.sh rename route|class|method <régi> <új>`:** a teljes projektben átnevez — route-neveket (`->name()`,
+  csoportok, `'profile.*'` minták, resource route-ok `->names()`-szel, és minden `route('x')` PHP-ban, Blade-ben,
+  JS-ben és Vue-ban), PHP-osztályokat (deklaráció, fájl-áthelyezés, névtér, `use`, típusjelzések, docblock; a
+  `--strings` a sztring-hivatkozásokat is átírja, a `--keep-table` megtartja az Eloquent táblanevet) és
+  PHP-metódusokat (felülírások, feloldott hívások, callable tömbök, route-akciók). Minden módosított fájl szintaxisát
+  előbb ellenőrzi, a `--dry` csak jelent, és egyetlen `undo` a teljes átnevezést visszavonja.
+- **MCP `generate` és `rename` eszköz (opt-in):** csak akkor szerepelnek a listában, ha a szerver `--generate`-tel
+  vagy `CALLGRAPH_GENERATE=1`-gyel fut; nélküle az eszközlista pontosan a korábbi.
+
+### Változás
+
+- **MCP-eszközjelzések:** a többi eszközzel ellentétben az opt-in `generate` és `rename` fájlokat ír, ezért
+  `readOnlyHint: false` (és `idempotentHint: false`) jelzést ad; az összes többi eszköz továbbra is
+  `readOnlyHint: true`.
+- **Helyi statisztika és opt-in telemetria: új parancsfajták.** A `uses` / `package_usage`, a `deps`, a `generate`,
+  az `undo` és a `rename` külön parancsként számít a helyi statisztikában és eseménynaplóban (ezen a gépen,
+  `callgraph.sh stats`), és — csak ha bekapcsoltad a telemetriát — az elküldött napi számokban is, továbbra is név,
+  útvonal és kód nélkül. A `callgraph.sh telemetry preview` megmutatja, mi menne el; kikapcsolás: `CALLGRAPH_STATS=0`
+  (helyi), `callgraph.sh telemetry off` vagy `CALLGRAPH_TELEMETRY=0` (küldés).
+
+### Javítás
+
+- PHP: a teljesen minősített név (pl. `\LogicException`, `\Helper`) mostantól a globális névtérből oldódik fel, nem az
+  aktuális névtérből vagy egy importból.
+- Az a SCSS-fájl, amelyben egy függvényhívás előtt ékezetes szöveg áll (`// Fejléc háttér`), már nem dönti össze a
+  projekt-szintű nézeteket, például a `locate`-et, a `profile`-t vagy a framework-nézeteket (a 0.9.5-ben is így volt).
+  Ha egy nyelvi elemző összeomlik egy fájlon, csak az a fájl marad ki, nem az egész parancs bukik el.
+
 ## [0.9.5] — 2026-11-13
 
 ### Új

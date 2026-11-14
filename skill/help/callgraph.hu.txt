@@ -97,6 +97,11 @@ Projekt-profil (architektúra, rétegek és minták a mappa- / fájlnevekből, a
                                                 --packages: minden közvetlen composer / npm függőség (telepített, deklarált)
   bash ~/.claude/skills/callgraph/callgraph.sh uses <csomag> [--calls] [--project alias]   hol használja a kód egy függőségét (guzzle, @vueuse/core): API-szimbólumonként a darabszám, az első fájl, +N; (típus) = import hívás nélkül; --calls: fájlonként minden hívás-sor
   bash ~/.claude/skills/callgraph/callgraph.sh deps [--project alias]   valószínűleg fölösleges / hiányzó / csak dev composer / npm függőségek (soronként egy; .callgraphignore: deps-ignore <név>)
+  Laravel / Inertia projekt-nézetek (a projekt gyökerén, pl. `. --format ziggy`; az outline-ok is megkapják a rövid linkeket):
+    --format ziggy     ismeretlen route('x') nevek (JS / Vue / PHP), sehonnan be nem töltött route-fájlok; outline: route::x → POST /x · Ctrl@m
+    --format forms     a useForm mezői ↔ az akció FormRequest / validate szabályai; outline: form: … · N mező ✓ / ⚠ …
+    --format models    modellek: tábla, oszlopok a migrációkból, relációk; fillable / cast nem oszlop, kétszer létrehozott tábla
+    --format inertia   oldalak: render-helyek, az oldal által nem deklarált props-ok, sehol nem renderelt oldalak
   bash ~/.claude/skills/callgraph/callgraph.sh <mappa> --layer service         csak az adott réteg fájljai (név,név...;
                                                 egy ökoszisztéma: controller:php, controller:js, …:swift, …:rust)
   bash ~/.claude/skills/callgraph/callgraph.sh <mappa> --layers                summary rétegenként, [szerep] a FILE sorokon
@@ -183,7 +188,17 @@ Kódgenerátor (fájlt ír; az MCP `generate` eszköz alapból ki van, a szerver
     Példák:
       gen 'c!:PaymentGateway<BaseGateway>[Chargeable] > ctor(-Client $http, -int $retries=3) + +charge(Order $order):Receipt + -sign(array $p):string' --write app/Services/PaymentGateway.php
       gen '+refund(Order $o):void{ $this->http->post($o->id); }' --into app/Services/PaymentGateway.php::PaymentGateway --after charge
-  bash ~/.claude/skills/callgraph/callgraph.sh undo [<fájl>]    a legutóbbi mentés visszaállítása (a fájlé, vagy a legutóbb módosítotté); az undo is visszavonható
+    Vue (TS vagy JS a projekt szerint): vue:Név>(script>…)+(template>…)+(style>…), comp:useX>… composable;
+      script: props(title:str,size?:int=3) emits(save:int,close) ref:n:T=v computed:n:T{…} fn:n(p:T):R{…} form(a,b) use:@/Components/X
+      template: Emmet div.card#id[attr=v @click=f :key=x.id]{szöveg} {{ kifejezés }} *3; a komponens importja magától; style: .a{decl;decl}
+      gen 'script>ref:loading:bool=false+fn:reset(){ form.reset() }' --into resources/js/Pages/Auth/Register.vue
+    Laravel-funkció: gen 'laravel:Fee[auth]>create(name:str,amount:int,paid?:bool)+edit+index'  (request, controller,
+      route-ok, Inertia-oldalak; ellenőrzi az űrlap ↔ szabályok egyezését és a modell oszlopait; egy undo minden fájlt visszavon)
+  bash ~/.claude/skills/callgraph/callgraph.sh rename route|class|method <régi> <új> [--dry] [--strings] [--keep-table]
+    route-nevek ('profile.*' = az egész csoport, resource route-ok ->names()-szel), PHP-osztályok (fájl-áthelyezés, use,
+    ::class, típusok), PHP-metódusok (feloldott hívások, felülírások, route-akciók) PHP / Blade / JS / Vue fájlokban; a
+    dinamikus hivatkozást csak listázza; fájlonként egy sor; egy undo a teljes átnevezést visszavonja
+  bash ~/.claude/skills/callgraph/callgraph.sh undo [<fájl>]    a legutóbbi mentés visszaállítása (a fájlé, vagy a legutóbb módosítotté / csoporté); az undo is visszavonható
 
 Kimenet-korlát: 400 sor fölött a mappás outline summary-ra, az egyfájlos metódus-indexre vált;
 
