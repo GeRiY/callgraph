@@ -6,6 +6,8 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ## [Unreleased]
 
+## [1.0.0] — 2026-11-16
+
 ### Új
 
 - **Csomagfelismerés (composer, npm, yarn, pnpm, bun):** a callgraph beolvassa a manifesteket és a lock-fájlokat
@@ -731,7 +733,8 @@ Első kiadás.
 - Beépített frissítés: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Előre fordított csomagok macOS-re (arm64, x86_64), Linuxra (x86_64, ARM64, statikus musl) és Windowsra.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.9.5...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v1.0.0...develop
+[1.0.0]: https://github.com/GeRiY/callgraph/releases/tag/v1.0.0
 [0.9.5]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.5
 [0.9.4]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.4
 [0.9.3]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.3

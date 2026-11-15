@@ -5,6 +5,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+## [1.0.0] — 2026-11-16
+
 ### Added
 
 - **Package recognition (composer, npm, yarn, pnpm, bun):** callgraph reads the manifests and lock files (offline) and
@@ -686,7 +688,8 @@ First release.
 - Built-in update: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Prebuilt packages for macOS (arm64, x86_64), Linux (x86_64, ARM64, static musl) and Windows.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v0.9.5...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v1.0.0...develop
+[1.0.0]: https://github.com/GeRiY/callgraph/releases/tag/v1.0.0
 [0.9.5]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.5
 [0.9.4]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.4
 [0.9.3]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.3
