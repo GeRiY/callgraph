@@ -3,7 +3,7 @@
 //! | Szabály | Kategória |
 //! |---|---|
 //! | `MacroRule` | `macro_use` (minden makróhívás; `resolved` = az import szerinti teljes út) |
-//! | `BoundLocalRule` | `external_call` (helyi változó / paraméter / closure hívása) |
+//! | `BoundLocalRule` | `dynamic_call` (helyi változó / paraméter / closure hívása: futásidőben dől el, nem hívó-él) |
 //! | `SelfMethodRule` | `internal_helper` (`self.x()` a container saját metódusára) |
 //! | `LocalPathRule` | `internal_helper` (`Self::x`, a fájl saját típusa / függvénye) |
 //! | `LocalMethodRule` | `internal_helper` (a metódusnév egyetlen saját containerben létezik) |
@@ -18,6 +18,7 @@ use super::{CallInput, CallRule, Callee, Verdict};
 use crate::core::Rule;
 use crate::lang::rs::framework::is_framework_crate;
 use crate::lang::rs::resolve::{Resolution, crate_key};
+use crate::model::DYNAMIC_CALL;
 
 pub(super) fn default_rules() -> Vec<Box<CallRule>> {
     vec![
@@ -72,7 +73,7 @@ impl Rule<CallInput<'_>> for BoundLocalRule {
     type Output = Verdict;
     fn apply(&self, input: &CallInput<'_>) -> Option<Verdict> {
         matches!(input.callee, Callee::Path(segs) if segs.len() == 1 && input.bound_locally)
-            .then(|| Verdict::new("external_call", None))
+            .then(|| Verdict::new(DYNAMIC_CALL, None))
     }
 }
 

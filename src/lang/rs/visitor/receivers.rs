@@ -11,9 +11,12 @@ use std::collections::{HashMap, HashSet};
 use syn::punctuated::Punctuated;
 use syn::visit::{self, Visit};
 use syn::{
-    Block, Expr, FnArg, GenericArgument, GenericParam, Local, Pat, PatIdent, Path, PathArguments,
-    ReturnType, Signature, Token, Type, TypeParamBound, WherePredicate,
+    Block, Expr, ExprClosure, ExprForLoop, ExprLet, ExprMatch, ExprMethodCall, FnArg,
+    GenericArgument, GenericParam, Local, Pat, PatIdent, Path, PathArguments, ReturnType,
+    Signature, Token, Type, TypeParamBound, WherePredicate,
 };
+
+use super::flow::{Env, Fields, Item, Shape, closure_slot, item_of, shape_of_expr, shape_of_type};
 
 /// A fájl függvényeinek visszatérési típusa: `(container, függvénynév)` → típus-út (`Result<T, _>` /
 /// `Option<T>` → `T`, `Self` → `["Self"]`). A `let x = self.make()?` / `Svc::open()?` fogadóhoz.
@@ -59,6 +62,28 @@ fn unwrap_wrapper(ty: &Type) -> &Type {
 pub(super) struct Infer<'g> {
     pub rets: &'g Returns,
     pub container: &'g str,
+    /// A fájl struct-mezőinek alakja (`for b in self.bars.iter_mut()`).
+    pub fields: &'g Fields,
+}
+
+/// Több saját trait-korlátú generikus (`T: A + B`) „típusa”: `["?", "A", "mod::B"]` — a jelölő után a
+/// jelöltek `::`-szel összefűzve. A hívás helyén a metódust ténylegesen deklaráló trait dönt.
+pub(super) const MULTI: &str = "?";
+
+fn multi_path(candidates: &[Vec<String>]) -> Vec<String> {
+    let mut out = vec![MULTI.to_owned()];
+    out.extend(candidates.iter().map(|c| c.join("::")));
+    out
+}
+
+/// A `T: A + B` jelölt-útjai; `None`, ha a típus nem ilyen.
+pub(super) fn multi_candidates(ty: &[String]) -> Option<Vec<Vec<String>>> {
+    let (first, rest) = ty.split_first()?;
+    (first == MULTI).then(|| {
+        rest.iter()
+            .map(|c| c.split("::").map(str::to_owned).collect())
+            .collect()
+    })
 }
 
 /// Gyakori std-trait: generikus korlátként nem ad saját típust a fogadóhoz.
@@ -95,21 +120,24 @@ const STD_BOUNDS: [&str; 30] = [
     "Deserialize",
 ];
 
-/// A generikus paraméterek egyetlen nem-std trait-korlátja (`T: Handler`, `where T: Handler + Clone`);
-/// két saját trait esetén a fogadó nem dönthető el, nincs típus.
-fn generic_bounds(sig: &Signature) -> HashMap<String, Vec<String>> {
-    let mut out: HashMap<String, Vec<String>> = HashMap::new();
+/// A generikus paraméterek nem-std trait-korlátai (`T: Handler`, `where T: Handler + Clone`); két saját
+/// trait esetén (`T: A + B`) mindkettő jelölt (lásd `MULTI`).
+fn generic_bounds(sig: &Signature) -> HashMap<String, Vec<Vec<String>>> {
+    let mut out: HashMap<String, Vec<Vec<String>>> = HashMap::new();
     let mut add = |name: String, bounds: &Punctuated<TypeParamBound, Token![+]>| {
-        let mut own = bounds.iter().filter_map(|b| match b {
-            TypeParamBound::Trait(t) => {
-                let segs = segments(&t.path);
-                let last = segs.last()?;
-                (!STD_BOUNDS.contains(&last.as_str())).then_some(segs)
-            }
-            _ => None,
-        });
-        if let (Some(only), None) = (own.next(), own.next()) {
-            out.entry(name).or_insert(only);
+        let own: Vec<Vec<String>> = bounds
+            .iter()
+            .filter_map(|b| match b {
+                TypeParamBound::Trait(t) => {
+                    let segs = segments(&t.path);
+                    let last = segs.last()?;
+                    (!STD_BOUNDS.contains(&last.as_str())).then_some(segs)
+                }
+                _ => None,
+            })
+            .collect();
+        if !own.is_empty() {
+            out.entry(name).or_insert(own);
         }
     };
     for param in &sig.generics.params {
@@ -131,7 +159,7 @@ fn generic_bounds(sig: &Signature) -> HashMap<String, Vec<String>> {
 }
 
 /// A típus egy generikus paraméter (`&T`, `Box<T>`) — a korlátja szerinti trait-út.
-fn bound_of(ty: &Type, bounds: &HashMap<String, Vec<String>>) -> Option<Vec<String>> {
+fn bound_of(ty: &Type, bounds: &HashMap<String, Vec<Vec<String>>>) -> Option<Vec<String>> {
     match ty {
         Type::Reference(r) => bound_of(&r.elem, bounds),
         Type::Paren(p) => bound_of(&p.elem, bounds),
@@ -146,9 +174,11 @@ fn bound_of(ty: &Type, bounds: &HashMap<String, Vec<String>>) -> Option<Vec<Stri
                     _ => None,
                 };
             }
-            p.path
-                .get_ident()
-                .and_then(|i| bounds.get(&i.to_string()).cloned())
+            let found = bounds.get(&p.path.get_ident()?.to_string())?;
+            match found.as_slice() {
+                [only] => Some(only.clone()),
+                many => Some(multi_path(many)),
+            }
         }
         _ => None,
     }
@@ -172,6 +202,7 @@ impl TypeEnv {
             bounds: &bounds,
             cx,
             typed: HashMap::new(),
+            shapes: HashMap::new(),
             counts: HashMap::new(),
         };
         for input in &sig.inputs {
@@ -211,9 +242,11 @@ impl TypeEnv {
 struct Scan<'g> {
     generics: &'g HashSet<String>,
     /// generikus paraméter → a trait-korlátja (`T: Handler` → `Handler`)
-    bounds: &'g HashMap<String, Vec<String>>,
+    bounds: &'g HashMap<String, Vec<Vec<String>>>,
     cx: &'g Infer<'g>,
     typed: HashMap<String, Vec<Option<Vec<String>>>>,
+    /// a név egyszerű kötéseinek gyűjtemény- / iterátor- / `Option`-alakja
+    shapes: HashMap<String, Vec<Option<Shape>>>,
     counts: HashMap<String, usize>,
 }
 
@@ -227,12 +260,92 @@ impl Scan<'_> {
         self.typed.entry(name).or_default().push(ty);
     }
 
+    fn bind_shape(&mut self, name: &str, shape: Option<Shape>) {
+        self.shapes.entry(name.to_owned()).or_default().push(shape);
+    }
+
+    /// A típus gyűjtemény- / `Option`-alakja (az elem-típusok a `ty_path` szerint).
+    fn shape_of_ty(&self, ty: &Type) -> Option<Shape> {
+        shape_of_type(ty, &|t| self.ty_path(t))
+    }
+
+    /// Egy minta kötéseinek típusa az elem alakjából: `x`, `&x`, `(k, v)`, `(i, x)`.
+    fn bind_pat(&mut self, pat: &Pat, item: &Item) {
+        match pat {
+            Pat::Ident(p) if p.subpat.is_none() => {
+                let ty = match item {
+                    Item::One(ty) => ty.clone(),
+                    Item::Tuple(_) => None,
+                };
+                self.bind(p.ident.to_string(), ty);
+            }
+            Pat::Reference(r) => self.bind_pat(&r.pat, item),
+            Pat::Paren(p) => self.bind_pat(&p.pat, item),
+            Pat::Tuple(t) => {
+                if let Item::Tuple(items) = item
+                    && items.len() == t.elems.len()
+                {
+                    for (pat, item) in t.elems.iter().zip(items) {
+                        self.bind_pat(pat, item);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// `Some(x)` / `Ok(x)` minta egy ismert `Option` / `Result` / `.next()` / `.get(k)` kifejezésen.
+    fn bind_option_pat(&mut self, pat: &Pat, scrutinee: &Expr) {
+        let Pat::TupleStruct(ts) = pat else {
+            return;
+        };
+        let wrapper = ts.path.segments.last().map(|s| s.ident.to_string());
+        if !matches!(wrapper.as_deref(), Some("Some" | "Ok")) || ts.elems.len() != 1 {
+            return;
+        }
+        let Some(inner) = ts.elems.first() else {
+            return;
+        };
+        if let Some(Shape::Opt(item)) = shape_of_expr(scrutinee, &*self) {
+            self.bind_pat(inner, &item);
+        }
+    }
+
+    /// Az iterátor-adapter closure-paramétere (`items.iter().map(|x| …)`, `fold(0, |acc, x| …)`) az elemet kapja.
+    fn closure_params(&mut self, node: &ExprMethodCall) {
+        let Some(recv) = shape_of_expr(&node.receiver, &*self) else {
+            return;
+        };
+        let name = node.method.to_string();
+        let Some((index, all)) = closure_slot(&name, matches!(recv, Shape::Coll { .. })) else {
+            return;
+        };
+        let Some(Expr::Closure(closure)) = node
+            .args
+            .iter()
+            .rev()
+            .find(|a| matches!(a, Expr::Closure(_)))
+        else {
+            return;
+        };
+        let item = item_of(&recv).clone();
+        let skip = if all { 0 } else { index };
+        let take = if all { usize::MAX } else { 1 };
+        for pat in closure.inputs.iter().skip(skip).take(take) {
+            if !matches!(pat, Pat::Type(_)) {
+                self.bind_pat(pat, &item);
+            }
+        }
+    }
+
     /// Paraméter: `x: T`, vagy az extractor-szerű újracsomagolás `State(x): State<T>` → `x: T`.
     fn param(&mut self, pat: &Pat, ty: &Type) {
         match pat {
             Pat::Ident(p) if p.subpat.is_none() => {
-                let ty = self.ty_path(ty);
-                self.bind(p.ident.to_string(), ty);
+                let path = self.ty_path(ty);
+                let shape = self.shape_of_ty(ty);
+                self.bind(p.ident.to_string(), path);
+                self.bind_shape(&p.ident.to_string(), shape);
             }
             Pat::TupleStruct(ts) if ts.elems.len() == 1 => {
                 let Some(Pat::Ident(inner)) = ts.elems.first() else {
@@ -248,29 +361,94 @@ impl Scan<'_> {
     }
 }
 
+impl Env for Scan<'_> {
+    /// A név alakja, ha eddigi minden kötése ugyanazt az alakot adja.
+    fn var(&self, name: &str) -> Option<Shape> {
+        let entries = self.shapes.get(name)?;
+        let first = entries.first()?.clone()?;
+        let bound = self.counts.get(name).copied().unwrap_or(0);
+        (entries.len() == bound && entries.iter().all(|s| s.as_ref() == Some(&first)))
+            .then_some(first)
+    }
+
+    fn field(&self, name: &str) -> Option<Shape> {
+        self.cx
+            .fields
+            .get(&(self.cx.container.to_owned(), name.to_owned()))
+            .cloned()
+    }
+}
+
 impl<'ast> Visit<'ast> for Scan<'_> {
     fn visit_pat_ident(&mut self, node: &'ast PatIdent) {
         *self.counts.entry(node.ident.to_string()).or_default() += 1;
         visit::visit_pat_ident(self, node);
     }
 
+    fn visit_expr_for_loop(&mut self, node: &'ast ExprForLoop) {
+        if let Some(shape) = shape_of_expr(&node.expr, &*self) {
+            let item = item_of(&shape).clone();
+            self.bind_pat(&node.pat, &item);
+        }
+        visit::visit_expr_for_loop(self, node);
+    }
+
+    fn visit_expr_let(&mut self, node: &'ast ExprLet) {
+        self.bind_option_pat(&node.pat, &node.expr);
+        visit::visit_expr_let(self, node);
+    }
+
+    fn visit_expr_match(&mut self, node: &'ast ExprMatch) {
+        for arm in &node.arms {
+            self.bind_option_pat(&arm.pat, &node.expr);
+        }
+        visit::visit_expr_match(self, node);
+    }
+
+    fn visit_expr_method_call(&mut self, node: &'ast ExprMethodCall) {
+        self.closure_params(node);
+        visit::visit_expr_method_call(self, node);
+    }
+
+    /// Típusos closure-paraméter (`|f: Foo| f.run()`).
+    fn visit_expr_closure(&mut self, node: &'ast ExprClosure) {
+        for input in &node.inputs {
+            if let Pat::Type(pt) = input {
+                let item = Item::One(self.ty_path(&pt.ty));
+                self.bind_pat(&pt.pat, &item);
+            }
+        }
+        visit::visit_expr_closure(self, node);
+    }
+
     fn visit_local(&mut self, node: &'ast Local) {
-        let (ident, ty) = match &node.pat {
+        let (ident, ty, shape) = match &node.pat {
             Pat::Ident(p) if p.subpat.is_none() => {
-                let ty = node
-                    .init
-                    .as_ref()
-                    .and_then(|init| infer_expr(&init.expr, self.cx));
-                (Some(&p.ident), ty)
+                let init = node.init.as_ref().map(|init| &*init.expr);
+                let ty = init.and_then(|expr| infer_expr(expr, self.cx));
+                let shape = init.and_then(|expr| shape_of_expr(expr, &*self));
+                (Some(&p.ident), ty, shape)
             }
             Pat::Type(pt) => match &*pt.pat {
-                Pat::Ident(p) if p.subpat.is_none() => (Some(&p.ident), self.ty_path(&pt.ty)),
-                _ => (None, None),
+                Pat::Ident(p) if p.subpat.is_none() => (
+                    Some(&p.ident),
+                    self.ty_path(&pt.ty),
+                    self.shape_of_ty(&pt.ty),
+                ),
+                _ => (None, None, None),
             },
-            _ => (None, None),
+            Pat::TupleStruct(_) => {
+                // `let Some(x) = opt else { return };`
+                if let Some(init) = &node.init {
+                    self.bind_option_pat(&node.pat, &init.expr);
+                }
+                (None, None, None)
+            }
+            _ => (None, None, None),
         };
         if let Some(ident) = ident {
             self.bind(ident.to_string(), ty);
+            self.bind_shape(&ident.to_string(), shape);
         }
         visit::visit_local(self, node);
     }
@@ -420,6 +598,7 @@ mod tests {
             &Infer {
                 rets: &rets,
                 container: "Own",
+                fields: &Fields::new(),
             },
         )
     }
@@ -475,9 +654,11 @@ mod tests {
     fn self_receiver_is_self() {
         let item: syn::ImplItemFn = syn::parse_str("fn f(&self) { self.go(); }").unwrap();
         let rets = Returns::new();
+        let fields = Fields::new();
         let cx = Infer {
             rets: &rets,
             container: "Own",
+            fields: &fields,
         };
         let e = TypeEnv::of_fn(&item.sig, &item.block, &cx);
         assert_eq!(ty(&e, "self").as_deref(), Some("Self"));
@@ -499,9 +680,11 @@ mod tests {
         let mut rets = Returns::new();
         rets.insert(("Svc".into(), "make".into()), vec!["Bar".into()]);
         rets.insert(("Svc".into(), "open".into()), vec!["Self".into()]);
+        let fields = Fields::new();
         let cx = Infer {
             rets: &rets,
             container: "Svc",
+            fields: &fields,
         };
         let f: syn::ImplItemFn = syn::parse_str(
             "fn go(&self) { let a = self.make().unwrap(); let b = Svc::open()?; let c = Self::open(); }",

@@ -147,6 +147,8 @@ fn methods_have_visibility_kind_params_and_ranges() {
     assert_eq!(find("fmt").visibility.as_deref(), Some("pub"));
     assert_eq!(find("helper").container.as_deref(), Some("users"));
     assert_eq!(find("works").container.as_deref(), Some("tests"));
+    // a `#[cfg(test)] mod tests` tagja és a `#[test]` függvény: `test`
+    assert_eq!(find("works").kind.as_deref(), Some("test"));
 }
 
 #[test]
@@ -206,7 +208,8 @@ fn calls_are_categorized() {
     let save = calls_of(&g, "save");
     let has = |t: &str, cat: &str| save.iter().any(|(a, b, _)| a == t && b == cat);
     assert!(has("format!", "macro_use"));
-    assert!(has("Err", "native_rust"));
+    // az enum-variáns konstruktor (`Err(..)`) nem hívás-él
+    assert!(!save.iter().any(|(t, _, _)| t == "Err"), "{save:?}");
     assert!(has("println!", "macro_use"));
     assert!(has("helper", "internal_helper"), "{save:?}");
     assert!(has("check", "internal_helper"));
@@ -230,7 +233,7 @@ fn calls_are_categorized() {
         Some("db::connect".into())
     )));
     let helper = calls_of(&g, "helper");
-    assert!(helper.contains(&("cb".into(), "external_call".into(), None)));
+    assert!(helper.contains(&("cb".into(), "dynamic_call".into(), None)));
     assert!(helper.contains(&(
         "Json".into(),
         "framework_use".into(),

@@ -21,6 +21,8 @@ mod tests;
 #[cfg(test)]
 mod tests_edge;
 #[cfg(test)]
+mod tests_flow_types;
+#[cfg(test)]
 mod tests_receivers;
 #[cfg(test)]
 mod tests_refs;

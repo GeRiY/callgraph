@@ -110,7 +110,7 @@ fn macros_have_their_own_category() {
 fn locals_and_unknown_methods_are_external_calls() {
     assert_eq!(
         verdict_bound(path("callback"), true),
-        ("external_call", None)
+        ("dynamic_call", None)
     );
     assert_eq!(
         verdict(method("frobnicate", false)),

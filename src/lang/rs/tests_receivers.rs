@@ -87,12 +87,16 @@ fn receiver_types_resolve_method_calls() {
         "{run:?}"
     );
     assert!(has(&run, "len", "native_rust", None), "{run:?}");
-    // ismeretlen fogadó: `?::spin` (a `for item` kötés miatt az `item` sem kap típust)
+    // ismeretlen fogadó: `?::spin`; a `for item in names` (Vec<String>) elem-típusa `String` → std, nem `?::`
     let spin = run
         .iter()
         .filter(|(t, c, r)| t == "spin" && c == "external_call" && r.as_deref() == Some("?::spin"))
         .count();
-    assert_eq!(spin, 2, "{run:?}");
+    assert_eq!(spin, 1, "{run:?}");
+    assert!(
+        has(&run, "spin", "native_rust", Some("String::spin")),
+        "{run:?}"
+    );
 }
 
 #[test]

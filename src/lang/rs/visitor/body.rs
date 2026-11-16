@@ -5,7 +5,8 @@ use std::collections::HashSet;
 
 use syn::visit::Visit;
 
-use super::receivers::{Infer, Returns, TypeEnv, return_path};
+use super::flow::{Fields, shape_of_type};
+use super::receivers::{Infer, Returns, TypeEnv, return_path, type_path};
 use super::scopes::{ConstNode, MacroScope, Scopes};
 
 /// A bejárt kód helye.
@@ -33,6 +34,16 @@ pub(super) fn walk_bodies<V: BodyVisit>(scopes: &Scopes<'_>, visitor: &mut V) {
                 .or_insert(ret);
         }
     }
+    let mut fields = Fields::new();
+    for f in &scopes.fields {
+        let Some(ident) = &f.field.ident else {
+            continue;
+        };
+        let no_generics = HashSet::new();
+        if let Some(shape) = shape_of_type(&f.field.ty, &|t| type_path(t, &no_generics)) {
+            fields.insert((f.container.clone(), ident.to_string()), shape);
+        }
+    }
     for f in &scopes.fns {
         let Some(block) = f.block else {
             continue;
@@ -53,6 +64,7 @@ pub(super) fn walk_bodies<V: BodyVisit>(scopes: &Scopes<'_>, visitor: &mut V) {
                 &Infer {
                     rets: &rets,
                     container: &f.container,
+                    fields: &fields,
                 },
             ),
         });

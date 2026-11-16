@@ -14,7 +14,7 @@ use syn::{Expr, ExprCall, ExprMethodCall, ExprPath, Macro, Member};
 
 use super::body::{BodyVisit, Location, walk_bodies};
 use super::macros::visit_body;
-use super::receivers::{segments, type_path};
+use super::receivers::{multi_candidates, segments, type_path};
 use super::scopes::ConstNode;
 use super::{FileVisitor, Scopes};
 use crate::index::UNKNOWN_RECEIVER;
@@ -22,7 +22,7 @@ use crate::lang::rs::categorize::{CallInput, Callee, Categorizer, Verdict, is_st
 use crate::lang::rs::context::RsContext;
 use crate::lang::rs::parser::ParsedFile;
 use crate::lang::rs::resolve::{Resolution, Resolver, qualify_container};
-use crate::model::{Call, FileGraphBuilder};
+use crate::model::{Call, DYNAMIC_CALL, DYNAMIC_KIND, FileGraphBuilder};
 
 /// A `calls` mezőt tölti (a kategorizáló a konstruktoron át jön).
 pub(crate) struct CallsVisitor {
@@ -131,7 +131,40 @@ impl Collector<'_, '_> {
             return;
         };
         let verdict = self.verdict(location, &callee);
-        self.push(callee.kind(), callee.target(), verdict, line, on);
+        // helyi closure / függvény-mutató hívása: futásidőben dől el, nem hívó-él
+        let kind = if verdict.category == DYNAMIC_CALL {
+            DYNAMIC_KIND
+        } else {
+            callee.kind()
+        };
+        self.push(kind, callee.target(), verdict, line, on);
+    }
+
+    /// Hordozó-konstruktor, nem valódi hívás: `Some(x)` / `Ok(x)` / `Err(e)`, `Box::new(x)` / `Rc::new` /
+    /// `Arc::new`, `Default::default()` — az enum-variáns és a csomagoló ugyanúgy zaj, mint a struct-literál
+    /// (azt sem rögzítjük). Saját típus / helyi kötés ugyanezzel a névvel nem számít annak.
+    fn is_trivial_ctor(&self, segs: &[String]) -> bool {
+        let Some(location) = &self.location else {
+            return false;
+        };
+        let named = match segs {
+            [variant] => {
+                matches!(variant.as_str(), "Some" | "Ok" | "Err")
+                    && !location.bindings.contains(variant)
+            }
+            [.., owner, func] => {
+                (matches!(owner.as_str(), "Box" | "Rc" | "Arc")
+                    && matches!(func.as_str(), "new" | "from" | "pin"))
+                    || (owner == "Default" && func == "default")
+            }
+            _ => false,
+        };
+        named
+            && !matches!(
+                self.resolver
+                    .resolve(segs, &location.container, &location.inline),
+                Resolution::Local(_)
+            )
     }
 
     /// `x.név()`: a saját `self`-metódus, a következtetett fogadó-típus, a többi szabály, végül `?::név`.
@@ -150,6 +183,7 @@ impl Collector<'_, '_> {
             base
         } else if let Some(typed) = self
             .receiver_type(location, &node.receiver)
+            .and_then(|ty| self.pick_multi(location, ty, &name))
             .and_then(|ty| self.typed_verdict(location, ty, &name))
         {
             typed
@@ -192,6 +226,18 @@ impl Collector<'_, '_> {
         })
     }
 
+    /// `T: A + B` fogadónál a metódust ténylegesen deklaráló (fájlbeli) trait; ha egyik sem, nincs típus.
+    /// Más típust változatlanul ad vissza.
+    fn pick_multi(&self, location: &Location, ty: Vec<String>, name: &str) -> Option<Vec<String>> {
+        let Some(candidates) = multi_candidates(&ty) else {
+            return Some(ty);
+        };
+        candidates.into_iter().find(|c| {
+            self.local_type(location, c)
+                .is_some_and(|own| self.resolver.has_method(&own, name))
+        })
+    }
+
     /// A fájlban definiált típus container-neve (`Self` → a hívó containere).
     fn local_type(&self, location: &Location, ty: &[String]) -> Option<String> {
         match self
@@ -217,6 +263,9 @@ impl Collector<'_, '_> {
                     return None;
                 };
                 let owner = self.receiver_type(location, &f.base)?;
+                if multi_candidates(&owner).is_some() {
+                    return None;
+                }
                 let owner = self.local_type(location, &owner)?;
                 let found = self.scopes.fields.iter().find(|x| {
                     x.container == owner && x.field.ident.as_ref().is_some_and(|i| i == field)
@@ -312,7 +361,10 @@ impl<'ast> Visit<'ast> for Collector<'_, '_> {
     fn visit_expr_call(&mut self, node: &'ast ExprCall) {
         if let Expr::Path(p) = &*node.func {
             let line = self.parsed.line(p.span());
-            self.record(Callee::Path(segments(&p.path)), line, None);
+            let segs = segments(&p.path);
+            if !self.is_trivial_ctor(&segs) {
+                self.record(Callee::Path(segs), line, None);
+            }
             // a hívott út maga nem konstans-hivatkozás: csak az argumentumok
             for arg in &node.args {
                 self.visit_expr(arg);

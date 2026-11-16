@@ -33,6 +33,46 @@ pub(super) fn doc_of(attrs: &[Attribute]) -> Option<String> {
     (!text.is_empty()).then(|| crate::lang::rs::parser::shorten(&text, 300))
 }
 
+/// Tesztfüggvény-attribútum: `#[test]`, `#[tokio::test]`, `#[rstest]`, `#[test_case(..)]`, `#[sqlx::test]`…
+pub(super) fn is_test_fn(attrs: &[Attribute]) -> bool {
+    attrs.iter().any(|a| {
+        a.path().segments.last().is_some_and(|s| {
+            matches!(
+                s.ident.to_string().as_str(),
+                "test" | "rstest" | "test_case" | "wasm_bindgen_test" | "quickcheck"
+            )
+        })
+    })
+}
+
+/// `#[cfg(test)]` (és `all(test, …)`; a `not(test)` nem): csak teszt-buildben létező elem.
+pub(super) fn is_cfg_test(attrs: &[Attribute]) -> bool {
+    attrs.iter().any(|a| {
+        a.path().is_ident("cfg")
+            && matches!(&a.meta, Meta::List(list) if cfg_mentions_test(list.tokens.clone()))
+    })
+}
+
+fn cfg_mentions_test(tokens: TokenStream) -> bool {
+    let (mut test, mut not) = (false, false);
+    scan_idents(tokens, &mut |name| match name {
+        "test" => test = true,
+        "not" => not = true,
+        _ => {}
+    });
+    test && !not
+}
+
+fn scan_idents(tokens: TokenStream, found: &mut dyn FnMut(&str)) {
+    for tree in tokens {
+        match tree {
+            TokenTree::Group(group) => scan_idents(group.stream(), found),
+            TokenTree::Ident(ident) => found(&ident.to_string()),
+            _ => {}
+        }
+    }
+}
+
 /// A láthatóság a kimenet alakjában: `pub`, `pub(crate)`, `pub(super)`, `pub(in …)`, különben `private`.
 pub(super) fn visibility(vis: &Visibility) -> String {
     match vis {
@@ -120,6 +160,21 @@ mod tests {
         assert_eq!(visibility(&item("pub fn a() {}").vis), "pub");
         assert_eq!(visibility(&item("pub(crate) fn a() {}").vis), "pub(crate)");
         assert_eq!(visibility(&item("fn a() {}").vis), "private");
+    }
+
+    #[test]
+    fn test_attributes() {
+        assert!(is_test_fn(&item("#[test]\nfn a() {}").attrs));
+        assert!(is_test_fn(
+            &item("#[tokio::test(flavor = \"x\")]\nasync fn a() {}").attrs
+        ));
+        assert!(!is_test_fn(&item("#[inline]\nfn a() {}").attrs));
+        assert!(is_cfg_test(&item("#[cfg(test)]\nfn a() {}").attrs));
+        assert!(is_cfg_test(
+            &item("#[cfg(all(test, unix))]\nfn a() {}").attrs
+        ));
+        assert!(!is_cfg_test(&item("#[cfg(not(test))]\nfn a() {}").attrs));
+        assert!(!is_cfg_test(&item("#[cfg(unix)]\nfn a() {}").attrs));
     }
 
     #[test]

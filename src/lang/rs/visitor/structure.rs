@@ -3,7 +3,7 @@
 
 use syn::{FnArg, ReturnType};
 
-use super::attrs::{doc_of, visibility};
+use super::attrs::{doc_of, is_cfg_test, is_test_fn, visibility};
 use super::scopes::{ConstNode, FnRole, FnScope, MacroScope};
 use super::{FileVisitor, Scopes};
 use crate::lang::rs::context::RsContext;
@@ -37,8 +37,19 @@ impl FileVisitor for StructureVisitor {
                 doc: doc_of(c.attrs),
             });
         }
+        let test_mods: Vec<&str> = scopes
+            .containers
+            .iter()
+            .filter(|c| c.kind == "mod" && is_cfg_test(c.attrs))
+            .map(|c| c.name.as_str())
+            .collect();
+        let test_file = scopes
+            .containers
+            .iter()
+            .any(|c| c.kind == "module" && is_cfg_test(c.attrs));
         for f in &scopes.fns {
-            builder.method(method(parsed, f));
+            let in_tests = test_file || in_test_mod(&test_mods, &f.inline);
+            builder.method(method(parsed, f, in_tests));
         }
         for m in &scopes.macros {
             if let MacroScope::Def {
@@ -97,14 +108,22 @@ fn macro_visibility(item: &syn::ItemMacro) -> String {
     if exported { "pub" } else { "private" }.to_owned()
 }
 
-/// A metódus kimeneti alakja; a `kind`: `fn` / `method` / `assoc` (`async ` előtaggal, ha aszinkron).
-fn method(parsed: &ParsedFile<'_>, f: &FnScope<'_>) -> Method {
+/// A függvény egy `#[cfg(test)]` inline modulban (vagy annak almoduljában) van-e.
+fn in_test_mod(test_mods: &[&str], inline: &[String]) -> bool {
+    (1..=inline.len()).any(|n| test_mods.contains(&inline[..n].join("::").as_str()))
+}
+
+/// A metódus kimeneti alakja; a `kind`: `fn` / `method` / `assoc` (`async ` előtaggal, ha aszinkron), a
+/// tesztek (`#[test]`, `#[tokio::test]`, `#[cfg(test)]` modul tagjai) `test`.
+fn method(parsed: &ParsedFile<'_>, f: &FnScope<'_>, in_tests: bool) -> Method {
     let base = match (&f.role, f.has_receiver()) {
         (FnRole::Free, _) => "fn",
         (_, true) => "method",
         (_, false) => "assoc",
     };
-    let kind = if f.sig.asyncness.is_some() {
+    let kind = if in_tests || is_test_fn(f.attrs) || is_cfg_test(f.attrs) {
+        "test".to_owned()
+    } else if f.sig.asyncness.is_some() {
         format!("async {base}")
     } else {
         base.to_owned()

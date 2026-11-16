@@ -234,13 +234,7 @@ fn strings_include_const_and_static_initializers() {
 fn method_callers_by_type_include_inferred_and_uncertain_receivers() {
     let sample = Sample::new();
     let out = sample.show("src", &["--grep", "AppState::next_id"]);
-    for expected in [
-        "create_order()",
-        "allocate()",
-        "report()",
-        "allocate_all()",
-        "?::next_id",
-    ] {
+    for expected in ["create_order()", "allocate()", "report()", "allocate_all()"] {
         assert!(out.contains(expected), "missing {expected:?} in:\n{out}");
     }
     let rows = callers(&sample, "AppState::next_id");
@@ -250,7 +244,8 @@ fn method_callers_by_type_include_inferred_and_uncertain_receivers() {
     };
     assert!(has("create_order", "AppState::next_id"), "{rows:?}");
     assert!(has("allocate", "AppState::next_id"), "{rows:?}");
-    assert!(has("allocate_all", "?::next_id"), "{rows:?}");
+    // az iterátor-adapter closure-paramétere az elem típusát kapja (`&[Client]` → `c: Client`)
+    assert!(has("allocate_all", "AppState::next_id"), "{rows:?}");
 }
 
 #[test]
