@@ -13,6 +13,11 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   létezik, ha a szerver `--generate` / `CALLGRAPH_GENERATE=1` móddal fut, és `readOnlyHint: false` jelölést kap.
 - **A `gen --dry` megmutatja, hová kerülne a kód:** `--into` / `--replace` mellett a próbafutás először kiírja az
   elhelyezést, pl. `→ app/Pay.php::Pay after charge (L41)` vagy `→ f.vue: script L12-14`.
+- **Vue prop-ok interfészből, alapértékekkel és `defineModel`-lel:** a `defineProps<Props>()` mostantól feloldja a
+  helyi `interface`-t vagy típusaliast (az `extends`-et és az `A & B`-t is); a `withDefaults` alapértékei
+  `type $name = default` alakban látszanak, és a prop nem számít kötelezőnek; a `defineModel` `model:` sorként jelenik
+  meg a vázlatban, a `--format api`-ban pedig `model` szakaszként. A csak típust használó `defineEmits` is a valódi
+  sorát mutatja.
 
 ### Változás
 
@@ -25,11 +30,22 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 - **Rövidebb MCP használati hibák:** a `generate`, `rename` vagy `undo` használati hibája MCP-n már nem fűzi hozzá a
   teljes használati szöveget; a CLI nem változik. A `generate` eszköz leírása is rövidebb — a nyelvtan az útmutatóban
   és a SKILL `gen` szakaszában van.
+- **A `laravel:` preset a `gen` generátorán át ír:** a FormRequest-ek, a controller-metódusok és az Inertia/Vue
+  oldalak mostantól ugyanúgy formázódnak, mint maga a `gen`: PHPDoc `@return array<string, list<string>|string>`,
+  `function submit()` a Vue oldalakon, a hosszú tagek attribútumonként tördelve, elöl az `@inertiajs/vue3` import, a
+  `const props =` pedig csak ott, ahol a script használja. A Ziggyt a `composer.json` / `package.json` függőséglistái
+  alapján ismeri fel, nem szövegkereséssel.
+- **Stíluslap-hívások és JSON-kulcsok a vázlatban:** a CSS/SCSS hívások (`var()`, `@include`, függvények, `@extend`) a
+  szabályuk alatt jelennek meg, és a `--grep` megtalálja őket. A metódus nélküli JSON-fájl rövid kulcsindexet kap a
+  metódusindexben (a felső kulcsok gyerekszámmal, a skalár sorozatok összevonva). A `--format summary` JSON-nál,
+  Markdown/HTML-nél és stíluslapoknál „0 metódus" helyett kulcsokat, szakaszokat vagy szabályokat számol.
 
 ### Javítás
 
 - **A `laravel:` preset írás előtt szintaxist ellenőriz a generált `.ts`, `.js` és `.html` fájlokon is:** korábban
   csak a PHP- és Vue-fájlokat ellenőrizte.
+- **Projekten kívüli JS/TS-fájlok modulútvonala:** a `package.json`, `tsconfig` vagy `jsconfig` nélküli fájl
+  `home/…` alakú modulútvonalat kapott; most a fájl mappájához képest relatív.
 
 ## [1.0.2] — 2026-11-16
 

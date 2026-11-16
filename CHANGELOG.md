@@ -12,6 +12,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   `--generate` / `CALLGRAPH_GENERATE=1`, and it is marked `readOnlyHint: false`.
 - **`gen --dry` shows where the code would go:** with `--into` / `--replace`, the dry run first prints the placement,
   e.g. `→ app/Pay.php::Pay after charge (L41)` or `→ f.vue: script L12-14`.
+- **Vue props from interfaces, defaults and `defineModel`:** `defineProps<Props>()` now resolves a local `interface`
+  or type alias (including `extends` and `A & B`); `withDefaults` defaults are shown as `type $name = default` and the
+  prop is not marked required; `defineModel` appears as `model:` in the outline and as a `model` section in
+  `--format api`. A type-only `defineEmits` now shows its real line.
 
 ### Changed
 
@@ -24,11 +28,22 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 - **Shorter MCP usage errors:** a usage error of `generate`, `rename` or `undo` over MCP no longer appends the whole
   usage text; the CLI is unchanged. The `generate` tool description is shorter too — the grammar is in the guide and
   in the SKILL `gen` section.
+- **The `laravel:` preset writes through the `gen` generator:** FormRequests, controller methods and Inertia/Vue pages
+  now follow the same formatting as `gen` itself: PHPDoc `@return array<string, list<string>|string>`, Vue pages with
+  `function submit()`, long tags wrapped one attribute per line, the `@inertiajs/vue3` import first, and
+  `const props =` only where the script uses it. Ziggy is detected from the `composer.json` / `package.json`
+  dependency lists instead of a text search.
+- **Stylesheet calls and JSON keys in the outline:** CSS/SCSS calls (`var()`, `@include`, functions, `@extend`) appear
+  under their rule and are found by `--grep`. A JSON file without methods gets a short key index in the method index
+  (top keys with child counts, runs of scalars collapsed). `--format summary` counts keys, sections or rules instead
+  of "0 methods" for JSON, Markdown/HTML and stylesheets.
 
 ### Fixed
 
 - **The `laravel:` preset syntax-checks generated `.ts`, `.js` and `.html` files before writing:** before, only PHP
   and Vue files were checked.
+- **Module paths of JS/TS files outside a project:** a file with no `package.json`, `tsconfig` or `jsconfig` above it
+  got module paths like `home/…`; the path is now relative to the file's folder.
 
 ## [1.0.2] — 2026-11-16
 
