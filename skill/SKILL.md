@@ -264,6 +264,13 @@ bash $CG gen 'c:Pay' --dry --project myapp                                      
 bash $CG undo --project myapp                                                      # restore the last change (a preset / rename: all its files)
 ```
 
+Expression grammar: `c:` class `i:` interface `t:` trait `e:` enum; `>` child, `+` sibling, `^` up, `*n` repeat;
+members `+`/`-`/`#` visibility, `::` static, `name(Type $p):Type{body}`, `$prop:Type=1`, `K=1`, `ctor(-Type $x)` promoted.
+Unknown class names are imported from the project (`unresolved:` lists the ones it could not place). `--dry` prints the
+code; with `--into` / `--replace` a first `→ file::Class after method (L41)` line says where it would go.
+`--replace ...:L42-L87 --expect <sha256-prefix>` refuses if those lines changed since you read them.
+MCP `generate` parameters: `expr`, `dry`, `write`, `into`, `after`, `replace`, `expect`, `project`.
+
 Also Vue / JS / TS / HTML (by the file extension) and `laravel:Fee>create(name:str)+index` (a whole feature, one undo).
 MCP: the `generate`, `rename` and `undo` tools are listed only when the server runs with `--generate` (`CALLGRAPH_GENERATE=1`).
 

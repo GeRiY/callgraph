@@ -46,7 +46,7 @@ mod spec;
 mod tests;
 
 use super::command::{GroupFile, WriteGroup};
-use super::error::{GenError, GenResult};
+use super::error::{GenError, GenResult, Kind};
 use super::fs::Env;
 use super::generator::{GenRequest, Output, Target};
 use super::target::Checker;
@@ -142,6 +142,7 @@ fn validate(file: &Planned) -> GenResult<()> {
                 p.line,
                 p.message
             ))
+            .with_kind(Kind::Syntax)
         } else {
             GenError::new(crate::tf!(
                 "syntax error in {}: {} L{}: {} (nothing written)",
@@ -151,6 +152,7 @@ fn validate(file: &Planned) -> GenResult<()> {
                 p.line,
                 p.message
             ))
+            .with_kind(Kind::Syntax)
         }
     })
 }

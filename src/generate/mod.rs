@@ -43,6 +43,7 @@ pub mod parser;
 pub mod php;
 pub mod preset;
 pub mod project;
+pub mod report;
 pub mod resolve;
 pub mod target;
 #[cfg(test)]

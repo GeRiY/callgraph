@@ -6,7 +6,7 @@
 use std::io::ErrorKind;
 
 use super::backup::{Backups, Journal, JournalEntry};
-use super::error::{GenError, GenResult};
+use super::error::{GenError, GenResult, Kind};
 use super::fs::Env;
 
 /// Egy végrehajtható szerkesztés.
@@ -28,6 +28,7 @@ fn protected(rel: &str) -> GenError {
         "{} védett a .callgraphignore-ban (`protect`), nem módosítom",
         rel
     ))
+    .with_kind(Kind::Protected)
 }
 
 /// Meglévő (vagy új) fájl írása: előbb a mentés, utána az írás. A mentés útját adja vissza.
@@ -79,6 +80,7 @@ impl EditCommand for WriteNew {
                     "{} már létezik — módosításhoz használd: --into <fájl>::Osztály vagy --replace <fájl>::metódus",
                     self.rel
                 ))
+                .with_kind(Kind::Exists)
             } else {
                 GenError::new(crate::tf!(
                     "cannot write {}: {}",

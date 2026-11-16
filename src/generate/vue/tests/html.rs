@@ -197,6 +197,24 @@ fn inline_style_script_and_comment() {
     assert!(fs.get("bad.html").is_none());
 }
 
+/// A `--dry` `--into` / `--replace` célnál egy hely-fejléc sor áll a kód előtt.
+#[test]
+fn dry_into_and_replace_print_a_placement_header() {
+    let fs = MemFs::with(&[("page.html", PAGE)]);
+    let out = go(&fs, "p.note{Added}", true, into("page.html", None)).unwrap();
+    assert!(out.lines[0].starts_with("→ page.html: html L"), "{out:?}");
+    assert!(
+        out.lines[1].contains("<p class=\"note\">Added</p>"),
+        "{out:?}"
+    );
+    let out = go(&fs, "h2{New}", true, replace_lines("page.html", 7, 7)).unwrap();
+    assert!(
+        out.lines[0].starts_with("→ page.html replace L7-7 → L7-7"),
+        "{out:?}"
+    );
+    assert_eq!(fs.get("page.html").unwrap(), PAGE);
+}
+
 #[test]
 fn into_end_of_body_after_line_and_by_selector() {
     let fs = MemFs::with(&[("page.html", PAGE)]);

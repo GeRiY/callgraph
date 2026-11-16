@@ -24,6 +24,20 @@ fn undo_usage() -> String {
     .to_owned()
 }
 
+/// A használati hiba szövege az MCP-hez: a záró `gen` / `undo` használati sor nélkül (a séma ismert, a sor ~60 token
+/// minden hibánál). A CLI stderr formátuma változatlan; ha a hiba csak maga a használati sor, az marad.
+pub(crate) fn compact_usage(message: &str) -> String {
+    for usage in [gen_usage(), undo_usage()] {
+        if let Some(head) = message.strip_suffix(usage.as_str()) {
+            let head = head.trim_end();
+            if !head.is_empty() {
+                return head.to_owned();
+            }
+        }
+    }
+    message.to_owned()
+}
+
 fn usage_error(usage: String) -> CallgraphError {
     CallgraphError::Usage(usage)
 }
@@ -273,5 +287,26 @@ mod tests {
             }
         );
         assert!(parse_undo(&s(&["a", "b"])).is_err());
+    }
+
+    /// A CLI-hiba végén a használati sor áll; az MCP-s változatban nincs, de az üzenet marad.
+    #[test]
+    fn compact_usage_drops_only_the_trailing_usage_line() {
+        let Err(CallgraphError::Usage(text)) =
+            parse_gen(&s(&["c:A", "--write", "a.php", "--into", "b.php"]))
+        else {
+            panic!("usage error expected");
+        };
+        assert!(text.ends_with(&gen_usage()), "{text}");
+        let compact = compact_usage(&text);
+        assert!(!compact.contains("callgraph gen"), "{compact}");
+        assert!(compact.contains("--write"), "{compact}");
+        // a csak-használati-sor hiba (hiányzó érték) és az idegen szöveg változatlan
+        assert_eq!(compact_usage(&gen_usage()), gen_usage());
+        assert_eq!(compact_usage("something else"), "something else");
+        let Err(CallgraphError::Usage(text)) = parse_undo(&s(&["a", "b"])) else {
+            panic!("usage error expected");
+        };
+        assert_eq!(compact_usage(&text), text);
     }
 }

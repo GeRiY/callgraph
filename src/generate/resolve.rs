@@ -4,9 +4,12 @@
 //!
 //! A 2. és 3. lépés lustán halad: a jelölteket (fájlokat) folyamatosan adja, és az első találatnál megáll.
 
-use std::path::Path;
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::rc::Rc;
 
-use super::fs::{FileSystem, walk_php};
+use super::fs::{FileSystem, MemoWalk, walk_php};
 use super::project::{Psr4, relative};
 
 /// A lánc egy tagja.
@@ -35,57 +38,103 @@ impl NameResolver for ExplicitUse {
     }
 }
 
-/// 2. A projekt osztály-indexe: a PSR-4 gyökerek alatt a `Név.php` fájl, a névtere az útból.
-pub struct ProjectClasses<'a> {
+/// A projekt PHP-fájljainak egyetlen, lusta és memoizált bejárása a PSR-4 gyökerek alatt: a 2. és 3. lépés (és a
+/// `strict_types` mintavétel) osztozik rajta, így egy kérés — akárhány feloldandó névvel — legfeljebb egyszer járja be
+/// a projektet.
+pub struct PhpScan<'a> {
     fs: &'a dyn FileSystem,
     root: &'a Path,
-    psr4: &'a Psr4,
+    walk: MemoWalk<'a>,
+    texts: RefCell<HashMap<PathBuf, Option<Rc<String>>>>,
 }
 
-impl<'a> ProjectClasses<'a> {
-    pub fn new(fs: &'a dyn FileSystem, root: &'a Path, psr4: &'a Psr4) -> Self {
-        Self { fs, root, psr4 }
+impl<'a> PhpScan<'a> {
+    pub fn new(fs: &'a dyn FileSystem, root: &'a Path, psr4: &Psr4) -> Self {
+        let files = psr4
+            .roots()
+            .into_iter()
+            .flat_map(move |dir| walk_php(fs, root.join(dir)));
+        Self {
+            fs,
+            root,
+            walk: MemoWalk::new(files),
+            texts: RefCell::default(),
+        }
+    }
+
+    /// A fájl szövege; kérésenként legfeljebb egyszer olvassa (az olvasási hiba is megjegyződik).
+    pub fn read(&self, path: &Path) -> Option<Rc<String>> {
+        self.texts
+            .borrow_mut()
+            .entry(path.to_path_buf())
+            .or_insert_with(|| self.fs.read(path).ok().map(Rc::new))
+            .clone()
+    }
+
+    /// A fájlok sorban (a már bejártak IO nélkül).
+    pub fn files(&self) -> impl Iterator<Item = PathBuf> + '_ {
+        self.walk.iter()
     }
 }
 
-impl NameResolver for ProjectClasses<'_> {
+/// 2. A projekt osztály-indexe: a PSR-4 gyökerek alatt a `Név.php` fájl, a névtere az útból.
+pub struct ProjectClasses<'a, 's> {
+    scan: &'a PhpScan<'s>,
+    psr4: &'a Psr4,
+}
+
+impl<'a, 's> ProjectClasses<'a, 's> {
+    pub fn new(scan: &'a PhpScan<'s>, psr4: &'a Psr4) -> Self {
+        Self { scan, psr4 }
+    }
+}
+
+impl NameResolver for ProjectClasses<'_, '_> {
     fn resolve(&self, short: &str) -> Option<String> {
         if self.psr4.is_empty() {
             return None;
         }
         let wanted = format!("{short}.php");
-        self.psr4
-            .roots()
-            .into_iter()
-            .flat_map(|dir| walk_php(self.fs, self.root.join(dir)))
+        self.scan
+            .files()
             .find(|path| {
                 path.file_name()
                     .is_some_and(|n| n.to_str() == Some(wanted.as_str()))
             })
-            .and_then(|path| relative(self.root, &path))
+            .and_then(|path| relative(self.scan.root, &path))
             .and_then(|rel| self.psr4.fqcn_of(&rel))
     }
 }
 
-/// Hány fájlt néz át legfeljebb a 3. lépés egy névnél.
+/// Hány fájlt néz át legfeljebb a 3. lépés.
 const USED_IMPORT_FILES: usize = 400;
 
-/// 3. A projektben már használt importok: az első olyan `use X\Név;` (vagy `use X\Y as Név;`) sor.
-pub struct UsedImports<'a> {
-    fs: &'a dyn FileSystem,
-    root: &'a Path,
-    psr4: &'a Psr4,
+/// A 3. lépés állapota: hány fájlt olvasott már el, és az ezekből összegyűjtött `alias → FQCN` párok (az első nyer).
+#[derive(Default)]
+struct UseIndex {
+    next: usize,
+    uses: HashMap<String, String>,
 }
 
-impl<'a> UsedImports<'a> {
-    pub fn new(fs: &'a dyn FileSystem, root: &'a Path, psr4: &'a Psr4) -> Self {
-        Self { fs, root, psr4 }
+/// A lánc 3. lépése: a projektben már használt importok, az első olyan `use X\Név;` (vagy `use X\Y as Név;`) sor.
+/// Minden fájlt legfeljebb egyszer olvas el, a következő név a már összegyűjtött sorokból indul.
+pub struct UsedImports<'a, 's> {
+    scan: &'a PhpScan<'s>,
+    index: RefCell<UseIndex>,
+}
+
+impl<'a, 's> UsedImports<'a, 's> {
+    pub fn new(scan: &'a PhpScan<'s>) -> Self {
+        Self {
+            scan,
+            index: RefCell::new(UseIndex::default()),
+        }
     }
 }
 
-/// A fájl legfelső szintű `use` sorai közül az, amelyik a `short` nevet adja.
-fn find_use(text: &str, short: &str) -> Option<String> {
-    text.lines().find_map(|line| {
+/// A fájl legfelső szintű `use` sorai: `(alias, FQCN)` párok.
+fn file_uses(text: &str) -> impl Iterator<Item = (String, String)> + '_ {
+    text.lines().filter_map(|line| {
         let rest = line.strip_prefix("use ")?.strip_suffix(';')?.trim();
         if rest.starts_with("function ") || rest.starts_with("const ") || rest.contains('{') {
             return None;
@@ -94,19 +143,29 @@ fn find_use(text: &str, short: &str) -> Option<String> {
             Some((p, a)) => (p.trim(), a.trim()),
             None => (rest, rest.rsplit('\\').next().unwrap_or(rest)),
         };
-        (alias == short).then(|| path.trim_start_matches('\\').to_owned())
+        Some((alias.to_owned(), path.trim_start_matches('\\').to_owned()))
     })
 }
 
-impl NameResolver for UsedImports<'_> {
+impl NameResolver for UsedImports<'_, '_> {
     fn resolve(&self, short: &str) -> Option<String> {
-        self.psr4
-            .roots()
-            .into_iter()
-            .flat_map(|dir| walk_php(self.fs, self.root.join(dir)))
-            .take(USED_IMPORT_FILES)
-            .filter_map(|path| self.fs.read(&path).ok())
-            .find_map(|text| find_use(&text, short))
+        let mut index = self.index.borrow_mut();
+        loop {
+            if let Some(found) = index.uses.get(short) {
+                return Some(found.clone());
+            }
+            if index.next >= USED_IMPORT_FILES {
+                return None;
+            }
+            let path = self.scan.walk.get(index.next)?;
+            index.next += 1;
+            let Some(text) = self.scan.read(&path) else {
+                continue;
+            };
+            for (alias, fqcn) in file_uses(&text) {
+                index.uses.entry(alias).or_insert(fqcn);
+            }
+        }
     }
 }
 
@@ -183,17 +242,12 @@ pub struct ResolverChain<'a> {
 
 impl<'a> ResolverChain<'a> {
     /// A PHP-lánc: explicit → projekt-index → használt importok → globálisok.
-    pub fn php(
-        explicit: Vec<(String, String)>,
-        fs: &'a dyn FileSystem,
-        root: &'a Path,
-        psr4: &'a Psr4,
-    ) -> Self {
+    pub fn php(explicit: Vec<(String, String)>, scan: &'a PhpScan<'_>, psr4: &'a Psr4) -> Self {
         Self {
             links: vec![
                 Box::new(ExplicitUse::new(explicit)),
-                Box::new(ProjectClasses::new(fs, root, psr4)),
-                Box::new(UsedImports::new(fs, root, psr4)),
+                Box::new(ProjectClasses::new(scan, psr4)),
+                Box::new(UsedImports::new(scan)),
                 Box::new(PhpGlobals),
             ],
         }

@@ -1083,3 +1083,181 @@ fn the_checker_follows_the_extension() {
     assert_eq!(Checker::for_path("notes.txt"), Checker::Skip);
     assert!(Checker::for_path("notes.txt").check("<<<").is_ok());
 }
+
+/// A `--dry` `--into` / `--replace` célnál egy hely-fejléc sort ír a kód elé; a hely egyezik a valódi futás összegzésével.
+#[test]
+fn dry_into_and_replace_print_a_placement_header() {
+    let into = Target::Into {
+        file: "app/Services/Pay.php".into(),
+        class: None,
+        after: Some("charge".into()),
+    };
+    let clock = FixedClock(Cell::new(T0));
+    let dry = run(
+        &project(),
+        &clock,
+        &request("+refund():void{ }", true, into.clone()),
+    )
+    .unwrap();
+    assert!(
+        dry.lines[0].starts_with("→ app/Services/Pay.php::Pay after charge (L"),
+        "{:?}",
+        dry.lines
+    );
+    assert!(dry.lines[1].contains("function refund"), "{:?}", dry.lines);
+    let real = run(
+        &project(),
+        &clock,
+        &request("+refund():void{ }", false, into),
+    )
+    .unwrap();
+    // `inserted 1 member(s) into … (L15-19)` ↔ `→ … (L15)`
+    let start = real.lines[0]
+        .rsplit_once("(L")
+        .and_then(|(_, rest)| rest.split_once('-'))
+        .map(|(a, _)| a.to_owned())
+        .unwrap();
+    assert!(
+        dry.lines[0].ends_with(&format!("(L{start})")),
+        "{} / {}",
+        dry.lines[0],
+        real.lines[0]
+    );
+
+    let replace = Target::Replace {
+        file: "app/Services/Pay.php".into(),
+        at: ReplaceAt::Method {
+            class: None,
+            name: "other".into(),
+        },
+        expect: None,
+    };
+    let dry = run(
+        &project(),
+        &clock,
+        &request("+other():int{ return 2; }", true, replace),
+    )
+    .unwrap();
+    assert!(
+        dry.lines[0].starts_with("→ app/Services/Pay.php replace L"),
+        "{:?}",
+        dry.lines
+    );
+    assert!(dry.lines[0].ends_with("(other)"), "{:?}", dry.lines);
+    assert!(dry.lines[1].contains("function other"), "{:?}", dry.lines);
+    // --write / előnézet: továbbra is csak a kód
+    let out = run(&project(), &clock, &request("c:A", true, Target::Preview)).unwrap();
+    assert!(!out.lines[0].starts_with('→'), "{:?}", out.lines);
+}
+
+/// A hibák fajtája: létező fájl, hiányzó fájl, szintaktikai hiba, megváltozott sorok.
+#[test]
+fn errors_carry_a_kind() {
+    use super::error::Kind;
+    let fs = project();
+    let clock = FixedClock(Cell::new(T0));
+    let generator = Generator::new(env(&fs, &clock), PhpEmitter);
+    let kind_of = |expr: &str, target: Target| {
+        generator
+            .run(&request(expr, false, target))
+            .unwrap_err()
+            .kind()
+    };
+    assert_eq!(
+        kind_of(
+            "c:Order",
+            Target::Write {
+                file: "app/Models/Order.php".into()
+            }
+        ),
+        Kind::Exists
+    );
+    assert_eq!(
+        kind_of(
+            "+x():void",
+            Target::Into {
+                file: "app/Missing.php".into(),
+                class: None,
+                after: None
+            }
+        ),
+        Kind::NotFound
+    );
+    assert_eq!(
+        kind_of(
+            "+x():void{ if }",
+            Target::Into {
+                file: "app/Services/Pay.php".into(),
+                class: None,
+                after: None
+            }
+        ),
+        Kind::Syntax
+    );
+    assert_eq!(
+        kind_of(
+            "+x():void",
+            Target::Replace {
+                file: "app/Services/Pay.php".into(),
+                at: ReplaceAt::Lines(9, 10),
+                expect: Some("deadbeef".into())
+            }
+        ),
+        Kind::Changed
+    );
+}
+
+/// Több ismeretlen név egy `--into`-ban: a projekt-bejárás egyszer történik (nem nevenként), és minden fájlt
+/// legfeljebb egyszer olvasunk.
+#[test]
+fn several_unknown_names_share_one_project_walk() {
+    let fs = project();
+    let clock = FixedClock(Cell::new(T0));
+    fs.reset_counters();
+    let out = run(
+        &fs,
+        &clock,
+        &request(
+            "+f(Alpha $a, Beta $b, Gamma $c, Delta $d):void",
+            true,
+            Target::Into {
+                file: "app/Services/Pay.php".into(),
+                class: None,
+                after: None,
+            },
+        ),
+    )
+    .unwrap();
+    assert_eq!(out.unresolved, ["Alpha", "Beta", "Delta", "Gamma"]);
+    // a project(): app, app/Dto, app/Models, app/Services + egy gyökér-listázás — egy bejárás (5 listázás) a nevek
+    // számától függetlenül; a régi névenkénti bejárás 4 névnél 4 × 4 lenne
+    assert!(fs.list_calls() <= 5, "lists: {}", fs.list_calls());
+    for rel in ["composer.json", "app/Other.php", "app/Models/Order.php"] {
+        assert!(fs.reads_of(rel) <= 1, "{rel}: {}", fs.reads_of(rel));
+    }
+    assert!(fs.read_calls() <= 6, "reads: {}", fs.read_calls());
+}
+
+/// A `--write` is egy bejáráson osztozik a névfeloldás és a `strict_types` mintavétel között.
+#[test]
+fn write_shares_the_walk_between_names_and_strict_detection() {
+    let fs = project();
+    let clock = FixedClock(Cell::new(T0));
+    fs.reset_counters();
+    let out = run(
+        &fs,
+        &clock,
+        &request(
+            "c:Fresh > +f(Alpha $a, Beta $b):void",
+            true,
+            Target::Write {
+                file: "app/Services/Fresh.php".into(),
+            },
+        ),
+    )
+    .unwrap();
+    assert_eq!(out.unresolved, ["Alpha", "Beta"]);
+    assert!(fs.list_calls() <= 5, "lists: {}", fs.list_calls());
+    assert!(fs.reads_of("app/Other.php") <= 1);
+    assert!(fs.reads_of("composer.json") <= 1);
+}

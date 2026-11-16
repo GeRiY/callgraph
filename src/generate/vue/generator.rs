@@ -18,9 +18,10 @@ use super::template::{components, opens_element};
 use super::{style, template};
 use crate::generate::command::{EditCommand, InsertInto, ReplaceRange, WriteNew};
 use crate::generate::edit::extend_over_docs;
-use crate::generate::error::{GenError, GenResult};
+use crate::generate::error::{GenError, GenResult, Kind as ErrorKind};
 use crate::generate::fs::Env;
 use crate::generate::generator::{GenRequest, Output, ReplaceAt, Target};
+use crate::generate::report;
 use crate::generate::target::{self, Checker};
 pub(super) use crate::generate::target::{Loaded, check_expect};
 use crate::lang::js::{Sfc, SfcBlockKind};
@@ -89,6 +90,7 @@ pub(super) fn problem(p: &super::check::Problem) -> GenError {
         p.line,
         p.message
     ))
+    .with_kind(ErrorKind::Syntax)
 }
 
 fn one_line_block(name: &str) -> GenError {
@@ -102,11 +104,16 @@ fn one_line_block(name: &str) -> GenError {
 /// A Facade.
 pub struct VueGenerator<'a> {
     pub(super) env: Env<'a>,
+    /// A projekt-ismeret: egy kérésen belül közös (memoizált bejárások és beolvasott fájlok).
+    project: VueProject<'a>,
 }
 
 impl<'a> VueGenerator<'a> {
     pub fn new(env: Env<'a>) -> Self {
-        Self { env }
+        Self {
+            env,
+            project: VueProject::new(env.fs, env.root),
+        }
     }
 
     /// A kérés végrehajtása.
@@ -166,8 +173,8 @@ impl<'a> VueGenerator<'a> {
         target::rel(self.env.root, file)
     }
 
-    fn project(&self) -> VueProject<'_> {
-        VueProject::new(self.env.fs, self.env.root)
+    fn project(&self) -> &VueProject<'a> {
+        &self.project
     }
 
     pub(super) fn validate(&self, rel: &str, text: &str) -> GenResult<()> {
@@ -499,23 +506,18 @@ impl<'a> VueGenerator<'a> {
     ) -> GenResult<Output> {
         let text = doc.lines.join(eol);
         self.validate(&rel, &text)?;
-        if dry {
-            return Ok(Output {
-                lines: block,
-                unresolved,
-            });
-        }
         let places: Vec<String> = doc
             .placed
             .iter()
             .map(|p| format!("{} L{}-{}", p.label, p.start + 1, p.start + p.len))
             .collect();
-        let summary = crate::tf!(
-            "inserted into {}: {}",
-            "beszúrva ide: {}: {}",
-            rel,
-            places.join(", ")
-        );
+        if dry {
+            return Ok(Output {
+                lines: report::with_header(report::sections_header(&rel, &places), block),
+                unresolved,
+            });
+        }
+        let summary = report::inserted_sections(&rel, &places);
         let line = InsertInto { rel, text, summary }.execute(self.env)?;
         Ok(Output {
             lines: vec![line],
@@ -684,23 +686,16 @@ impl<'a> VueGenerator<'a> {
         }
         let new_text = doc.lines.join(eol);
         self.validate(&rel, &new_text)?;
+        let new = (from + 1, from + block.len());
+        let label = format!("{class}::{name}");
         if dry {
+            let header = report::replace_header(&rel, (from + 1, to), new, &label);
             return Ok(Output {
-                lines: block,
+                lines: report::with_header(header, block),
                 unresolved: Vec::new(),
             });
         }
-        let summary = crate::tf!(
-            "replaced {} L{}-{} → L{}-{} ({}::{})",
-            "kicserélve: {} L{}-{} → L{}-{} ({}::{})",
-            rel,
-            from + 1,
-            to,
-            from + 1,
-            from + block.len(),
-            class,
-            name
-        );
+        let summary = report::replaced(&rel, (from + 1, to), new, &label);
         let line = ReplaceRange {
             rel,
             text: new_text,
@@ -772,28 +767,21 @@ impl<'a> VueGenerator<'a> {
         }
         let new_text = doc.lines.join(eol);
         self.validate(&rel, &new_text)?;
-        if dry {
-            return Ok(Output {
-                lines: block,
-                unresolved: rendered.unresolved,
-            });
-        }
         let placed = doc
             .placed
             .iter()
             .find(|p| p.label == section)
             .map_or((from, block.len()), |p| (p.start, p.len));
-        let name = label.map(|n| format!(" ({n})")).unwrap_or_default();
-        let summary = crate::tf!(
-            "replaced {} L{}-{} → L{}-{}{}",
-            "kicserélve: {} L{}-{} → L{}-{}{}",
-            rel,
-            from + 1,
-            to,
-            placed.0 + 1,
-            placed.0 + placed.1,
-            name
-        );
+        let new = (placed.0 + 1, placed.0 + placed.1);
+        let label = label.unwrap_or_default();
+        if dry {
+            let header = report::replace_header(&rel, (from + 1, to), new, &label);
+            return Ok(Output {
+                lines: report::with_header(header, block),
+                unresolved: rendered.unresolved,
+            });
+        }
+        let summary = report::replaced(&rel, (from + 1, to), new, &label);
         let line = ReplaceRange {
             rel,
             text: new_text,

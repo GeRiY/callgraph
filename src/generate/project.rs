@@ -3,7 +3,8 @@
 
 use std::path::Path;
 
-use super::fs::{FileSystem, walk_php};
+use super::fs::FileSystem;
+use super::resolve::PhpScan;
 
 /// Hány fájlt mintázunk a stílus megállapításához.
 const STYLE_SAMPLE: usize = 50;
@@ -135,16 +136,12 @@ pub fn relative(root: &Path, path: &Path) -> Option<String> {
     )
 }
 
-/// `declare(strict_types=1)` a mintázott PHP-fájlok többségében (nincs minta → igen, a modern alapérték).
-pub fn detect_strict_types(fs: &dyn FileSystem, root: &Path, psr4: &Psr4) -> bool {
+/// `declare(strict_types=1)` a mintázott PHP-fájlok többségében (nincs minta → igen, a modern alapérték); `files`: a
+/// projekt PHP-fájljai (az első `STYLE_SAMPLE`-t olvassa, a közös szöveg-gyorsítótáron át).
+pub fn detect_strict_types(scan: &PhpScan<'_>) -> bool {
     let (mut sampled, mut strict) = (0usize, 0usize);
-    let files = psr4
-        .roots()
-        .into_iter()
-        .flat_map(|dir| walk_php(fs, root.join(dir)))
-        .take(STYLE_SAMPLE);
-    for file in files {
-        let Ok(text) = fs.read(&file) else {
+    for file in scan.files().take(STYLE_SAMPLE) {
+        let Some(text) = scan.read(&file) else {
             continue;
         };
         sampled += 1;

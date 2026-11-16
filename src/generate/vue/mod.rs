@@ -125,6 +125,7 @@ pub use generator::{VueGenerator, wants_vue};
 pub(crate) use check::{Problem, check_script_file, check_vue};
 pub(crate) use html_gen::is_html_file;
 pub(crate) use html_scan::check_html;
+pub(crate) use project::VueProject;
 
 /// A projekt Vue-stílusa a preset számára: TypeScript-e, pontosvesszős-e, és a behúzás-egység.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -135,8 +136,7 @@ pub struct ProjectFacts {
 }
 
 /// A projekt kódstílusa és behúzása (a meglévő `.vue` fájlokból).
-pub fn project_facts(env: crate::generate::Env<'_>) -> ProjectFacts {
-    let project = project::VueProject::new(env.fs, env.root);
+pub fn project_facts(project: &VueProject<'_>) -> ProjectFacts {
     let style = project.code_style();
     ProjectFacts {
         ts: style.ts,
@@ -146,8 +146,8 @@ pub fn project_facts(env: crate::generate::Env<'_>) -> ProjectFacts {
 }
 
 /// A `<név>.vue` komponens import-útja (`@/Components/Név.vue`), ha a projektben van ilyen fájl.
-pub fn component_path(env: crate::generate::Env<'_>, name: &str) -> Option<String> {
-    project::VueProject::new(env.fs, env.root).find_component(name)
+pub fn component_path(project: &VueProject<'_>, name: &str) -> Option<String> {
+    project.find_component(name)
 }
 
 /// Egy kész `.vue` szöveg ellenőrzése (script: oxc, template: tag-egyensúly, style: CSS-parser); hiba: egy sor.

@@ -213,9 +213,7 @@ pub(crate) struct LocateParams {
 // `//` komment: a `///` a sémába kerülne, és növelné a `tools/list` tokenjeit.)
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, JsonSchema)]
 pub(crate) struct GenerateParams {
-    /// The expression, e.g. `c!:Pay<Base>[Chargeable] > ctor(-Client $http) + +charge(Order $o):Receipt{ … }`:
-    /// `c:` class `i:` interface `t:` trait `e:` enum; `>` child, `+` sibling, `^` up, `*n` repeat; members
-    /// `+`/`-`/`#` visibility, `::` static, `name(Type $p):Type{body}`, `$prop:Type=1`, `K=1`, `ctor(-Type $x)` promoted.
+    /// The expression, e.g. `c:Pay > ctor(-Client $http) + +charge(Order $o):Receipt{ … }` (grammar: see the guide).
     pub expr: String,
     /// Return the generated code instead of writing it.
     #[serde(default)]

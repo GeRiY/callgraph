@@ -6,7 +6,7 @@ use std::path::{Component, Path};
 
 use super::edit::{range_text, split_lines};
 use super::emitter::Emitter;
-use super::error::{GenError, GenResult};
+use super::error::{GenError, GenResult, Kind};
 use super::fs::Env;
 use super::php::PhpEmitter;
 use super::vue::{Problem, check_html, check_script_file, check_vue, is_html_file};
@@ -57,7 +57,8 @@ pub fn load(env: Env<'_>, rel: &str) -> GenResult<Loaded> {
             "{} nem található (új fájl: --write {})",
             rel,
             rel
-        )));
+        ))
+        .with_kind(Kind::NotFound));
     }
     let text = env.fs.read(&path).map_err(|e| {
         GenError::new(crate::tf!(
@@ -93,7 +94,8 @@ pub fn check_expect(
             rel,
             wanted,
             &current[..12]
-        )));
+        ))
+        .with_kind(Kind::Changed));
     }
     Ok(())
 }

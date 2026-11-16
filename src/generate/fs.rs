@@ -1,6 +1,7 @@
 //! Fájlrendszer és óra, befecskendezhető (DI) felületen: az éles megvalósítás a lemezre ír, a tesztek memóriában
 //! futnak rögzített órával. A generátor minden I/O-ja ezen át megy (`Generator`, `Backups`, osztály-index).
 
+use std::cell::RefCell;
 use std::io;
 use std::path::{Path, PathBuf};
 
@@ -156,6 +157,47 @@ pub fn walk_php<'a>(fs: &'a dyn FileSystem, dir: PathBuf) -> impl Iterator<Item 
             pending = files.into_iter();
         }
     })
+}
+
+/// Egy lusta fájl-bejárás memoizált kezdete: az elemeket egyszer kéri le a bejárótól, és a további olvasók a már látott
+/// elemeket IO nélkül kapják. Így egy kérésen belül több név / lekérdezés egyetlen bejáráson osztozik.
+pub struct MemoWalk<'a> {
+    state: RefCell<WalkState<'a>>,
+}
+
+struct WalkState<'a> {
+    iter: Box<dyn Iterator<Item = PathBuf> + 'a>,
+    seen: Vec<PathBuf>,
+    done: bool,
+}
+
+impl<'a> MemoWalk<'a> {
+    pub fn new(iter: impl Iterator<Item = PathBuf> + 'a) -> Self {
+        Self {
+            state: RefCell::new(WalkState {
+                iter: Box::new(iter),
+                seen: Vec::new(),
+                done: false,
+            }),
+        }
+    }
+
+    /// Az `i`. elem (0-alapú); a bejárás csak addig halad, amíg szükséges.
+    pub fn get(&self, i: usize) -> Option<PathBuf> {
+        let mut state = self.state.borrow_mut();
+        while state.seen.len() <= i && !state.done {
+            match state.iter.next() {
+                Some(path) => state.seen.push(path),
+                None => state.done = true,
+            }
+        }
+        state.seen.get(i).cloned()
+    }
+
+    /// Az elemek sorban (a már látottak IO nélkül, a többi lustán).
+    pub fn iter(&self) -> impl Iterator<Item = PathBuf> + '_ {
+        (0..).map_while(|i| self.get(i))
+    }
 }
 
 /// A generátor környezete: projekt-gyökér, valamint a befecskendezett fájlrendszer és óra.

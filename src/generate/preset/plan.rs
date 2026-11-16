@@ -8,9 +8,11 @@ use super::php::{self, ControllerCtx};
 use super::spec::{Action, Field, FieldType, Names, Op, Spec};
 use crate::generate::edit::{add_imports, insert_at_end, join_lines, split_lines};
 use crate::generate::emitter::Emitter;
-use crate::generate::error::{GenError, GenResult};
+use crate::generate::error::{GenError, GenResult, Kind as ErrorKind};
 use crate::generate::fs::{Env, walk_php};
 use crate::generate::project::{Psr4, detect_strict_types, relative};
+use crate::generate::report;
+use crate::generate::resolve::PhpScan;
 use crate::generate::vue;
 use crate::generate::{PhpEmitter, generator::pick_container};
 use crate::packages::frameworks::laravel::preset as laravel;
@@ -91,7 +93,8 @@ fn ensure_new(env: Env<'_>, rel: &str) -> GenResult<()> {
             "{} already exists — the preset never overwrites a file (nothing written)",
             "{} már létezik — a preset soha nem ír felül fájlt (nem írtam semmit)",
             rel
-        )));
+        ))
+        .with_kind(ErrorKind::Exists));
     }
     Ok(())
 }
@@ -132,9 +135,9 @@ fn pages_dir(env: Env<'_>) -> &'static str {
     }
 }
 
-/// A projekt komponensei, amelyeket az oldalak használnak.
-fn parts(env: Env<'_>) -> Parts {
-    let path = |name: &str| vue::component_path(env, name);
+/// A projekt komponensei, amelyeket az oldalak használnak; `composer`: a már beolvasott `composer.json` szövege.
+fn parts(env: Env<'_>, project: &vue::VueProject<'_>, composer: Option<&str>) -> Parts {
+    let path = |name: &str| vue::component_path(project, name);
     Parts {
         layout: ["AuthenticatedLayout", "AppLayout"]
             .iter()
@@ -143,18 +146,18 @@ fn parts(env: Env<'_>) -> Parts {
         input: path("TextInput"),
         error: path("InputError"),
         button: path("PrimaryButton"),
-        ziggy: has_ziggy(env),
+        ziggy: has_ziggy(env, composer),
     }
 }
 
 /// Ziggy a projektben: `tightenco/ziggy` a composer.json-ban vagy `ziggy-js` a package.json-ban.
-fn has_ziggy(env: Env<'_>) -> bool {
-    let mentions = |rel: &str, needle: &str| {
-        env.fs
-            .read(&env.root.join(rel))
-            .is_ok_and(|text| text.contains(needle))
-    };
-    mentions("composer.json", "\"tightenco/ziggy\"") || mentions("package.json", "\"ziggy-js\"")
+/// A `composer.json` szövegét a hívó már beolvasta (egy futás egyszer olvassa).
+fn has_ziggy(env: Env<'_>, composer: Option<&str>) -> bool {
+    composer.is_some_and(|text| text.contains("\"tightenco/ziggy\""))
+        || env
+            .fs
+            .read(&env.root.join("package.json"))
+            .is_ok_and(|text| text.contains("\"ziggy-js\""))
 }
 
 /// Az utolsó nem üres sor után, egy üres sorral elválasztva; a záró újsor megmarad.
@@ -381,20 +384,18 @@ fn plan_controller(
         rel: rel.to_owned(),
         text: join_lines(&lines, eol),
         shown: block,
-        summary: crate::tf!(
-            "inserted into {}: {}",
-            "beszúrva ide: {}: {}",
-            rel,
-            methods.join(", ")
-        ),
+        summary: report::inserted_sections(rel, &methods),
     })
 }
 
 /// A terv a kifejezésből. Hibánál (létező kérés / oldal / metódus) semmi nem íródik.
 pub fn build(env: Env<'_>, spec: &Spec) -> GenResult<Plan> {
     let names = Names::of(spec);
-    let psr4 = Psr4::load(env.fs, env.root);
-    let strict = detect_strict_types(env.fs, env.root, &psr4);
+    // a composer.json egyszer olvasódik: a PSR-4 térkép és a Ziggy-észlelés is ebből dolgozik
+    let composer = env.fs.read(&env.root.join("composer.json")).ok();
+    let psr4 = composer.as_deref().map(Psr4::parse).unwrap_or_default();
+    let scan = PhpScan::new(env.fs, env.root, &psr4);
+    let strict = detect_strict_types(&scan);
     let ops = spec.ops();
     let ns_of = |rel: &str, fallback: &str| {
         psr4.namespace_of(rel)
@@ -492,8 +493,10 @@ pub fn build(env: Env<'_>, spec: &Spec) -> GenResult<Plan> {
     plan.verified_routes = routes.verified;
 
     // 4. oldalak
-    let facts = vue::project_facts(env);
-    let parts = parts(env);
+    // egy projekt-ismeret az oldalaknak: a bejárások és a mintafájlok egyszer olvasódnak
+    let vue_project = vue::VueProject::new(env.fs, env.root);
+    let facts = vue::project_facts(&vue_project);
+    let parts = parts(env, &vue_project, composer.as_deref());
     let dir = pages_dir(env);
     for (action, kind) in [
         (Action::Index, Kind::Index),

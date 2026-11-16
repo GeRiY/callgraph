@@ -15,6 +15,7 @@ mod uses_args;
 
 pub use args::{CliArgs, HookAction, NO_GITIGNORE_FLAG, NoteAction, take_no_gitignore};
 pub use command::Command;
+pub(crate) use generate_args::compact_usage;
 pub use profile_args::LayerArgs;
 pub use telemetry_args::TelemetryAction;
 

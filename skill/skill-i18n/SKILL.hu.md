@@ -268,6 +268,13 @@ bash $CG gen 'c:Pay' --dry --project myapp                                      
 bash $CG undo --project myapp                                                      # az utolsó módosítás visszaállítása (preset / rename: az összes fájlja)
 ```
 
+Kifejezés-nyelvtan: `c:` osztály `i:` interfész `t:` trait `e:` enum; `>` gyerek, `+` testvér, `^` fel, `*n` ismétlés;
+tagok: `+`/`-`/`#` láthatóság, `::` statikus, `név(Típus $p):Típus{törzs}`, `$prop:Típus=1`, `K=1`, `ctor(-Típus $x)`
+promotált. Az ismeretlen osztályneveket a projektből importálja (az `unresolved:` felsorolja, amit nem tudott elhelyezni).
+A `--dry` a kódot írja ki; `--into` / `--replace` mellett az első `→ fájl::Osztály after metódus (L41)` sor megmondja,
+hova kerülne. A `--replace ...:L42-L87 --expect <sha256-előtag>` visszautasít, ha a sorok azóta megváltoztak.
+MCP `generate` paraméterek: `expr`, `dry`, `write`, `into`, `after`, `replace`, `expect`, `project`.
+
 Vue / JS / TS / HTML is (a fájl kiterjesztése szerint), és `laravel:Fee>create(name:str)+index` (egy teljes funkció, egy undo).
 MCP: a `generate`, `rename` és `undo` eszköz csak akkor szerepel a listában, ha a szerver `--generate`-tel
 (`CALLGRAPH_GENERATE=1`) fut.

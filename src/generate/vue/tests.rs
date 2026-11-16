@@ -644,6 +644,39 @@ function reset(): void {
     assert!(file.contains("  <p>new</p>\n</template>"), "{file}");
 }
 
+/// A `--dry` `--into` / `--replace` célnál egy hely-fejléc sor áll a kód előtt (a fájl nem változik).
+#[test]
+fn dry_into_and_replace_print_a_placement_header() {
+    let fs = MemFs::with(&[("src/A.vue", EXISTING_SFC)]);
+    let out = go(
+        &fs,
+        "script>fn:reset():void{ a.value = 0 }",
+        true,
+        into("src/A.vue", None),
+    )
+    .unwrap();
+    assert!(out.lines[0].starts_with("→ src/A.vue: script L"), "{out:?}");
+    assert!(out.lines[1..].iter().any(|l| l.contains("function reset")));
+    assert_eq!(fs.get("src/A.vue").unwrap(), EXISTING_SFC);
+
+    let out = go(
+        &fs,
+        "script>ref:a:int=2",
+        true,
+        Target::Replace {
+            file: "src/A.vue".to_owned(),
+            at: ReplaceAt::Lines(4, 4),
+            expect: None,
+        },
+    )
+    .unwrap();
+    assert!(
+        out.lines[0].starts_with("→ src/A.vue replace L4-4 → L"),
+        "{out:?}"
+    );
+    assert_eq!(fs.get("src/A.vue").unwrap(), EXISTING_SFC);
+}
+
 #[test]
 fn invalid_script_is_rejected_and_nothing_is_written() {
     let fs = MemFs::default();

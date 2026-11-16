@@ -2,11 +2,14 @@
 //! `lang="ts"` a meglévő `.vue` fájlokban), pontosvesszős-e a stílus, és hol van a `<Név>.vue` komponens (az
 //! `@/…` alias a `resources/js` vagy a `src` mappára mutat).
 
+use std::cell::{OnceCell, RefCell};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 
 use super::edit::indent_unit;
 use crate::generate::edit::split_lines;
-use crate::generate::fs::FileSystem;
+use crate::generate::fs::{FileSystem, MemoWalk};
 
 /// Hány `.vue` fájlt mintázunk a stílushoz.
 const SAMPLE: usize = 30;
@@ -20,10 +23,15 @@ pub struct CodeStyle {
     pub semi: bool,
 }
 
-/// A projekt-ismeret forrása.
+/// A projekt-ismeret forrása. A bejárásokat és a beolvasott fájlokat memoizálja: egy példány (egy kérés) minden mappát
+/// legfeljebb egyszer listáz, és minden fájlt legfeljebb egyszer olvas, akárhány kérdés érkezik.
 pub struct VueProject<'a> {
     fs: &'a dyn FileSystem,
     root: &'a Path,
+    walks: RefCell<HashMap<PathBuf, Rc<MemoWalk<'a>>>>,
+    texts: RefCell<HashMap<PathBuf, Option<Rc<String>>>>,
+    sample_roots: OnceCell<Vec<PathBuf>>,
+    sample: OnceCell<Vec<PathBuf>>,
 }
 
 fn skipped_dir(name: &str) -> bool {
@@ -99,32 +107,70 @@ pub fn uses_semicolons(text: &str) -> Option<bool> {
 
 impl<'a> VueProject<'a> {
     pub fn new(fs: &'a dyn FileSystem, root: &'a Path) -> Self {
-        Self { fs, root }
+        Self {
+            fs,
+            root,
+            walks: RefCell::default(),
+            texts: RefCell::default(),
+            sample_roots: OnceCell::new(),
+            sample: OnceCell::new(),
+        }
     }
 
-    fn sample_roots(&self) -> Vec<PathBuf> {
-        let mut roots: Vec<PathBuf> = ROOTS
-            .iter()
-            .map(|r| self.root.join(r))
-            .filter(|p| self.fs.list(p).is_ok())
-            .collect();
-        if roots.is_empty() {
-            roots.push(self.root.to_path_buf());
-        }
-        roots
+    /// A mappa `.vue` fájljainak memoizált, lusta bejárása.
+    fn walk(&self, dir: &Path) -> Rc<MemoWalk<'a>> {
+        let mut walks = self.walks.borrow_mut();
+        let fs = self.fs;
+        Rc::clone(
+            walks
+                .entry(dir.to_path_buf())
+                .or_insert_with(|| Rc::new(MemoWalk::new(walk_vue(fs, dir.to_path_buf())))),
+        )
+    }
+
+    /// A fájl szövege, legfeljebb egyszer olvasva (az olvasási hiba is megjegyződik).
+    fn text(&self, path: &Path) -> Option<Rc<String>> {
+        let mut texts = self.texts.borrow_mut();
+        texts
+            .entry(path.to_path_buf())
+            .or_insert_with(|| self.fs.read(path).ok().map(Rc::new))
+            .clone()
+    }
+
+    fn sample_roots(&self) -> &[PathBuf] {
+        self.sample_roots.get_or_init(|| {
+            let mut roots: Vec<PathBuf> = ROOTS
+                .iter()
+                .map(|r| self.root.join(r))
+                .filter(|p| self.fs.list(p).is_ok())
+                .collect();
+            if roots.is_empty() {
+                roots.push(self.root.to_path_buf());
+            }
+            roots
+        })
+    }
+
+    /// A stílus-mintavétel fájljai: az első `SAMPLE` `.vue` fájl a mintavételi gyökerek alatt (egyszer bejárva).
+    fn sample_files(&self) -> &[PathBuf] {
+        self.sample.get_or_init(|| {
+            let mut files = Vec::new();
+            for dir in self.sample_roots() {
+                files.extend(self.walk(dir).iter().take(SAMPLE - files.len()));
+                if files.len() >= SAMPLE {
+                    break;
+                }
+            }
+            files
+        })
     }
 
     /// TypeScript-e a projekt, és pontosvesszős-e a stílusa.
     pub fn code_style(&self) -> CodeStyle {
         let mut ts = self.fs.exists(&self.root.join("tsconfig.json"));
         let (mut with, mut without) = (0usize, 0usize);
-        let files = self
-            .sample_roots()
-            .into_iter()
-            .flat_map(|dir| walk_vue(self.fs, dir))
-            .take(SAMPLE);
-        for file in files {
-            let Ok(text) = self.fs.read(&file) else {
+        for file in self.sample_files() {
+            let Some(text) = self.text(file) else {
                 continue;
             };
             ts |= script_is_ts(&text);
@@ -143,13 +189,8 @@ impl<'a> VueProject<'a> {
     /// A projekt behúzás-egysége (2 vagy 4): az első olyan `.vue` fájlból, amelyben van behúzott sor; minta nélkül 4
     /// (a Laravel / Breeze alapértéke).
     pub fn indent(&self) -> usize {
-        let files = self
-            .sample_roots()
-            .into_iter()
-            .flat_map(|dir| walk_vue(self.fs, dir))
-            .take(SAMPLE);
-        for file in files {
-            let Ok(text) = self.fs.read(&file) else {
+        for file in self.sample_files() {
+            let Some(text) = self.text(file) else {
                 continue;
             };
             let (lines, _) = split_lines(&text);
@@ -226,7 +267,9 @@ impl<'a> VueProject<'a> {
         let wanted = format!("{name}.vue");
         for root in ROOTS {
             let base = self.root.join(root);
-            let matches: Vec<PathBuf> = walk_vue(self.fs, base.clone())
+            let matches: Vec<PathBuf> = self
+                .walk(&base)
+                .iter()
                 .filter(|p| {
                     p.file_name()
                         .is_some_and(|n| n.to_str() == Some(wanted.as_str()))

@@ -14,6 +14,7 @@ use super::template::opens_element;
 use crate::generate::command::{EditCommand, ReplaceRange, WriteNew};
 use crate::generate::error::{GenError, GenResult};
 use crate::generate::generator::{GenRequest, Output, ReplaceAt, Target};
+use crate::generate::report;
 
 /// `.html` / `.htm` fájl-e.
 pub fn is_html_file(file: &str) -> bool {
@@ -231,20 +232,17 @@ impl VueGenerator<'_> {
         doc.mark("html", from, block.len());
         let new_text = doc.lines.join(eol);
         self.validate(&rel, &new_text)?;
+        let new = (from + 1, from + block.len());
+        let label = label.unwrap_or_default();
         if dry {
-            return Ok(with_warnings(block, &doc.text(), &fresh));
+            let header = report::replace_header(&rel, (from + 1, to), new, &label);
+            return Ok(with_warnings(
+                report::with_header(header, block),
+                &doc.text(),
+                &fresh,
+            ));
         }
-        let name = label.map(|n| format!(" ({n})")).unwrap_or_default();
-        let summary = crate::tf!(
-            "replaced {} L{}-{} → L{}-{}{}",
-            "kicserélve: {} L{}-{} → L{}-{}{}",
-            rel,
-            from + 1,
-            to,
-            from + 1,
-            from + block.len(),
-            name
-        );
+        let summary = report::replaced(&rel, (from + 1, to), new, &label);
         let line = ReplaceRange {
             rel,
             text: new_text,

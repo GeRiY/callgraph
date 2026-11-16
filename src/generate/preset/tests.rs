@@ -730,3 +730,21 @@ fn validate_checks_ts_and_html_files_too() {
     // ismeretlen kiterjesztés: nincs ellenőrzés
     assert!(super::validate(&planned("lang/en.json", "{ not json")).is_ok());
 }
+
+/// Egy preset-futás a `composer.json`-t és a mintafájlokat egyszer olvassa, a projektet nem járja be komponensenként.
+#[test]
+fn a_preset_run_reads_each_project_file_once() {
+    let fs = project();
+    let clock = FixedClock(Cell::new(T0));
+    fs.reset_counters();
+    run(&fs, &clock, CREATE, true).unwrap();
+    assert_eq!(fs.reads_of("composer.json"), 1);
+    for rel in [
+        "resources/js/Components/InputLabel.vue",
+        "resources/js/Components/TextInput.vue",
+        "resources/js/Layouts/AuthenticatedLayout.vue",
+    ] {
+        assert!(fs.reads_of(rel) <= 1, "{rel}: {}", fs.reads_of(rel));
+    }
+    assert!(fs.list_calls() <= 16, "lists: {}", fs.list_calls());
+}

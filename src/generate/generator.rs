@@ -9,11 +9,12 @@ use super::ast::{Member, Program, TypeKind};
 use super::command::{EditCommand, InsertInto, ReplaceRange, Undo, WriteNew};
 use super::edit::{add_imports, extend_over_docs, insert_after_line, insert_at_end, join_lines};
 use super::emitter::{Emitter, FileSpec};
-use super::error::{GenError, GenResult};
+use super::error::{GenError, GenResult, Kind};
 use super::fs::Env;
 use super::parser;
 use super::project::{Psr4, detect_strict_types};
-use super::resolve::ResolverChain;
+use super::report;
+use super::resolve::{PhpScan, ResolverChain};
 use super::target;
 use crate::model::{Container, FileGraph};
 
@@ -171,6 +172,7 @@ impl<'a, E: Emitter> Generator<'a, E> {
                 line,
                 message
             ))
+            .with_kind(Kind::Syntax)
         })
     }
 
@@ -182,6 +184,7 @@ impl<'a, E: Emitter> Generator<'a, E> {
         namespace: Option<&str>,
         existing: &[(String, String)],
         psr4: &Psr4,
+        scan: &PhpScan<'_>,
     ) -> (Vec<(String, Option<String>)>, Vec<String>) {
         let alias_of = |fqcn: &str, alias: &Option<String>| {
             alias
@@ -194,7 +197,7 @@ impl<'a, E: Emitter> Generator<'a, E> {
             .map(|u| (alias_of(&u.fqcn, &u.alias), u.fqcn.clone()))
             .collect();
         explicit.extend(existing.iter().cloned());
-        let chain = ResolverChain::php(explicit.clone(), self.env.fs, self.env.root, psr4);
+        let chain = ResolverChain::php(explicit.clone(), scan, psr4);
         let mut imports: Vec<(String, Option<String>)> = program
             .uses
             .iter()
@@ -237,9 +240,10 @@ impl<'a, E: Emitter> Generator<'a, E> {
             .clone()
             .or_else(|| rel.and_then(|r| psr4.namespace_of(r)));
         let names = self.emitter.referenced_names(&program.decls, &[]);
+        let scan = PhpScan::new(self.env.fs, self.env.root, &psr4);
         let (imports, unresolved) =
-            self.resolve_names(&names, program, namespace.as_deref(), &[], &psr4);
-        let strict_types = detect_strict_types(self.env.fs, self.env.root, &psr4);
+            self.resolve_names(&names, program, namespace.as_deref(), &[], &psr4, &scan);
+        let strict_types = detect_strict_types(&scan);
         let spec = FileSpec {
             namespace: namespace.as_deref(),
             imports: &imports,
@@ -275,7 +279,8 @@ impl<'a, E: Emitter> Generator<'a, E> {
             })?;
         let names = self.emitter.referenced_names(&[], &program.loose);
         let psr4 = Psr4::load(self.env.fs, self.env.root);
-        let (_, unresolved) = self.resolve_names(&names, program, None, &[], &psr4);
+        let scan = PhpScan::new(self.env.fs, self.env.root, &psr4);
+        let (_, unresolved) = self.resolve_names(&names, program, None, &[], &psr4, &scan);
         Ok(Output {
             lines: block,
             unresolved,
@@ -368,12 +373,14 @@ impl<'a, E: Emitter> Generator<'a, E> {
         let block: Vec<String> = self.emitter.members(kind, members).collect();
         let names = self.emitter.referenced_names(&[], members);
         let psr4 = Psr4::load(self.env.fs, self.env.root);
+        let scan = PhpScan::new(self.env.fs, self.env.root, &psr4);
         let (imports, unresolved) = self.resolve_names(
             &names,
             program,
             graph.namespace.as_deref(),
             &file_imports(&graph),
             &psr4,
+            &scan,
         );
         let first = match after {
             Some(method) => {
@@ -395,26 +402,19 @@ impl<'a, E: Emitter> Generator<'a, E> {
         let added = add_imports(&mut lines, limit, &imports);
         let text = join_lines(&lines, eol);
         self.validate(&rel, &text)?;
-        if dry {
-            return Ok(Output {
-                lines: block,
-                unresolved,
-            });
-        }
         let start = first + added + 1;
         let end = start + block.len().saturating_sub(1);
         let place = match after {
             Some(method) => format!("{}::{} after {method}", rel, container.name),
             None => format!("{}::{}", rel, container.name),
         };
-        let summary = crate::tf!(
-            "inserted {} member(s) into {} (L{}-{})",
-            "beszúrva {} tag ide: {} (L{}-{})",
-            members.len(),
-            place,
-            start,
-            end
-        );
+        if dry {
+            return Ok(Output {
+                lines: report::with_header(report::insert_header(&place, start), block),
+                unresolved,
+            });
+        }
+        let summary = report::inserted_members(members.len(), &place, start, end);
         let line = InsertInto { rel, text, summary }.execute(self.env)?;
         Ok(Output {
             lines: vec![line],
@@ -478,12 +478,14 @@ impl<'a, E: Emitter> Generator<'a, E> {
             .emitter
             .referenced_names(&program.decls, &program.loose);
         let psr4 = Psr4::load(self.env.fs, self.env.root);
+        let scan = PhpScan::new(self.env.fs, self.env.root, &psr4);
         let (imports, unresolved) = self.resolve_names(
             &names,
             program,
             graph.namespace.as_deref(),
             &file_imports(&graph),
             &psr4,
+            &scan,
         );
         let tail = lines.split_off(to);
         lines.truncate(from - 1);
@@ -492,25 +494,17 @@ impl<'a, E: Emitter> Generator<'a, E> {
         let added = add_imports(&mut lines, from - 1, &imports);
         let text = join_lines(&lines, eol);
         self.validate(&rel, &text)?;
+        let new_from = from + added;
+        let new_to = new_from + block.len().saturating_sub(1);
+        let label = label.unwrap_or_default();
         if dry {
+            let header = report::replace_header(&rel, (from, to), (new_from, new_to), label);
             return Ok(Output {
-                lines: block,
+                lines: report::with_header(header, block),
                 unresolved,
             });
         }
-        let new_from = from + added;
-        let new_to = new_from + block.len().saturating_sub(1);
-        let name = label.map(|n| format!(" ({n})")).unwrap_or_default();
-        let summary = crate::tf!(
-            "replaced {} L{}-{} → L{}-{}{}",
-            "kicserélve: {} L{}-{} → L{}-{}{}",
-            rel,
-            from,
-            to,
-            new_from,
-            new_to,
-            name
-        );
+        let summary = report::replaced(&rel, (from, to), (new_from, new_to), label);
         let line = ReplaceRange { rel, text, summary }.execute(self.env)?;
         Ok(Output {
             lines: vec![line],

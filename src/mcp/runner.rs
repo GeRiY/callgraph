@@ -6,7 +6,8 @@ use std::path::PathBuf;
 use super::guard::ProjectRoot;
 use super::params::{GenerateParams, RenameParams, UndoParams};
 use super::request::ShowQuery;
-use crate::cli::{CliArgs, build_command};
+use crate::cli::{CliArgs, build_command, compact_usage};
+use crate::error::CallgraphError;
 use crate::skill::{ProjectRegistry, SkillHome};
 
 /// Egy `show`-lekérdezés végrehajtója (DI: a szerver ezen át fut, a teszt cserélheti).
@@ -112,7 +113,13 @@ impl ShowRunner {
     fn execute_plain(args: Vec<String>) -> Result<String, String> {
         let command = CliArgs::parse(args)
             .and_then(build_command)
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| match e {
+                // a használati sor MCP-n felesleges (a séma ismert): csak az üzenet
+                CallgraphError::Usage(text) => {
+                    CallgraphError::Usage(compact_usage(&text)).to_string()
+                }
+                other => other.to_string(),
+            })?;
         let (mut out, mut err) = (Vec::new(), Vec::new());
         let code = command.run(&mut out, &mut err).map_err(|e| e.to_string())?;
         // a `CALLGRAPH_STRICT` csak a CLI-é: itt a 3-as kód (szintaktikai hibás fájl) is siker, a `⚠` sor a kimenetben

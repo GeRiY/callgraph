@@ -18,6 +18,7 @@ pub struct MemFs {
     pub files: RefCell<BTreeMap<PathBuf, String>>,
     reads: Cell<usize>,
     lists: Cell<usize>,
+    read_log: RefCell<Vec<PathBuf>>,
 }
 
 impl MemFs {
@@ -73,6 +74,16 @@ impl MemFs {
         self.reads.get()
     }
 
+    /// Hányszor olvasták a fájlt (a gyökérhez képesti úttal) a számlálók utolsó nullázása óta.
+    pub fn reads_of(&self, rel: &str) -> usize {
+        let path = Path::new(ROOT).join(rel);
+        self.read_log
+            .borrow()
+            .iter()
+            .filter(|p| **p == path)
+            .count()
+    }
+
     /// Eddigi `list` hívások száma.
     pub fn list_calls(&self) -> usize {
         self.lists.get()
@@ -82,12 +93,14 @@ impl MemFs {
     pub fn reset_counters(&self) {
         self.reads.set(0);
         self.lists.set(0);
+        self.read_log.borrow_mut().clear();
     }
 }
 
 impl FileSystem for MemFs {
     fn read(&self, path: &Path) -> io::Result<String> {
         self.reads.set(self.reads.get() + 1);
+        self.read_log.borrow_mut().push(path.to_path_buf());
         self.files
             .borrow()
             .get(path)
