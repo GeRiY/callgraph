@@ -9,7 +9,7 @@ use super::super::parser::{children, end_line, line, named_children};
 use super::scan;
 use super::signature::is_view_type;
 use super::{MethodSpan, Scope, SwiftVisitor, clip};
-use crate::model::{Constant, FileGraphBuilder, Method, Property};
+use crate::model::{Call, Constant, FileGraphBuilder, Method, Property};
 
 impl SwiftVisitor<'_, '_> {
     /// Egy deklaráció-tag felvétele; `false`, ha a node nem deklaráció (fájl-szintű utasítás).
@@ -134,6 +134,7 @@ impl SwiftVisitor<'_, '_> {
                 js: false,
             });
         } else {
+            let queried = self.queried_model(node, declared.as_deref());
             let inferred = declared.or_else(|| value.and_then(|v| self.infer_type(v)));
             let mut parts = self.attributes(node);
             parts.extend(inferred);
@@ -149,6 +150,9 @@ impl SwiftVisitor<'_, '_> {
                 default: None,
                 js: false,
             });
+            if let Some(model) = queried {
+                self.query_edge(node, container, &model, b);
+            }
         }
         if let Some(value) = value {
             let scope = Scope {
@@ -159,6 +163,42 @@ impl SwiftVisitor<'_, '_> {
             };
             self.walk_body(value, &scope, b);
         }
+    }
+
+    /// `@Query var items: [Item]` (SwiftData): az elemtípus neve, ha a property `@Query`-s és tömb-típusú.
+    fn queried_model(&self, node: Node<'_>, declared: Option<&str>) -> Option<String> {
+        let queried = self
+            .attributes(node)
+            .iter()
+            .any(|a| a == "@Query" || a.starts_with("@Query("));
+        if !queried {
+            return None;
+        }
+        scan::element_type(declared?)
+    }
+
+    /// Modell-él a `@Query`-vel lekérdezett típusra: `query` fajta, `model_use` kategória, `@Query(Item)` cél.
+    fn query_edge(
+        &mut self,
+        node: Node<'_>,
+        container: Option<&str>,
+        model: &str,
+        b: &mut FileGraphBuilder,
+    ) {
+        b.call(Call {
+            container: container.map(str::to_string),
+            caller: Some("__top__".to_string()),
+            line: line(node),
+            end_line: None,
+            kind: "query".to_string(),
+            target: format!("@Query({model})"),
+            resolved: None,
+            on: None,
+            category: "model_use".to_string(),
+            args: None,
+            handler: None,
+            from: None,
+        });
     }
 
     /// `case a = 1, b` → egy-egy `enum_case` konstans (nyers érték vagy asszociált értékek).

@@ -58,6 +58,9 @@ pub(crate) fn closing_tip(lang: Lang) -> &'static str {
         "\n---\n💡 a törzs-logikához (feltételek, string-literálok, pontos sorrend): Read a fenti L<n>-<m> sortartományra (offset=<n>, limit=<m-n+1>) — ne a teljes fájlt.\n",
     )
 }
+/// Ennyi teszt-függvény fölött a csupa tesztes konténer tagjai egy `N tests` sorba vonódnak.
+const COLLAPSE_TESTS: usize = 3;
+
 fn outline(
     row: &QueryResult,
     lang: Lang,
@@ -115,9 +118,22 @@ fn outline(
             .filter(|e| !e.is_empty())
             .map(|e| format!(" uses {}", e.join(", ")))
             .unwrap_or_default();
+        let mut methods: Vec<_> = g
+            .methods
+            .iter()
+            .filter(|m| g.owns(c, m.container.as_deref(), m.line))
+            .filter(|m| row.methods.as_ref().is_none_or(|ms| ms.contains(&m.name)))
+            .collect();
+        methods.sort_by_key(|m| m.line);
+        // csupa teszt-függvényű konténer (Rust `mod tests`): `[tests]` jelölés; kijelölés nélkül, ha sok a teszt,
+        // a tagok egy `N tests` sorba vonva
+        let test_module =
+            !methods.is_empty() && methods.iter().all(|m| m.kind.as_deref() == Some("test"));
+        let collapsed = test_module && row.methods.is_none() && methods.len() >= COLLAPSE_TESTS;
+        let tests_mark = if test_module { " [tests]" } else { "" };
         writeln!(
             s,
-            "{} {}{}{}{}  L{}-{}",
+            "{} {}{}{}{}{tests_mark}  L{}-{}",
             c.kind, c.name, extends, implements, traits, c.line, c.end_line
         )
         .unwrap();
@@ -180,13 +196,20 @@ fn outline(
                 .unwrap();
             }
         }
-        let mut methods: Vec<_> = g
-            .methods
-            .iter()
-            .filter(|m| g.owns(c, m.container.as_deref(), m.line))
-            .filter(|m| row.methods.as_ref().is_none_or(|ms| ms.contains(&m.name)))
-            .collect();
-        methods.sort_by_key(|m| m.line);
+        if collapsed {
+            if let (Some(first), Some(last)) = (methods.first(), methods.last()) {
+                let n = methods.len();
+                writeln!(
+                    s,
+                    "  {}  L{}-{}",
+                    ltf!(lang, "{n} tests", "{n} teszt"),
+                    first.line,
+                    last.end_line.unwrap_or(last.line)
+                )
+                .unwrap();
+            }
+            continue;
+        }
         for m in methods {
             method_line(&mut s, m);
             if !notes.is_empty() {
@@ -295,9 +318,14 @@ pub(super) fn method_line(s: &mut String, m: &Method) {
     } else {
         format!("{}{}", m.name, parens(m))
     };
+    let test = if m.kind.as_deref() == Some("test") {
+        " [test]"
+    } else {
+        ""
+    };
     writeln!(
         s,
-        "  {label}  L{}-{}{}{}",
+        "  {label}  L{}-{}{}{}{test}",
         m.line,
         m.end_line.unwrap_or(m.line),
         if m.is_static { " [static]" } else { "" },
@@ -332,14 +360,25 @@ pub(crate) fn call_lines(
             .iter()
             .filter(|c| c.line == line)
             .find_map(|c| row.via_of(c));
-        (line, via, source.get(&row.graph.file, line))
+        // csak hivatkozásokat tartalmazó sor `(ref)`: a sor többi hívása hívás marad
+        let reference = calls
+            .iter()
+            .filter(|c| c.line == line)
+            .all(|c| c.is_reference());
+        (line, (via, reference), source.get(&row.graph.file, line))
     }));
     let (shown, rest) = snippet::cap(sites);
     for site in &shown {
         writeln!(
             s,
             "{indent}{}",
-            snippet::sites_line(lang, &site.lines, site.key, site.code.as_deref())
+            snippet::sites_line_ref(
+                lang,
+                &site.lines,
+                site.key.1,
+                site.key.0,
+                site.code.as_deref()
+            )
         )
         .unwrap();
     }
@@ -363,10 +402,20 @@ pub(super) fn categories(row: &QueryResult, m: &Method, lang: Lang) -> Vec<(Stri
         .filter(|c| c.caller.as_deref() == Some(&m.name))
         .filter(|c| c.container.as_deref() == m.container.as_deref())
     {
+        // wire / inject / nav: a hívás-fajta a kategória-oszlopban (`wire   RealtimeSocket::onFrame`)
+        let column = if matches!(c.kind.as_str(), "wire" | "inject" | "nav") {
+            c.kind.clone()
+        } else {
+            c.category.clone()
+        };
+        let mut target = shown_target(row, c, lang);
+        if c.is_reference() {
+            target.push_str(snippet::REF_MARK);
+        }
         grouped
-            .entry((c.category.clone(), package_label(row, c)))
+            .entry((column, package_label(row, c)))
             .or_default()
-            .push(shown_target(row, c, lang));
+            .push(target);
     }
     let mut ordered: Vec<(CategoryKey, Vec<String>)> = grouped.into_iter().collect();
     // a `dynamic_call` a lista végére (a rendezés stabil: a többi marad ábécében)

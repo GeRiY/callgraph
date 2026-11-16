@@ -3,8 +3,8 @@
 use std::collections::{HashMap, HashSet};
 
 use super::known::{
-    NATIVE_FUNCTIONS, NATIVE_METHODS, NATIVE_TYPES, SWIFTUI_FUNCTIONS, SWIFTUI_MODIFIERS,
-    SWIFTUI_VIEWS, is_in,
+    NATIVE_FUNCTIONS, NATIVE_METHODS, NATIVE_TYPES, SWIFTDATA_MODIFIERS, SWIFTDATA_TYPES,
+    SWIFTUI_FUNCTIONS, SWIFTUI_MODIFIERS, SWIFTUI_VIEWS, is_in,
 };
 use crate::core::{Chain, Rule};
 
@@ -23,6 +23,9 @@ pub(crate) struct CallInfo {
     pub chained: bool,
     /// A hívás egy nézet `body`-jában / `some View` computed property-ben van.
     pub in_view: bool,
+    /// A fogadó deklarált típusa, ha a deklarációból kiderül (`@Environment(\.modelContext) var context` →
+    /// `ModelContext`).
+    pub recv_type: Option<String>,
 }
 
 /// A fájl ismert nevei: a típusok (nézet-e) és a fájlban definiált függvények.
@@ -36,6 +39,9 @@ pub(crate) struct FileSymbols {
     pub protocols: HashSet<String>,
     /// Típus (rövid név, extension-nél az alap típus) → a property-jei: név → típusnév (`vm` → `ChatViewModel`).
     pub props: HashMap<String, HashMap<String, String>>,
+    /// Típus (rövid név, extension-nél az alap típus) → a metódusainak nevei: a metódus-hivatkozás és a
+    /// tulajdonság-olvasás (`vm.save` / `vm.title`) megkülönböztetéséhez.
+    pub methods: HashMap<String, HashSet<String>>,
 }
 
 /// A kategorizáló bemenete: a hívás és a fájl szimbólumai.
@@ -57,6 +63,7 @@ impl Default for Categorizer {
             chain: Chain::new(
                 vec![
                     Box::new(Internal),
+                    Box::new(SwiftData),
                     Box::new(Constructor),
                     Box::new(FreeFunction),
                     Box::new(Modifier),
@@ -88,6 +95,24 @@ impl Rule<CategorizeInput<'_>> for Internal {
         let local = i.symbols.functions.contains(&c.name);
         ((c.on_self && local) || (!c.member && !is_type_name(&c.name) && local))
             .then_some("internal_helper")
+    }
+}
+
+/// SwiftData: `ModelContext` / `ModelContainer` fogadón hívott metódus (`context.insert(item)`), a típusok
+/// konstruktora (`FetchDescriptor<Item>()`) és a `.modelContainer(for:)` módosító → `swiftdata_api`.
+struct SwiftData;
+impl Rule<CategorizeInput<'_>> for SwiftData {
+    type Output = &'static str;
+    fn apply(&self, i: &CategorizeInput<'_>) -> Option<&'static str> {
+        let c = i.call;
+        let user_type = i.symbols.types.contains_key(&c.name);
+        let typed_receiver = c
+            .recv_type
+            .as_deref()
+            .is_some_and(|t| is_in(SWIFTDATA_TYPES, t));
+        let constructor = !c.member && !user_type && is_in(SWIFTDATA_TYPES, &c.name);
+        let modifier = c.member && is_in(SWIFTDATA_MODIFIERS, &c.name);
+        (typed_receiver || constructor || modifier).then_some("swiftdata_api")
     }
 }
 

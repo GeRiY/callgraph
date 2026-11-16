@@ -24,6 +24,9 @@ pub struct CallerRow {
     pub via: Option<String>,
     #[serde(skip)]
     pub(crate) guessed: bool,
+    /// Hivatkozás, nem hívás (`Call::is_reference`): a szöveges kimenet `(ref)`-fel jelöli.
+    #[serde(skip)]
+    pub(crate) reference: bool,
 }
 
 #[derive(Clone)]
@@ -83,6 +86,7 @@ impl CallerIndex {
                         level: 0,
                         via: None,
                         guessed: false,
+                        reference: call.is_reference(),
                     },
                     lookup,
                     caller_key,

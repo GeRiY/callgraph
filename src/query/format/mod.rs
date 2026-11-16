@@ -27,6 +27,8 @@ mod summary;
 #[cfg(test)]
 mod document_tests;
 #[cfg(test)]
+mod outline_marks_tests;
+#[cfg(test)]
 mod snapshot_tests;
 #[cfg(test)]
 mod tests;

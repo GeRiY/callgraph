@@ -106,3 +106,5 @@ pub(super) fn clip(text: &str, max: usize) -> String {
 mod tests;
 #[cfg(test)]
 mod tests_links;
+#[cfg(test)]
+mod tests_patterns;

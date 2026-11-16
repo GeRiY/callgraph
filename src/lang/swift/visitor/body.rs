@@ -24,7 +24,15 @@ impl SwiftVisitor<'_, '_> {
                     return;
                 }
             }
+            "constructor_expression" => self.constructor(node, scope, b),
             "value_argument" => self.argument_ref(node, scope, b),
+            "selector_expression" => {
+                // `#selector(handle)`: metódus-hivatkozás; a belső (hívás-szerű) alak nem hívás
+                self.selector_ref(node, scope, b);
+                return;
+            }
+            // `case .detail(let id):` minta, nem hívás
+            "switch_pattern" => return,
             "assignment" => self.assignment_wire(node, scope, b),
             "if_statement" => self.if_flow(node, scope, b),
             "switch_statement" => self.switch_flow(node, scope, b),

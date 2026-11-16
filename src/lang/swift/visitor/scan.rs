@@ -79,7 +79,15 @@ fn collect(
             }
             "function_declaration" | "protocol_function_declaration" => {
                 if let Some(name) = child.child_by_field_name("name") {
-                    symbols.functions.insert(parsed.text(name).to_string());
+                    let name = parsed.text(name).to_string();
+                    if let Some(owner) = owner {
+                        symbols
+                            .methods
+                            .entry(owner.to_string())
+                            .or_default()
+                            .insert(name.clone());
+                    }
+                    symbols.functions.insert(name);
                 }
             }
             "property_declaration" | "protocol_property_declaration" => {
@@ -116,6 +124,13 @@ pub(super) fn base_type(text: &str) -> Option<String> {
         && t.chars()
             .all(|c| c.is_alphanumeric() || c == '_' || c == '.');
     valid.then(|| t.to_string())
+}
+
+/// Egy tömb-típus (`: [Item]`) elemtípusa; más alakra (`Array<Item>`, szótár, tuple) `None`.
+pub(super) fn element_type(text: &str) -> Option<String> {
+    let t = text.trim().trim_start_matches(':').trim();
+    let inner = t.strip_prefix('[')?.strip_suffix(']')?;
+    base_type(inner)
 }
 
 /// A `Típus(...)` hívás típusa (nagybetűs puszta azonosító hívása), a property inicializálójához.
@@ -165,6 +180,10 @@ fn environment_type(parsed: &ParsedSwift<'_>, node: Node<'_>) -> Option<String> 
         .find_map(|a| {
             let text = parsed.text(a).trim();
             let inner = text.strip_prefix("@Environment(")?.strip_suffix(')')?;
+            if inner.trim() == "\\.modelContext" {
+                // a SwiftData-kontextus kulcs-útvonala: a property típusa `ModelContext`
+                return Some("ModelContext".to_string());
+            }
             base_type(inner.strip_suffix(".self")?)
         })
 }

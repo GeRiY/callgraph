@@ -331,6 +331,7 @@ fn direct_rows(rows: &[QueryResult]) -> Vec<CallerRow> {
                 level: 1,
                 via: row.via_of(call).map(str::to_owned),
                 guessed: false,
+                reference: call.is_reference(),
             })
         })
         .collect()
@@ -505,7 +506,13 @@ fn render_depth(view: DepthView<'_>) -> String {
             writeln!(
                 output,
                 "    {}",
-                snippet::call_line(lang, caller.line, caller.via.as_deref(), code.as_deref())
+                snippet::sites_line_ref(
+                    lang,
+                    &[caller.line],
+                    caller.reference,
+                    caller.via.as_deref(),
+                    code.as_deref()
+                )
             )
             .unwrap();
         }
@@ -687,7 +694,13 @@ fn render_single(view: SingleView<'_>) -> String {
             writeln!(
                 guessed,
                 "    {}",
-                snippet::call_line(lang, caller.line, None, code.as_deref())
+                snippet::sites_line_ref(
+                    lang,
+                    &[caller.line],
+                    caller.reference,
+                    None,
+                    code.as_deref()
+                )
             )
             .unwrap();
         }
@@ -764,7 +777,7 @@ fn flat_lines(
                 let target = call.resolved.as_deref().unwrap_or(&call.target);
                 (
                     call.line,
-                    (target, row.via_of(call)),
+                    (target, row.via_of(call), call.is_reference()),
                     source.get(&row.graph.file, call.line),
                 )
             }));
@@ -777,10 +790,11 @@ fn flat_lines(
                 marks.caller_mark(&row.graph.file, container, caller)
             );
             for site in &shown {
-                let (target, via) = site.key;
+                let (target, via, reference) = site.key;
                 let line = format!(
-                    "{prefix}  {}  ← {target}{}\n",
+                    "{prefix}  {}  ← {target}{}{}\n",
                     snippet::line_list(&site.lines),
+                    if reference { snippet::REF_MARK } else { "" },
                     snippet::marks(lang, via, site.code.as_deref())
                 );
                 if push_limited(&mut out, &line, max) {

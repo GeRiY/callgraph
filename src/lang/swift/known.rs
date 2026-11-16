@@ -80,6 +80,18 @@ pub(crate) const SWIFTUI_VIEWS: &[&str] = &[
     "State",
 ];
 
+/// SwiftData-típusok: a fogadójukon hívott metódus és a konstruktoruk `swiftdata_api`; nem projekt-szimbólumok.
+pub(crate) const SWIFTDATA_TYPES: &[&str] = &[
+    "FetchDescriptor",
+    "ModelConfiguration",
+    "ModelContainer",
+    "ModelContext",
+    "Schema",
+];
+
+/// SwiftData-módosítók (`.modelContainer(for: Item.self)`).
+pub(crate) const SWIFTDATA_MODIFIERS: &[&str] = &["modelContainer"];
+
 /// Gyakori SwiftUI-módosítók (`.padding()`, `.onAppear {}` … → `swiftui_modifier`).
 pub(crate) const SWIFTUI_MODIFIERS: &[&str] = &[
     "accessibilityLabel",

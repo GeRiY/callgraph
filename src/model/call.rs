@@ -8,7 +8,7 @@ pub const DYNAMIC_CALL: &str = "dynamic_call";
 /// Az összes ismert hívás-kategória (a nyelvi frontendek kategorizálóinak közös listája): a `--category` ellenőrzése
 /// és az „ismeretlen kategória” hibaüzenet ebből jön. Ábécében, a `dynamic_call` a végén (`category_rank`).
 /// Új kategória a frontendben: ide is fel kell venni — a `known_categories_cover_every_frontend` teszt őrzi.
-pub const KNOWN_CATEGORIES: [&str; 47] = [
+pub const KNOWN_CATEGORIES: [&str; 48] = [
     "anchor",
     "android_api",
     "component_use",
@@ -47,6 +47,7 @@ pub const KNOWN_CATEGORIES: [&str; 47] = [
     "package_use",
     "route_helper",
     "static_call",
+    "swiftdata_api",
     "swiftui_api",
     "swiftui_modifier",
     "swiftui_view",
@@ -94,8 +95,9 @@ pub struct Call {
     pub category: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub args: Option<Vec<String>>,
-    /// Hivatkozás, nem hívás: JS template puszta függvénynév-eseménykezelő; Swift metódus-hivatkozás
-    /// (`Composer(onSend: vm.send)`) — a kimenet `(ref)`-fel jelölheti.
+    /// Hivatkozás, nem hívás: JS template puszta függvénynév-eseménykezelő; Swift és Rust metódus-/függvény-
+    /// hivatkozás (`Composer(onSend: vm.send)`, `.map(Self::parse)`). A Kotlin `::f` hivatkozás `kind == "reference"`.
+    /// A kimenet mindkettőt `(ref)`-fel jelöli — az olvasáshoz az `is_reference()` az egyetlen kapu.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub handler: Option<bool>,
     /// JS / TS / Vue: a nem helyi import forrás-specifikátora (`axios`, `@vueuse/core`, `lodash/debounce`), amelyből
@@ -107,6 +109,11 @@ pub struct Call {
 }
 
 impl Call {
+    /// Hivatkozás-e a hívás (nem hívás): `handler == Some(true)` (JS template, Swift, Rust) vagy `kind == "reference"` (Kotlin).
+    pub fn is_reference(&self) -> bool {
+        self.handler == Some(true) || self.kind == "reference"
+    }
+
     /// Dinamikus hívás-jelölés (`dynamic_call`): a cél a hívott kifejezés szövege, nincs feloldás.
     pub fn is_dynamic(&self) -> bool {
         self.category == DYNAMIC_CALL

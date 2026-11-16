@@ -325,7 +325,12 @@ impl Collector<'_, '_> {
             [] => false,
         };
         if known {
+            let before = self.calls.len();
             self.record(Callee::Path(segs.to_vec()), line, None);
+            // hivatkozás, nem hívás: a kimenet `(ref)`-fel jelöli
+            if let Some(call) = self.calls.get_mut(before) {
+                call.handler = Some(true);
+            }
         }
     }
 

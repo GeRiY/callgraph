@@ -5,6 +5,7 @@ use tree_sitter::Node;
 
 use super::super::categorize::CallInfo;
 use super::super::parser::{end_line, line, named_children};
+use super::links::Receiver;
 use super::{Scope, SwiftVisitor, clip};
 use crate::model::{Call, FileGraphBuilder};
 
@@ -32,6 +33,11 @@ impl SwiftVisitor<'_, '_> {
             .path
             .as_deref()
             .is_some_and(|p| p == "self" || p == "Self");
+        let chain = callee
+            .path
+            .as_deref()
+            .filter(|_| callee.member)
+            .and_then(|path| self.receiver_chain(path, scope));
         let info = CallInfo {
             name: callee.name.clone(),
             member: callee.member,
@@ -39,6 +45,10 @@ impl SwiftVisitor<'_, '_> {
             on_self,
             chained: callee.chained,
             in_view: scope.in_view,
+            recv_type: match &chain {
+                Some(Receiver::Typed(ty)) => Some(ty.clone()),
+                _ => None,
+            },
         };
         let mut category = self.categorizer.categorize(&info, &self.symbols);
         let mut kind = if callee.member {
@@ -72,6 +82,13 @@ impl SwiftVisitor<'_, '_> {
         {
             kind = "nav";
         }
+        // a másik fájlban megakadó lánc: `on` = `Típus::property.property` (az index folytatja a feloldást)
+        let pending_on = match &chain {
+            Some(Receiver::Pending { ty, rest }) if resolved.is_none() => {
+                Some(format!("{ty}::{}", rest.join(".")))
+            }
+            _ => None,
+        };
         let start = line(callee.name_node);
         let end = end_line(node);
         b.call(Call {
@@ -82,9 +99,44 @@ impl SwiftVisitor<'_, '_> {
             kind: kind.to_string(),
             target,
             resolved,
-            on: callee
+            on: pending_on.or(callee
                 .root
-                .filter(|_| callee.member && !on_self && callee.path.is_some()),
+                .filter(|_| callee.member && !on_self && callee.path.is_some())),
+            category: category.to_string(),
+            args: self.args(node),
+            handler: None,
+            from: None,
+        });
+    }
+
+    /// Generikus típus példányosítása (`ItemList<Item>(items: items)`, `FetchDescriptor<Item>()`): `new` hívás
+    /// a típus nevével; tömb- / szótár-konstruktor (`[Item]()`) nem hívás-él.
+    pub(super) fn constructor(&mut self, node: Node<'_>, scope: &Scope, b: &mut FileGraphBuilder) {
+        let Some(name) = self.constructed_name(node) else {
+            return;
+        };
+        let info = CallInfo {
+            name: name.clone(),
+            in_view: scope.in_view,
+            ..CallInfo::default()
+        };
+        let category = self.categorizer.categorize(&info, &self.symbols);
+        let kind = if self.nav_depth > 0 && matches!(category, "component_use" | "instantiation") {
+            "nav"
+        } else {
+            "new"
+        };
+        let start = line(node);
+        let end = end_line(node);
+        b.call(Call {
+            container: scope.container.clone(),
+            caller: Some(scope.caller.clone()),
+            line: start,
+            end_line: (end > start).then_some(end),
+            kind: kind.to_string(),
+            target: name,
+            resolved: None,
+            on: None,
             category: category.to_string(),
             args: self.args(node),
             handler: None,
@@ -115,6 +167,20 @@ impl SwiftVisitor<'_, '_> {
                     path: self.path_of(target),
                     root,
                     chained: through_call,
+                })
+            }
+            // `Box<Item>(…)` hívásként értelmezve: a generikus típus neve
+            "user_type" => {
+                let name_node = named_children(expr)
+                    .into_iter()
+                    .rfind(|c| c.kind() == "type_identifier")?;
+                Some(Callee {
+                    name_node,
+                    name: self.text(name_node).to_string(),
+                    member: false,
+                    path: None,
+                    root: None,
+                    chained: false,
                 })
             }
             "prefix_expression" => {
@@ -171,7 +237,7 @@ impl SwiftVisitor<'_, '_> {
     fn args(&self, node: Node<'_>) -> Option<Vec<String>> {
         let suffix = named_children(node)
             .into_iter()
-            .find(|c| c.kind() == "call_suffix")?;
+            .find(|c| matches!(c.kind(), "call_suffix" | "constructor_suffix"))?;
         let arguments = named_children(suffix)
             .into_iter()
             .find(|c| c.kind() == "value_arguments")?;

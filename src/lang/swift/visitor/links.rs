@@ -5,7 +5,7 @@
 use tree_sitter::Node;
 
 use super::super::categorize::CallInfo;
-use super::super::known::{NATIVE_TYPES, SWIFTUI_VIEWS, is_in};
+use super::super::known::{NATIVE_TYPES, SWIFTDATA_TYPES, SWIFTUI_VIEWS, is_in};
 use super::super::parser::{end_line, line, named_children};
 use super::{Scope, SwiftVisitor, scan};
 use crate::model::{Call, FileGraphBuilder};
@@ -32,7 +32,7 @@ const HIGHER_ORDER: &[&str] = &[
     "reduce",
 ];
 
-/// Visszahívást jelző címke / név: `onSend`, `action`, `completion`, `submitHandler`…
+/// Visszahívást jelző címke / név: `onSend`, `action`, `completion`, `submitHandler`, `operation`…
 fn callback_like(name: &str) -> bool {
     let on_prefixed = name
         .strip_prefix("on")
@@ -41,11 +41,50 @@ fn callback_like(name: &str) -> bool {
     on_prefixed
         || matches!(
             name,
-            "action" | "handler" | "completion" | "callback" | "perform" | "receiveValue"
+            "action"
+                | "handler"
+                | "completion"
+                | "callback"
+                | "perform"
+                | "receiveValue"
+                | "receiveCompletion"
+                | "operation"
+                | "execute"
+                | "block"
+                | "work"
         )
         || ["Handler", "Action", "Callback", "Completion"]
             .iter()
             .any(|suffix| name.ends_with(suffix))
+}
+
+/// A hívás címke nélküli argumentuma visszahívás-e: `callback_like` név vagy magasabb rendű függvény
+/// (`items.map(vm.format)`); az `onReceive(vm.publisher)` első argumentuma érték, nem visszahívás.
+fn callee_takes_callback(callee: &str) -> bool {
+    (callback_like(callee) && callee != "onReceive") || HIGHER_ORDER.contains(&callee)
+}
+
+/// Mennyire biztos, hogy egy argumentum visszahívás: címke (`action:`), a hívó neve (`.map(…)`), vagy semmi.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Hint {
+    None,
+    Callee,
+    Label,
+}
+
+/// Egy fogadó-út feloldásának eredménye.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum Receiver {
+    /// A teljes út típusa ismert (keretrendszer-típus is lehet: `ModelContext`).
+    Typed(String),
+    /// Az út egy másik fájlban deklarált típusnál megakadt: `ty` az utolsó ismert elem típusa, `rest` a
+    /// hátralévő property-nevek (`self.store.session.user` → `Store` + `session`, `user`).
+    Pending { ty: String, rest: Vec<String> },
+}
+
+/// A stdlib / Foundation / SwiftData típus: nem projekt-szimbólum.
+fn is_framework_type(ty: &str) -> bool {
+    is_in(NATIVE_TYPES, ty) || is_in(SWIFTDATA_TYPES, ty)
 }
 
 impl SwiftVisitor<'_, '_> {
@@ -71,6 +110,16 @@ impl SwiftVisitor<'_, '_> {
     /// Egy `a.b.c` fogadó-út típusa: `self` a saját típus, az első elem helyi változó / paraméter / property
     /// vagy (nagybetűvel) egy típus neve; a továbbiak a fájlban deklarált típusok property-jei.
     pub(super) fn receiver_type(&self, path: &str, scope: &Scope) -> Option<String> {
+        match self.receiver_chain(path, scope)? {
+            // a stdlib / Foundation / SwiftData fogadó nem projekt-szimbólum: nincs `Típus::név` cél
+            Receiver::Typed(ty) if !is_framework_type(&ty) => Some(ty),
+            _ => None,
+        }
+    }
+
+    /// Egy fogadó-út feloldása: teljes típus (keretrendszer-típus is lehet), vagy — ha a lánc egy másik fájlban
+    /// deklarált típusnál megakad — az utolsó ismert típus és a hátralévő property-nevek.
+    pub(super) fn receiver_chain(&self, path: &str, scope: &Scope) -> Option<Receiver> {
         let mut segments = path.split('.');
         let first = segments.next()?;
         let mut ty = if matches!(first, "self" | "Self") {
@@ -87,16 +136,29 @@ impl SwiftVisitor<'_, '_> {
         } else {
             return None;
         };
-        for segment in segments {
-            ty = self
+        let rest: Vec<&str> = segments.collect();
+        for (i, segment) in rest.iter().enumerate() {
+            if ty.is_empty() {
+                return None;
+            }
+            let next = self
                 .symbols
                 .props
-                .get(scan::type_key(&ty))?
-                .get(segment)?
-                .clone();
+                .get(scan::type_key(&ty))
+                .and_then(|props| props.get(*segment));
+            match next {
+                Some(next) => ty = next.clone(),
+                None if is_framework_type(&ty) => return None,
+                // a típus (vagy a property-je) másik fájlban deklarált: az index folytathatja a láncot
+                None => {
+                    return Some(Receiver::Pending {
+                        ty,
+                        rest: rest[i..].iter().map(|s| (*s).to_string()).collect(),
+                    });
+                }
+            }
         }
-        // a stdlib / Foundation fogadó (`String`, `Date`…) nem projekt-szimbólum: nincs `Típus::név` cél
-        (!ty.is_empty() && !is_in(NATIVE_TYPES, &ty)).then_some(ty)
+        (!ty.is_empty()).then_some(Receiver::Typed(ty))
     }
 
     /// A tag-hívás feloldása `Típus::név` alakra a fogadó deklarált típusából.
@@ -171,11 +233,27 @@ impl SwiftVisitor<'_, '_> {
     /// A hívás neve, amelynek az argumentuma a `value_argument`.
     fn enclosing_callee(&self, argument: Node<'_>) -> Option<String> {
         let call = argument.parent()?.parent()?.parent()?;
-        if call.kind() != "call_expression" {
+        match call.kind() {
+            "call_expression" => {
+                let expr = named_children(call).into_iter().next()?;
+                self.callee(expr).map(|callee| callee.name)
+            }
+            // `Box<Item>(onTap: vm.tap)`: a generikus konstruktor típusneve
+            "constructor_expression" => self.constructed_name(call),
+            _ => None,
+        }
+    }
+
+    /// A `constructor_expression` típusneve (`Box<Item>(…)` → `Box`); tömb- / szótár-típusnál `None`.
+    pub(super) fn constructed_name(&self, node: Node<'_>) -> Option<String> {
+        let ty = node.child_by_field_name("constructed_type")?;
+        if ty.kind() != "user_type" {
             return None;
         }
-        let expr = named_children(call).into_iter().next()?;
-        self.callee(expr).map(|callee| callee.name)
+        named_children(ty)
+            .into_iter()
+            .rfind(|c| c.kind() == "type_identifier")
+            .map(|n| self.text(n).to_string())
     }
 
     /// Argumentum-érték, amely metódus-hivatkozás lehet: `Composer(onSend: vm.send)`, `Button(action: save)`.
@@ -194,22 +272,58 @@ impl SwiftVisitor<'_, '_> {
             .child_by_field_name("name")
             .map(|n| self.text(n).trim_end_matches(':').trim().to_string());
         let callee = self.enclosing_callee(argument).unwrap_or_default();
-        let hinted = match label.as_deref() {
-            Some(label) => callback_like(label),
-            None => callback_like(&callee) || HIGHER_ORDER.contains(&callee.as_str()),
+        let hint = match label.as_deref() {
+            Some(label) if callback_like(label) => Hint::Label,
+            Some(_) => Hint::None,
+            None if callee_takes_callback(&callee) => Hint::Callee,
+            None => Hint::None,
         };
-        self.method_ref(value, hinted, scope, b);
+        self.method_ref(value, hint, scope, b);
+    }
+
+    /// `#selector(handle)` / `#selector(vm.handle)` / `#selector(handle(_:))`: a megnevezett metódus
+    /// hivatkozása (a belső hívás-szerű alakot nem járjuk be, az nem hívás).
+    pub(super) fn selector_ref(&mut self, node: Node<'_>, scope: &Scope, b: &mut FileGraphBuilder) {
+        let Some(mut inner) = named_children(node).into_iter().next() else {
+            return;
+        };
+        if inner.kind() == "call_expression" {
+            match named_children(inner).into_iter().next() {
+                Some(callee) => inner = callee,
+                None => return,
+            }
+        }
+        self.method_ref(inner, Hint::Label, scope, b);
+    }
+
+    /// Elfogadható-e `ty.name` metódus-hivatkozásnak. A fájlban deklarált típusnál a metódus-lista dönt: metódus
+    /// mindig hivatkozás, tulajdonság (`vm.title`) csak címkével jelzett visszahívásnál (tárolt closure).
+    /// Másik fájlban deklarált típusnál csak a visszahívást jelző szövegkörnyezet számít.
+    fn accepts_ref(&self, ty: &str, name: &str, hint: Hint) -> bool {
+        let key = scan::type_key(ty);
+        if self
+            .symbols
+            .methods
+            .get(key)
+            .is_some_and(|methods| methods.contains(name))
+        {
+            return true;
+        }
+        let is_property = self
+            .symbols
+            .props
+            .get(key)
+            .is_some_and(|props| props.contains_key(name));
+        match hint {
+            Hint::Label => true,
+            Hint::Callee => !is_property,
+            Hint::None => false,
+        }
     }
 
     /// Egy érték, amely metódusra / függvényre hivatkozik (nem hívja): hívás-él `handler: true` jelöléssel.
-    /// `hinted`: a szövegkörnyezet visszahívást vár; e nélkül csak a fájlban definiált metódus neve számít.
-    fn method_ref(
-        &mut self,
-        value: Node<'_>,
-        hinted: bool,
-        scope: &Scope,
-        b: &mut FileGraphBuilder,
-    ) {
+    /// `hint`: a szövegkörnyezet visszahívást vár; e nélkül csak a fájlban deklarált típus metódusa számít.
+    fn method_ref(&mut self, value: Node<'_>, hint: Hint, scope: &Scope, b: &mut FileGraphBuilder) {
         if !matches!(value.kind(), "simple_identifier" | "navigation_expression") {
             return;
         }
@@ -220,14 +334,14 @@ impl SwiftVisitor<'_, '_> {
             Some((receiver, name)) => (Some(receiver.to_string()), name.to_string()),
             None => (None, path.clone()),
         };
-        if !(hinted || self.symbols.functions.contains(&name)) {
-            return;
-        }
         let (resolved, root) = match &receiver {
             Some(receiver) => {
                 let Some(ty) = self.receiver_type(receiver, scope) else {
                     return;
                 };
+                if !self.accepts_ref(&ty, &name, hint) {
+                    return;
+                }
                 let root = receiver.split('.').next().map(str::to_string);
                 (Some(format!("{ty}::{name}")), root)
             }
@@ -250,6 +364,7 @@ impl SwiftVisitor<'_, '_> {
             on_self,
             chained: false,
             in_view: scope.in_view,
+            recv_type: None,
         };
         let category = self.categorizer.categorize(&info, &self.symbols);
         b.call(Call {
@@ -319,6 +434,7 @@ impl SwiftVisitor<'_, '_> {
             on_self,
             chained: false,
             in_view: scope.in_view,
+            recv_type: None,
         };
         let category = self.categorizer.categorize(&info, &self.symbols);
         let start = line(node);
@@ -338,7 +454,7 @@ impl SwiftVisitor<'_, '_> {
             from: None,
         });
         if !lambda {
-            self.method_ref(result, true, scope, b);
+            self.method_ref(result, Hint::Label, scope, b);
         }
     }
 }

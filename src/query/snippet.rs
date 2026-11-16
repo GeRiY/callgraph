@@ -180,6 +180,25 @@ pub(crate) fn sites_line(
     out
 }
 
+/// Mint a `sites_line`, hivatkozásnál a sorszámok után ` (ref)`: `L25 (ref) via Resolver │ kód`.
+pub(crate) fn sites_line_ref(
+    lang: Lang,
+    lines: &[u32],
+    reference: bool,
+    via: Option<&str>,
+    code: Option<&str>,
+) -> String {
+    let mut out = line_list(lines);
+    if reference {
+        out.push_str(REF_MARK);
+    }
+    out.push_str(&marks(lang, via, code));
+    out
+}
+
+/// A hivatkozás (nem hívás) jelölése a kimenetben; nyelvfüggetlen.
+pub(crate) const REF_MARK: &str = " (ref)";
+
 /// A levágott hívás-sorok jelzése a sorszámaikkal (`… +2 more: L55, L61`).
 pub(crate) fn more(lang: Lang, lines: &[u32]) -> String {
     let (count, list) = (lines.len(), line_list(lines));
