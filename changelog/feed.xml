@@ -9,6 +9,15 @@
   <author><name>Gergő Makra</name></author>
   <icon>https://callgraph.eu/assets/favicon.svg</icon>
   <entry>
+    <title>callgraph v1.0.1</title>
+    <link rel="alternate" type="text/html" href="https://callgraph.eu/changelog/#v1.0.1"/>
+    <link rel="related" type="text/html" href="https://github.com/GeRiY/callgraph/releases/tag/v1.0.1"/>
+    <id>https://github.com/GeRiY/callgraph/releases/tag/v1.0.1</id>
+    <updated>2026-11-16T00:00:00Z</updated>
+    <published>2026-11-16T00:00:00Z</published>
+    <content type="html">&lt;h3&gt;Fixed&lt;/h3&gt;&lt;ul&gt;&lt;li&gt;&lt;strong&gt;Laravel route files loaded from a group keep the group's prefixes:&lt;/strong&gt; a file loaded with &lt;code&gt;-&amp;gt;group(base_path('routes/admin.php'))&lt;/code&gt;, &lt;code&gt;-&amp;gt;group(__DIR__.'/admin.php')&lt;/code&gt;, a &lt;code&gt;require&lt;/code&gt; inside a group, or a group in the &lt;code&gt;then:&lt;/code&gt; closure of &lt;code&gt;bootstrap/app.php&lt;/code&gt; now inherits the group's URI prefix and route-name prefix. Existing chained names like &lt;code&gt;admin.reports.show&lt;/code&gt; are no longer reported as unknown by &lt;code&gt;--format ziggy&lt;/code&gt; (false alarms), and &lt;code&gt;rename route&lt;/code&gt; checks names the same way.&lt;/li&gt;&lt;li&gt;&lt;strong&gt;Unnamed routes in a named Laravel group get the group's name:&lt;/strong&gt; a route without its own &lt;code&gt;-&amp;gt;name()&lt;/code&gt; inside a named group now gets the group's combined name, like Laravel does (&lt;code&gt;Route::prefix('x')-&amp;gt;name('a')-&amp;gt;group(fn () =&amp;gt; Route::name('.b')-&amp;gt;group(fn () =&amp;gt; Route::get('/', ...)))&lt;/code&gt; gives &lt;code&gt;a.b&lt;/code&gt;), so &lt;code&gt;route('a.b')&lt;/code&gt; is no longer reported as unknown by &lt;code&gt;--format ziggy&lt;/code&gt;. A route file that is &lt;code&gt;require&lt;/code&gt;d but left out of the scan (typically a gitignored, local-only file, e.g. &lt;code&gt;if (app()-&amp;gt;isLocal()) require __DIR__.'/local.php';&lt;/code&gt;) is read from disk and its routes count.&lt;/li&gt;&lt;/ul&gt;</content>
+  </entry>
+  <entry>
     <title>callgraph v1.0.0</title>
     <link rel="alternate" type="text/html" href="https://callgraph.eu/changelog/#v1.0.0"/>
     <link rel="related" type="text/html" href="https://github.com/GeRiY/callgraph/releases/tag/v1.0.0"/>

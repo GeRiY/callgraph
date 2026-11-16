@@ -8,6 +8,17 @@ Minden kiadás dátummal, a legújabb elöl: mi új, mi változott és mi javult
 
 [A legújabb verzió telepítése](https://callgraph.eu/hu/#install)[Legfrissebb kiadás a GitHubon](https://github.com/GeRiY/callgraph/releases/latest)
 
+## v1.0.1 — 2026-11-16
+
+[Kiadási jegyzet és letöltések a GitHubon](https://github.com/GeRiY/callgraph/releases/tag/v1.0.1)
+
+### Javítás
+
+
+- **A csoportból betöltött Laravel route-fájlok megkapják a csoport előtagjait:** a `->group(base_path('routes/admin.php'))`, `->group(__DIR__.'/admin.php')`, a csoporton belüli `require`, illetve a `bootstrap/app.php` `then:` closure-jében lévő csoport által betöltött fájl mostantól örökli a csoport URI-előtagját és route-név előtagját. A meglévő láncolt neveket (pl. `admin.reports.show`) a `--format ziggy` már nem jelzi ismeretlennek (téves riasztás), a `rename route` pedig ugyanígy ellenőrzi a neveket.
+
+- **A névvel ellátott Laravel csoport név nélküli route-jai megkapják a csoport nevét:** a saját `->name()` nélküli route a névvel ellátott csoportban mostantól a csoport összefűzött nevét kapja, ahogy a Laravel is (`Route::prefix('x')->name('a')->group(fn () => Route::name('.b')->group(fn () => Route::get('/', ...)))` eredménye `a.b`), így a `route('a.b')` hívást a `--format ziggy` már nem jelzi ismeretlennek. Az a route-fájl, amelyet `require` tölt be, de kimaradt a szkennelésből (jellemzően gitignore-olt, csak helyi fájl, pl. `if (app()->isLocal()) require __DIR__.'/local.php';`), a lemezről beolvasásra kerül, és a route-jai beleszámítanak.
+
 ## v1.0.0 — 2026-11-16
 
 [Kiadási jegyzet és letöltések a GitHubon](https://github.com/GeRiY/callgraph/releases/tag/v1.0.0)
