@@ -23,7 +23,18 @@ fn count_label(
     };
     match container.kind.as_str() {
         "stylesheet" => plural(methods, ["rule", "rules"], "szabály"),
-        "view" => plural(methods, ["section", "sections"], "szakasz"),
+        // Blade: a szakaszon kívüli rész `template` ál-metódus, nem szakasz
+        "view" => {
+            let sections = row
+                .graph
+                .methods
+                .iter()
+                .filter(|m| {
+                    m.name != "template" && m.container.as_deref() == Some(container.name.as_str())
+                })
+                .count();
+            plural(sections.min(methods), ["section", "sections"], "szakasz")
+        }
         "document" => {
             let keys = row
                 .graph
