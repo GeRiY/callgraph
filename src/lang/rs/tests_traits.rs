@@ -70,3 +70,28 @@ fn trait_and_implementation_callers_see_each_other_with_a_via_mark() {
         vec![("generic".to_owned(), Some("Handler".to_owned()))]
     );
 }
+
+#[test]
+fn generic_with_two_traits_from_other_files_resolves_each_call_to_its_trait() {
+    let a = graph_of("/p/src/a.rs", "pub trait A {\n    fn ping(&self);\n}\n");
+    let b = graph_of("/p/src/b.rs", "pub trait B {\n    fn pong(&self);\n}\n");
+    let run = graph_of(
+        "/p/src/run.rs",
+        "pub fn run<T: A + B>(t: &T) {\n    t.ping();\n    t.pong();\n}\n",
+    );
+    let index = CallerIndex::build([
+        ("/p/src/a.rs", &a),
+        ("/p/src/b.rs", &b),
+        ("/p/src/run.rs", &run),
+    ]);
+    let callers = |pattern: &str| -> Vec<String> {
+        index
+            .callers(pattern, 1)
+            .unwrap()
+            .into_iter()
+            .map(|r| r.caller)
+            .collect()
+    };
+    assert_eq!(callers("A::ping"), vec!["run".to_owned()]);
+    assert_eq!(callers("B::pong"), vec!["run".to_owned()]);
+}

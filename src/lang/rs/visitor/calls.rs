@@ -14,7 +14,7 @@ use syn::{Expr, ExprCall, ExprMethodCall, ExprPath, Macro, Member};
 
 use super::body::{BodyVisit, Location, walk_bodies};
 use super::macros::visit_body;
-use super::receivers::{multi_candidates, segments, type_path};
+use super::receivers::{MULTI, multi_candidates, segments, type_path};
 use super::scopes::ConstNode;
 use super::{FileVisitor, Scopes};
 use crate::index::UNKNOWN_RECEIVER;
@@ -179,10 +179,11 @@ impl Collector<'_, '_> {
             on_self,
         };
         let base = self.verdict(location, &callee);
+        let receiver = self.receiver_type(location, &node.receiver);
+        let multi = receiver.as_deref().and_then(multi_candidates);
         let verdict = if on_self && self.resolver.has_method(&location.container, &name) {
             base
-        } else if let Some(typed) = self
-            .receiver_type(location, &node.receiver)
+        } else if let Some(typed) = receiver
             .and_then(|ty| self.pick_multi(location, ty, &name))
             .and_then(|ty| self.typed_verdict(location, ty, &name))
         {
@@ -195,7 +196,19 @@ impl Collector<'_, '_> {
         } else {
             base
         };
-        let on = self.parsed.short(&*node.receiver, 40);
+        // `T: A + B`, és egyik trait sem ebben a fájlban van: a jelöltek az `on`-ban utaznak (`?A+B`),
+        // a hívó-index a projekt trait-jeiből dönt (lásd `multi_target` az indexben)
+        let unresolved = verdict
+            .resolved
+            .as_deref()
+            .is_some_and(|r| r.starts_with(UNKNOWN_RECEIVER));
+        let on = match multi {
+            Some(candidates) if unresolved => {
+                let names: Vec<String> = candidates.iter().map(|c| c.join("::")).collect();
+                format!("{}{}", MULTI, names.join("+"))
+            }
+            _ => self.parsed.short(&*node.receiver, 40),
+        };
         let line = self.parsed.line(node.method.span());
         self.push(callee.kind(), name, verdict, line, Some(on));
     }

@@ -60,6 +60,7 @@ impl CallerIndex {
         let records: Vec<(&str, &FileGraph)> = graphs.into_iter().collect();
         let hierarchy = TypeHierarchy::from_graphs(records.iter().map(|(_, graph)| *graph));
         let properties = property_types(&records);
+        let rust_traits = rust_trait_methods(&records);
         let mut edges = Vec::new();
         for (path, graph) in records {
             let namespace = graph.namespace.as_deref().unwrap_or("");
@@ -68,7 +69,14 @@ impl CallerIndex {
                 // Swift: a másik fájlban elakadt fogadó-lánc (`Store::session.user`) feloldása a property-típusokon át
                 let chained = (call.resolved.is_none() && path.ends_with(".swift"))
                     .then(|| chain_target(&properties, call.on.as_deref()?, &call.target))
-                    .flatten();
+                    .flatten()
+                    .or_else(|| {
+                        // Rust: `T: A + B`, a trait-ek másik fájlban (az `on` = `?A+B`)
+                        let uncertain = call.resolved.as_deref().is_some_and(is_uncertain);
+                        (uncertain && path.ends_with(".rs"))
+                            .then(|| multi_target(&rust_traits, call.on.as_deref()?, &call.target))
+                            .flatten()
+                    });
                 let target = chained
                     .clone()
                     .or_else(|| call.resolved.clone())
@@ -576,6 +584,44 @@ fn chain_type(hint: &str) -> Option<String> {
             .chars()
             .all(|c| c.is_alphanumeric() || c == '_' || c == '.');
     valid.then(|| token.to_owned())
+}
+
+/// A projekt Rust trait-jei: trait neve → a deklarált metódusok nevei.
+fn rust_trait_methods(records: &[(&str, &FileGraph)]) -> HashMap<String, HashSet<String>> {
+    let mut out: HashMap<String, HashSet<String>> = HashMap::new();
+    for (path, graph) in records {
+        if !path.ends_with(".rs") {
+            continue;
+        }
+        for container in graph.containers.iter().filter(|c| c.kind == "trait") {
+            let methods = out.entry(container.name.clone()).or_default();
+            methods.extend(
+                graph
+                    .methods
+                    .iter()
+                    .filter(|m| m.container.as_deref() == Some(container.name.as_str()))
+                    .map(|m| m.name.clone()),
+            );
+        }
+    }
+    out
+}
+
+/// `T: A + B` hívás (`on` = `?A+B`) tényleges célja: ha a jelöltek közül pontosan egy trait deklarálja a
+/// metódust, `Trait::metódus`. Több (vagy nulla) találatnál `None`: a hívás marad bizonytalan (`?::név`) —
+/// ez kevesebb zaj, mint minden trait-hez külön, találgatott él.
+fn multi_target(
+    traits: &HashMap<String, HashSet<String>>,
+    on: &str,
+    method: &str,
+) -> Option<String> {
+    let candidates = on.strip_prefix('?')?;
+    let mut found = candidates
+        .split('+')
+        .filter_map(|c| c.rsplit("::").next())
+        .filter(|name| traits.get(*name).is_some_and(|m| m.contains(method)));
+    let first = found.next()?;
+    found.next().is_none().then(|| format!("{first}::{method}"))
 }
 
 /// Az elakadt fogadó-lánc (`on` = `Típus::a.b`, `target` = `…a.b.metódus`) tényleges célja: a property-ösvény
