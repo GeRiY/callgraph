@@ -32,7 +32,7 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   `by viewModels()` injektálási él, a view modelen hívott metódusok pedig a típusára oldódnak fel. A Hilt
   `@Inject constructor`, `@Provides` és `@Binds` megmutatja, mi injektálódik és melyik metódus szolgáltat egy típust.
   A `NavHost` `composable("route") { Screen() }` és a `navController.navigate("…")` navigációs él (a típusbiztos
-  útvonalak is). Az interfészmetódus és a megvalósításai hívói látják egymást. Az Android-projektek profilt kapnak
+  útvonalak is: `navigate(Detail(…))` / `composable<Detail>`), akkor is, ha a `NavHost` másik fájlban van. Az interfészmetódus és a megvalósításai hívói látják egymást. Az Android-projektek profilt kapnak
   (ui / view model / data / domain / di rétegek; a `*.gradle.kts` nem számít alkalmazáskódnak), a Kotlin pedig
   megjelenik a használati statisztikában. A `!!` nem rejti el a hívás fogadóját, a `*Test.kt` fájlok és az
   `androidTest` mappák a `locate`-ban tesztnek számítanak, a metódustörzsek szűrése pedig helyes (kommentek, raw
@@ -50,7 +50,9 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   a generikus nézetek (`List<Item>(…)`) komponenshasználatnak számítanak, az actor metódusok pedig feloldódnak. A
   fájlokon átívelő property-láncon át indított hívás (`self.store.session.user.load()`) az utolsó property típusának
   metódusára oldódik fel. A tárolt closure-t meghívó metódus (`onFrame?(…)`) a closure hívottjainak közvetlen
-  hívójaként jelenik meg, a „called through a stored closure” alatt, `via <Type>::<property>` jelöléssel.
+  hívójaként jelenik meg, a „called through a stored closure” alatt, `via <Type>::<property>` jelöléssel. A fájlokon át feloldott hívók (Kotlin-útvonalak, Swift property-láncok,
+  Rust trait-korlátok) a hívólista első szintjén jelennek meg, a „called through a stored closure or resolved across
+  files” alatt.
 - **`callgraph mcp --allow <mappa>`:** az MCP-szerver egy további mappát is olvashat, pl. egy testvér `../android`
   mappát. A kapcsoló ismételhető, vagy a `CALLGRAPH_MCP_ALLOW` környezeti változó használható; alapból a szerver a
   projektgyökérre korlátozott marad.
@@ -59,7 +61,7 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   visszatérési típusával (`self.make()?`, `Type::open().unwrap()`) típusozott fogadók feloldódnak.
   A ciklusváltozók (`for b in self.bars`), az `if let Some(x)` / `while let` / `match Some(x)` kötések és az
   iterátor-closure paraméterek (`items.iter().map(|x| x.name())`) megkapják az elemtípusukat, így a metódushívásaik
-  feloldódnak; `T: A + B` esetén a metódust deklaráló trait számít. A `#[test]` / `#[tokio::test]` függvények és a
+  feloldódnak; `T: A + B` esetén a metódust deklaráló trait számít, akkor is, ha a traitek más fájlokban vannak deklarálva. A `#[test]` / `#[tokio::test]` függvények és a
   `#[cfg(test)]` modulok tesztként vannak jelölve, a `Some` / `Ok` / `Err` / `Box::new` / `Default::default` már nem
   zsúfolja a híváslistát, a helyi closure hívása pedig dinamikusnak van jelölve. A trait-metódus és a megvalósításai
   hívói mindkét irányban látják egymást (`via`).

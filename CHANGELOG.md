@@ -28,7 +28,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   `*.gradle.kts` files are marked as Gradle build scripts. `hiltViewModel()`, `viewModel()` and `by viewModels()` are
   injection edges, and calls on the view model resolve to its type. Hilt `@Inject constructor`, `@Provides` and
   `@Binds` show what is injected and which method provides a type. `NavHost` `composable("route") { Screen() }` and
-  `navController.navigate("…")` are navigation edges (type-safe routes too). Callers of an interface method and of
+  `navController.navigate("…")` are navigation edges (type-safe routes too, `navigate(Detail(…))` / `composable<Detail>`), also when the `NavHost`
+  is in another file. Callers of an interface method and of
   its implementations see each other. Android projects get a profile (ui / view model / data / domain / di layers;
   `*.gradle.kts` is not counted as app code), and Kotlin appears in the usage statistics. `!!` does not hide the
   receiver of a call, `*Test.kt` files and `androidTest` folders count as tests in `locate`, and method bodies are
@@ -46,7 +47,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   (`List<Item>(…)`) count as component uses, and actor methods resolve. A call through a property chain that spans
   files (`self.store.session.user.load()`) resolves to the method of the last property's type. The method that
   invokes a stored closure (`onFrame?(…)`) is listed as a direct caller of the closure's callees, under "called
-  through a stored closure", as `via <Type>::<property>`.
+  through a stored closure", as `via <Type>::<property>`. Callers resolved across files (Kotlin routes, Swift property
+  chains, Rust trait bounds) are shown at the first level of the callers list, under "called through a stored closure
+  or resolved across files".
 - **`callgraph mcp --allow <dir>`:** lets the MCP server read an extra folder, e.g. a sibling `../android`. Repeat
   the flag or set `CALLGRAPH_MCP_ALLOW`; by default the server stays restricted to the project root.
 - **Rust: function references and more receiver types:** a function or method passed as a value (`.map(Self::parse)`,
@@ -54,7 +57,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   method's return type (`self.make()?`, `Type::open().unwrap()`) are resolved. Loop variables (`for b in self.bars`),
   `if let Some(x)` / `while let` / `match Some(x)` bindings and iterator-closure parameters
   (`items.iter().map(|x| x.name())`) get their element type, so their method calls resolve; with `T: A + B` the trait
-  that declares the method is used. `#[test]` / `#[tokio::test]` functions and `#[cfg(test)]` modules are marked as
+  that declares the method is used, also when the traits are declared in other files. `#[test]` / `#[tokio::test]` functions and `#[cfg(test)]` modules are marked as
   tests, `Some` / `Ok` / `Err` / `Box::new` / `Default::default` no longer clutter the call list, and calls of a local
   closure are marked dynamic. Callers of a trait method and of its implementations see each other in both directions
   (`via`).
