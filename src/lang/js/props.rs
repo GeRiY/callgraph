@@ -1,5 +1,7 @@
 //! `properties`: a Vue `props` (defineProps / Options `props:`), objektum-, tömb- és TS típus-literál alakkal.
 
+use std::collections::HashMap;
+
 use oxc_ast::ast::*;
 use oxc_span::{GetSpan, Span};
 
@@ -21,18 +23,110 @@ impl JsPass for PropsPass {
                 }
             }
         }
+        let defaults = with_defaults(ctx, program);
         for call in macro_calls(program, "defineProps") {
             match call.arguments.first() {
                 Some(Argument::SpreadElement(_)) => {}
                 Some(arg) => props_from(ctx, &container, arg.to_expression(), out),
                 None => {
-                    let ty = call.type_arguments.as_ref().and_then(|t| t.params.first());
-                    if let Some(TSType::TSTypeLiteral(lit)) = ty {
-                        type_members(ctx, &container, &lit.members, out);
+                    if let Some(ty) = call.type_arguments.as_ref().and_then(|t| t.params.first()) {
+                        let scope = TypeScope {
+                            ctx,
+                            program,
+                            container: &container,
+                            defaults: &defaults,
+                        };
+                        scope.collect(ty, 0, out);
                     }
                 }
             }
         }
+    }
+}
+
+/// A `withDefaults(defineProps<…>(), { név: érték })` alapértékei: prop-név → az érték rövidített forrása.
+fn with_defaults(ctx: &PassContext<'_>, program: &Program<'_>) -> HashMap<String, String> {
+    let mut defaults = HashMap::new();
+    for call in macro_calls(program, "withDefaults") {
+        let Some(Argument::ObjectExpression(obj)) = call.arguments.get(1) else {
+            continue;
+        };
+        for prop in &obj.properties {
+            if let ObjectPropertyKind::ObjectProperty(p) = prop
+                && let Some(name) = key_name(&p.key)
+            {
+                let value = if p.method {
+                    "fn".to_string()
+                } else {
+                    src_of(ctx.source, p.value.span(), 30)
+                };
+                defaults.insert(name.to_string(), value);
+            }
+        }
+    }
+    defaults
+}
+
+/// A `defineProps<T>()` típus-paraméterének feloldása a fájlon belül (típus-literál, helyi `interface` / `type`,
+/// `extends`, `A & B`); importált típust nem követ.
+struct TypeScope<'s, 'a, 'c> {
+    ctx: &'s PassContext<'c>,
+    program: &'s Program<'a>,
+    container: &'s str,
+    defaults: &'s HashMap<String, String>,
+}
+
+impl TypeScope<'_, '_, '_> {
+    fn collect(&self, ty: &TSType<'_>, depth: usize, out: &mut JsAnalysis) {
+        // önhivatkozó / végtelen típus-láncok ellen
+        if depth > 5 {
+            return;
+        }
+        match ty {
+            TSType::TSTypeLiteral(lit) => self.members(&lit.members, out),
+            TSType::TSIntersectionType(i) => {
+                for part in &i.types {
+                    self.collect(part, depth + 1, out);
+                }
+            }
+            TSType::TSParenthesizedType(p) => self.collect(&p.type_annotation, depth + 1, out),
+            TSType::TSTypeReference(r) => {
+                if let TSTypeName::IdentifierReference(id) = &r.type_name {
+                    self.named(id.name.as_str(), depth + 1, out);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// A fájl top-level `interface <név>` / `type <név> = …` deklarációja (exportálva is).
+    fn named(&self, name: &str, depth: usize, out: &mut JsAnalysis) {
+        for stmt in &self.program.body {
+            let decl = match stmt {
+                Statement::ExportDeclaration(e) => Some(&e.declaration),
+                other => other.as_declaration(),
+            };
+            match decl {
+                Some(Declaration::TSInterfaceDeclaration(i)) if i.id.name == name => {
+                    for parent in &i.extends {
+                        if let TSTypeName::IdentifierReference(id) = &parent.type_name {
+                            self.named(id.name.as_str(), depth + 1, out);
+                        }
+                    }
+                    self.members(&i.body.body, out);
+                    return;
+                }
+                Some(Declaration::TSTypeAliasDeclaration(a)) if a.id.name == name => {
+                    self.collect(&a.type_annotation, depth + 1, out);
+                    return;
+                }
+                _ => {}
+            }
+        }
+    }
+
+    fn members(&self, members: &[TSSignature<'_>], out: &mut JsAnalysis) {
+        type_members(self.ctx, self.container, members, self.defaults, out);
     }
 }
 
@@ -150,7 +244,7 @@ fn props_from(ctx: &PassContext<'_>, container: &str, expr: &Expression<'_>, out
                     && let Some(name) = key_name(&p.key)
                 {
                     let (ty, required) = object_prop_type(ctx.source, p);
-                    push(ctx, container, name, p.span.start, ty, required, out);
+                    push(ctx, container, name, p.span.start, ty, required, None, out);
                 }
             }
         }
@@ -166,6 +260,7 @@ fn props_from(ctx: &PassContext<'_>, container: &str, expr: &Expression<'_>, out
                         s.span.start,
                         "mixed".into(),
                         false,
+                        None,
                         out,
                     );
                 }
@@ -208,6 +303,7 @@ fn type_members(
     ctx: &PassContext<'_>,
     container: &str,
     members: &[TSSignature<'_>],
+    defaults: &HashMap<String, String>,
     out: &mut JsAnalysis,
 ) {
     for m in members {
@@ -232,11 +328,24 @@ fn type_members(
         };
         if let Some(name) = key_name(key) {
             let ty = ty.unwrap_or_else(|| "mixed".into());
-            push(ctx, container, name, span.start, ty, !optional, out);
+            // `withDefaults` alapérték: külön tárolva (`doc`), és a prop nem kötelező
+            let default = defaults.get(name);
+            push(
+                ctx,
+                container,
+                name,
+                span.start,
+                ty,
+                !optional && default.is_none(),
+                default.cloned(),
+                out,
+            );
         }
     }
 }
 
+/// A `default` a prop alapértéke (a JS-propnál a `doc` mező hordozza; a JSON-ban nem jelenik meg).
+#[allow(clippy::too_many_arguments)]
 fn push(
     ctx: &PassContext<'_>,
     container: &str,
@@ -244,6 +353,7 @@ fn push(
     offset: u32,
     ty: String,
     readonly: bool,
+    default: Option<String>,
     out: &mut JsAnalysis,
 ) {
     out.builder.property(Property {
@@ -255,6 +365,6 @@ fn push(
         visibility: "public".into(),
         is_static: false,
         readonly,
-        doc: None,
+        doc: default,
     });
 }

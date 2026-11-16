@@ -188,7 +188,141 @@ mod tests {
             ("module", "util", 2)
         );
         assert!(a.graph.framework.as_deref() == Some("js") && a.warnings.is_empty());
-        assert_eq!(a.graph.module.as_deref(), Some("p/util.ts"));
+        // jsconfig/tsconfig/package.json nélkül a gyökér a fájl mappája (nem a fájlrendszer teteje)
+        assert_eq!(a.graph.module.as_deref(), Some("util.ts"));
+    }
+
+    /// `(név, típus, kötelező)` a fájl property-ihez.
+    fn props(a: &Analysis) -> Vec<(String, String, bool)> {
+        a.graph
+            .properties
+            .iter()
+            .map(|p| {
+                (
+                    p.name.clone(),
+                    p.type_hint.clone().unwrap_or_default(),
+                    p.readonly,
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn define_props_resolves_a_local_interface_and_type_alias() {
+        let a = run(
+            "/p/Board.vue",
+            "<script setup lang=\"ts\">
+interface Base { id: number }
+interface Props extends Base {
+  title: string
+  size?: number
+}
+const props = defineProps<Props>()
+</script>
+",
+        );
+        let found = props(&a);
+        for want in [
+            ("id".to_string(), "number".to_string(), true),
+            ("title".to_string(), "string".to_string(), true),
+            ("size".to_string(), "number".to_string(), false),
+        ] {
+            assert!(found.contains(&want), "{want:?} in {found:?}");
+        }
+        let b = run(
+            "/p/Alias.vue",
+            "<script setup lang=\"ts\">
+type Props = { a: string } & { b?: boolean }
+defineProps<Props>()
+</script>
+",
+        );
+        let names: Vec<_> = props(&b).into_iter().map(|p| p.0).collect();
+        assert_eq!(names, ["a", "b"]);
+        // importált típus: nem követjük, nincs találgatás
+        let c = run(
+            "/p/Imported.vue",
+            "<script setup lang=\"ts\">
+import type { Props } from './types'
+defineProps<Props>()
+</script>
+",
+        );
+        assert!(props(&c).is_empty());
+    }
+
+    #[test]
+    fn with_defaults_marks_props_optional_and_shows_the_default() {
+        let a = run(
+            "/p/Card.vue",
+            "<script setup lang=\"ts\">
+interface Props { size: number; label: string }
+const props = withDefaults(defineProps<Props>(), { size: 3 })
+</script>
+",
+        );
+        let found = props(&a);
+        assert!(
+            found.contains(&("size".to_string(), "number".to_string(), false)),
+            "{found:?}"
+        );
+        assert!(
+            found.contains(&("label".to_string(), "string".to_string(), true)),
+            "{found:?}"
+        );
+        let default = |n: &str| {
+            a.graph
+                .properties
+                .iter()
+                .find(|p| p.name == n)
+                .and_then(|p| p.doc.clone())
+        };
+        assert_eq!(default("size").as_deref(), Some("3"));
+        assert_eq!(default("label"), None);
+    }
+
+    #[test]
+    fn define_model_and_type_only_emits_are_recorded_with_lines() {
+        let a = run(
+            "/p/Field.vue",
+            "<script setup lang=\"ts\">
+const model = defineModel<string>({ required: true })
+const open = defineModel<boolean>('open')
+const emit = defineEmits<{ (e: 'save'): void }>()
+</script>
+",
+        );
+        let value_of = |name: &str| {
+            a.graph
+                .constants
+                .iter()
+                .find(|c| c.name == name)
+                .map(|c| (c.line, c.value.clone().unwrap_or_default()))
+        };
+        assert_eq!(
+            value_of("model:modelValue"),
+            Some((2, "string [required]".to_string()))
+        );
+        assert_eq!(value_of("model:open"), Some((3, "boolean".to_string())));
+        // a `defineEmits<{…}>()` sora már nem 0
+        assert_eq!(value_of("emit:save").map(|c| c.0), Some(4));
+    }
+
+    #[test]
+    fn options_api_props_are_still_listed() {
+        let a = run(
+            "/p/Opt.vue",
+            "<script>
+export default { props: { title: { type: String, required: true }, n: Number } }
+</script>
+",
+        );
+        let found = props(&a);
+        assert!(
+            found.contains(&("title".to_string(), "String".to_string(), true)),
+            "{found:?}"
+        );
+        assert!(found.iter().any(|p| p.0 == "n"), "{found:?}");
     }
 
     #[test]

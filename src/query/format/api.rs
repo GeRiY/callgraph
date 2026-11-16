@@ -194,7 +194,7 @@ fn write_container(
     out.push_str("---\n");
 }
 
-/// A Vue-komponens szerződése: a `props:` (név, ismert típus, kötelező) és az `emits:` lista; a JS-prop / emit
+/// A Vue-komponens szerződése: a `props:` (név, ismert típus, kötelező), az `emits:` és a `model:` lista; a JS-prop / emit
 /// csak a JS-frontendből jön, így más nyelv kimenete nem változik.
 fn write_vue_contract(out: &mut String, row: &QueryResult, container: &crate::model::Container) {
     let props: Vec<_> = row
@@ -213,9 +213,13 @@ fn write_vue_contract(out: &mut String, row: &QueryResult, container: &crate::mo
                 .filter(|t| !t.is_empty() && *t != "mixed");
             writeln!(
                 out,
-                "    {}{}{}",
+                "    {}{}{}{}",
                 p.name,
                 ty.map(|t| format!(": {t}")).unwrap_or_default(),
+                p.doc
+                    .as_deref()
+                    .map(|d| format!(" = {d}"))
+                    .unwrap_or_default(),
                 if p.readonly { " [required]" } else { "" }
             )
             .unwrap();
@@ -234,6 +238,27 @@ fn write_vue_contract(out: &mut String, row: &QueryResult, container: &crate::mo
         writeln!(out, "  emits ({n}):").unwrap();
         for c in emits {
             writeln!(out, "    {}", c.name.trim_start_matches("emit:")).unwrap();
+        }
+        out.push('\n');
+    }
+    let models: Vec<_> = row
+        .graph
+        .constants
+        .iter()
+        .filter(|c| c.js && c.kind == "model")
+        .filter(|c| row.graph.owns(container, c.container.as_deref(), c.line))
+        .collect();
+    if !models.is_empty() {
+        writeln!(out, "  model ({}):", models.len()).unwrap();
+        for c in models {
+            let ty = c.value.as_deref().filter(|t| *t != "mixed");
+            writeln!(
+                out,
+                "    {}{}",
+                c.name.trim_start_matches("model:"),
+                ty.map(|t| format!(": {t}")).unwrap_or_default()
+            )
+            .unwrap();
         }
         out.push('\n');
     }

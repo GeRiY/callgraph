@@ -154,9 +154,15 @@ fn outline(
             for p in props {
                 writeln!(
                     s,
-                    "    {} ${}{}{}",
+                    "    {} ${}{}{}{}",
                     p.type_hint.clone().unwrap_or_else(|| "mixed".to_owned()),
                     p.name.trim_start_matches('$'),
+                    // JS/Vue-prop: a `doc` az alapérték (`withDefaults`)
+                    p.doc
+                        .as_deref()
+                        .filter(|_| p.js)
+                        .map(|d| format!(" = {d}"))
+                        .unwrap_or_default(),
                     if p.readonly { " [readonly]" } else { "" },
                     if p.is_static { " [static]" } else { "" }
                 )

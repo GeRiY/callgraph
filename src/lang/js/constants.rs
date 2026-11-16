@@ -56,8 +56,15 @@ impl JsPass for ConstantsPass {
             if let Some(src) = &type_src {
                 names.extend(type_emit_names(src));
             }
-            let line = arg.map_or(0, |e| ctx.lines.line_of(e.span().start as usize));
+            // típus-paraméteres alaknál (`defineEmits<{…}>()`) nincs argumentum: a hívás sora
+            let line = arg.map_or_else(
+                || ctx.lines.line_of(call.span.start as usize),
+                |e| ctx.lines.line_of(e.span().start as usize),
+            );
             push_emits(&container, line, names, out);
+        }
+        for call in macro_calls(program, "defineModel") {
+            push_model(ctx, &container, call, out);
         }
     }
 }
@@ -101,6 +108,49 @@ fn type_emit_names(src: &str) -> BTreeSet<String> {
     let calls = CALL_SIGNATURE.captures_iter(src);
     let tuples = NAMED_TUPLE.captures_iter(src);
     calls.chain(tuples).map(|c| c[1].to_string()).collect()
+}
+
+/// A `defineModel<T>('név', {…})` → `model:<név>` konstans (név nélkül `modelValue`), értéke a típus.
+fn push_model(
+    ctx: &PassContext<'_>,
+    container: &str,
+    call: &CallExpression<'_>,
+    out: &mut JsAnalysis,
+) {
+    let (name, options) = match call.arguments.first() {
+        Some(Argument::StringLiteral(s)) => match s.value.as_str() {
+            Some(name) => (name.to_string(), call.arguments.get(1)),
+            None => return,
+        },
+        Some(Argument::SpreadElement(_)) => return,
+        first => ("modelValue".to_string(), first),
+    };
+    let required = matches!(options, Some(Argument::ObjectExpression(o)) if o.properties.iter().any(|p| {
+        matches!(p, ObjectPropertyKind::ObjectProperty(p)
+            if key_name(&p.key) == Some("required")
+                && matches!(&p.value, Expression::BooleanLiteral(b) if b.value))
+    }));
+    let ty = call
+        .type_arguments
+        .as_ref()
+        .and_then(|t| t.params.first())
+        .map(|t| src_of(ctx.source, t.span(), 40))
+        .unwrap_or_else(|| "mixed".into());
+    out.builder.constant(Constant {
+        js: true,
+        container: Some(container.to_string()),
+        kind: "model".into(),
+        name: format!("model:{name}"),
+        line: ctx.lines.line_of(call.span.start as usize),
+        value: Some(if required {
+            format!("{ty} [required]")
+        } else {
+            ty
+        }),
+        visibility: None,
+        caller: None,
+        doc: None,
+    });
 }
 
 fn push_emits(container: &str, line: u32, names: BTreeSet<String>, out: &mut JsAnalysis) {

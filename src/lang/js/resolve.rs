@@ -87,6 +87,8 @@ impl Resolver {
     fn config_for_dir(&self, dir: &Path) -> Arc<ResolveConfig> {
         let mut visited = Vec::new();
         let mut cur = dir.to_path_buf();
+        // nincs jsconfig/tsconfig/package.json felfelé: a gyökér a fájl saját mappája (nem a fájlrendszer teteje)
+        let mut fallback = false;
         let found = loop {
             if let Some(hit) = self.lock().get(&cur) {
                 break hit.clone();
@@ -95,13 +97,21 @@ impl Resolver {
             if let Some(cfg) = read_config(&cur) {
                 break Arc::new(cfg);
             }
-            let at_top = cur.parent().is_none();
-            if cur.join("package.json").exists() || at_top {
+            if cur.join("package.json").exists() {
                 break Arc::new(ResolveConfig::plain(&cur));
+            }
+            if cur.parent().is_none() {
+                fallback = true;
+                break Arc::new(ResolveConfig::plain(dir));
             }
             cur = cur.parent().map(Path::to_path_buf).unwrap_or_default();
         };
         let mut cache = self.lock();
+        if fallback {
+            // a tartalék csak a kiinduló mappára érvényes, a közös ősökre nem
+            cache.insert(dir.to_path_buf(), found.clone());
+            return found;
+        }
         for d in visited {
             cache.insert(d, found.clone());
         }
@@ -277,6 +287,22 @@ mod tests {
         let r2 = Resolver::new();
         assert_eq!(r2.root(&d.join("a/b/x.js")), d.join("a"));
         assert_eq!(r2.display("@/x", &d.join("a/b/x.js")), "@/x");
+        let _ = fs::remove_dir_all(d);
+    }
+
+    /// jsconfig/tsconfig/package.json nélkül a gyökér a fájl mappája, nem a fájlrendszer teteje (`home/…` modulút).
+    #[test]
+    fn no_config_falls_back_to_the_file_folder() {
+        let d = temp("noroot");
+        fs::create_dir_all(d.join("sub")).unwrap();
+        let r = Resolver::new();
+        let file = d.join("sub/Setup.vue");
+        let root = r.root(&file);
+        if root.starts_with(&d) {
+            assert_eq!(root, d.join("sub"));
+            assert_eq!(r.module_path(&file), "Setup.vue");
+            assert_eq!(r.display("./Child.vue", &file), "Child.vue");
+        }
         let _ = fs::remove_dir_all(d);
     }
 

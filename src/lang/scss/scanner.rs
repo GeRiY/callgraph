@@ -42,7 +42,8 @@ impl<'a> ScssScanner<'a> {
             doc: None,
         });
         let mut depth = 0usize;
-        let mut methods: Vec<(usize, usize)> = Vec::new();
+        // (metódus-index, mélység, outline-név): a nyitott szabályok a hívások `caller`-éhez
+        let mut methods: Vec<(usize, usize, String)> = Vec::new();
         // nyitott zárójel a sor elején: többsoros paraméterlista / argumentum / map folytatása — nem deklaráció
         let mut paren_depth = 0isize;
         for (n, raw) in self.source.lines().enumerate() {
@@ -66,7 +67,7 @@ impl<'a> ScssScanner<'a> {
             }
             paren_depth = (paren_depth + paren_delta(raw)).max(0);
             control_flow(&mut self.builder, &self.container, raw, ln);
-            self.calls(raw, ln);
+            let enclosing = methods.last().map(|(_, _, name)| name.clone());
             if let Some(head) = raw
                 .split('{')
                 .next()
@@ -77,7 +78,7 @@ impl<'a> ScssScanner<'a> {
                     let idx = self.builder.method_count();
                     self.builder.method(Method {
                         container: Some(self.container.clone()),
-                        name,
+                        name: name.clone(),
                         line: ln,
                         end_line: Some(ln),
                         visibility: None,
@@ -90,8 +91,7 @@ impl<'a> ScssScanner<'a> {
                         body: None,
                         kind: Some(kind.into()),
                     });
-                    methods.push((idx, depth));
-                    let _ = kind;
+                    methods.push((idx, depth, name));
                 } else if is_rule(head) {
                     let idx = self.builder.method_count();
                     self.builder.method(Method {
@@ -109,16 +109,24 @@ impl<'a> ScssScanner<'a> {
                         body: None,
                         kind: Some("rule".into()),
                     });
-                    methods.push((idx, depth));
+                    methods.push((idx, depth, normalize(head)));
                 }
             }
+            // egysoros szabály (`.a { x: var(--y) }`): a hívás a saját szabályáé, különben a befoglalóé
+            let caller =
+                if raw.contains('{') && raw.matches('{').count() == raw.matches('}').count() {
+                    methods.last().map(|(_, _, name)| name.clone())
+                } else {
+                    enclosing
+                };
+            self.calls(raw, ln, caller.as_deref());
             for c in raw.chars() {
                 if c == '{' {
                     depth += 1;
                 } else if c == '}' {
                     depth = depth.saturating_sub(1);
-                    if let Some(pos) = methods.iter().rposition(|(_, d)| *d == depth) {
-                        let (idx, _) = methods.remove(pos);
+                    if let Some(pos) = methods.iter().rposition(|(_, d, _)| *d == depth) {
+                        let (idx, _, _) = methods.remove(pos);
                         self.builder.set_method_end(idx, ln);
                     }
                 }
@@ -193,13 +201,14 @@ impl<'a> ScssScanner<'a> {
             .trim_end_matches(';');
         self.builder.import(alias.into(), spec.into());
     }
-    fn calls(&mut self, raw: &str, ln: u32) {
+    fn calls(&mut self, raw: &str, ln: u32, caller: Option<&str>) {
         let s = raw.trim();
         if let Some(a) = s.find("@include ")
             && let Some((target, args)) = call_parts(&s[a + 9..])
         {
             self.builder.call(call(
                 &self.container,
+                caller,
                 ln,
                 "include",
                 target,
@@ -208,6 +217,7 @@ impl<'a> ScssScanner<'a> {
             ));
             self.builder.call(call(
                 &self.container,
+                caller,
                 ln,
                 "func_call",
                 target.rsplit('.').next().unwrap_or(target),
@@ -223,6 +233,7 @@ impl<'a> ScssScanner<'a> {
                 .trim_end_matches(';');
             self.builder.call(call(
                 &self.container,
+                caller,
                 ln,
                 "extend",
                 target,
@@ -240,6 +251,7 @@ impl<'a> ScssScanner<'a> {
             }
             self.builder.call(call(
                 &self.container,
+                caller,
                 ln,
                 "func_call",
                 name,
@@ -255,7 +267,7 @@ impl<'a> ScssScanner<'a> {
                     handler: None,
                     from: None,
                     container: Some(self.container.clone()),
-                    caller: None,
+                    caller: caller.map(str::to_string),
                     line: ln,
                     end_line: None,
                     kind: "interpolation".into(),

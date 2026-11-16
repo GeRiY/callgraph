@@ -10,6 +10,13 @@ use crate::model::{
 
 struct OpenRule {
     method: Option<usize>,
+    /// A szabály outline-neve (a benne lévő hívások `caller`-e); üres fejlécnél `None`.
+    name: Option<String>,
+}
+
+/// A legbelső nyitott, névvel rendelkező szabály neve.
+fn innermost(stack: &[OpenRule]) -> Option<String> {
+    stack.iter().rev().find_map(|open| open.name.clone())
 }
 
 /// CSS forrásból gráfrekordokat készítő, állapotot hordozó leképező.
@@ -62,7 +69,7 @@ impl<'a> CssScanner<'a> {
                 let end = (i + 2).min(bytes.len());
                 self.comment(start, end, None);
                 self.strings_in(start, end);
-                self.calls(&self.source[start..end], start);
+                self.calls(&self.source[start..end], start, None);
                 self.import_statement(&self.source[start..end]);
                 i = end;
                 continue;
@@ -118,7 +125,10 @@ impl<'a> CssScanner<'a> {
                         branches: Vec::new(),
                     });
                 }
-                stack.push(OpenRule { method });
+                stack.push(OpenRule {
+                    method,
+                    name: (!header.is_empty()).then_some(header),
+                });
                 segment = i + 1;
             } else if bytes[i] == b'}' {
                 if let Some(open) = stack.pop()
@@ -129,7 +139,8 @@ impl<'a> CssScanner<'a> {
                 segment = i + 1;
             } else if bytes[i] == b';' {
                 self.statement_at_rule(segment, i);
-                self.declaration(&self.source[segment..i], segment);
+                let caller = innermost(&stack);
+                self.declaration(&self.source[segment..i], segment, caller);
                 self.import_statement(&self.source[segment..i]);
                 segment = i + 1;
             }
@@ -178,7 +189,7 @@ impl<'a> CssScanner<'a> {
         self.builder.set_method_end(index, end);
     }
 
-    fn declaration(&mut self, raw: &str, start: usize) {
+    fn declaration(&mut self, raw: &str, start: usize, caller: Option<String>) {
         let cleaned = strip_comments(raw);
         let Some((name, value)) = cleaned.split_once(':') else {
             return;
@@ -206,10 +217,10 @@ impl<'a> CssScanner<'a> {
                 doc: None,
             });
         }
-        self.calls(&cleaned, start);
+        self.calls(&cleaned, start, caller);
     }
 
-    fn calls(&mut self, raw: &str, start: usize) {
+    fn calls(&mut self, raw: &str, start: usize, caller: Option<String>) {
         let b = raw.as_bytes();
         let mut i = 0;
         while i < b.len() {
@@ -232,7 +243,7 @@ impl<'a> CssScanner<'a> {
                         handler: None,
                         from: None,
                         container: Some(self.container.clone()),
-                        caller: None,
+                        caller: caller.clone(),
                         line: line(self.source, start + i),
                         kind: target.into(),
                         target: target.into(),

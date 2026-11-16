@@ -172,10 +172,10 @@ mod tests {
 
     /// Minden referencia-sor `graph`-ja visszaolvasható és mezőegyezéssel újraírható.
     #[test]
+    #[ignore = "golden/ref.jsonl reference missing from the repo (owner decision pending)"]
     fn reference_rows_roundtrip() {
         let Some(reference) = golden_ref() else {
-            eprintln!("golden/ref.jsonl nem található — a teszt kimarad");
-            return;
+            panic!("golden/ref.jsonl not found");
         };
         let mut rows = 0;
         for line in reference.lines().filter(|l| !l.trim().is_empty()) {

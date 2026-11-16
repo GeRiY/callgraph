@@ -8,6 +8,40 @@ use super::Formatter;
 
 pub struct Summary;
 
+/// A container utáni számláló: kódnál metódus, stíluslapnál szabály, JSON-dokumentumnál kulcs, más dokumentumnál
+/// (Markdown / HTML) szakasz — a `(0 metódus)` hamis állítás lenne rájuk.
+fn count_label(
+    row: &QueryResult,
+    container: &crate::model::Container,
+    methods: usize,
+    lang: Lang,
+) -> String {
+    let plural = |n: usize, en: [&str; 2], hu: &str| match lang {
+        Lang::En if n == 1 => format!("  ({n} {})", en[0]),
+        Lang::En => format!("  ({n} {})", en[1]),
+        Lang::Hu => format!("  ({n} {hu})"),
+    };
+    match container.kind.as_str() {
+        "stylesheet" => plural(methods, ["rule", "rules"], "szabály"),
+        "document" => {
+            let keys = row
+                .graph
+                .constants
+                .iter()
+                .filter(|k| {
+                    k.kind == "key" && row.graph.owns(container, k.container.as_deref(), k.line)
+                })
+                .count();
+            if keys > 0 {
+                plural(keys, ["key", "keys"], "kulcs")
+            } else {
+                plural(methods, ["section", "sections"], "szakasz")
+            }
+        }
+        _ => plural(methods, ["method", "methods"], "metódus"),
+    }
+}
+
 impl Formatter for Summary {
     fn format(&self, rows: &[QueryResult], lang: Lang) -> String {
         let mut out = String::new();
@@ -48,11 +82,7 @@ impl Formatter for Summary {
                     {
                         write!(out, " implements {}", implements.join(", ")).unwrap();
                     }
-                    let count = match lang {
-                        Lang::En if methods == 1 => format!("  ({methods} method)"),
-                        Lang::En => format!("  ({methods} methods)"),
-                        Lang::Hu => format!("  ({methods} metódus)"),
-                    };
+                    let count = count_label(row, container, methods, lang);
                     out.push_str(&count);
                     if let Some(doc) = &container.doc {
                         let doc = if doc.chars().count() > 100 {

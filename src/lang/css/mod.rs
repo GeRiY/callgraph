@@ -174,4 +174,27 @@ mod tests {
             ]
         );
     }
+
+    /// A hívás `caller`-e a legbelső nyitott szabály (`@media` alatt is a benne lévő szabály); szabályon kívül `None`.
+    #[test]
+    fn calls_get_the_innermost_rule_as_caller() {
+        let source = ":root { --brand: red; --gap: calc(1px + 2px); }
+.card { color: var(--brand); }
+@media (min-width: 640px) {
+  .card .title { margin: calc(var(--gap) * 2); }
+}
+";
+        let file = SourceFile::new("/tmp/css/app.css", source.as_bytes().to_vec(), None);
+        let graph = CssFrontend::new().analyze(&file).unwrap().graph;
+        let callers = |target: &str| -> Vec<Option<&str>> {
+            graph
+                .calls
+                .iter()
+                .filter(|c| c.target == target)
+                .map(|c| c.caller.as_deref())
+                .collect()
+        };
+        assert_eq!(callers("var"), [Some(".card"), Some(".card .title")]);
+        assert_eq!(callers("calc"), [Some(":root"), Some(".card .title")]);
+    }
 }

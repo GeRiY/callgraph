@@ -9,6 +9,10 @@ use crate::lang::LanguageRegistry;
 use crate::query::QueryResult;
 
 fn outline(path: &str, text: &str) -> String {
+    render("outline", path, text)
+}
+
+fn render(format: &str, path: &str, text: &str) -> String {
     let language = LanguageRegistry::with_defaults();
     let file = SourceFile::new(path, text.as_bytes().to_vec(), None);
     let analyzer = language.for_path(std::path::Path::new(path)).unwrap();
@@ -18,8 +22,80 @@ fn outline(path: &str, text: &str) -> String {
     )];
     FormatterRegistry::with_defaults()
         .in_lang(Lang::En)
-        .render_with("outline", &rows, None, None)
+        .render_with(format, &rows, None, None)
         .unwrap()
+}
+
+/// `{"key_0": "v0", …}` sorokra bontva: soronként egy kulcs.
+fn flat_json(keys: usize) -> String {
+    let rows: Vec<String> = (0..keys)
+        .map(|i| format!("  \"key_{i}\": \"value {i}\""))
+        .collect();
+    format!("{{\n{}\n}}\n", rows.join(",\n"))
+}
+
+#[test]
+fn json_method_index_falls_back_to_a_compact_key_index() {
+    let out = render("method-index", "lang/en.json", &flat_json(450));
+    assert!(out.contains("document en.json  L1-452\n"), "{out}");
+    assert!(
+        out.contains("  key_0 … key_449  450 string  L2-451\n"),
+        "{out}"
+    );
+    assert!(out.lines().count() <= 25, "{out}");
+}
+
+#[test]
+fn json_key_index_keeps_nested_objects_and_counts_their_keys() {
+    let source = r#"{
+  "name": "x",
+  "board": {
+    "title": "T",
+    "cols": { "a": 1 }
+  },
+  "version": 3
+}
+"#;
+    let out = render("method-index", "package.json", source);
+    assert!(out.contains("  name  \"x\"  L2\n"), "{out}");
+    assert!(out.contains("  board  object (2)  L3-5  4 keys\n"), "{out}");
+    assert!(out.contains("  version  3  L7\n"), "{out}");
+    assert!(!out.contains("board.title"), "{out}");
+}
+
+#[test]
+fn summary_counts_keys_sections_and_rules_instead_of_zero_methods() {
+    let json = render("summary", "lang/en.json", &flat_json(450));
+    assert!(
+        json.contains("en.json  document en.json  (450 keys)"),
+        "{json}"
+    );
+    let md = render("summary", "docs/README.md", "# A\ntext\n## B\nmore\n");
+    assert!(md.contains("(2 sections)"), "{md}");
+    let css = render(
+        "summary",
+        "app.css",
+        ".a { color: red; }\n.b { color: blue; }\n",
+    );
+    assert!(css.contains("stylesheet app  (2 rules)"), "{css}");
+}
+
+#[test]
+fn stylesheet_outline_shows_calls_under_their_rule() {
+    let css = outline(
+        "app.css",
+        ":root { --brand: red; }\n.card {\n  color: var(--brand);\n}\n",
+    );
+    let card = css.find("  .card").unwrap_or(usize::MAX);
+    let var = css.find("var").unwrap_or(0);
+    assert!(card < var, "{css}");
+    let scss = outline(
+        "app.scss",
+        "@mixin pad($n) { padding: $n; }\n.card {\n  @include pad(2);\n}\n",
+    );
+    let card = scss.find("  .card").unwrap_or(usize::MAX);
+    let include = scss.rfind("include").unwrap_or(0);
+    assert!(card < include, "{scss}");
 }
 
 #[test]

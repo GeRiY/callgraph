@@ -2,6 +2,7 @@ use crate::model::{Call, Constant, ControlFlow, FileGraphBuilder};
 
 pub(super) fn call(
     container: &str,
+    caller: Option<&str>,
     line: u32,
     kind: &str,
     target: &str,
@@ -12,7 +13,7 @@ pub(super) fn call(
         handler: None,
         from: None,
         container: Some(container.into()),
-        caller: None,
+        caller: caller.map(str::to_string),
         line,
         end_line: None,
         kind: kind.into(),

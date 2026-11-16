@@ -216,7 +216,9 @@ mod tests {
         assert_eq!(graph.strings[0].end_line, Some(5));
     }
 
+    /// A referencia nincs a repóban, ezért a teszt `#[ignore]`: nem lehet csendben zöld. Referenciával: `--ignored`.
     #[test]
+    #[ignore = "golden/ref-md.jsonl reference missing from the repo (owner decision pending)"]
     fn markdown_golden_rows_match() {
         let mut dir = Some(std::path::Path::new(env!("CARGO_MANIFEST_DIR")));
         let Some(reference) = (loop {
@@ -226,7 +228,7 @@ mod tests {
                 Err(_) => dir = current.parent(),
             }
         }) else {
-            return;
+            panic!("golden/ref-md.jsonl not found");
         };
         for line in reference.lines().filter(|line| !line.trim().is_empty()) {
             let row: serde_json::Value = serde_json::from_str(line).unwrap();
