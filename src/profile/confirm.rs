@@ -149,7 +149,19 @@ pub(crate) static CONFIRM_RULES: &[ConfirmRule] = &[
         &[],
         "ObservableObject / @Observable",
     ),
+    rule(
+        "viewmodel",
+        &["viewmodel", "androidviewmodel"],
+        &[],
+        "extends ViewModel",
+    ),
     rule("view", &["view"], &[], "conforms to View"),
+    rule(
+        "view",
+        &["*activity", "*fragment"],
+        &[],
+        "extends Activity / Fragment",
+    ),
     rule(
         "store",
         &[],
@@ -212,6 +224,47 @@ pub(crate) fn swift_code_role(
     }
     (data && has(&["codable", "decodable", "encodable", "identifiable"]))
         .then_some(("model", "Codable / Identifiable"))
+}
+
+/// Kotlin / Android fájl szerepe a kódjából, ha a név és a mappa nem mondott semmit: `@Dao` → `repository`,
+/// `@Entity` → `model`, Retrofit-interfész (`@GET`…) → `api`, `@Module` → `provider` (DI), `ViewModel` leszármazott →
+/// `viewmodel`, `Activity` / `Fragment` vagy `@Composable` függvény → `view`. A szerep és a kiírt címke.
+pub(crate) fn kotlin_code_role(
+    graph: &FileGraph,
+    hierarchy: &TypeHierarchy,
+) -> Option<(&'static str, &'static str)> {
+    let annotations: HashSet<String> = graph
+        .calls
+        .iter()
+        .filter(|call| call.kind == "annotation")
+        .map(|call| short(call.target.trim_start_matches('@')))
+        .collect();
+    let has_annotation = |names: &[&str]| names.iter().any(|name| annotations.contains(*name));
+    let ancestors = ancestor_names(graph, hierarchy);
+    let extends = |tail: &str| ancestors.iter().any(|name| name.ends_with(tail));
+    if has_annotation(&["dao"]) {
+        return Some(("repository", "@Dao"));
+    }
+    if has_annotation(&["entity"]) {
+        return Some(("model", "@Entity"));
+    }
+    if has_annotation(&["get", "post", "put", "delete", "patch", "head", "http"]) {
+        return Some(("api", "Retrofit interface"));
+    }
+    if has_annotation(&["module", "installin"]) {
+        return Some(("provider", "@Module"));
+    }
+    if has_annotation(&["hiltviewmodel"]) || extends("viewmodel") {
+        return Some(("viewmodel", "extends ViewModel"));
+    }
+    if extends("activity") || extends("fragment") {
+        return Some(("view", "extends Activity / Fragment"));
+    }
+    graph
+        .methods
+        .iter()
+        .any(|m| m.kind.as_deref() == Some("composable"))
+        .then_some(("view", "@Composable"))
 }
 
 /// Csak enum(ok) van-e a fájlban: PHP / Rust / Swift-nél minden típus `enum` (az `impl` / `extension` blokkok és a

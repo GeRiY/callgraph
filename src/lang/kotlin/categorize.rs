@@ -40,6 +40,10 @@ pub(crate) struct FileSymbols {
     pub composables: HashSet<String>,
     /// Osztály → (property / konstruktor-paraméter neve → típusa).
     pub members: HashMap<String, HashMap<String, String>>,
+    /// A `composable("útvonal") { Képernyő() }` párok: (útvonal, képernyő-függvény neve).
+    pub routes: Vec<(String, String)>,
+    /// A képernyő-hívások node-azonosítója → útvonaluk (a hívás `nav` fajtát kap).
+    pub screen_nodes: HashMap<usize, String>,
 }
 
 /// A kategorizáló bemenete: a hívás és a fájl szimbólumai.

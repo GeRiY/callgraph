@@ -134,6 +134,7 @@ pub(crate) fn language(path: &Path) -> &'static str {
         "vue" => "vue",
         "rs" => "rs",
         "swift" => "swift",
+        "kt" | "kts" => "kt",
         "py" | "pyi" => "py",
         "go" => "go",
         "md" | "markdown" => "md",
@@ -145,8 +146,8 @@ pub(crate) fn language(path: &Path) -> &'static str {
 
 /// A rögzített nyelvnevek (a tesztek és az adatvédelmi ellenőrzés szótára).
 #[cfg(test)]
-pub(crate) const LANGUAGES: [&str; 12] = [
-    "php", "js", "ts", "vue", "rs", "swift", "py", "go", "md", "json", "html", "other",
+pub(crate) const LANGUAGES: [&str; 13] = [
+    "php", "js", "ts", "vue", "rs", "swift", "kt", "py", "go", "md", "json", "html", "other",
 ];
 
 /// Egységes alak: `/` elválasztó, `./` előtag és záró `/` nélkül.

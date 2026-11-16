@@ -67,7 +67,7 @@ pub(crate) struct ProjectProfile {
     pub patterns: Vec<PatternSummary>,
     /// Az ismeretlen szerepű fájlok mappái (mappa, fájlszám), csökkenő sorrendben.
     pub unknown: Vec<(String, usize)>,
-    /// Kódfájlok száma (PHP, JS / TS / Vue, Swift, Rust), a kihagyott vendor- és generált fájlok nélkül.
+    /// Kódfájlok száma (PHP, JS / TS / Vue, Swift, Kotlin, Rust), a kihagyott vendor- és generált fájlok nélkül.
     pub files: usize,
     pub flow: Option<FlowStats>,
     /// A C jel (gráf) lefutott-e.

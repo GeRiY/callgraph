@@ -55,6 +55,9 @@ pub(crate) fn startup_summary(root: &Path, lang: Lang) -> Option<String> {
         "package.json",
         "Cargo.toml",
         "Package.swift",
+        "build.gradle.kts",
+        "build.gradle",
+        "settings.gradle.kts",
         ".git",
         ".callgraph",
     ];

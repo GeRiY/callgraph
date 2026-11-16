@@ -52,6 +52,18 @@ impl KotlinVisitor<'_, '_> {
         }
     }
 
+    /// A paraméterek alapérték-kifejezései (`= hiltViewModel()`).
+    pub(super) fn param_defaults<'t>(&self, node: Node<'t>) -> Vec<Node<'t>> {
+        let mut out = Vec::new();
+        for list in named_children(node)
+            .into_iter()
+            .filter(|c| c.kind() == "function_value_parameters")
+        {
+            collect_defaults(list, 3, &mut out);
+        }
+        out
+    }
+
     /// A paraméterek nevei és típusai a helyi változó-térképhez (csak a nagybetűs alaptípusúak).
     pub(super) fn param_types(&self, node: Node<'_>) -> Vec<(String, String)> {
         let mut out = Vec::new();
@@ -105,5 +117,24 @@ impl KotlinVisitor<'_, '_> {
             .take_while(|c| c.id() != name.id())
             .find(|c| TYPE_KINDS.contains(&c.kind()))
             .map(|t| clip(self.text(t), 40))
+    }
+}
+
+/// A `parameter` után `=` és az alapérték-kifejezés következik (testvér-node-ok).
+fn collect_defaults<'t>(node: Node<'t>, depth: usize, out: &mut Vec<Node<'t>>) {
+    let all = children(node);
+    for (i, child) in all.iter().enumerate() {
+        match child.kind() {
+            "parameter" => {
+                if all.get(i + 1).is_some_and(|n| n.kind() == "=")
+                    && let Some(value) = all.get(i + 2)
+                {
+                    out.push(*value);
+                }
+            }
+            "modifiers" => {}
+            _ if depth > 0 && child.is_named() => collect_defaults(*child, depth - 1, out),
+            _ => {}
+        }
     }
 }

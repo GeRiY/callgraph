@@ -15,7 +15,7 @@ use crate::model::FileGraph;
 use crate::packages::Packages;
 
 use super::classify::{Classifier, Reason};
-use super::confirm::{confirm, enum_only, swift_code_role};
+use super::confirm::{confirm, enum_only, kotlin_code_role, swift_code_role};
 use super::ecosystem::manifest_frameworks;
 use super::flow::{self, FlowFile};
 use super::layer::Layer;
@@ -32,6 +32,8 @@ const GRAPH_FRAMEWORKS: &[&str] = &[
     "yii",
     "vue",
     "swiftui",
+    "compose",
+    "android",
     "axum",
     "actix-web",
     "rocket",
@@ -147,7 +149,7 @@ pub(super) fn settle(
         entry.class = *fallback;
         entry.confirmed = check(entry.class.role);
     }
-    // Swift: a név és a mappa nem mondott semmit (vagy csak egy kontextus-mappa: `Features/…`), a gráf kód-jele
+    // Swift / Kotlin: a név és a mappa nem mondott semmit (vagy csak egy kontextus-mappa: `Features/…`), a gráf kód-jele
     // (nézet, `@Observable`, `Codable`) dönt
     let weak = entry.class.reason == Reason::Unknown
         || (matches!(entry.class.reason, Reason::Folder(_))
@@ -155,11 +157,12 @@ pub(super) fn settle(
                 .class
                 .role
                 .is_some_and(|role| role.kind() == Kind::Context));
-    if weak
-        && entry.class.eco == Eco::Swift
-        && let Some(graph) = graph
-        && let Some((role, label)) = swift_code_role(graph, hierarchy)
-    {
+    let code_role = match (entry.class.eco, graph) {
+        (Eco::Swift, Some(graph)) => swift_code_role(graph, hierarchy),
+        (Eco::Kotlin, Some(graph)) => kotlin_code_role(graph, hierarchy),
+        _ => None,
+    };
+    if weak && let Some((role, label)) = code_role {
         entry.class.role = Role::named(role);
         entry.class.confidence = Confidence::Medium;
         entry.class.reason = Reason::Code(label);

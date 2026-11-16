@@ -211,6 +211,7 @@ impl KotlinVisitor<'_, '_> {
             js: false,
         });
         self.annotation_calls(node, container, "__top__", b);
+        self.field_injection(node, container, b);
         if let Some(value) = value {
             self.walk_property_value(value, container, b);
         }
@@ -301,14 +302,19 @@ impl KotlinVisitor<'_, '_> {
         });
         self.add_method_span(&container, &name, line(node), end_line(node));
         self.annotation_calls(node, container.as_deref(), &name, b);
+        self.provider_edge(node, container.as_deref(), &name, b);
+        self.locals.clear();
+        self.locals.extend(locals);
+        let scope = Scope {
+            container,
+            caller: name,
+            in_compose,
+        };
+        // a paraméter-alapértékek (`viewModel: X = hiltViewModel()`) a függvény hívásai
+        for value in self.param_defaults(node) {
+            self.walk_body(value, &scope, b);
+        }
         if let Some(body) = body {
-            self.locals.clear();
-            self.locals.extend(locals);
-            let scope = Scope {
-                container,
-                caller: name,
-                in_compose,
-            };
             self.walk_body(body, &scope, b);
         }
     }

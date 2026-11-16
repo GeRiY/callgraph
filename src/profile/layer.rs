@@ -1,4 +1,4 @@
-//! Egy réteg = szerep + ökoszisztéma (PHP, JS / TS / Vue, Swift, Rust): a backend `controller`-e és egy AngularJS
+//! Egy réteg = szerep + ökoszisztéma (PHP, JS / TS / Vue, Swift, Kotlin, Rust): a backend `controller`-e és egy AngularJS
 //! `controllers` mappa külön réteg, és a hívásirány-lánc sem köti össze őket. A kiírt név csak akkor kap minősítőt
 //! (`controller (php)` / `controller (js)`), ha ugyanaz a szerep több ökoszisztémában is előfordul — egy
 //! ökoszisztémás projektben a kimenet változatlan.

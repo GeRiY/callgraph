@@ -11,16 +11,18 @@ pub(crate) enum Eco {
     Js,
     Swift,
     Rust,
+    Kotlin,
 }
 
 impl Eco {
-    /// `.php` → PHP, `.js/.ts/.vue…` → JS, `.swift`, `.rs`; más (CSS, JSON, MD…) nem kód-réteg: `None`.
+    /// `.php` → PHP, `.js/.ts/.vue…` → JS, `.swift`, `.rs`, `.kt` / `.kts`; más (CSS, JSON, MD…) nem kód-réteg: `None`.
     pub(crate) fn of_extension(ext: &str) -> Option<Self> {
         match ext.to_ascii_lowercase().as_str() {
             "php" => Some(Self::Php),
             "js" | "jsx" | "ts" | "tsx" | "mjs" | "cjs" | "mts" | "cts" | "vue" => Some(Self::Js),
             "swift" => Some(Self::Swift),
             "rs" => Some(Self::Rust),
+            "kt" | "kts" => Some(Self::Kotlin),
             _ => None,
         }
     }
@@ -32,6 +34,7 @@ impl Eco {
             Self::Js => "js",
             Self::Swift => "swift",
             Self::Rust => "rust",
+            Self::Kotlin => "kotlin",
         }
     }
 
@@ -42,6 +45,7 @@ impl Eco {
             "js" | "ts" | "vue" | "javascript" | "typescript" => Some(Self::Js),
             "swift" => Some(Self::Swift),
             "rust" | "rs" => Some(Self::Rust),
+            "kotlin" | "kt" | "android" => Some(Self::Kotlin),
             _ => None,
         }
     }
@@ -52,6 +56,7 @@ impl Eco {
             Self::Js => 2,
             Self::Swift => 4,
             Self::Rust => 8,
+            Self::Kotlin => 16,
         }
     }
 }
@@ -66,14 +71,15 @@ impl Ecos {
     }
 }
 
-pub(crate) const ANY: Ecos = Ecos(0b1111);
+pub(crate) const ANY: Ecos = Ecos(0b11111);
 pub(crate) const PHP: Ecos = Ecos(1);
 pub(crate) const JS: Ecos = Ecos(2);
-pub(crate) const SWIFT: Ecos = Ecos(4);
 pub(crate) const RUST: Ecos = Ecos(8);
+pub(crate) const KOTLIN: Ecos = Ecos(16);
+const SWIFT_KOTLIN: Ecos = Ecos(4 | 16);
 const PHP_SWIFT_RUST: Ecos = Ecos(1 | 4 | 8);
-const NOT_PHP: Ecos = Ecos(2 | 4 | 8);
-const JS_SWIFT: Ecos = Ecos(2 | 4);
+const NOT_PHP: Ecos = Ecos(2 | 4 | 8 | 16);
+const JS_SWIFT_KOTLIN: Ecos = Ecos(2 | 4 | 16);
 
 /// Mappanév-szabály: a normalizált (kisbetűs, `-`/`_` nélküli) mappanevek bármelyike; `parent`: a közvetlen
 /// szülő-mappa neve is kell (`Http/Requests`).
@@ -195,9 +201,9 @@ pub(crate) static FOLDER_RULES: &[FolderRule] = &[
     ),
     folder(&["templates", "layouts"], None, "view", Medium, JS),
     folder(&["screens"], None, "page", Medium, JS),
-    folder(&["screens"], None, "view", Medium, SWIFT),
+    folder(&["screens"], None, "view", Medium, SWIFT_KOTLIN),
     folder(&["components", "component"], None, "component", High, JS),
-    folder(&["components"], None, "view", Medium, SWIFT),
+    folder(&["components"], None, "view", Medium, SWIFT_KOTLIN),
     folder(&["pages", "page"], None, "page", High, JS),
     folder(
         &["composables", "composable", "hooks", "hook"],
@@ -207,7 +213,7 @@ pub(crate) static FOLDER_RULES: &[FolderRule] = &[
         JS,
     ),
     folder(&["stores", "store"], None, "store", High, JS),
-    folder(&["stores", "store"], None, "store", Medium, SWIFT),
+    folder(&["stores", "store"], None, "store", Medium, SWIFT_KOTLIN),
     folder(&["api", "apis"], None, "api", High, JS),
     folder(
         &["viewmodels", "viewmodel", "vms"],
@@ -226,7 +232,15 @@ pub(crate) static FOLDER_RULES: &[FolderRule] = &[
     folder(&["migrations", "migration"], None, "migration", High, ANY),
     folder(&["seeders", "seeds"], None, "migration", Medium, PHP),
     folder(
-        &["tests", "test", "__tests__", "spec", "specs", "e2e"],
+        &[
+            "tests",
+            "test",
+            "__tests__",
+            "spec",
+            "specs",
+            "e2e",
+            "androidtest",
+        ],
         None,
         "test",
         High,
@@ -250,7 +264,7 @@ pub(crate) static FOLDER_RULES: &[FolderRule] = &[
     ),
     folder(&["presentation"], None, "presentation", Medium, ANY),
     folder(&["ports", "port"], None, "port", High, ANY),
-    // Swift: a tipikus SwiftUI-projekt mappaszerkezete (`Features/Chat/Content`, `Core/Networking`, `Shared/UI`)
+    // Swift / Kotlin: a tipikus SwiftUI- / Android-projekt mappaszerkezete (`Features/Chat/Content`, `Core/Networking`, `Shared/UI`)
     folder(
         &[
             "networking",
@@ -263,14 +277,14 @@ pub(crate) static FOLDER_RULES: &[FolderRule] = &[
         None,
         "api",
         Medium,
-        SWIFT,
+        SWIFT_KOTLIN,
     ),
     folder(
         &["persistence", "storage", "database", "db"],
         None,
         "repository",
         Medium,
-        SWIFT,
+        SWIFT_KOTLIN,
     ),
     folder(
         &[
@@ -285,14 +299,14 @@ pub(crate) static FOLDER_RULES: &[FolderRule] = &[
         None,
         "view",
         Medium,
-        SWIFT,
+        SWIFT_KOTLIN,
     ),
     folder(
         &["features", "feature", "modules", "scenes", "flows"],
         None,
         "feature",
         Medium,
-        SWIFT,
+        SWIFT_KOTLIN,
     ),
     folder(
         &[
@@ -309,8 +323,33 @@ pub(crate) static FOLDER_RULES: &[FolderRule] = &[
         None,
         "util",
         Medium,
-        SWIFT,
+        SWIFT_KOTLIN,
     ),
+    // Kotlin / Android: `data/`, `di/`, `viewmodel/`, `navigation/`, `dao/`, `entity/`
+    folder(
+        &["data", "datasource", "datasources", "dao"],
+        None,
+        "repository",
+        Medium,
+        KOTLIN,
+    ),
+    folder(&["entity", "entities"], None, "model", Medium, KOTLIN),
+    folder(
+        &["viewmodel", "viewmodels"],
+        None,
+        "viewmodel",
+        Medium,
+        KOTLIN,
+    ),
+    folder(
+        &["di", "inject", "injection", "hilt", "koin", "dagger"],
+        None,
+        "provider",
+        Medium,
+        KOTLIN,
+    ),
+    folder(&["navigation", "nav"], None, "route", Medium, KOTLIN),
+    folder(&["activities", "fragments"], None, "view", Medium, KOTLIN),
 ];
 
 /// Fájlnév-végződés (a kiterjesztés nélküli név vége, kis-/nagybetű érzékenyen: `UserService`).
@@ -365,11 +404,11 @@ pub(crate) static SUFFIX_RULES: &[SuffixRule] = &[
     suffix("Event", "event", Medium, PHP),
     suffix("Command", "command", Medium, ANY),
     suffix("Provider", "provider", Medium, ANY),
-    suffix("Screen", "view", Medium, SWIFT),
+    suffix("Screen", "view", Medium, SWIFT_KOTLIN),
     suffix("Screen", "page", Medium, JS),
-    suffix("View", "view", Medium, SWIFT),
+    suffix("View", "view", Medium, SWIFT_KOTLIN),
     suffix("Page", "page", Medium, JS),
-    suffix("Store", "store", Medium, JS_SWIFT),
+    suffix("Store", "store", Medium, JS_SWIFT_KOTLIN),
     suffix("Component", "component", Medium, JS),
     suffix("Migration", "migration", Medium, ANY),
     suffix("Seeder", "migration", Medium, PHP),
@@ -379,11 +418,21 @@ pub(crate) static SUFFIX_RULES: &[SuffixRule] = &[
     suffix("Router", "route", Medium, ANY),
     suffix("Routes", "route", Medium, ANY),
     suffix("Model", "model", Medium, ANY),
-    suffix("Client", "api", Medium, SWIFT),
-    suffix("Manager", "service", Medium, SWIFT),
-    suffix("Row", "view", Medium, SWIFT),
-    suffix("Cell", "view", Medium, SWIFT),
-    suffix("Sheet", "view", Medium, SWIFT),
+    suffix("Client", "api", Medium, SWIFT_KOTLIN),
+    suffix("Manager", "service", Medium, SWIFT_KOTLIN),
+    suffix("Row", "view", Medium, SWIFT_KOTLIN),
+    suffix("Cell", "view", Medium, SWIFT_KOTLIN),
+    suffix("Sheet", "view", Medium, SWIFT_KOTLIN),
+    suffix("Activity", "view", Medium, KOTLIN),
+    suffix("Fragment", "view", Medium, KOTLIN),
+    suffix("UseCase", "service", Medium, KOTLIN),
+    suffix("Interactor", "service", Medium, KOTLIN),
+    suffix("Dao", "repository", High, KOTLIN),
+    suffix("RepositoryImpl", "repository", High, KOTLIN),
+    suffix("DataSource", "repository", Medium, KOTLIN),
+    suffix("Entity", "model", Medium, KOTLIN),
+    suffix("Api", "api", Medium, KOTLIN),
+    suffix("Module", "provider", Medium, KOTLIN),
 ];
 
 /// JS / TS pontozott fájlnév (`user.store.ts`, `api.service.ts`, `a.spec.ts`): az utolsó pont utáni rész.

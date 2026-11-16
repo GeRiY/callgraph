@@ -5,7 +5,9 @@ mod body;
 mod calls;
 mod decls;
 mod flow;
+mod links;
 mod members;
+mod nav;
 mod scan;
 mod signature;
 mod text;
@@ -116,3 +118,5 @@ pub(super) fn clip(text: &str, max: usize) -> String {
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_links;

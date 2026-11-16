@@ -195,6 +195,7 @@ impl KotlinVisitor<'_, '_> {
         });
         self.add_method_span(&container_opt, &name, line(ctor), end_line(ctor));
         self.annotation_calls(ctor, Some(container), &name, b);
+        self.constructor_injection(node, ctor, container, b);
         let scope = Scope {
             container: container_opt,
             caller: name,

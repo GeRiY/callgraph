@@ -116,6 +116,16 @@ pub(crate) static ARCHITECTURES: &[ArchRule] = &[
         subsumed_by: &[],
     },
     ArchRule {
+        id: "android",
+        label: "Android (Screens / Activities → ViewModels → Repositories)",
+        frameworks: &[],
+        eco: Some(Eco::Kotlin),
+        all: &["view", "viewmodel"],
+        any: &[],
+        min_any: 0,
+        subsumed_by: &[],
+    },
+    ArchRule {
         id: "rust-web",
         label: "Rust web (routes / handlers → service → repo)",
         frameworks: &["axum", "actix-web", "rocket", "warp", "poem"],

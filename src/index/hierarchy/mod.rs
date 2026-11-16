@@ -24,7 +24,7 @@ struct TypeNode {
     parent_labels: Vec<String>,
     /// A típusban definiált metódusok, kisbetűvel.
     methods: HashSet<String>,
-    /// Swift protokoll: az implementációi akkor is rokonok, ha a metódust definiálják (a protokoll-metódus hívója
+    /// Swift protokoll / Kotlin interfész: az implementációi akkor is rokonok, ha a metódust definiálják (a protokoll-metódus hívója
     /// egy konkrét implementáción át fut le).
     protocol: bool,
 }
@@ -120,7 +120,9 @@ impl TypeHierarchy {
                     hierarchy.nodes.len() - 1
                 });
                 let node = &mut hierarchy.nodes[at];
-                node.protocol |= container.kind == "protocol";
+                let kotlin = graph.file.ends_with(".kt") || graph.file.ends_with(".kts");
+                node.protocol |= container.kind == "protocol"
+                    || (kotlin && container.kind.ends_with("interface"));
                 for form in [full, name.to_owned()] {
                     if !node.forms.contains(&form) {
                         node.forms.push(form);

@@ -40,8 +40,8 @@ fn render_with(
     let mut out = String::new();
     if profile.files == 0 {
         out.push_str(lang.pick(
-            "profile: no code files (PHP, JS / TS / Vue, Swift, Rust) under the root\n",
-            "profil: nincs kódfájl (PHP, JS / TS / Vue, Swift, Rust) a gyökér alatt\n",
+            "profile: no code files (PHP, JS / TS / Vue, Swift, Kotlin, Rust) under the root\n",
+            "profil: nincs kódfájl (PHP, JS / TS / Vue, Swift, Kotlin, Rust) a gyökér alatt\n",
         ));
         return out;
     }

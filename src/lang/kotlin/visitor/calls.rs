@@ -6,7 +6,9 @@ use tree_sitter::Node;
 
 use super::super::categorize::CallInfo;
 use super::super::parser::{children, end_line, line, named_children};
-use super::util::{IDENTS, base_type, is_comment};
+use super::util::{
+    IDENTS, base_type, declared_type_around, is_comment, is_injector, type_argument,
+};
 use super::{KotlinVisitor, Scope, clip};
 use crate::model::{Call, FileGraphBuilder};
 
@@ -73,19 +75,36 @@ impl KotlinVisitor<'_, '_> {
             receiver_type: receiver_type.clone(),
         };
         let category = self.categorizer.categorize(&info, &self.symbols);
-        let kind = if callee.member {
+        let mut kind = if callee.member {
             "method_call"
         } else if callee.name.chars().next().is_some_and(char::is_uppercase) {
             "new"
         } else {
             "func_call"
         };
-        let target = match (&callee.path, callee.member) {
+        let mut target = match (&callee.path, callee.member) {
             (Some(path), true) => format!("{path}.{}", callee.name),
             (None, true) => format!(".{}", callee.name),
             _ => callee.name.clone(),
         };
-        let resolved = self.resolved_of(&callee, receiver_type.as_deref());
+        let mut resolved = self.resolved_of(&callee, receiver_type.as_deref());
+        let mut args_text = self.args(&args);
+        // `hiltViewModel()` / `by viewModels()`: befecskendezés, a példány típusa a típus-argumentumból vagy a
+        // deklarációból (`viewModel: X = hiltViewModel()`)
+        if !callee.member
+            && is_injector(&callee.name)
+            && let Some(ty) =
+                type_argument(self.parsed, node).or_else(|| declared_type_around(self.parsed, node))
+        {
+            kind = "inject";
+            target = format!("{}({ty})", callee.name);
+            resolved = None;
+        }
+        // `composable("útvonal") { Képernyő() }`: a képernyő-hívás navigációs él, az argumentuma az útvonal
+        if let Some(route) = self.symbols.screen_nodes.get(&node.id()) {
+            kind = "nav";
+            args_text = Some(vec![route.clone()]);
+        }
         let start = line(callee.name_node);
         let end = end_line(node);
         let on = if !callee.member || callee.path.is_none() {
@@ -105,10 +124,13 @@ impl KotlinVisitor<'_, '_> {
             resolved,
             on,
             category: category.to_string(),
-            args: self.args(&args),
+            args: args_text,
             handler: None,
             from: None,
         });
+        if callee.member && callee.name == "navigate" {
+            self.navigate_edge(node, scope, b);
+        }
     }
 
     /// `Foo::bar` / `::bar` / `this::bar` metódus-hivatkozás hívás-élként (`type: reference`).

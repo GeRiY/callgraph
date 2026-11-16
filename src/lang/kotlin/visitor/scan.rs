@@ -7,6 +7,7 @@ use tree_sitter::Node;
 
 use super::super::categorize::FileSymbols;
 use super::super::parser::{ParsedKotlin, named_children};
+use super::nav;
 use super::util::{
     annotation_names, base_type, binding_kind, infer_type, is_comment, name_and_type, name_node,
     value_of,
@@ -131,6 +132,15 @@ fn collect(parsed: &ParsedKotlin<'_>, node: Node<'_>, class: Option<&str>, out: 
                             .entry(class.to_string())
                             .or_default()
                             .insert(name, ty);
+                    }
+                }
+                collect(parsed, child, class, out);
+            }
+            "call_expression" => {
+                if let Some((route, screens)) = nav::destination(parsed, child) {
+                    for (node, name) in screens {
+                        out.screen_nodes.insert(node.id(), route.clone());
+                        out.routes.push((route.clone(), name));
                     }
                 }
                 collect(parsed, child, class, out);

@@ -31,6 +31,26 @@ const GENERIC_FACTORIES: &[&str] = &[
     "remember",
 ];
 
+/// A DI / ViewModel-befecskendező gyári függvények: a példány típusa a típus-argumentumból vagy a deklarált típusból
+/// jön (`hiltViewModel()`, `by viewModels()`, `by inject()`).
+const INJECTORS: &[&str] = &[
+    "viewModel",
+    "hiltViewModel",
+    "koinViewModel",
+    "getViewModel",
+    "viewModels",
+    "activityViewModels",
+    "navGraphViewModels",
+    "hiltNavGraphViewModel",
+    "inject",
+    "koinInject",
+];
+
+/// Befecskendező gyári függvény-e a név.
+pub(super) fn is_injector(name: &str) -> bool {
+    INJECTORS.contains(&name)
+}
+
 pub(super) fn is_comment(node: Node<'_>) -> bool {
     COMMENTS.contains(&node.kind())
 }
@@ -157,6 +177,34 @@ fn first_type_argument(parsed: &ParsedKotlin<'_>, node: Node<'_>, depth: usize) 
             )
         })
         .find_map(|c| first_type_argument(parsed, c, depth - 1))
+}
+
+/// A hívás első típus-argumentuma (`hiltViewModel<HomeViewModel>()` → `HomeViewModel`).
+pub(super) fn type_argument(parsed: &ParsedKotlin<'_>, node: Node<'_>) -> Option<String> {
+    first_type_argument(parsed, node, 3)
+}
+
+/// A hívás értékét fogadó deklaráció típusa: `viewModel: X = hiltViewModel()` (paraméter-alapérték),
+/// `val vm: X = viewModel()`, `val vm: X by viewModels()`; csak közvetlen inicializálónál / delegáltnál.
+pub(super) fn declared_type_around(parsed: &ParsedKotlin<'_>, call: Node<'_>) -> Option<String> {
+    let holder = match call.parent() {
+        Some(p) if p.kind() == "property_delegate" => p.parent()?,
+        Some(p) if p.kind() == "property_declaration" => p,
+        _ => {
+            let eq = call.prev_sibling().filter(|n| n.kind() == "=")?;
+            eq.prev_sibling()?
+        }
+    };
+    if !matches!(
+        holder.kind(),
+        "property_declaration" | "parameter" | "class_parameter"
+    ) {
+        return None;
+    }
+    name_and_type(parsed, holder)
+        .1
+        .as_deref()
+        .and_then(base_type)
 }
 
 /// Egyszerű típus-következtetés az inicializálóból: literálok, `Foo(..)`, `viewModel<T>()`, `mutableStateOf(..)`.

@@ -19,7 +19,7 @@ pub(crate) fn name_hit(stem: &str, eco: Eco) -> Option<NameHit> {
     match eco {
         Eco::Js => js_name(stem).or_else(|| camel_suffix(stem.split('.').next()?, eco)),
         Eco::Rust => rust_module(stem),
-        Eco::Php | Eco::Swift => camel_suffix(stem.split('.').next()?, eco),
+        Eco::Php | Eco::Swift | Eco::Kotlin => camel_suffix(stem.split('.').next()?, eco),
     }
 }
 

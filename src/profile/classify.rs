@@ -129,6 +129,10 @@ impl Classifier {
     fn classify_by(&self, rel: &str, strict: bool, names: bool) -> Option<Classification> {
         let (dir, file) = rel.rsplit_once('/').unwrap_or(("", rel));
         let (stem, ext) = file.rsplit_once('.')?;
+        // a Gradle build-szkript (`build.gradle.kts`) nem alkalmazás-kód
+        if ext.eq_ignore_ascii_case("kts") && stem.to_ascii_lowercase().ends_with(".gradle") {
+            return None;
+        }
         let eco = Eco::of_extension(ext)?;
         if let Some(mapping) = self.overrides.lookup(rel) {
             let (confidence, reason) = match mapping.role {
