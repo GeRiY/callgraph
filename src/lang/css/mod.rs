@@ -1,8 +1,6 @@
 //! CSS frontend: Raffia-validálás és CSS → `FileGraph` leképezés.
 
 mod frontend;
-mod rules;
-mod scanner;
 
 pub use frontend::CssFrontend;
 

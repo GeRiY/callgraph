@@ -4,9 +4,9 @@ use std::path::{Path, PathBuf};
 
 use raffia::{Parser, Syntax, ast::Stylesheet};
 
-use super::scanner::CssScanner;
 use crate::core::SourceFile;
 use crate::error::Result;
+use crate::lang::stylesheet::{Dialect, StylesheetScanner};
 use crate::lang::{Analysis, Language, LanguageFrontend, LanguageRole};
 
 /// CSS-forrásokat a közös fájlgráfba fordító frontend.
@@ -37,7 +37,7 @@ impl Language for CssFrontend {
         let text = String::from_utf8_lossy(&file.text);
         let mut parser = Parser::new(&text, Syntax::Css);
         let parse_error = parser.parse::<Stylesheet>().err().map(|e| format!("{e:?}"));
-        let mut result = CssScanner::new(&file.path_string(), &text).scan();
+        let mut result = StylesheetScanner::new(Dialect::Css, &file.path_string(), &text).scan();
         if let Some(error) = parse_error {
             result.warnings.push(crate::tf!(
                 "{}: CSS syntax error: {error}",

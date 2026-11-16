@@ -73,6 +73,22 @@ impl Resolver {
             .is_some_and(|cs| cs.iter().any(|c| c == container))
     }
 
+    /// A fájl saját szabad függvénye-e a név (értékként átadott `helper`-hez).
+    pub(crate) fn is_free_fn(&self, name: &str) -> bool {
+        self.free_fns.contains_key(name)
+    }
+
+    /// Kisbetűs elemre (függvényre) mutató import-e a név (`use crate::util::double;`).
+    pub(crate) fn imports_fn(&self, name: &str) -> bool {
+        self.imports.iter().any(|(alias, target)| {
+            alias == name
+                && target.len() >= 2
+                && target
+                    .last()
+                    .is_some_and(|l| l.chars().next().is_some_and(char::is_lowercase))
+        })
+    }
+
     /// Az egyetlen container, amelyben `name` nevű `self`-es metódus van.
     pub(crate) fn unique_method(&self, name: &str) -> Option<&str> {
         match self.methods.get(name).map(Vec::as_slice) {
@@ -136,12 +152,25 @@ impl Resolver {
         }
         let own = self.module.absolute(&[]);
         if full.len() > own.len() && full[..own.len()] == own[..] {
-            let item = &full[own.len()];
+            let rel = &full[own.len()..];
+            let item = &rel[0];
             if self.types.contains(item) {
-                return Resolution::Local(full[own.len()..].join("::"));
+                return Resolution::Local(rel.join("::"));
             }
-            if full.len() == own.len() + 1 && self.free_fns.contains_key(item) {
+            if rel.len() == 1 && self.free_fns.contains_key(item) {
                 return Resolution::Local(format!("{}::{item}", self.module.container_name()));
+            }
+            // a fájl beágyazott moduljának eleme (`mod inner { … }` → `inner::f`, `inner::Ty::new`)
+            if rel.len() >= 2 {
+                let (name, scope) = (&rel[rel.len() - 1], rel[..rel.len() - 1].join("::"));
+                if self
+                    .free_fns
+                    .get(name)
+                    .is_some_and(|cs| cs.contains(&scope))
+                    || (1..rel.len()).any(|k| self.types.contains(&rel[..k].join("::")))
+                {
+                    return Resolution::Local(rel.join("::"));
+                }
             }
         }
         Resolution::Crate(full)

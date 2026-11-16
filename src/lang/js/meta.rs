@@ -4,13 +4,14 @@ use std::path::Path;
 
 use oxc_ast::ast::{
     Declaration, ExportDefaultDeclarationKind, Program, Statement, TSInterfaceDeclaration,
+    TSSignature,
 };
 use oxc_span::GetSpan;
 
 use super::analysis::{JsAnalysis, JsPass, PassContext};
 use super::resolve::Resolver;
 use super::sfc::{Sfc, SfcBlock, SfcBlockKind};
-use crate::model::{Container, FileGraphBuilder};
+use crate::model::{Container, FileGraphBuilder, Property};
 
 /// A `framework`, `module` és (`.vue`-nál) `sfc` mező kitöltése a fájl szövegéből.
 pub fn apply_file_meta(
@@ -18,13 +19,13 @@ pub fn apply_file_meta(
     resolver: &Resolver,
     path: &Path,
     text: &str,
-    is_vue: bool,
+    sfc: Option<&Sfc>,
 ) {
-    builder.framework(Some(if is_vue { "vue" } else { "js" }.to_string()));
+    builder.framework(Some(if sfc.is_some() { "vue" } else { "js" }.to_string()));
     builder.imports_as_object();
     builder.module(Some(resolver.module_path(path)));
-    if is_vue {
-        builder.sfc(Some(sfc_summary(&Sfc::parse(text), text)));
+    if let Some(sfc) = sfc {
+        builder.sfc(Some(sfc_summary(sfc, text)));
     }
 }
 
@@ -143,6 +144,33 @@ fn interface_container(
         traits: Some(Vec::new()),
         doc,
     });
+    // a tagok property-ként (típus; az opcionálisé `?`-lel): az api-nézet és a `locate` mezőnévre is látja
+    for member in &i.body.body {
+        let TSSignature::TSPropertySignature(p) = member else {
+            continue;
+        };
+        let Some(name) = super::props::key_name(&p.key) else {
+            continue;
+        };
+        let ty = p
+            .type_annotation
+            .as_ref()
+            .map(|a| super::props::src_of(ctx.source, a.type_annotation.span(), 40))
+            .filter(|ty| !ty.is_empty())
+            .unwrap_or_else(|| "mixed".into());
+        out.builder.property(Property {
+            container: Some(i.id.name.to_string()),
+            name: name.to_string(),
+            line: ctx.lines.line_of(p.span.start as usize),
+            type_hint: Some(if p.optional { format!("{ty}?") } else { ty }),
+            visibility: "public".into(),
+            is_static: false,
+            readonly: p.readonly,
+            doc: None,
+            default: None,
+            js: false,
+        });
+    }
 }
 
 fn slice(src: &str, span: oxc_span::Span) -> &str {

@@ -161,6 +161,7 @@ impl PythonVisitor<'_, '_> {
                 is_static: false,
                 readonly: false,
                 doc: None,
+                default: None,
                 js: false,
             });
         }

@@ -152,6 +152,7 @@ fn property(parsed: &ParsedFile<'_>, container: &str, p: &Property<'_>, b: &mut 
             is_static,
             readonly,
             doc: doc_for(parsed, span),
+            default: None,
         });
     }
 }
@@ -174,5 +175,6 @@ fn promoted(
         is_static: false,
         readonly,
         doc: doc_for(parsed, p.span()),
+        default: None,
     });
 }

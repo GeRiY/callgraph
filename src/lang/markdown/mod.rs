@@ -1,9 +1,12 @@
 //! Markdown dokumentum-indexelő.
 
-use crate::core::SourceFile;
+use crate::core::{LineIndex, SourceFile};
 use crate::error::Result;
+use crate::lang::document::{
+    container, file_name, link_category, resolve_relative, section_ends, section_method,
+};
 use crate::lang::{Analysis, Language, LanguageDocument, LanguageRole};
-use crate::model::{Call, Container, FileGraphBuilder, Method, StringLit};
+use crate::model::{Call, FileGraphBuilder, StringLit};
 use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 use std::path::{Path, PathBuf};
 
@@ -16,25 +19,8 @@ impl MdDocument {
     pub fn with_defaults() -> Self {
         Self
     }
-    fn starts(text: &str) -> Vec<usize> {
-        std::iter::once(0)
-            .chain(text.match_indices('\n').map(|(i, _)| i + 1))
-            .collect()
-    }
-    fn line(offset: usize, starts: &[usize]) -> u32 {
-        starts.partition_point(|&x| x <= offset).max(1) as u32
-    }
     fn level(level: HeadingLevel) -> u8 {
         level as u8
-    }
-    fn category(target: &str) -> &'static str {
-        if target.starts_with('#') {
-            "anchor"
-        } else if target.contains("://") || target.starts_with("mailto:") {
-            "external_url"
-        } else {
-            "internal_file"
-        }
     }
 }
 
@@ -51,27 +37,11 @@ impl Language for MdDocument {
 
     fn analyze(&self, file: &SourceFile) -> Result<Analysis> {
         let text = String::from_utf8_lossy(&file.text);
-        let starts = Self::starts(&text);
-        let name = file
-            .path
-            .file_name()
-            .and_then(|x| x.to_str())
-            .unwrap_or_default()
-            .to_owned();
+        let lines = LineIndex::new(&text);
+        let name = file_name(&file.path);
         let end = text.lines().count().max(1) as u32;
         let mut b = FileGraphBuilder::new(file.path_string());
-        b.container(Container {
-            kind: "document".into(),
-            name: name.clone(),
-            line: 1,
-            end_line: end,
-            is_abstract: Some(false),
-            is_final: Some(false),
-            extends: Some(vec![]),
-            implements: Some(vec![]),
-            traits: Some(vec![]),
-            doc: None,
-        });
+        b.container(container(&name, end));
         let mut current_heading: Option<(HeadingLevel, usize, String)> = None;
         let mut headings: Vec<(u32, u8, String)> = Vec::new();
         let events = Parser::new_ext(&text, Options::all()).into_offset_iter();
@@ -88,7 +58,7 @@ impl Language for MdDocument {
                 Event::End(TagEnd::Heading(_)) => {
                     if let Some((level, start, title)) = current_heading.take() {
                         headings.push((
-                            Self::line(start, &starts),
+                            lines.line_of(start),
                             Self::level(level),
                             title.trim().to_owned(),
                         ));
@@ -105,13 +75,13 @@ impl Language for MdDocument {
                         from: None,
                         container: Some(name.clone()),
                         caller: Some(caller),
-                        line: Self::line(range.start, &starts),
+                        line: lines.line_of(range.start),
                         end_line: None,
                         kind: "link".into(),
                         target: target.clone(),
                         resolved: None,
                         on: None,
-                        category: Self::category(&target).into(),
+                        category: link_category(&target).into(),
                         args: None,
                     });
                 }
@@ -125,7 +95,7 @@ impl Language for MdDocument {
                         from: None,
                         container: Some(name.clone()),
                         caller: Some(caller),
-                        line: Self::line(range.start, &starts),
+                        line: lines.line_of(range.start),
                         end_line: None,
                         kind: "image".into(),
                         target: dest_url.to_string(),
@@ -140,8 +110,8 @@ impl Language for MdDocument {
                         CodeBlockKind::Fenced(value) => value.to_string(),
                         CodeBlockKind::Indented => "plaintext".into(),
                     };
-                    let start = Self::line(range.start, &starts);
-                    let close = Self::line(range.end.saturating_sub(1), &starts);
+                    let start = lines.line_of(range.start);
+                    let close = lines.line_of(range.end.saturating_sub(1));
                     b.string(StringLit {
                         container: Some(name.clone()),
                         caller: Some("__top__".into()),
@@ -156,27 +126,12 @@ impl Language for MdDocument {
                 _ => {}
             }
         }
-        for (idx, (line, level, title)) in headings.iter().enumerate() {
-            let section_end = headings
-                .iter()
-                .skip(idx + 1)
-                .find(|(_, next, _)| *next <= *level)
-                .map_or(end, |(next, _, _)| next - 1);
-            b.method(Method {
-                container: Some(name.clone()),
-                name: title.clone(),
-                line: *line,
-                end_line: Some(section_end),
-                visibility: Some(format!("h{level}")),
-                is_static: false,
-                is_abstract: false,
-                params: vec![],
-                return_type: None,
-                doc_types: None,
-                doc: None,
-                body: None,
-                kind: None,
-            });
+        let spans: Vec<(u32, u8)> = headings
+            .iter()
+            .map(|(line, level, _)| (*line, *level))
+            .collect();
+        for ((line, level, title), section_end) in headings.iter().zip(section_ends(&spans, end)) {
+            b.method(section_method(&name, title, *line, section_end, *level));
         }
         Ok(Analysis {
             graph: b.build(),
@@ -187,16 +142,7 @@ impl Language for MdDocument {
 
 impl LanguageDocument for MdDocument {
     fn resolve_reference(&self, reference: &str, from: &Path) -> Option<PathBuf> {
-        if reference.starts_with('#')
-            || reference.contains("://")
-            || reference.starts_with("mailto:")
-        {
-            return None;
-        }
-        let path = from
-            .parent()?
-            .join(reference.split_once('#').map_or(reference, |(p, _)| p));
-        path.exists().then(|| path.canonicalize().unwrap_or(path))
+        resolve_relative(reference, from)
     }
 }
 

@@ -26,6 +26,8 @@ pub trait JsPass: Send + Sync {
 pub struct JsAnalysis {
     pub builder: FileGraphBuilder,
     pub warnings: Vec<String>,
+    /// A blokk metódus-indexe: a `MethodsPass` tölti, a `CallsPass` olvassa (a blokkonként újra felülírva).
+    pub method_index: Option<super::methods::MethodIndex>,
 }
 
 impl JsAnalysis {
@@ -33,6 +35,7 @@ impl JsAnalysis {
         Self {
             builder: FileGraphBuilder::new(file),
             warnings: Vec::new(),
+            method_index: None,
         }
     }
 }

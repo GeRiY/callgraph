@@ -111,6 +111,7 @@ fn prop(name: &str) -> Property {
         is_static: false,
         readonly: false,
         doc: None,
+        default: None,
         js: true,
     }
 }

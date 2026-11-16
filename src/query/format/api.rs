@@ -216,7 +216,7 @@ fn write_vue_contract(out: &mut String, row: &QueryResult, container: &crate::mo
                 "    {}{}{}{}",
                 p.name,
                 ty.map(|t| format!(": {t}")).unwrap_or_default(),
-                p.doc
+                p.default
                     .as_deref()
                     .map(|d| format!(" = {d}"))
                     .unwrap_or_default(),

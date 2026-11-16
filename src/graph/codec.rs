@@ -24,7 +24,7 @@ use crate::model::{
 };
 
 /// A tárolt szerkezet verziója; ha változik, a régi tároló csendben újraépül.
-pub(crate) const FORMAT_VERSION: u32 = 7; // 7: a szűkített tények importjai (`uses`: a csak típus-hivatkozás)
+pub(crate) const FORMAT_VERSION: u32 = 8; // 8: a Vue-prop alapértéke külön mező (`default`); 7: a szűkített tények importjai (`uses`: a csak típus-hivatkozás)
 
 /// A keretezett fájlok eleje.
 const MAGIC: &[u8; 4] = b"CGB1";
@@ -381,6 +381,7 @@ struct StoredProperty {
     is_static: bool,
     readonly: bool,
     doc: Option<String>,
+    default: Option<String>,
     js: bool,
 }
 
@@ -395,6 +396,7 @@ impl From<&Property> for StoredProperty {
             is_static,
             readonly,
             doc,
+            default,
             js,
         } = property;
         Self {
@@ -406,6 +408,7 @@ impl From<&Property> for StoredProperty {
             is_static: *is_static,
             readonly: *readonly,
             doc: doc.clone(),
+            default: default.clone(),
             js: *js,
         }
     }
@@ -422,6 +425,7 @@ impl From<StoredProperty> for Property {
             is_static: stored.is_static,
             readonly: stored.readonly,
             doc: stored.doc,
+            default: stored.default,
             js: stored.js,
         }
     }

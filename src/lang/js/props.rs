@@ -344,7 +344,7 @@ fn type_members(
     }
 }
 
-/// A `default` a prop alapértéke (a JS-propnál a `doc` mező hordozza; a JSON-ban nem jelenik meg).
+/// A `default` a prop alapértéke (`withDefaults`); a `Property.default` mezőbe kerül.
 #[allow(clippy::too_many_arguments)]
 fn push(
     ctx: &PassContext<'_>,
@@ -365,6 +365,7 @@ fn push(
         visibility: "public".into(),
         is_static: false,
         readonly,
-        doc: default,
+        doc: None,
+        default,
     });
 }

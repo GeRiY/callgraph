@@ -71,6 +71,12 @@ struct Collector<'p, 'a> {
     calls: Vec<Call>,
 }
 
+fn starts_lower(name: &str) -> bool {
+    name.chars()
+        .next()
+        .is_some_and(|c| c.is_lowercase() || c == '_')
+}
+
 /// Konstans-szerű név: `SCREAMING_CASE`, legalább két karakter, nagybetűvel kezdődik.
 fn is_const_name(name: &str) -> bool {
     name.chars().count() >= 2
@@ -248,6 +254,32 @@ impl Collector<'_, '_> {
         self.push("const_fetch", target, verdict, line, None);
     }
 
+    /// Függvény / metódus értékként átadva (`.map(Self::parse)`, `.and_then(Foo::new)`, `.map(util::double)`,
+    /// `.map(helper)`): ugyanúgy hívás-él, mint a közvetlen hívás. Az egyszegmensű név csak akkor, ha a
+    /// fájl saját szabad függvénye vagy importált kisbetűs név, és nincs helyi kötés ugyanezzel a névvel.
+    fn record_fn_ref(&mut self, segs: &[String], line: u32) {
+        let Some(location) = &self.location else {
+            return;
+        };
+        let Some(last) = segs.last() else {
+            return;
+        };
+        if !starts_lower(last) {
+            return;
+        }
+        let known = match segs {
+            [name] => {
+                !location.bindings.contains(name)
+                    && (self.resolver.is_free_fn(name) || self.resolver.imports_fn(name))
+            }
+            [_, _, ..] => true,
+            [] => false,
+        };
+        if known {
+            self.record(Callee::Path(segs.to_vec()), line, None);
+        }
+    }
+
     /// Az egyszegmensű konstans containere: előbb a hívás helyének modulja, utána bármely modul-szintű.
     fn own_const(&self, location: &Location, name: &str) -> Option<String> {
         let here = qualify_container(self.resolver.module(), &location.inline);
@@ -305,6 +337,8 @@ impl<'ast> Visit<'ast> for Collector<'_, '_> {
         {
             let line = self.parsed.line(node.span());
             self.record_const(segments(&node.path), line);
+        } else if node.qself.is_none() {
+            self.record_fn_ref(&segments(&node.path), self.parsed.line(node.span()));
         }
         visit::visit_expr_path(self, node);
     }

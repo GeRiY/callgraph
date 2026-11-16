@@ -5,7 +5,7 @@ use std::collections::HashSet;
 
 use syn::visit::Visit;
 
-use super::receivers::TypeEnv;
+use super::receivers::{Infer, Returns, TypeEnv, return_path};
 use super::scopes::{ConstNode, MacroScope, Scopes};
 
 /// A bejárt kód helye.
@@ -26,6 +26,13 @@ pub(super) trait BodyVisit: for<'ast> Visit<'ast> {
 
 /// Minden függvénytörzs, konstans-érték és felső szintű makróhívás bejárása.
 pub(super) fn walk_bodies<V: BodyVisit>(scopes: &Scopes<'_>, visitor: &mut V) {
+    let mut rets = Returns::new();
+    for f in &scopes.fns {
+        if let Some(ret) = return_path(f.sig) {
+            rets.entry((f.container.clone(), f.sig.ident.to_string()))
+                .or_insert(ret);
+        }
+    }
     for f in &scopes.fns {
         let Some(block) = f.block else {
             continue;
@@ -40,7 +47,14 @@ pub(super) fn walk_bodies<V: BodyVisit>(scopes: &Scopes<'_>, visitor: &mut V) {
             caller: f.name.clone(),
             inline: f.inline.clone(),
             bindings: bindings.0,
-            types: TypeEnv::of_fn(f.sig, block),
+            types: TypeEnv::of_fn(
+                f.sig,
+                block,
+                &Infer {
+                    rets: &rets,
+                    container: &f.container,
+                },
+            ),
         });
         visitor.visit_block(block);
     }

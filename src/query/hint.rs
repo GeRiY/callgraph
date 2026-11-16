@@ -377,7 +377,15 @@ pub(crate) fn locate_no_match(lang: Lang) -> &'static str {
 
 /// Ismeretlen `--category`: az ismert nevek listájával (a layer-hibával analóg), és ha van hasonló, azzal.
 pub(crate) fn unknown_category(lang: Lang, name: &str, known: &[&str]) -> String {
-    let list = known.join(", ");
+    // a stíluslap- / dokumentum-kategória után a nyelvcsalád (`var [css]`)
+    let list = known
+        .iter()
+        .map(|category| match crate::model::category_language(category) {
+            Some(family) => format!("{category} [{family}]"),
+            None => (*category).to_owned(),
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
     let mut out = ltf!(
         lang,
         "Unknown category: {name} (known: {list})",

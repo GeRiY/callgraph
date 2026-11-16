@@ -30,6 +30,14 @@ impl FileVisitor for ImportsVisitor {
                 ctx.resolver.add_import(alias, canonical);
             }
         }
+        // a fájl saját almoduljai (`mod util;`, `pub mod shape { … }`): a `util::f()` a crate saját útja, nem
+        // külső crate — a `use` által már bevezetett névvel ütközve a `use` marad
+        let base = ctx.resolver.module().absolute(&[]);
+        for name in collector.child_mods {
+            let mut path = base.clone();
+            path.push(name.clone());
+            ctx.resolver.add_import(name, path);
+        }
         builder.imports_as_object();
     }
 }
@@ -39,6 +47,8 @@ struct Collector {
     inline: Vec<String>,
     /// (inline modulok, alias, leírt út)
     found: Vec<(Vec<String>, String, Vec<String>)>,
+    /// A fájl legfelső szintű `mod x;` / `mod x { … }` nevei.
+    child_mods: Vec<String>,
 }
 
 impl Collector {
@@ -109,6 +119,9 @@ impl<'ast> Visit<'ast> for Collector {
     }
 
     fn visit_item_mod(&mut self, node: &'ast syn::ItemMod) {
+        if self.inline.is_empty() {
+            self.child_mods.push(node.ident.to_string());
+        }
         self.inline.push(node.ident.to_string());
         syn::visit::visit_item_mod(self, node);
         self.inline.pop();

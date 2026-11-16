@@ -634,6 +634,7 @@ fn property(container: &str, name: &str, line: u32) -> Property {
         is_static: false,
         readonly: false,
         doc: None,
+        default: None,
         js: false,
     }
 }

@@ -1,6 +1,6 @@
 ---
 name: callgraph
-description: Token-efficient mapping of a PHP / Rust / JS / TS / Vue / Swift / Python / Go codebase with AST analysis, WITHOUT reading the file — where to start with a task (locate: ranked files from the names in the task), categorized call graph (class/component, method/function with line ranges), method body, "where is it called" search, impact analysis (--depth), string and constant search, control-flow branches, framework views (routes, validation, events…). Use it to understand PHP, .rs, .vue, .js, .ts, .swift files, for call relationships and "who calls this / where is it used" questions — make it the FIRST step instead of a full Read/Grep. Do NOT use it for non-code files (md, json, css, plain text), or when you need the exact file text in an already known range (then --lines or a targeted Read).
+description: Token-efficient mapping of a PHP / Rust / JS / TS / Vue / Swift / Python / Go codebase with AST analysis, WITHOUT reading the file — where to start with a task (locate: ranked files from the names in the task), categorized call graph (class/component, method/function with line ranges), method body, "where is it called" search, impact analysis (--depth), string and constant search, control-flow branches, framework views (routes, validation, events…). Use it to understand PHP, .rs, .vue, .js, .ts, .swift files, for the structure of md / json / css / scss / html files (sections, keys, rules, links), for call relationships and "who calls this / where is it used" questions — make it the FIRST step instead of a full Read/Grep. Do NOT use it for plain text files, or when you need the exact file text in an already known range (then --lines or a targeted Read).
 ---
 
 # callgraph — code map without Read
@@ -60,7 +60,7 @@ Four typical tasks and the calls that answer them (an empty or wrong result come
 - **Unfamiliar project:** `callgraph.sh profile` (architecture, layers) → `locate <terms>` → the outline of the files it
   lists → `--body`.
 - **"Where is this text / constant":** `callgraph.sh <dir> --strings <fragment>` (UI text, messages; a case-insensitive
-  substring) or `--const <name>`; for an exact text, or in non-code files, use Grep.
+  substring) or `--const <name>`; for an exact text, or in plain-text files, use Grep.
 
 ## Quick commands
 
@@ -100,6 +100,7 @@ PHP receiver types come from `new Foo()`, `Foo::create()`, typed parameters / pr
 - `L25 │ $this->repo->find($id)`: the call's own source line. You don't need `--body` just to see how something is
   called, only for the full logic.
 - `via Resolver`: the call goes through an interface, parent class or trait of the searched type.
+- `L12-30` after a name: its line range; for the body logic (conditions, exact order) read just that range (Read with offset / limit), not the whole file.
 - `L12, L40 │ …`: the same call on several lines; at most 3 rows per caller, then `… +2 more: L55, L61`.
 - `?` / `?::name`: the receiver type is unknown, a name-only match; it may be wrong, check the line.
 - `🔒` after a file path: the file is protected; read it, don't edit it.

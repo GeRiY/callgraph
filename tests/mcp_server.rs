@@ -182,6 +182,10 @@ fn initialize_list_and_call_outline() {
         .output()
         .unwrap();
     let cli_text = String::from_utf8_lossy(&cli.stdout);
+    // a 💡 zárósor csak a CLI-n van (MCP-n a guide egyszer elmondja)
+    let cli_text = cli_text
+        .split_once("\n---\n💡")
+        .map_or(cli_text.to_string(), |(head, _)| head.to_string());
     let canonical = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .canonicalize()
         .unwrap();

@@ -224,6 +224,7 @@ impl Collector<'_> {
             is_static: p.r#static,
             readonly: p.readonly,
             doc: None,
+            default: None,
             js: false,
         });
     }
@@ -252,6 +253,7 @@ impl Collector<'_> {
             is_static: false,
             readonly: param.readonly,
             doc: None,
+            default: None,
             js: false,
         });
     }

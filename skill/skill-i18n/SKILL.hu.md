@@ -1,6 +1,6 @@
 ---
 name: callgraph
-description: PHP / Rust / JS / TS / Vue / Swift / Python / Go kódbázis token-hatékony feltérképezése AST-elemzéssel, a fájl beolvasása NÉLKÜL — honnan induljak egy feladattal (locate: rangsorolt fájlok a feladat neveiből), kategorizált hívás-gráf (osztály/komponens, metódus/függvény sortartománnyal), metódus-törzs, "hol hívják" keresés, hatáselemzés (--depth), string- és konstans-keresés, vezérlési ágak, framework-nézetek (routes, validation, events…). Használd PHP-, .rs-, .vue-, .js-, .ts-, .swift-fájl megértéséhez, hívási kapcsolatok, "ki hívja / hol használják" kérdésekhez — ez legyen az ELSŐ lépés a teljes Read/Grep helyett. NE használd nem kód fájlra (md, json, css, sima szöveg), vagy ha a pontos fájlszöveg kell egy már ismert sávban (akkor --lines vagy célzott Read).
+description: PHP / Rust / JS / TS / Vue / Swift / Python / Go kódbázis token-hatékony feltérképezése AST-elemzéssel, a fájl beolvasása NÉLKÜL — honnan induljak egy feladattal (locate: rangsorolt fájlok a feladat neveiből), kategorizált hívás-gráf (osztály/komponens, metódus/függvény sortartománnyal), metódus-törzs, "hol hívják" keresés, hatáselemzés (--depth), string- és konstans-keresés, vezérlési ágak, framework-nézetek (routes, validation, events…). Használd PHP-, .rs-, .vue-, .js-, .ts-, .swift-fájl megértéséhez, md / json / css / scss / html fájl szerkezetéhez (szakaszok, kulcsok, szabályok, linkek), hívási kapcsolatok, "ki hívja / hol használják" kérdésekhez — ez legyen az ELSŐ lépés a teljes Read/Grep helyett. NE használd sima szöveges fájlra, vagy ha a pontos fájlszöveg kell egy már ismert sávban (akkor --lines vagy célzott Read).
 ---
 
 # callgraph — kód-térkép Read nélkül
@@ -61,7 +61,7 @@ illeszkedik …`, `Esetleg erre gondoltál: …` — kövesd, ne próbálkozz va
 - **Ismeretlen projekt:** `callgraph.sh profile` (architektúra, rétegek) → `locate <kifejezések>` → a listázott fájlok
   outline-ja → `--body`.
 - **„Hol van ez a szöveg / konstans”:** `callgraph.sh <mappa> --strings <töredék>` (felületi szöveg, üzenet; kis-/nagybetű-
-  független részlet) vagy `--const <név>`; pontos szövegre, illetve nem kód fájlokban Grep.
+  független részlet) vagy `--const <név>`; pontos szövegre, illetve sima szöveges fájlokban Grep.
 
 ## Gyors parancsok
 
@@ -101,6 +101,7 @@ a láncolt `app(Foo::class)->bar()` `Foo::bar`-ra oldódik; a sztring-azonosít�
 - `L25 │ $this->repo->find($id)`: a hívás saját forrássora. Csak azért, hogy lásd, hogyan hívják, nem kell `--body`;
   a teljes logikához igen.
 - `via Resolver`: a hívás a keresett típus interfészén, szülőosztályán vagy trait-jén át megy.
+- `L12-30` egy név után: a sortartománya; a törzs-logikához (feltételek, pontos sorrend) csak azt a sávot olvasd (Read offset / limit), ne a teljes fájlt.
 - `L12, L40 │ …`: ugyanaz a hívás több soron; hívónként legfeljebb 3 sor, utána `… +2 további: L55, L61`.
 - `?` / `?::név`: ismeretlen fogadó-típus, csak név szerinti egyezés; lehet téves, nézd meg a sort.
 - `🔒` a fájl útja után: védett fájl; olvasd, de ne szerkeszd.

@@ -82,6 +82,7 @@ impl FileVisitor for StructureVisitor {
                 is_static: false,
                 readonly: false,
                 doc: doc_of(&f.attrs),
+                default: None,
                 js: false,
             });
         }

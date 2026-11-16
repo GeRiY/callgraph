@@ -100,6 +100,14 @@ impl ShowRunner {
     /// `crate::next`), hiba → a hibaszöveg.
     fn execute(args: Vec<String>, root: &ProjectRoot) -> Result<String, String> {
         let mut text = Self::execute_plain(args.clone())?;
+        // az outline záró 💡 sora a CLI-nek szól; MCP-n az útmutató egyszer elmondja az `L…-…` jelölést
+        for lang in [crate::i18n::Lang::En, crate::i18n::Lang::Hu] {
+            let tip = crate::query::format::closing_tip(lang);
+            if text.ends_with(tip) {
+                text.truncate(text.len() - tip.len());
+                break;
+            }
+        }
         if crate::next::enabled() {
             let project = Some(root.label()).filter(|label| !label.contains('/'));
             if let Some(line) = crate::next::annotate(&args, root.root(), &text, project) {

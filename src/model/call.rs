@@ -52,6 +52,16 @@ pub const KNOWN_CATEGORIES: [&str; 41] = [
     DYNAMIC_CALL,
 ];
 
+/// Az olyan kategória nyelvcsaládja, amelyik nem kód-nyelv (stíluslap / dokumentum): a `--category` súgó ezt írja ki.
+pub fn category_language(category: &str) -> Option<&'static str> {
+    match category {
+        "var" => Some("css"),
+        "include" | "extend" | "interpolation" => Some("scss"),
+        "anchor" | "external_url" | "internal_file" | "image" => Some("md/html"),
+        _ => None,
+    }
+}
+
 /// A `Call.kind` (`type`) a dinamikus hívásoknál.
 pub const DYNAMIC_KIND: &str = "dynamic";
 

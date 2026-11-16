@@ -31,10 +31,16 @@ impl JsPass for MethodsPass {
             .file_stem()
             .map(|s| s.to_string_lossy().into_owned())
             .unwrap_or_default();
-        let mut c = Collector::new(docs, ctx.lines, main);
+        let mut c = Collector::new(docs, ctx.lines, main.clone());
         for stmt in &program.body {
             collect_statement(&mut c, stmt);
         }
+        // a hívás-passz ezt olvassa (a pszeudo-metódus előtti állapot, mint a `method_index`-ben)
+        out.method_index = Some(MethodIndex {
+            names: c.names.clone(),
+            fns: c.fns.clone(),
+            main,
+        });
         pseudo_method(&mut c, ctx, program);
         c.methods.sort_by_key(|m| m.line);
         // az osztály-containereket a `ClassContainerPass` adja (itt csak a metódusaik container-neve kell)

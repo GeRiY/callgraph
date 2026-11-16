@@ -15,6 +15,9 @@ pub struct Property {
     pub is_static: bool,
     pub readonly: bool,
     pub doc: Option<String>,
+    /// A Vue-prop alapértéke (`withDefaults`, `default:`); JSON-ban csak ha van.
+    #[serde(default)]
+    pub default: Option<String>,
     /// JS/Vue-prop: a régi JS-motor alakja (`kind:'prop'`, `visibility`/`doc` nélkül).
     #[serde(skip, default)]
     pub js: bool,
@@ -23,7 +26,7 @@ pub struct Property {
 impl Serialize for Property {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         use serde::ser::SerializeStruct;
-        let mut st = serializer.serialize_struct("Property", 8)?;
+        let mut st = serializer.serialize_struct("Property", 9)?;
         st.serialize_field("container", &self.container)?;
         st.serialize_field("name", &self.name)?;
         st.serialize_field("line", &self.line)?;
@@ -35,6 +38,9 @@ impl Serialize for Property {
         st.serialize_field("readonly", &self.readonly)?;
         if self.js {
             st.serialize_field("kind", "prop")?;
+            if let Some(default) = &self.default {
+                st.serialize_field("default", default)?;
+            }
         } else {
             st.serialize_field("doc", &self.doc)?;
         }

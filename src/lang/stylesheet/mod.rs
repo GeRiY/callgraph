@@ -1,5 +1,9 @@
-//! CSS- és SCSS-szkennerek közös, forráshelyes tokenizáló segédei.
+//! A CSS és az SCSS közös szkennere: egy motor, a nyelvi eltérések a `Dialect`-ben (`scanner`), a tiszta segédek
+//! a `helpers` / `rules` / `scss_parts` modulokban.
 
 mod helpers;
+mod rules;
+mod scanner;
+mod scss_parts;
 
-pub(crate) use helpers::{clean_header, is_ident, is_ident_start, line, normalize, strip_comments};
+pub(crate) use scanner::{Dialect, StylesheetScanner};

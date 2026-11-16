@@ -1,8 +1,8 @@
 use std::path::{Path, PathBuf};
 
-use super::scanner::ScssScanner;
 use crate::core::SourceFile;
 use crate::error::Result;
+use crate::lang::stylesheet::{Dialect, StylesheetScanner};
 use crate::lang::{Analysis, Language, LanguageFrontend, LanguageRole};
 
 /// SCSS-forrásokat elemző frontend.
@@ -29,7 +29,7 @@ impl Language for ScssFrontend {
         let text = String::from_utf8_lossy(&file.text);
         let mut parser = Parser::new(&text, Syntax::Scss);
         let error = parser.parse::<Stylesheet>().err().map(|e| format!("{e:?}"));
-        let mut result = ScssScanner::new(&file.path_string(), &text).scan();
+        let mut result = StylesheetScanner::new(Dialect::Scss, &file.path_string(), &text).scan();
         if let Some(error) = error {
             result.warnings.push(crate::tf!(
                 "{}: SCSS syntax error: {error}",

@@ -11,9 +11,148 @@ use std::collections::{HashMap, HashSet};
 use syn::punctuated::Punctuated;
 use syn::visit::{self, Visit};
 use syn::{
-    Block, Expr, FnArg, GenericArgument, Local, Pat, PatIdent, Path, PathArguments, Signature,
-    Token, Type, TypeParamBound,
+    Block, Expr, FnArg, GenericArgument, GenericParam, Local, Pat, PatIdent, Path, PathArguments,
+    ReturnType, Signature, Token, Type, TypeParamBound, WherePredicate,
 };
+
+/// A fájl függvényeinek visszatérési típusa: `(container, függvénynév)` → típus-út (`Result<T, _>` /
+/// `Option<T>` → `T`, `Self` → `["Self"]`). A `let x = self.make()?` / `Svc::open()?` fogadóhoz.
+pub(super) type Returns = HashMap<(String, String), Vec<String>>;
+
+/// A visszatérési típus fogadóként használt útja (lásd `Returns`).
+pub(super) fn return_path(sig: &Signature) -> Option<Vec<String>> {
+    let ReturnType::Type(_, ty) = &sig.output else {
+        return None;
+    };
+    let generics: HashSet<String> = sig
+        .generics
+        .type_params()
+        .map(|p| p.ident.to_string())
+        .collect();
+    let inner = unwrap_wrapper(ty);
+    type_path(inner, &generics).or_else(|| {
+        matches!(inner, Type::Path(p) if p.path.is_ident("Self")).then(|| vec!["Self".to_owned()])
+    })
+}
+
+/// `Result<T, E>` / `Option<T>` → `T` (más típus változatlan).
+fn unwrap_wrapper(ty: &Type) -> &Type {
+    let Type::Path(p) = ty else {
+        return ty;
+    };
+    let Some(last) = p.path.segments.last() else {
+        return ty;
+    };
+    if !matches!(last.ident.to_string().as_str(), "Result" | "Option") {
+        return ty;
+    }
+    let PathArguments::AngleBracketed(args) = &last.arguments else {
+        return ty;
+    };
+    match args.args.first() {
+        Some(GenericArgument::Type(inner)) => inner,
+        _ => ty,
+    }
+}
+
+/// A következtetés környezete: a hívó container és a fájl függvényeinek visszatérési típusa.
+pub(super) struct Infer<'g> {
+    pub rets: &'g Returns,
+    pub container: &'g str,
+}
+
+/// Gyakori std-trait: generikus korlátként nem ad saját típust a fogadóhoz.
+const STD_BOUNDS: [&str; 30] = [
+    "Clone",
+    "Copy",
+    "Debug",
+    "Display",
+    "Default",
+    "Send",
+    "Sync",
+    "Sized",
+    "Eq",
+    "PartialEq",
+    "Ord",
+    "PartialOrd",
+    "Hash",
+    "Into",
+    "From",
+    "TryFrom",
+    "TryInto",
+    "AsRef",
+    "AsMut",
+    "Iterator",
+    "IntoIterator",
+    "Fn",
+    "FnMut",
+    "FnOnce",
+    "ToString",
+    "Borrow",
+    "Deref",
+    "Future",
+    "Serialize",
+    "Deserialize",
+];
+
+/// A generikus paraméterek egyetlen nem-std trait-korlátja (`T: Handler`, `where T: Handler + Clone`);
+/// két saját trait esetén a fogadó nem dönthető el, nincs típus.
+fn generic_bounds(sig: &Signature) -> HashMap<String, Vec<String>> {
+    let mut out: HashMap<String, Vec<String>> = HashMap::new();
+    let mut add = |name: String, bounds: &Punctuated<TypeParamBound, Token![+]>| {
+        let mut own = bounds.iter().filter_map(|b| match b {
+            TypeParamBound::Trait(t) => {
+                let segs = segments(&t.path);
+                let last = segs.last()?;
+                (!STD_BOUNDS.contains(&last.as_str())).then_some(segs)
+            }
+            _ => None,
+        });
+        if let (Some(only), None) = (own.next(), own.next()) {
+            out.entry(name).or_insert(only);
+        }
+    };
+    for param in &sig.generics.params {
+        if let GenericParam::Type(t) = param {
+            add(t.ident.to_string(), &t.bounds);
+        }
+    }
+    if let Some(clause) = &sig.generics.where_clause {
+        for pred in &clause.predicates {
+            if let WherePredicate::Type(p) = pred
+                && let Type::Path(tp) = &p.bounded_ty
+                && let Some(ident) = tp.path.get_ident()
+            {
+                add(ident.to_string(), &p.bounds);
+            }
+        }
+    }
+    out
+}
+
+/// A típus egy generikus paraméter (`&T`, `Box<T>`) — a korlátja szerinti trait-út.
+fn bound_of(ty: &Type, bounds: &HashMap<String, Vec<String>>) -> Option<Vec<String>> {
+    match ty {
+        Type::Reference(r) => bound_of(&r.elem, bounds),
+        Type::Paren(p) => bound_of(&p.elem, bounds),
+        Type::Path(p) if p.qself.is_none() => {
+            let last = p.path.segments.last()?;
+            if matches!(last.ident.to_string().as_str(), "Box" | "Rc" | "Arc") {
+                let PathArguments::AngleBracketed(args) = &last.arguments else {
+                    return None;
+                };
+                return match args.args.first() {
+                    Some(GenericArgument::Type(inner)) => bound_of(inner, bounds),
+                    _ => None,
+                };
+            }
+            p.path
+                .get_ident()
+                .and_then(|i| bounds.get(&i.to_string()).cloned())
+        }
+        _ => None,
+    }
+}
 
 /// A függvény helyi neveinek típus-útja (a leírt alak szegmensei, generikus argumentumok nélkül).
 #[derive(Debug, Default, Clone)]
@@ -21,14 +160,17 @@ pub(super) struct TypeEnv(HashMap<String, Vec<String>>);
 
 impl TypeEnv {
     /// A függvény paramétereiből és `let`-jeiből.
-    pub(super) fn of_fn(sig: &Signature, block: &Block) -> Self {
+    pub(super) fn of_fn(sig: &Signature, block: &Block, cx: &Infer<'_>) -> Self {
         let generics: HashSet<String> = sig
             .generics
             .type_params()
             .map(|p| p.ident.to_string())
             .collect();
+        let bounds = generic_bounds(sig);
         let mut scan = Scan {
             generics: &generics,
+            bounds: &bounds,
+            cx,
             typed: HashMap::new(),
             counts: HashMap::new(),
         };
@@ -68,11 +210,19 @@ impl TypeEnv {
 /// összes kötése (minden minta-azonosító, a closure-paraméterek és a beágyazott minták is).
 struct Scan<'g> {
     generics: &'g HashSet<String>,
+    /// generikus paraméter → a trait-korlátja (`T: Handler` → `Handler`)
+    bounds: &'g HashMap<String, Vec<String>>,
+    cx: &'g Infer<'g>,
     typed: HashMap<String, Vec<Option<Vec<String>>>>,
     counts: HashMap<String, usize>,
 }
 
 impl Scan<'_> {
+    /// A típus fogadó-útja: saját típus, vagy a generikus paraméter trait-korlátja.
+    fn ty_path(&self, ty: &Type) -> Option<Vec<String>> {
+        type_path(ty, self.generics).or_else(|| bound_of(ty, self.bounds))
+    }
+
     fn bind(&mut self, name: String, ty: Option<Vec<String>>) {
         self.typed.entry(name).or_default().push(ty);
     }
@@ -81,7 +231,7 @@ impl Scan<'_> {
     fn param(&mut self, pat: &Pat, ty: &Type) {
         match pat {
             Pat::Ident(p) if p.subpat.is_none() => {
-                let ty = type_path(ty, self.generics);
+                let ty = self.ty_path(ty);
                 self.bind(p.ident.to_string(), ty);
             }
             Pat::TupleStruct(ts) if ts.elems.len() == 1 => {
@@ -90,7 +240,7 @@ impl Scan<'_> {
                 };
                 let wrapper = ts.path.segments.last().map(|s| s.ident.to_string());
                 let ty = newtype_inner(ty, wrapper.as_deref())
-                    .and_then(|inner_ty| type_path(inner_ty, self.generics));
+                    .and_then(|inner_ty| self.ty_path(inner_ty));
                 self.bind(inner.ident.to_string(), ty);
             }
             _ => {}
@@ -107,13 +257,14 @@ impl<'ast> Visit<'ast> for Scan<'_> {
     fn visit_local(&mut self, node: &'ast Local) {
         let (ident, ty) = match &node.pat {
             Pat::Ident(p) if p.subpat.is_none() => {
-                let ty = node.init.as_ref().and_then(|init| infer_expr(&init.expr));
+                let ty = node
+                    .init
+                    .as_ref()
+                    .and_then(|init| infer_expr(&init.expr, self.cx));
                 (Some(&p.ident), ty)
             }
             Pat::Type(pt) => match &*pt.pat {
-                Pat::Ident(p) if p.subpat.is_none() => {
-                    (Some(&p.ident), type_path(&pt.ty, self.generics))
-                }
+                Pat::Ident(p) if p.subpat.is_none() => (Some(&p.ident), self.ty_path(&pt.ty)),
                 _ => (None, None),
             },
             _ => (None, None),
@@ -198,9 +349,10 @@ fn is_constructor(name: &str) -> bool {
         || name.starts_with("from_")
 }
 
-/// A `let` kezdőértékének típusa: struct-literál, konstruktor-hívás (`?`, `.unwrap()`, `.expect()`,
-/// `.await` és zárójel / referencia átlátszó).
-pub(super) fn infer_expr(expr: &Expr) -> Option<Vec<String>> {
+/// A `let` kezdőértékének típusa: struct-literál, konstruktor-hívás, a fájl függvényének ismert
+/// visszatérési típusa (`self.make()?`, `Svc::open()?`); `?`, `.unwrap()`, `.expect()`, `.await`,
+/// zárójel / referencia átlátszó.
+pub(super) fn infer_expr(expr: &Expr, cx: &Infer<'_>) -> Option<Vec<String>> {
     match expr {
         Expr::Struct(s) if s.qself.is_none() => {
             let segs = segments(&s.path);
@@ -223,16 +375,33 @@ pub(super) fn infer_expr(expr: &Expr) -> Option<Vec<String>> {
             let [.., owner, func] = segs.as_slice() else {
                 return None;
             };
-            let typeish = owner == "Self" || starts_upper(owner);
-            (typeish && is_constructor(func)).then(|| segs[..segs.len() - 1].to_vec())
+            if owner != "Self" && !starts_upper(owner) {
+                return None;
+            }
+            let owner_path = segs[..segs.len() - 1].to_vec();
+            if is_constructor(func) {
+                return Some(owner_path);
+            }
+            let container = if owner == "Self" { cx.container } else { owner };
+            let ret = cx.rets.get(&(container.to_owned(), func.clone()))?;
+            Some(if ret.len() == 1 && ret[0] == "Self" {
+                owner_path
+            } else {
+                ret.clone()
+            })
         }
-        Expr::Try(t) => infer_expr(&t.expr),
-        Expr::Await(a) => infer_expr(&a.base),
-        Expr::Paren(p) => infer_expr(&p.expr),
-        Expr::Group(g) => infer_expr(&g.expr),
-        Expr::Reference(r) => infer_expr(&r.expr),
+        Expr::Try(t) => infer_expr(&t.expr, cx),
+        Expr::Await(a) => infer_expr(&a.base, cx),
+        Expr::Paren(p) => infer_expr(&p.expr, cx),
+        Expr::Group(g) => infer_expr(&g.expr, cx),
+        Expr::Reference(r) => infer_expr(&r.expr, cx),
         Expr::MethodCall(m) if m.method == "unwrap" || m.method == "expect" => {
-            infer_expr(&m.receiver)
+            infer_expr(&m.receiver, cx)
+        }
+        Expr::MethodCall(m) if matches!(&*m.receiver, Expr::Path(p) if p.path.is_ident("self")) => {
+            cx.rets
+                .get(&(cx.container.to_owned(), m.method.to_string()))
+                .cloned()
         }
         _ => None,
     }
@@ -244,7 +413,15 @@ mod tests {
 
     fn env(src: &str) -> TypeEnv {
         let f: syn::ItemFn = syn::parse_str(src).unwrap();
-        TypeEnv::of_fn(&f.sig, &f.block)
+        let rets = Returns::new();
+        TypeEnv::of_fn(
+            &f.sig,
+            &f.block,
+            &Infer {
+                rets: &rets,
+                container: "Own",
+            },
+        )
     }
 
     fn ty(env: &TypeEnv, name: &str) -> Option<String> {
@@ -265,7 +442,8 @@ mod tests {
         );
         assert_eq!(ty(&e, "a").as_deref(), Some("Repo"));
         assert_eq!(ty(&e, "b").as_deref(), Some("Shape"));
-        assert_eq!(ty(&e, "c"), None);
+        // generikus paraméter: a saját trait-korlát a típus (`T: Store` → Store)
+        assert_eq!(ty(&e, "c").as_deref(), Some("Store"));
         assert_eq!(ty(&e, "s").as_deref(), Some("App"));
         assert_eq!(ty(&e, "g").as_deref(), Some("db::Pool"));
         assert_eq!(ty(&e, "x").as_deref(), Some("Repo"));
@@ -296,7 +474,56 @@ mod tests {
     #[test]
     fn self_receiver_is_self() {
         let item: syn::ImplItemFn = syn::parse_str("fn f(&self) { self.go(); }").unwrap();
-        let e = TypeEnv::of_fn(&item.sig, &item.block);
+        let rets = Returns::new();
+        let cx = Infer {
+            rets: &rets,
+            container: "Own",
+        };
+        let e = TypeEnv::of_fn(&item.sig, &item.block, &cx);
         assert_eq!(ty(&e, "self").as_deref(), Some("Self"));
+    }
+
+    #[test]
+    fn generic_trait_bounds_give_the_trait() {
+        let e = env(
+            "fn f<T: Handler, U: Clone, V>(a: &T, b: U, c: Box<V>, d: &W) where V: Store + Send { }",
+        );
+        assert_eq!(ty(&e, "a").as_deref(), Some("Handler"));
+        assert_eq!(ty(&e, "b"), None);
+        assert_eq!(ty(&e, "c").as_deref(), Some("Store"));
+        assert_eq!(ty(&e, "d"), None);
+    }
+
+    #[test]
+    fn known_return_types_type_the_binding() {
+        let mut rets = Returns::new();
+        rets.insert(("Svc".into(), "make".into()), vec!["Bar".into()]);
+        rets.insert(("Svc".into(), "open".into()), vec!["Self".into()]);
+        let cx = Infer {
+            rets: &rets,
+            container: "Svc",
+        };
+        let f: syn::ImplItemFn = syn::parse_str(
+            "fn go(&self) { let a = self.make().unwrap(); let b = Svc::open()?; let c = Self::open(); }",
+        )
+        .unwrap();
+        let e = TypeEnv::of_fn(&f.sig, &f.block, &cx);
+        assert_eq!(ty(&e, "a").as_deref(), Some("Bar"));
+        assert_eq!(ty(&e, "b").as_deref(), Some("Svc"));
+        assert_eq!(ty(&e, "c").as_deref(), Some("Self"));
+    }
+
+    #[test]
+    fn return_paths_unwrap_result_and_option() {
+        let path = |src: &str| {
+            let f: syn::ItemFn = syn::parse_str(src).unwrap();
+            return_path(&f.sig).map(|p| p.join("::"))
+        };
+        assert_eq!(path("fn a() -> Result<Bar, E> {}").as_deref(), Some("Bar"));
+        assert_eq!(path("fn a() -> Option<Self> {}").as_deref(), Some("Self"));
+        assert_eq!(path("fn a() -> io::Result<Bar> {}").as_deref(), Some("Bar"));
+        assert_eq!(path("fn a() -> i32 {}").as_deref(), Some("i32"));
+        assert_eq!(path("fn a<T>() -> T {}"), None);
+        assert_eq!(path("fn a() {}"), None);
     }
 }

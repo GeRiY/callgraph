@@ -143,6 +143,7 @@ impl SwiftVisitor<'_, '_> {
                 is_static,
                 readonly: is_let,
                 doc: self.doc_of(node),
+                default: None,
                 js: false,
             });
         }

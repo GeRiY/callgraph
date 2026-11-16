@@ -1,4 +1,4 @@
-//! A CSS-szabályok outline-fajtája és fejléc-helye (a szkenner segédei).
+//! A stíluslap-szabályok outline-fajtája és fejléc-helye (a szkenner segédei).
 
 /// A `;`-re végződő at-szabályok, amik az outline-ba kerülnek (a Tailwind v4-éi is); az `@apply` nem ilyen.
 const STATEMENT_AT_RULES: &[&str] = &[

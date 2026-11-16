@@ -47,11 +47,16 @@ fn render(
         .map(|row| outline(row, lang, source, marks))
         .collect::<Vec<_>>()
         .join("\n---\n");
-    text.push_str(lang.pick(
+    text.push_str(closing_tip(lang));
+    text
+}
+
+/// A CLI-s outline záró 💡 sora (a sortartomány-jelölés magyarázata); az MCP-n elmarad (az útmutató egyszer elmondja).
+pub(crate) fn closing_tip(lang: Lang) -> &'static str {
+    lang.pick(
         "\n---\n💡 for the body logic (conditions, string literals, exact order): Read the L<n>-<m> line range above (offset=<n>, limit=<m-n+1>) — not the whole file.\n",
         "\n---\n💡 a törzs-logikához (feltételek, string-literálok, pontos sorrend): Read a fenti L<n>-<m> sortartományra (offset=<n>, limit=<m-n+1>) — ne a teljes fájlt.\n",
-    ));
-    text
+    )
 }
 fn outline(
     row: &QueryResult,
@@ -129,6 +134,8 @@ fn outline(
             .collect();
         if !cons.is_empty() {
             writeln!(s, "  constants ({}):", cons.len()).unwrap();
+            // package.json / composer.json: a függőség sorának végén a lockban zárolt verzió
+            let locks = manifest_locks(row);
             // jq: name + (value → " = value") + (enum_case → " [enum case]")
             for x in cons {
                 let value = x
@@ -141,7 +148,12 @@ fn outline(
                 } else {
                     ""
                 };
-                writeln!(s, "    {}{value}{case}", x.name).unwrap();
+                let locked = locks
+                    .as_ref()
+                    .and_then(|locks| locked_version(locks, x))
+                    .map(|version| format!(" · lock {version}"))
+                    .unwrap_or_default();
+                writeln!(s, "    {}{value}{case}{locked}", x.name).unwrap();
             }
         }
         let props: Vec<_> = g
@@ -157,10 +169,9 @@ fn outline(
                     "    {} ${}{}{}{}",
                     p.type_hint.clone().unwrap_or_else(|| "mixed".to_owned()),
                     p.name.trim_start_matches('$'),
-                    // JS/Vue-prop: a `doc` az alapérték (`withDefaults`)
-                    p.doc
+                    // Vue-prop alapértéke (`withDefaults`)
+                    p.default
                         .as_deref()
-                        .filter(|_| p.js)
                         .map(|d| format!(" = {d}"))
                         .unwrap_or_default(),
                     if p.readonly { " [readonly]" } else { "" },
@@ -255,7 +266,7 @@ fn heading_level(m: &Method) -> Option<usize> {
 
 /// A tag neve után `()`, ha hívható; a CSS-szabály / at-szabály, a JSON-kulcs, a Markdown- / HTML-címsor és a
 /// HTML `<title>` nem az.
-pub(super) fn parens(m: &Method) -> &'static str {
+pub(crate) fn parens(m: &Method) -> &'static str {
     let plain = matches!(
         m.kind.as_deref(),
         Some("rule" | "at-rule" | "key" | "title")
@@ -363,14 +374,30 @@ pub(super) fn categories(row: &QueryResult, m: &Method, lang: Lang) -> Vec<(Stri
     ordered
         .into_iter()
         .map(|((category, label), targets)| {
-            let mut unique = Vec::new();
+            // az azonos cél egyszer; dokumentum-linknél a darabszámmal (`docs/install.md ×3`)
+            let mut unique: Vec<(String, usize)> = Vec::new();
             for target in targets {
-                if !unique.contains(&target) {
-                    unique.push(target);
+                match unique.iter_mut().find(|(seen, _)| *seen == target) {
+                    Some((_, count)) => *count += 1,
+                    None => unique.push((target, 1)),
                 }
             }
             unique.sort();
-            let list = unique.join(", ");
+            let counted = matches!(
+                category.as_str(),
+                "anchor" | "external_url" | "internal_file" | "image"
+            );
+            let list = unique
+                .iter()
+                .map(|(target, count)| {
+                    if counted && *count > 1 {
+                        format!("{target} ×{count}")
+                    } else {
+                        target.clone()
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
             let list = match label {
                 Some(label) => format!("{label}: {list}"),
                 None => list,
@@ -389,6 +416,10 @@ pub(super) fn shown_target(row: &QueryResult, call: &Call, lang: Lang) -> String
     if let Some(link) = row.route_link(call, lang) {
         return format!("{target}{link}");
     }
+    // dokumentum-link: a nem létező fájl / saját címsor ` ⚠ missing`
+    if link_missing(&row.graph, call) {
+        return format!("{target}{}", lang.pick(" ⚠ missing", " ⚠ hiányzik"));
+    }
     match row.inertia_page(call) {
         Some(page) if page.exists => format!("{target} → {}", page.short),
         Some(page) => format!(
@@ -398,6 +429,108 @@ pub(super) fn shown_target(row: &QueryResult, call: &Call, lang: Lang) -> String
         ),
         None => target.to_owned(),
     }
+}
+
+/// A `package.json` / `composer.json` fájl függőségeinek zárolt verziója (név → verzió) a csomagtérképből; más
+/// fájlnál, vagy csomagtérkép nélkül `None`.
+fn manifest_locks(row: &QueryResult) -> Option<std::collections::HashMap<String, String>> {
+    let ecosystem = match std::path::Path::new(&row.graph.file)
+        .file_name()
+        .and_then(|name| name.to_str())?
+    {
+        "package.json" => "node",
+        "composer.json" => "php",
+        _ => return None,
+    };
+    let packages = row.packages.as_ref()?;
+    let locks: std::collections::HashMap<String, String> = packages
+        .all_direct()
+        .into_iter()
+        .filter(|package| package.ecosystem.label() == ecosystem)
+        .filter_map(|package| Some((package.name.clone(), package.installed.clone()?)))
+        .collect();
+    (!locks.is_empty()).then_some(locks)
+}
+
+/// A függőség-kulcs (`dependencies.vue`, `require.laravel/framework`) zárolt verziója.
+fn locked_version<'l>(
+    locks: &'l std::collections::HashMap<String, String>,
+    key: &crate::model::Constant,
+) -> Option<&'l str> {
+    if key.kind != "key" {
+        return None;
+    }
+    let (section, name) = key.name.split_once('.')?;
+    matches!(
+        section,
+        "dependencies" | "devDependencies" | "peerDependencies" | "require" | "require-dev"
+    )
+    .then(|| locks.get(name).map(String::as_str))
+    .flatten()
+}
+
+/// Hiányzik-e a dokumentum-link célja: a relatív fájl nem létezik, vagy a Markdown `#horgony` nem egyezik a fájl
+/// egyik címsorának slug-jával sem. Az ellenőrizhetetlen cél (abszolút út, séma, sablon, `%`-kódolás, HTML-id)
+/// nem hiányzik.
+fn link_missing(g: &FileGraph, call: &Call) -> bool {
+    let path = std::path::Path::new(&g.file);
+    let extension = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or_default();
+    let target = call.target.as_str();
+    if target.contains(['%', '{', '<', '$']) {
+        return false;
+    }
+    match call.category.as_str() {
+        "internal_file" if matches!(extension, "md" | "html" | "htm") => {
+            let file = target.split(['#', '?']).next().unwrap_or_default();
+            if file.is_empty() || file.starts_with('/') || file.contains(':') {
+                return false;
+            }
+            path.parent().is_some_and(|dir| !dir.join(file).exists())
+        }
+        "anchor" if extension == "md" => {
+            let wanted = target.trim_start_matches('#').to_lowercase();
+            !wanted.is_empty() && !heading_slugs(g).contains(&wanted)
+        }
+        _ => false,
+    }
+}
+
+/// A fájl címsorainak GitHub-stílusú horgony-neve (kisbetű, szóköz → `-`, írásjel nélkül; az ismétlődőé `-1`, `-2`…).
+fn heading_slugs(g: &FileGraph) -> Vec<String> {
+    let mut slugs: Vec<String> = Vec::new();
+    for m in g.methods.iter().filter(|m| heading_level(m).is_some()) {
+        let base: String = m
+            .name
+            .trim()
+            .to_lowercase()
+            .chars()
+            .filter_map(|c| match c {
+                c if c.is_alphanumeric() || c == '_' || c == '-' => Some(c),
+                c if c.is_whitespace() => Some('-'),
+                _ => None,
+            })
+            .collect();
+        let same = slugs
+            .iter()
+            .filter(|s| **s == base || is_numbered(s, &base))
+            .count();
+        slugs.push(if same == 0 {
+            base
+        } else {
+            format!("{base}-{same}")
+        });
+    }
+    slugs
+}
+
+/// A `slug` a `base-<szám>` alak (az ismétlődő címsor sorszámozott horgonya).
+fn is_numbered(slug: &str, base: &str) -> bool {
+    slug.strip_prefix(base)
+        .and_then(|rest| rest.strip_prefix('-'))
+        .is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
 }
 
 /// A hívás csomag-címkéje az outline-ban (`guzzle`): csak a csomaghoz rendelt `external_call` / `framework_use`

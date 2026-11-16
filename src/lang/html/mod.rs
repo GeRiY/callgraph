@@ -5,14 +5,16 @@
 
 mod scanner;
 
-use crate::core::SourceFile;
+use crate::core::{LineIndex, SourceFile};
 use crate::error::Result;
+use crate::lang::document::{
+    container, file_name, link_category, resolve_relative, section_ends, section_method,
+};
 use crate::lang::{Analysis, Language, LanguageDocument, LanguageRole};
-use crate::model::{Call, Container, FileGraphBuilder, Method, StringLit};
+use crate::model::{Call, FileGraphBuilder, StringLit};
 use std::path::{Path, PathBuf};
 
-/// A `<title>` szakaszának `kind`-ja (az outline `<title> …` alakban írja).
-pub const TITLE_KIND: &str = "title";
+pub use crate::lang::document::TITLE_KIND;
 
 /// HTML-fájlokat a közös dokumentum-gráfba képező nyelv.
 #[derive(Debug, Default, Clone, Copy)]
@@ -22,40 +24,6 @@ impl HtmlDocument {
     /// Alapértelmezett összeállítás.
     pub fn with_defaults() -> Self {
         Self
-    }
-    fn starts(text: &str) -> Vec<usize> {
-        std::iter::once(0)
-            .chain(text.match_indices('\n').map(|(i, _)| i + 1))
-            .collect()
-    }
-    fn line(offset: usize, starts: &[usize]) -> u32 {
-        starts.partition_point(|&x| x <= offset).max(1) as u32
-    }
-    fn category(target: &str) -> &'static str {
-        if target.starts_with('#') {
-            "anchor"
-        } else if target.contains("://") || target.starts_with("mailto:") {
-            "external_url"
-        } else {
-            "internal_file"
-        }
-    }
-    fn section_method(container: &str, name: &str, line: u32, end: u32, level: u8) -> Method {
-        Method {
-            container: Some(container.to_owned()),
-            name: name.to_owned(),
-            line,
-            end_line: Some(end),
-            visibility: (level > 0).then(|| format!("h{level}")),
-            is_static: false,
-            is_abstract: false,
-            params: vec![],
-            return_type: None,
-            doc_types: None,
-            doc: None,
-            body: None,
-            kind: (level == 0).then(|| TITLE_KIND.to_owned()),
-        }
     }
 }
 
@@ -72,29 +40,13 @@ impl Language for HtmlDocument {
 
     fn analyze(&self, file: &SourceFile) -> Result<Analysis> {
         let text = String::from_utf8_lossy(&file.text);
-        let starts = Self::starts(&text);
-        let line = |offset: usize| Self::line(offset, &starts);
-        let name = file
-            .path
-            .file_name()
-            .and_then(|x| x.to_str())
-            .unwrap_or_default()
-            .to_owned();
+        let lines = LineIndex::new(&text);
+        let line = |offset: usize| lines.line_of(offset);
+        let name = file_name(&file.path);
         let end = text.lines().count().max(1) as u32;
         let scan = scanner::scan(&text);
         let mut b = FileGraphBuilder::new(file.path_string());
-        b.container(Container {
-            kind: "document".into(),
-            name: name.clone(),
-            line: 1,
-            end_line: end,
-            is_abstract: Some(false),
-            is_final: Some(false),
-            extends: Some(vec![]),
-            implements: Some(vec![]),
-            traits: Some(vec![]),
-            doc: None,
-        });
+        b.container(container(&name, end));
         // az a címsor, amelyik alá egy pozíció tartozik (előtte `__top__`)
         let caller_at = |offset: usize| -> String {
             scan.headings
@@ -106,28 +58,21 @@ impl Language for HtmlDocument {
         if let Some(title) = &scan.title {
             let first = line(title.start);
             let last = line(title.end).max(first);
-            b.method(Self::section_method(&name, &title.text, first, last, 0));
+            b.method(section_method(&name, &title.text, first, last, 0));
         }
         let headings: Vec<(u32, u8, &str)> = scan
             .headings
             .iter()
             .map(|h| (line(h.start), h.level, h.text.as_str()))
             .collect();
-        for (idx, (first, level, title)) in headings.iter().enumerate() {
-            // a szakasz a következő azonos vagy magasabb szintű címsorig tart
-            let section_end = headings
-                .iter()
-                .skip(idx + 1)
-                .find(|(_, next, _)| *next <= *level)
-                .map_or(end, |(next, _, _)| next.saturating_sub(1))
-                .max(*first);
-            b.method(Self::section_method(
-                &name,
-                title,
-                *first,
-                section_end,
-                *level,
-            ));
+        // a szakasz a következő azonos vagy magasabb szintű címsorig tart
+        let spans: Vec<(u32, u8)> = headings
+            .iter()
+            .map(|&(first, level, _)| (first, level))
+            .collect();
+        for (&(first, level, title), section_end) in headings.iter().zip(section_ends(&spans, end))
+        {
+            b.method(section_method(&name, title, first, section_end, level));
         }
         for t in &scan.texts {
             let first = line(t.start);
@@ -144,7 +89,7 @@ impl Language for HtmlDocument {
             let category = if link.image {
                 "image"
             } else {
-                Self::category(&link.target)
+                link_category(&link.target)
             };
             b.call(Call {
                 handler: None,
@@ -170,16 +115,7 @@ impl Language for HtmlDocument {
 
 impl LanguageDocument for HtmlDocument {
     fn resolve_reference(&self, reference: &str, from: &Path) -> Option<PathBuf> {
-        if reference.starts_with('#')
-            || reference.contains("://")
-            || reference.starts_with("mailto:")
-        {
-            return None;
-        }
-        let path = from
-            .parent()?
-            .join(reference.split_once('#').map_or(reference, |(p, _)| p));
-        path.exists().then(|| path.canonicalize().unwrap_or(path))
+        resolve_relative(reference, from)
     }
 }
 

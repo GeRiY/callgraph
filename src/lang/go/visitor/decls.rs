@@ -183,6 +183,7 @@ impl<'s> GoVisitor<'_, 's> {
                     is_static: false,
                     readonly: false,
                     doc: field_doc.clone(),
+                    default: None,
                     js: false,
                 });
             }

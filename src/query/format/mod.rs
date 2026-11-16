@@ -27,10 +27,12 @@ mod summary;
 #[cfg(test)]
 mod document_tests;
 #[cfg(test)]
+mod snapshot_tests;
+#[cfg(test)]
 mod tests;
 
 pub use body::BodyMode;
-pub(crate) use outline::{call_lines, grep_outline, method_calls};
+pub(crate) use outline::{call_lines, closing_tip, grep_outline, method_calls, parens};
 pub use parse_errors::trailer as parse_trailer;
 pub(crate) use parse_errors::{file_lines as parse_error_lines, issue as parse_issue};
 

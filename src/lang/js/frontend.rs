@@ -108,7 +108,15 @@ impl Language for JsFrontend {
         let text = String::from_utf8_lossy(&file.text);
         let is_vue = crate::lang::filetype::extension_lower(&file.path).as_deref() == Some("vue");
         let mut out = JsAnalysis::new(file.path_string());
-        apply_file_meta(&mut out.builder, &self.resolver, &file.path, &text, is_vue);
+        // az SFC-t egyszer bontjuk fel: a meta, a script-blokkok és a template is ebből dolgozik
+        let sfc = is_vue.then(|| Sfc::parse(&text));
+        apply_file_meta(
+            &mut out.builder,
+            &self.resolver,
+            &file.path,
+            &text,
+            sfc.as_ref(),
+        );
         out.builder.container(Container {
             kind: if is_vue { "component" } else { "module" }.to_string(),
             name: file
@@ -125,8 +133,7 @@ impl Language for JsFrontend {
             traits: Some(Vec::new()),
             doc: None,
         });
-        if is_vue {
-            let sfc = Sfc::parse(&text);
+        if let Some(sfc) = &sfc {
             for block in sfc.scripts() {
                 let src = &text[block.start..block.end];
                 let lines = LineIndex::with_base(src, block.start_line);
@@ -150,8 +157,8 @@ impl Language for JsFrontend {
         out.builder.sort_methods_by_line();
         // a template a kész gráf metódusait és importjait olvassa, ezért az utolsó lépés
         let mut graph = out.builder.build();
-        if is_vue {
-            super::template::analyze_template(&mut graph, &text, &Sfc::parse(&text));
+        if let Some(sfc) = &sfc {
+            super::template::analyze_template(&mut graph, &text, sfc);
         }
         Ok(Analysis {
             graph,
@@ -274,8 +281,9 @@ const props = withDefaults(defineProps<Props>(), { size: 3 })
             a.graph
                 .properties
                 .iter()
-                .find(|p| p.name == n)
-                .and_then(|p| p.doc.clone())
+                // a `Props` interface tagja (F-T1) is property: a komponens propját nézzük
+                .find(|p| p.name == n && p.container.as_deref() != Some("Props"))
+                .and_then(|p| p.default.clone())
         };
         assert_eq!(default("size").as_deref(), Some("3"));
         assert_eq!(default("label"), None);

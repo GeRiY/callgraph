@@ -41,6 +41,8 @@ pub(crate) enum Symbol {
         name: String,
         line: u32,
         end: u32,
+        /// Hívható-e (a `name()` jelölés): a stíluslap-szabály, a címsor, a JSON-kulcs nem az.
+        callable: bool,
         callers: Callers,
     },
     Constant {
@@ -318,6 +320,7 @@ impl<'a> Matcher<'a> {
                 name: m.name.clone(),
                 line: m.line,
                 end: m.end_line.unwrap_or(m.line),
+                callable: !crate::query::format::parens(m).is_empty(),
                 callers: self.callers.of(m.container.as_deref(), &m.name),
             };
             self.name_hits(&m.name, m.container.as_deref(), symbol, hits);

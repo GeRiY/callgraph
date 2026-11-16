@@ -11,8 +11,9 @@ use jsonc_parser::{
     parse_to_ast,
 };
 
-use crate::core::SourceFile;
+use crate::core::{LineIndex, SourceFile};
 use crate::error::Result;
+use crate::lang::document::{container, file_name};
 use crate::lang::{Analysis, Language, LanguageDocument, LanguageRole};
 use crate::model::{Constant, FileGraphBuilder};
 
@@ -26,16 +27,6 @@ impl JsonDocument {
         Self
     }
 
-    fn line(offset: usize, starts: &[usize]) -> u32 {
-        starts.partition_point(|&start| start <= offset).max(1) as u32
-    }
-
-    fn starts(text: &str) -> Vec<usize> {
-        std::iter::once(0)
-            .chain(text.match_indices('\n').map(|(i, _)| i + 1))
-            .collect()
-    }
-
     fn scalar(value: &Value<'_>) -> Option<String> {
         match value {
             Value::StringLit(value) => Some(value.value.to_string()),
@@ -47,7 +38,7 @@ impl JsonDocument {
         value: &Value<'_>,
         path: &str,
         source: &str,
-        starts: &[usize],
+        lines: &LineIndex,
         b: &mut FileGraphBuilder,
     ) {
         if let Value::Object(object) = value {
@@ -63,7 +54,7 @@ impl JsonDocument {
                     container: Some(source.to_owned()),
                     kind: "key".into(),
                     name: child_path.clone(),
-                    line: Self::line(property.name.range().start, starts),
+                    line: lines.line_of(property.name.range().start),
                     value: Some(value::display(&property.value)),
                     visibility: Some("public".into()),
                     caller: None,
@@ -79,11 +70,11 @@ impl JsonDocument {
                 {
                     b.import(key.to_owned(), version);
                 }
-                Self::walk(&property.value, &child_path, source, starts, b);
+                Self::walk(&property.value, &child_path, source, lines, b);
             }
         } else if let Value::Array(array) = value {
             for child in &array.elements {
-                Self::walk(child, path, source, starts, b);
+                Self::walk(child, path, source, lines, b);
             }
         }
     }
@@ -109,26 +100,10 @@ impl Language for JsonDocument {
 
     fn analyze(&self, file: &SourceFile) -> Result<Analysis> {
         let text = String::from_utf8_lossy(&file.text);
-        let starts = Self::starts(&text);
+        let lines = LineIndex::new(&text);
         let mut b = FileGraphBuilder::new(file.path_string());
-        let name = file
-            .path
-            .file_name()
-            .and_then(|x| x.to_str())
-            .unwrap_or_default()
-            .to_owned();
-        b.container(crate::model::Container {
-            kind: "document".into(),
-            name: name.clone(),
-            line: 1,
-            end_line: text.lines().count().max(1) as u32,
-            is_abstract: Some(false),
-            is_final: Some(false),
-            extends: Some(vec![]),
-            implements: Some(vec![]),
-            traits: Some(vec![]),
-            doc: None,
-        });
+        let name = file_name(&file.path);
+        b.container(container(&name, text.lines().count().max(1) as u32));
         let parsed = parse_to_ast(
             &text,
             &CollectOptions {
@@ -140,7 +115,7 @@ impl Language for JsonDocument {
         let warnings = match parsed {
             Ok(parsed) => {
                 if let Some(value) = parsed.value {
-                    Self::walk(&value, "", &name, &starts, &mut b);
+                    Self::walk(&value, "", &name, &lines, &mut b);
                 }
                 Vec::new()
             }

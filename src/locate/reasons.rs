@@ -131,10 +131,12 @@ pub(crate) fn describe(reason: &Reason, terms: &[Term]) -> String {
             name,
             line,
             end,
+            callable,
             callers,
             ..
         } => {
-            let mut text = format!("{name}()  L{line}-{end}");
+            let parens = if *callable { "()" } else { "" };
+            let mut text = format!("{name}{parens}  L{line}-{end}");
             if callers.count > 0 {
                 let more = if callers.count > callers.sample.len() {
                     ", …"

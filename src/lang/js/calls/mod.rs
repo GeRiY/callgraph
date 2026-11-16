@@ -33,7 +33,11 @@ pub struct CallsPass {
 
 impl JsPass for CallsPass {
     fn run(&self, ctx: &PassContext<'_>, program: &Program<'_>, out: &mut JsAnalysis) {
-        let index = method_index(ctx, program);
+        // a `MethodsPass` már összegyűjtötte; önálló futtatásnál (teszt) újra gyűjtjük
+        let index = out
+            .method_index
+            .take()
+            .unwrap_or_else(|| method_index(ctx, program));
         let mut scope = Scope {
             names: index.names.clone(),
             ..Scope::default()
