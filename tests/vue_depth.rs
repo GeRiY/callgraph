@@ -91,6 +91,7 @@ fn depth_follows_template_usage_beyond_the_first_level() {
     let project = Project::new();
     let out = project.run(
         &[
+            "show",
             "resources/js",
             "--grep",
             "Molecules/MoleculeX.vue",
