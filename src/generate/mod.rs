@@ -44,6 +44,10 @@ pub mod php;
 pub mod preset;
 pub mod project;
 pub mod resolve;
+pub mod target;
+#[cfg(test)]
+#[allow(dead_code)] // a fixture közös: nem minden teszt használ minden segédet
+pub(crate) mod testing;
 pub mod vue;
 
 #[cfg(test)]
@@ -52,7 +56,7 @@ mod tests;
 pub use emitter::Emitter;
 pub use error::{GenError, GenResult};
 pub use fs::{Clock, Env, FileSystem, RealFs, SystemClock};
-pub use generator::{GenRequest, Generator, Output, ReplaceAt, Target};
+pub use generator::{GenRequest, Generator, Output, ReplaceAt, Target, undo};
 pub use php::PhpEmitter;
 pub use preset::{PresetGenerator, wants_preset};
 pub use vue::{VueGenerator, wants_vue};

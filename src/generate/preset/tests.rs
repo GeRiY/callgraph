@@ -1,107 +1,15 @@
 //! A preset egységtesztjei: memóriabeli fájlrendszerrel és rögzített órával (mint a generátor tesztjei).
 
-use std::cell::{Cell, RefCell};
-use std::collections::BTreeMap;
-use std::io;
-use std::path::{Path, PathBuf};
+use std::cell::Cell;
+use std::path::Path;
 
 use super::{PresetGenerator, spec};
-use crate::generate::fs::{Clock, DirEntry, Env, FileSystem};
+use crate::generate::fs::Env;
 use crate::generate::generator::{GenRequest, Generator, Target};
 use crate::generate::php::PhpEmitter;
+use crate::generate::testing::{FixedClock, MemFs, ROOT};
 
-const ROOT: &str = "/p";
 const T0: u64 = 1_700_000_000;
-
-#[derive(Default)]
-struct MemFs {
-    files: RefCell<BTreeMap<PathBuf, String>>,
-}
-
-impl MemFs {
-    fn with(files: &[(&str, &str)]) -> Self {
-        let fs = Self::default();
-        for (path, text) in files {
-            fs.files
-                .borrow_mut()
-                .insert(Path::new(ROOT).join(path), (*text).to_owned());
-        }
-        fs
-    }
-
-    fn get(&self, rel: &str) -> Option<String> {
-        self.files.borrow().get(&Path::new(ROOT).join(rel)).cloned()
-    }
-
-    fn put(&self, rel: &str, text: &str) {
-        self.files
-            .borrow_mut()
-            .insert(Path::new(ROOT).join(rel), text.to_owned());
-    }
-}
-
-impl FileSystem for MemFs {
-    fn read(&self, path: &Path) -> io::Result<String> {
-        self.files
-            .borrow()
-            .get(path)
-            .cloned()
-            .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))
-    }
-
-    fn write(&self, path: &Path, content: &str) -> io::Result<()> {
-        self.files
-            .borrow_mut()
-            .insert(path.to_path_buf(), content.to_owned());
-        Ok(())
-    }
-
-    fn create_new(&self, path: &Path, content: &str) -> io::Result<()> {
-        if self.files.borrow().contains_key(path) {
-            return Err(io::Error::from(io::ErrorKind::AlreadyExists));
-        }
-        self.write(path, content)
-    }
-
-    fn exists(&self, path: &Path) -> bool {
-        self.files.borrow().contains_key(path)
-    }
-
-    fn list(&self, dir: &Path) -> io::Result<Vec<DirEntry>> {
-        let mut entries: BTreeMap<PathBuf, bool> = BTreeMap::new();
-        for path in self.files.borrow().keys() {
-            let Ok(rest) = path.strip_prefix(dir) else {
-                continue;
-            };
-            let mut parts = rest.components();
-            let Some(first) = parts.next() else {
-                continue;
-            };
-            let is_dir = parts.next().is_some();
-            entries.insert(dir.join(first.as_os_str()), is_dir);
-        }
-        if entries.is_empty() {
-            return Err(io::Error::from(io::ErrorKind::NotFound));
-        }
-        Ok(entries
-            .into_iter()
-            .map(|(path, is_dir)| DirEntry { path, is_dir })
-            .collect())
-    }
-
-    fn remove(&self, path: &Path) -> io::Result<()> {
-        self.files.borrow_mut().remove(path);
-        Ok(())
-    }
-}
-
-struct FixedClock(Cell<u64>);
-
-impl Clock for FixedClock {
-    fn now_secs(&self) -> u64 {
-        self.0.get()
-    }
-}
 
 fn env<'a>(fs: &'a MemFs, clock: &'a FixedClock) -> Env<'a> {
     Env {
@@ -788,4 +696,37 @@ fn a_preset_takes_no_file_target() {
         .run(&req)
         .unwrap_err();
     assert!(err.to_string().contains("picks its files itself"));
+}
+
+/// A preset a `.ts` / `.js` / `.html` fájlt is ellenőrzi írás előtt (a közös `target::Checker`-rel), a hiba egy sor.
+#[test]
+fn validate_checks_ts_and_html_files_too() {
+    let planned = |rel: &str, text: &str| super::plan::Planned {
+        rel: rel.to_owned(),
+        text: text.to_owned(),
+        shown: Vec::new(),
+        summary: String::new(),
+    };
+    assert!(
+        super::validate(&planned(
+            "resources/js/types/fee.ts",
+            "export type Fee = { id: number };\n"
+        ))
+        .is_ok()
+    );
+    let err = super::validate(&planned("resources/js/types/fee.ts", "export type = ;\n"))
+        .unwrap_err()
+        .to_string();
+    assert!(
+        err.starts_with("syntax error in resources/js/types/fee.ts at L1:"),
+        "{err}"
+    );
+    assert!(err.ends_with("(nothing written)"), "{err}");
+    assert!(super::validate(&planned("public/a.html", "<div>\n</div>\n")).is_ok());
+    let err = super::validate(&planned("public/a.html", "<body>\n<div>\n</body>\n"))
+        .unwrap_err()
+        .to_string();
+    assert!(err.contains("public/a.html"), "{err}");
+    // ismeretlen kiterjesztés: nincs ellenőrzés
+    assert!(super::validate(&planned("lang/en.json", "{ not json")).is_ok());
 }

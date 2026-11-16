@@ -309,6 +309,26 @@ impl RenameParams {
     }
 }
 
+// `undo` (opt-in, mint a `generate`): a legutóbbi generálás / átnevezés visszavonása. (Típus-szintű `//` komment.)
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, JsonSchema)]
+pub(crate) struct UndoParams {
+    /// File to restore from its newest backup; default: the whole last change (all files of the last generate / rename).
+    #[serde(default)]
+    pub file: Option<String>,
+    /// Registered project alias; default: the server's working directory.
+    #[serde(default)]
+    pub project: Option<String>,
+}
+
+impl UndoParams {
+    /// A CLI `undo` argumentumai (a `--project` a hívónál jön).
+    pub(crate) fn to_args(&self) -> Vec<String> {
+        let mut args = vec!["undo".to_owned()];
+        args.extend(self.file.clone());
+        args
+    }
+}
+
 // `next`: egy korábbi eredmény javasolt következő lépése az azonosítójával.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, JsonSchema)]
 pub(crate) struct NextParams {
@@ -496,6 +516,7 @@ mod tests {
             serde_json::to_string(&schemars::schema_for!(PackageUsageParams)).unwrap(),
             serde_json::to_string(&schemars::schema_for!(GenerateParams)).unwrap(),
             serde_json::to_string(&schemars::schema_for!(RenameParams)).unwrap(),
+            serde_json::to_string(&schemars::schema_for!(UndoParams)).unwrap(),
         ] {
             for hungarian in ["eszköz", "nézet", "választás", "metódus", "függőség"] {
                 assert!(!schema.contains(hungarian), "{hungarian}: {schema}");

@@ -6,7 +6,7 @@ use std::sync::LazyLock;
 
 use regex::Regex;
 
-use super::forms::{compare, object_keys};
+use super::forms::{compare, declared_var, object_keys, sent_keys};
 use super::models::parse_model;
 use super::routes::{matching, parse_file, strip_comments};
 use super::rules::request_validation;
@@ -81,7 +81,12 @@ pub(crate) fn form_contract(page: &str, request: &str) -> Option<Contract> {
     let at = page.find("useForm(")?;
     let open = at + "useForm".len();
     let close = matching(page, open, page.len())?;
-    let fields = object_keys(page.get(open + 1..close)?)?;
+    let declared = object_keys(page.get(open + 1..close)?)?;
+    // `form.transform(..)`: a ténylegesen küldött kulcsok
+    let fields = match declared_var(page.get(..at)?) {
+        Some(var) => sent_keys(page, &var, declared)?,
+        None => declared,
+    };
     let validation = request_validation(request);
     if !validation.found {
         return None;

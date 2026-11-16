@@ -644,3 +644,57 @@ fn inline_validation_styles_and_explicit_reads() {
     assert_eq!(reads, vec!["opt", "p", "q", "remember", "title"]);
     assert!(!rules::body_validation("$x = 1;").found);
 }
+
+/// `form.transform(..)`: a küldött kulcsok a visszaadott objektum kulcsai (spreadnél a deklaráltak is); az
+/// értelmezhetetlen transform kihagyja az űrlapot.
+#[test]
+fn a_transform_decides_the_sent_keys() {
+    let sent = |transform: &str| -> Option<Vec<String>> {
+        let text = format!(
+            "const form = useForm({{ name: '', tag: '' }});\n{transform}\nconst save = () => form.post('/x');\n"
+        );
+        let calls = vec![
+            use_form(&text, "const form"),
+            submit(&text, "form.post", "form.post"),
+        ];
+        extract("p.vue", &text, &calls)
+            .into_iter()
+            .next()
+            .map(|site| site.fields)
+    };
+    // nincs transform: a deklarált mezők
+    assert_eq!(sent(""), Some(strings(&["name", "tag"])));
+    // spread: a deklarált mezők + az újak
+    assert_eq!(
+        sent("form.transform((data) => ({ ...data, slug: data.name }));"),
+        Some(strings(&["name", "tag", "slug"]))
+    );
+    // spread nélkül csak a visszaadott kulcsok (blokk-törzs `return`-nel is)
+    assert_eq!(
+        sent("form.transform((data) => {\n  return { name: data.name.trim() };\n});"),
+        Some(strings(&["name"]))
+    );
+    // értelmezhetetlen: az űrlap kimarad
+    assert_eq!(sent("form.transform(normalize);"), None);
+    // másik változó transformja nem számít
+    assert_eq!(
+        sent("other.transform((data) => ({ x: 1 }));"),
+        Some(strings(&["name", "tag"]))
+    );
+}
+
+/// A preset űrlap-szerződése a transformot is figyelembe veszi: nincs hamis „szabály nélkül küldött” mező.
+#[test]
+fn the_preset_contract_follows_the_transform() {
+    use super::preset::form_contract;
+    let request = "<?php\nclass StoreFeeRequest extends FormRequest\n{\n    public function rules(): array\n    {\n        return ['name' => 'required', 'slug' => 'required'];\n    }\n}\n";
+    let plain = "const form = useForm({ name: '', slug: '', draft: false });\n";
+    let contract = form_contract(plain, request).unwrap();
+    assert_eq!(contract.unvalidated, strings(&["draft"]));
+    let sent =
+        format!("{plain}form.transform((data) => ({{ name: data.name, slug: data.slug }}));\n");
+    let contract = form_contract(&sent, request).unwrap();
+    assert_eq!(contract.fields, strings(&["name", "slug"]));
+    assert!(contract.unvalidated.is_empty(), "{contract:?}");
+    assert!(contract.missing.is_empty(), "{contract:?}");
+}

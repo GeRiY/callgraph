@@ -2,10 +2,8 @@
 //! → emitterek (script / template / style) → fájl (Builder) → ellenőrzés (oxc / tag-egyensúly / CSS) → parancs
 //! (`WriteNew` / `InsertInto` / `ReplaceRange`, mentéssel). Semmi nem íródik, amíg a teljes új szöveg hibátlan.
 
-use std::path::{Component, Path};
-
 use super::builder::{SfcBuilder, composable_file, script_body, script_open, style_open};
-use super::check::{check_script_file, check_vue};
+use super::check::check_script_file;
 use super::edit::{
     Doc, declared_names, find_statement, indent_block, indent_of, indent_unit, last_nonblank,
     reindent,
@@ -19,10 +17,12 @@ use super::script::{ScriptEmitter, is_doc_line};
 use super::template::{components, opens_element};
 use super::{style, template};
 use crate::generate::command::{EditCommand, InsertInto, ReplaceRange, WriteNew};
-use crate::generate::edit::{extend_over_docs, range_text, split_lines};
+use crate::generate::edit::extend_over_docs;
 use crate::generate::error::{GenError, GenResult};
 use crate::generate::fs::Env;
 use crate::generate::generator::{GenRequest, Output, ReplaceAt, Target};
+use crate::generate::target::{self, Checker};
+pub(super) use crate::generate::target::{Loaded, check_expect};
 use crate::lang::js::{Sfc, SfcBlockKind};
 
 /// A cél-fájl fajtája.
@@ -70,13 +70,6 @@ pub fn wants_vue(request: &GenRequest) -> bool {
 
 fn is_script_file(file: &str) -> bool {
     matches!(file_kind(file), Ok(FileKind::Script { .. }))
-}
-
-/// Egy beolvasott fájl.
-pub(super) struct Loaded {
-    pub(super) text: String,
-    pub(super) lines: Vec<String>,
-    pub(super) eol: &'static str,
 }
 
 /// A kirajzolt szakaszok és importok.
@@ -170,32 +163,7 @@ impl<'a> VueGenerator<'a> {
     }
 
     pub(super) fn rel(&self, file: &str) -> GenResult<String> {
-        let outside = || {
-            GenError::new(crate::tf!(
-                "{} is outside the project",
-                "{} a projekten kívül van",
-                file
-            ))
-        };
-        let path = Path::new(file);
-        // a gyökér levágása az abszolútság vizsgálata előtt (Windows-on a `/p/x` nem abszolút, de a gyökér alatt van)
-        let relative = match path.strip_prefix(self.env.root) {
-            Ok(rel) => rel,
-            Err(_) if path.is_absolute() => return Err(outside()),
-            Err(_) => path,
-        };
-        let mut parts = Vec::new();
-        for component in relative.components() {
-            match component {
-                Component::Normal(part) => parts.push(part.to_string_lossy().into_owned()),
-                Component::CurDir => {}
-                _ => return Err(outside()),
-            }
-        }
-        if parts.is_empty() {
-            return Err(outside());
-        }
-        Ok(parts.join("/"))
+        target::rel(self.env.root, file)
     }
 
     fn project(&self) -> VueProject<'_> {
@@ -203,36 +171,11 @@ impl<'a> VueGenerator<'a> {
     }
 
     pub(super) fn validate(&self, rel: &str, text: &str) -> GenResult<()> {
-        let result = if super::html_gen::is_html_file(rel) {
-            super::html_scan::check_html(text)
-        } else if rel.ends_with(".vue") {
-            check_vue(text)
-        } else {
-            check_script_file(rel, text)
-        };
-        result.map_err(|p| problem(&p))
+        Checker::for_path(rel).check(text).map_err(|p| problem(&p))
     }
 
     pub(super) fn load(&self, rel: &str) -> GenResult<Loaded> {
-        let path = self.env.root.join(rel);
-        if !self.env.fs.exists(&path) {
-            return Err(GenError::new(crate::tf!(
-                "{} not found (a new file: --write {})",
-                "{} nem található (új fájl: --write {})",
-                rel,
-                rel
-            )));
-        }
-        let text = self.env.fs.read(&path).map_err(|e| {
-            GenError::new(crate::tf!(
-                "cannot read {}: {}",
-                "nem olvasható: {}: {}",
-                rel,
-                e
-            ))
-        })?;
-        let (lines, eol) = split_lines(&text);
-        Ok(Loaded { text, lines, eol })
+        target::load(self.env, rel)
     }
 
     /// A meglévő fájl kódstílusa: a fájlból, ami hiányzik, azt a projektből.
@@ -714,7 +657,7 @@ impl<'a> VueGenerator<'a> {
             ))
         })?;
         let (from, to) = (found.start, found.end + 1);
-        check_expect(&doc, &rel, (from, to), expect)?;
+        check_expect(&doc.lines, &rel, from + 1, to, expect)?;
         let from = if style.ts {
             from
         } else {
@@ -786,7 +729,7 @@ impl<'a> VueGenerator<'a> {
         let style = self.style_of(kind, &text);
         let mut doc = Doc::new(lines);
         let (from, to, label) = replace_range(&doc, kind, at, &rel)?;
-        check_expect(&doc, &rel, (from, to), expect)?;
+        check_expect(&doc.lines, &rel, from + 1, to, expect)?;
         let bound = bound_names(&doc.lines);
         let rendered = self.render(program, style, &bound);
         let module_mode =
@@ -931,33 +874,6 @@ fn class_span_of(rel: &str, doc: &Doc, class: &str) -> GenResult<ClassSpan> {
             class_names(rel, &text).join(", ")
         ))
     })
-}
-
-/// Az `--expect`: a `[from, to)` sorok sha256-előtagja egyezik-e (különben valaki közben módosította).
-pub(super) fn check_expect(
-    doc: &Doc,
-    rel: &str,
-    (from, to): (usize, usize),
-    expect: Option<&str>,
-) -> GenResult<()> {
-    let Some(prefix) = expect else {
-        return Ok(());
-    };
-    let current =
-        crate::update::checksum::sha256_hex(range_text(&doc.lines, from + 1, to).as_bytes());
-    let wanted = prefix.trim().to_ascii_lowercase();
-    if wanted.len() < 4 || !current.starts_with(&wanted) {
-        return Err(GenError::new(crate::tf!(
-            "L{}-{} of {} changed (expected sha256 {}…, current {}…): read it again before replacing",
-            "L{}-{} tartalma megváltozott ebben: {} (várt sha256 {}…, jelenlegi {}…): cserélés előtt olvasd újra",
-            from + 1,
-            to,
-            rel,
-            wanted,
-            &current[..12]
-        )));
-    }
-    Ok(())
 }
 
 /// Modulként kezelendő-e a kifejezés a meglévő fájlnál: `mod:` / osztály / export-módosító, vagy Vue-specifikus

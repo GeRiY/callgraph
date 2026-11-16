@@ -714,13 +714,13 @@ fn generate_tool_appears_only_when_enabled() {
     assert!(
         tools
             .iter()
-            .all(|t| t["name"] != "generate" && t["name"] != "rename")
+            .all(|t| !["generate", "rename", "undo"].contains(&t["name"].as_str().unwrap()))
     );
     drop(off);
 
     let mut on = Session::start_with(&dir, &[("CALLGRAPH_GENERATE", std::ffi::OsStr::new("1"))]);
     let tools = list(&mut on);
-    assert_eq!(tools.len(), 14);
+    assert_eq!(tools.len(), 15);
     let rename = tools.iter().find(|t| t["name"] == "rename").unwrap();
     assert_eq!(
         rename["annotations"]["readOnlyHint"],
@@ -730,6 +730,12 @@ fn generate_tool_appears_only_when_enabled() {
     assert!(
         rename["description"].as_str().unwrap().chars().count() <= 200,
         "{rename}"
+    );
+    let undo = tools.iter().find(|t| t["name"] == "undo").unwrap();
+    assert_eq!(undo["annotations"]["readOnlyHint"], json!(false), "{undo}");
+    assert!(
+        undo["description"].as_str().unwrap().chars().count() <= 160,
+        "{undo}"
     );
     let generate = tools.iter().find(|t| t["name"] == "generate").unwrap();
     let a = &generate["annotations"];
@@ -777,5 +783,28 @@ fn generate_tool_appears_only_when_enabled() {
     );
     assert_eq!(again["isError"], json!(true), "{again}");
     assert!(text(&again).contains("already exists"), "{again}");
+    // az `undo` visszaállítja az utolsó módosítást (a mentésből)
+    let into = on.call(
+        6,
+        "generate",
+        json!({"expr": "+extra():void", "into": "app/Pay.php::Pay"}),
+    );
+    assert_ne!(into["isError"], json!(true), "{into}");
+    assert!(
+        std::fs::read_to_string(dir.join("app/Pay.php"))
+            .unwrap()
+            .contains("extra")
+    );
+    let undone = on.call(7, "undo", json!({}));
+    assert_ne!(undone["isError"], json!(true), "{undone}");
+    assert!(
+        text(&undone).starts_with("restored app/Pay.php"),
+        "{undone}"
+    );
+    assert!(
+        !std::fs::read_to_string(dir.join("app/Pay.php"))
+            .unwrap()
+            .contains("extra")
+    );
     let _ = std::fs::remove_dir_all(&dir);
 }

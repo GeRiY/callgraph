@@ -254,6 +254,24 @@ a `method` vagy a `pattern` szűkítése; `full: true` csak indokolt esetben.
 CLI-megfelelők: `locate` = `bash $CG locate <kifejezés>…`, `outline` = `bash $CG <út>` (`method` = `<út>::név`), `method_body` = `::név --body`,
 `find_callers` = `--grep`, `search` = `--strings` / `--const`, `framework_view` = `--format <nézet>`, `notes` = `--notes`.
 
+## Generálás és undo (fájlokat ír; MCP-n opt-in)
+
+A `gen '<kifejezés>'` rövid kifejezésből kódot ír, és egy sort ad vissza; fájlt soha nem ír felül, minden módosítás előtt
+mentést készít, és az egész új szöveget megparse-olja írás előtt (szintaktikai hibánál semmi nem íródik). Az `undo` az
+utolsó módosítást állítja vissza.
+
+```bash
+bash $CG gen 'c!:Pay<Base> > ctor(-Client $http) + +charge(Order $o):Receipt' --write app/Pay.php --project myapp   # új fájl
+bash $CG gen '+refund(Order $o):void' --into app/Pay.php::Pay --after charge --project myapp                    # metódus hozzáadása
+bash $CG gen '+charge(Order $o):Receipt{ ... }' --replace app/Pay.php::charge --project myapp                   # metódus cseréje
+bash $CG gen 'c:Pay' --dry --project myapp                                                                      # előnézet: csak a kód
+bash $CG undo --project myapp                                                      # az utolsó módosítás visszaállítása (preset / rename: az összes fájlja)
+```
+
+Vue / JS / TS / HTML is (a fájl kiterjesztése szerint), és `laravel:Fee>create(name:str)+index` (egy teljes funkció, egy undo).
+MCP: a `generate`, `rename` és `undo` eszköz csak akkor szerepel a listában, ha a szerver `--generate`-tel
+(`CALLGRAPH_GENERATE=1`) fut.
+
 ## Kimenet-korlát
 
 400 sor fölött a mappás outline `summary`-ra, az egyfájlos outline metódus-indexre, a `--grep` találatonként

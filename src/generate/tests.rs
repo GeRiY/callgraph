@@ -1,116 +1,18 @@
 //! A generátor egységtesztjei: tokenizáló / parser, PHP-emitter, a feloldó-lánc, a szerkesztő-parancsok (memóriabeli
 //! fájlrendszerrel és rögzített órával), a mentések és az undo.
 
-use std::cell::{Cell, RefCell};
-use std::collections::BTreeMap;
+use std::cell::Cell;
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use super::ast::TypeKind;
 use super::backup::Backups;
-use super::fs::{Clock, DirEntry, Env, FileSystem, stamp, walk_php};
+use super::fs::{DirEntry, Env, FileSystem, stamp, walk_php};
 use super::generator::{GenRequest, Generator, Output, ReplaceAt, Target};
 use super::php::PhpEmitter;
 use super::project::Psr4;
+use super::testing::{FixedClock, MemFs, ROOT};
 use super::{Emitter, parser};
-
-/// Memóriabeli fájlrendszer (abszolút utak, `/p` a gyökér).
-#[derive(Default)]
-struct MemFs {
-    files: RefCell<BTreeMap<PathBuf, String>>,
-}
-
-impl MemFs {
-    fn with(files: &[(&str, &str)]) -> Self {
-        let fs = Self::default();
-        for (path, text) in files {
-            fs.files
-                .borrow_mut()
-                .insert(Path::new(ROOT).join(path), (*text).to_owned());
-        }
-        fs
-    }
-
-    fn get(&self, rel: &str) -> Option<String> {
-        self.files.borrow().get(&Path::new(ROOT).join(rel)).cloned()
-    }
-
-    fn names_under(&self, rel: &str) -> Vec<String> {
-        let dir = Path::new(ROOT).join(rel);
-        self.files
-            .borrow()
-            .keys()
-            .filter(|p| p.starts_with(&dir))
-            .map(|p| p.display().to_string())
-            .collect()
-    }
-}
-
-impl FileSystem for MemFs {
-    fn read(&self, path: &Path) -> io::Result<String> {
-        self.files
-            .borrow()
-            .get(path)
-            .cloned()
-            .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))
-    }
-
-    fn write(&self, path: &Path, content: &str) -> io::Result<()> {
-        self.files
-            .borrow_mut()
-            .insert(path.to_path_buf(), content.to_owned());
-        Ok(())
-    }
-
-    fn create_new(&self, path: &Path, content: &str) -> io::Result<()> {
-        if self.files.borrow().contains_key(path) {
-            return Err(io::Error::from(io::ErrorKind::AlreadyExists));
-        }
-        self.write(path, content)
-    }
-
-    fn exists(&self, path: &Path) -> bool {
-        self.files.borrow().contains_key(path)
-    }
-
-    fn list(&self, dir: &Path) -> io::Result<Vec<DirEntry>> {
-        let mut entries: BTreeMap<PathBuf, bool> = BTreeMap::new();
-        for path in self.files.borrow().keys() {
-            let Ok(rest) = path.strip_prefix(dir) else {
-                continue;
-            };
-            let mut parts = rest.components();
-            let Some(first) = parts.next() else {
-                continue;
-            };
-            let is_dir = parts.next().is_some();
-            entries.insert(dir.join(first.as_os_str()), is_dir);
-        }
-        if entries.is_empty() {
-            return Err(io::Error::from(io::ErrorKind::NotFound));
-        }
-        Ok(entries
-            .into_iter()
-            .map(|(path, is_dir)| DirEntry { path, is_dir })
-            .collect())
-    }
-
-    fn remove(&self, path: &Path) -> io::Result<()> {
-        self.files.borrow_mut().remove(path);
-        Ok(())
-    }
-}
-
-const ROOT: &str = "/p";
-
-/// Rögzített, léptethető óra.
-struct FixedClock(Cell<u64>);
-
-impl Clock for FixedClock {
-    fn now_secs(&self) -> u64 {
-        self.0.get()
-    }
-}
 
 /// 2023-11-14T22:13:20Z
 const T0: u64 = 1_700_000_000;
@@ -1133,4 +1035,51 @@ fn params_accept_names_without_a_dollar() {
         (php[0].name.as_str(), php[0].default.as_deref()),
         ("order", Some("null"))
     );
+}
+
+/// A közös fixture számolja a `read` / `list` hívásokat (az IO-regressziós assertek alapja).
+#[test]
+fn the_fixture_counts_reads_and_lists() {
+    let fs = MemFs::with(&[("app/A.php", "<?php\n")]);
+    assert_eq!((fs.read_calls(), fs.list_calls()), (0, 0));
+    fs.read(&Path::new(ROOT).join("app/A.php")).unwrap();
+    fs.list(&Path::new(ROOT).join("app")).unwrap();
+    fs.list(&Path::new(ROOT).join("app")).unwrap();
+    assert_eq!((fs.read_calls(), fs.list_calls()), (1, 2));
+    fs.reset_counters();
+    assert_eq!((fs.read_calls(), fs.list_calls()), (0, 0));
+}
+
+/// A közös ellenőrző a kiterjesztés szerint választ; ismeretlen kiterjesztésnél nem ellenőriz.
+#[test]
+fn the_checker_follows_the_extension() {
+    use super::target::Checker;
+    assert!(
+        Checker::for_path("app/A.php")
+            .check("<?php\nclass A {}\n")
+            .is_ok()
+    );
+    assert!(
+        Checker::for_path("app/A.php")
+            .check("<?php\nclass {\n")
+            .is_err()
+    );
+    assert!(
+        Checker::for_path("a.ts")
+            .check("const a: number = 1;\n")
+            .is_ok()
+    );
+    assert!(Checker::for_path("a.ts").check("const = ;\n").is_err());
+    assert!(
+        Checker::for_path("a.html")
+            .check("<body>\n<div>\n</body>\n")
+            .is_err()
+    );
+    assert!(
+        Checker::for_path("a.vue")
+            .check("<template>\n<div>\n</template>\n")
+            .is_err()
+    );
+    assert_eq!(Checker::for_path("notes.txt"), Checker::Skip);
+    assert!(Checker::for_path("notes.txt").check("<<<").is_ok());
 }

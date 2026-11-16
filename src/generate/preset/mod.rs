@@ -45,13 +45,11 @@ mod spec;
 #[cfg(test)]
 mod tests;
 
-use super::PhpEmitter;
 use super::command::{GroupFile, WriteGroup};
-use super::emitter::Emitter;
 use super::error::{GenError, GenResult};
 use super::fs::Env;
 use super::generator::{GenRequest, Output, Target};
-use super::vue;
+use super::target::Checker;
 use plan::Planned;
 
 /// A preset-nek szól-e a kérés: a kifejezés feje `laravel:`.
@@ -132,30 +130,27 @@ impl<'a> PresetGenerator<'a> {
     }
 }
 
-/// Egy tervezett fájl szintaxis-ellenőrzése írás előtt (PHP: mago, Vue: oxc / tag-egyensúly / CSS).
+/// Egy tervezett fájl szintaxis-ellenőrzése írás előtt (PHP: mago, Vue / TS / JS: oxc, tag-egyensúly, CSS; HTML:
+/// tag-egyensúly), a közös `target::Checker`-rel.
 fn validate(file: &Planned) -> GenResult<()> {
-    if file.rel.ends_with(".php") {
-        PhpEmitter
-            .check(&file.rel, &file.text)
-            .map_err(|(line, message)| {
-                GenError::new(crate::tf!(
-                    "syntax error in {} at L{}: {} (nothing written)",
-                    "szintaktikai hiba itt: {} az L{}. sorban: {} (nem írtam semmit)",
-                    file.rel,
-                    line,
-                    message
-                ))
-            })
-    } else if file.rel.ends_with(".vue") {
-        vue::check_sfc(&file.text).map_err(|message| {
+    Checker::for_path(&file.rel).check(&file.text).map_err(|p| {
+        if p.section == file.rel {
             GenError::new(crate::tf!(
-                "syntax error in {}: {} (nothing written)",
-                "szintaktikai hiba itt: {}: {} (nem írtam semmit)",
+                "syntax error in {} at L{}: {} (nothing written)",
+                "szintaktikai hiba itt: {} az L{}. sorban: {} (nem írtam semmit)",
                 file.rel,
-                message
+                p.line,
+                p.message
             ))
-        })
-    } else {
-        Ok(())
-    }
+        } else {
+            GenError::new(crate::tf!(
+                "syntax error in {}: {} L{}: {} (nothing written)",
+                "szintaktikai hiba itt: {}: {} L{}: {} (nem írtam semmit)",
+                file.rel,
+                p.section,
+                p.line,
+                p.message
+            ))
+        }
+    })
 }

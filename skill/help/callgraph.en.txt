@@ -171,7 +171,7 @@ Update (from GitHub Releases; projects.json, lang, errors.jsonl, feedback.jsonl,
   check.callgraph.eu (no ID, no IP stored). Off: CALLGRAPH_COUNT=0 or DO_NOT_TRACK=1 (also with CALLGRAPH_UPDATE_CHECK=0);
   DO_NOT_TRACK=1 also stops the opt-in telemetry.
 
-Code generator (writes files; the MCP `generate` tool is off unless the server runs with --generate or CALLGRAPH_GENERATE=1):
+Code generator (writes files; the MCP `generate`, `rename` and `undo` tools are off unless the server runs with --generate or CALLGRAPH_GENERATE=1):
   bash ~/.claude/skills/callgraph/callgraph.sh gen '<expr>' [--dry] [--write <file> | --into <file>[::Class] [--after <method>] | --replace <file>(:L<a>-L<b> | ::<method>) [--expect <sha256-prefix>]] [--project alias]
     Prints one line (what was written, the backup, `unresolved: Foo` for names it could not import); code only with --dry
     (the default without a target). Never overwrites a file (--write refuses an existing one); every change to an existing

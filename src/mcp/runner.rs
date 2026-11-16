@@ -4,7 +4,7 @@
 use std::path::PathBuf;
 
 use super::guard::ProjectRoot;
-use super::params::{GenerateParams, RenameParams};
+use super::params::{GenerateParams, RenameParams, UndoParams};
 use super::request::ShowQuery;
 use crate::cli::{CliArgs, build_command};
 use crate::skill::{ProjectRegistry, SkillHome};
@@ -62,6 +62,11 @@ pub(crate) trait QueryRunner: Send + Sync {
     fn rename(&self, params: &RenameParams) -> Result<String, String> {
         let _ = params;
         Err(crate::t!("rename is not available", "a rename nem érhető el").into())
+    }
+    /// Az utolsó generálás / átnevezés visszavonása (`undo` eszköz, opt-in): a CLI `undo` parancsának kimenete.
+    fn undo(&self, params: &UndoParams) -> Result<String, String> {
+        let _ = params;
+        Err(crate::t!("undo is not available", "az undo nem érhető el").into())
     }
 }
 
@@ -204,6 +209,14 @@ impl QueryRunner for ShowRunner {
     }
 
     fn rename(&self, params: &RenameParams) -> Result<String, String> {
+        let root = self.root(params.project.as_deref())?;
+        let mut args = params.to_args();
+        args.push("--project".to_owned());
+        args.push(root.root().display().to_string());
+        Self::execute_plain(args)
+    }
+
+    fn undo(&self, params: &UndoParams) -> Result<String, String> {
         let root = self.root(params.project.as_deref())?;
         let mut args = params.to_args();
         args.push("--project".to_owned());

@@ -16,7 +16,7 @@ use rmcp::{ServerHandler, tool, tool_handler, tool_router};
 use super::params::{
     FindCallersParams, FrameworkViewParams, GenerateParams, LocateParams, MethodBodyParams,
     NextParams, NotesParams, OutlineParams, PackageUsageParams, ProfileParams, RenameParams,
-    SearchParams,
+    SearchParams, UndoParams,
 };
 use super::request::ShowQuery;
 use super::runner::QueryRunner;
@@ -41,6 +41,7 @@ impl CallgraphServer {
         if !crate::generate::enabled() {
             tool_router.remove_route("generate");
             tool_router.remove_route("rename");
+            tool_router.remove_route("undo");
         }
         Self {
             runner,
@@ -347,6 +348,26 @@ impl CallgraphServer {
             .await
             .unwrap_or_else(|e| Err(e.to_string()));
         let call = Self::plain(CommandKind::Rename, started, project.as_deref());
+        self.finish(&call, result)
+    }
+
+    #[tool(
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            idempotent_hint = false,
+            open_world_hint = false
+        ),
+        description = "Undo the last change made by generate or rename: restores the file (or, without file, the whole last group) from its backup."
+    )]
+    async fn undo(&self, Parameters(p): Parameters<UndoParams>) -> CallToolResult {
+        let started = Instant::now();
+        let project = p.project.clone();
+        let runner = Arc::clone(&self.runner);
+        let result = tokio::task::spawn_blocking(move || runner.undo(&p))
+            .await
+            .unwrap_or_else(|e| Err(e.to_string()));
+        let call = Self::plain(CommandKind::Undo, started, project.as_deref());
         self.finish(&call, result)
     }
 

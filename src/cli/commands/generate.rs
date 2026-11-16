@@ -8,7 +8,7 @@ use crate::cli::Command;
 use crate::error::Result;
 use crate::generate::{
     Env, GenRequest, Generator, PhpEmitter, PresetGenerator, RealFs, SystemClock, VueGenerator,
-    wants_preset, wants_vue,
+    undo, wants_preset, wants_vue,
 };
 use crate::skill::SkillHome;
 
@@ -84,7 +84,7 @@ impl Command for UndoCommand {
             fs: &RealFs,
             clock: &SystemClock,
         };
-        match Generator::new(env, PhpEmitter).undo(self.file.as_deref()) {
+        match undo(env, self.file.as_deref()) {
             Ok(output) => {
                 write!(out, "{}", output.render())?;
                 Ok(0)

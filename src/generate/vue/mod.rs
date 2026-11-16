@@ -121,6 +121,10 @@ mod types;
 mod tests;
 
 pub use generator::{VueGenerator, wants_vue};
+// a közös célfájl-infrastruktúra (`generate::target`) ellenőrzői
+pub(crate) use check::{Problem, check_script_file, check_vue};
+pub(crate) use html_gen::is_html_file;
+pub(crate) use html_scan::check_html;
 
 /// A projekt Vue-stílusa a preset számára: TypeScript-e, pontosvesszős-e, és a behúzás-egység.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

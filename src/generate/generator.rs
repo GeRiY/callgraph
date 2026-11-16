@@ -4,20 +4,17 @@
 //! új szöveg nem parse-ol hibátlanul.
 
 use std::collections::BTreeSet;
-use std::path::{Component, Path};
 
 use super::ast::{Member, Program, TypeKind};
 use super::command::{EditCommand, InsertInto, ReplaceRange, Undo, WriteNew};
-use super::edit::{
-    add_imports, extend_over_docs, insert_after_line, insert_at_end, join_lines, range_text,
-    split_lines,
-};
+use super::edit::{add_imports, extend_over_docs, insert_after_line, insert_at_end, join_lines};
 use super::emitter::{Emitter, FileSpec};
 use super::error::{GenError, GenResult};
 use super::fs::Env;
 use super::parser;
 use super::project::{Psr4, detect_strict_types};
 use super::resolve::ResolverChain;
+use super::target;
 use crate::model::{Container, FileGraph};
 
 /// Hová menjen a generált kód.
@@ -85,6 +82,17 @@ struct Loaded {
     graph: FileGraph,
 }
 
+/// Az `undo` a generátor / átnevezés mentéseiből: a fájl (vagy a legutóbb mentett fájl / csoport) visszaállítása.
+/// Az emitterhez nincs köze, ezért önálló függvény (a CLI és az MCP is ezt hívja).
+pub fn undo(env: Env<'_>, file: Option<&str>) -> GenResult<Output> {
+    let rel = file.map(|f| target::rel(env.root, f)).transpose()?;
+    let line = Undo { rel }.execute(env)?;
+    Ok(Output {
+        lines: vec![line],
+        unresolved: Vec::new(),
+    })
+}
+
 /// A Facade.
 pub struct Generator<'a, E: Emitter> {
     env: Env<'a>,
@@ -132,42 +140,12 @@ impl<'a, E: Emitter> Generator<'a, E> {
 
     /// Az `undo`: a fájl (vagy a legutóbb mentett fájl) legutóbbi mentésének visszaállítása.
     pub fn undo(&self, file: Option<&str>) -> GenResult<Output> {
-        let rel = file.map(|f| self.rel(f)).transpose()?;
-        let line = Undo { rel }.execute(self.env)?;
-        Ok(Output {
-            lines: vec![line],
-            unresolved: Vec::new(),
-        })
+        undo(self.env, file)
     }
 
-    /// A felhasználói fájl-út projekt-relatív, `/`-es alakja; a gyökéren kívüli út hiba.
+    /// A felhasználói fájl-út projekt-relatív, `/`-es alakja (lásd `target::rel`).
     fn rel(&self, file: &str) -> GenResult<String> {
-        let outside = || {
-            GenError::new(crate::tf!(
-                "{} is outside the project",
-                "{} a projekten kívül van",
-                file
-            ))
-        };
-        let path = Path::new(file);
-        // a gyökér levágása az abszolútság vizsgálata előtt (Windows-on a `/p/x` nem abszolút, de a gyökér alatt van)
-        let relative = match path.strip_prefix(self.env.root) {
-            Ok(rel) => rel,
-            Err(_) if path.is_absolute() => return Err(outside()),
-            Err(_) => path,
-        };
-        let mut parts = Vec::new();
-        for component in relative.components() {
-            match component {
-                Component::Normal(part) => parts.push(part.to_string_lossy().into_owned()),
-                Component::CurDir => {}
-                _ => return Err(outside()),
-            }
-        }
-        if parts.is_empty() {
-            return Err(outside());
-        }
-        Ok(parts.join("/"))
+        target::rel(self.env.root, file)
     }
 
     fn check_extension(&self, rel: &str) -> GenResult<()> {
@@ -333,26 +311,13 @@ impl<'a, E: Emitter> Generator<'a, E> {
 
     /// A meglévő fájl beolvasása és elemzése.
     fn load(&self, rel: &str) -> GenResult<Loaded> {
-        let path = self.env.root.join(rel);
-        if !self.env.fs.exists(&path) {
-            return Err(GenError::new(crate::tf!(
-                "{} not found (a new file: --write {})",
-                "{} nem található (új fájl: --write {})",
-                rel,
-                rel
-            )));
-        }
-        let text = self.env.fs.read(&path).map_err(|e| {
-            GenError::new(crate::tf!(
-                "cannot read {}: {}",
-                "nem olvasható: {}: {}",
-                rel,
-                e
-            ))
-        })?;
-        let (lines, eol) = split_lines(&text);
-        let graph = self.emitter.analyze(rel, &text);
-        Ok(Loaded { lines, eol, graph })
+        let source = target::load(self.env, rel)?;
+        let graph = self.emitter.analyze(rel, &source.text);
+        Ok(Loaded {
+            lines: source.lines,
+            eol: source.eol,
+            graph,
+        })
     }
 
     /// A tagok forrása a `--into`-hoz: egyetlen típus tagjai, vagy a csupasz tagok.
@@ -491,22 +456,7 @@ impl<'a, E: Emitter> Generator<'a, E> {
                 (start, end, Some(name.as_str()))
             }
         };
-        if let Some(prefix) = expect {
-            let current =
-                crate::update::checksum::sha256_hex(range_text(&lines, from, to).as_bytes());
-            let wanted = prefix.trim().to_ascii_lowercase();
-            if wanted.len() < 4 || !current.starts_with(&wanted) {
-                return Err(GenError::new(crate::tf!(
-                    "L{}-{} of {} changed (expected sha256 {}…, current {}…): read it again before replacing",
-                    "L{}-{} tartalma megváltozott ebben: {} (várt sha256 {}…, jelenlegi {}…): cserélés előtt olvasd újra",
-                    from,
-                    to,
-                    rel,
-                    wanted,
-                    &current[..12]
-                )));
-            }
-        }
+        target::check_expect(&lines, &rel, from, to, expect)?;
         let kind = graph
             .containers
             .iter()

@@ -250,6 +250,22 @@ Output is capped at 400 lines (directory → summary, file → method index, sea
 CLI equivalents: `locate` = `bash $CG locate <term>…`, `outline` = `bash $CG <path>` (`method` = `<path>::name`), `method_body` = `::name --body`,
 `find_callers` = `--grep`, `search` = `--strings` / `--const`, `framework_view` = `--format <view>`, `notes` = `--notes`.
 
+## Generate and undo (writes files; opt-in over MCP)
+
+`gen '<expr>'` writes code from a short expression and prints one line; it never overwrites a file, backs up every change
+first and parses the whole new text before writing (on a syntax error nothing is written). `undo` restores the last change.
+
+```bash
+bash $CG gen 'c!:Pay<Base> > ctor(-Client $http) + +charge(Order $o):Receipt' --write app/Pay.php --project myapp   # new file
+bash $CG gen '+refund(Order $o):void' --into app/Pay.php::Pay --after charge --project myapp                    # add a method
+bash $CG gen '+charge(Order $o):Receipt{ ... }' --replace app/Pay.php::charge --project myapp                   # replace a method
+bash $CG gen 'c:Pay' --dry --project myapp                                                                      # preview: the code only
+bash $CG undo --project myapp                                                      # restore the last change (a preset / rename: all its files)
+```
+
+Also Vue / JS / TS / HTML (by the file extension) and `laravel:Fee>create(name:str)+index` (a whole feature, one undo).
+MCP: the `generate`, `rename` and `undo` tools are listed only when the server runs with `--generate` (`CALLGRAPH_GENERATE=1`).
+
 ## Output limit
 
 Above 400 lines the directory outline switches to `summary`, the single-file outline to a method index, `--grep` to

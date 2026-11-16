@@ -222,7 +222,7 @@ impl VueGenerator<'_> {
             }
             ReplaceAt::Method { name, .. } => element_lines(&doc, &rel, name)?,
         };
-        check_expect(&doc, &rel, (from, to), expect)?;
+        check_expect(&doc.lines, &rel, from + 1, to, expect)?;
         let unit = indent_unit(&doc.lines);
         let indent = doc.lines.get(from).map_or(0, |l| indent_of(l));
         let block = indent_block(&reindent(&render_nodes(&nodes), unit), indent);

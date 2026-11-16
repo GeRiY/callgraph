@@ -14,7 +14,7 @@ use regex::Regex;
 use super::super::files::ProjectFiles;
 use super::super::inertia::render::{literal, source_args_named, split_top};
 use super::cache::MethodInfo;
-use super::routes::{Action, Route, short_class, strip_comments};
+use super::routes::{Action, Route, matching, short_class, strip_comments};
 use super::rules::{self, Validation};
 use super::{Laravel, has_verb};
 use crate::i18n::Lang;
@@ -164,7 +164,8 @@ pub(super) fn extract(rel: &str, text: &str, calls: &[Call]) -> Vec<Site> {
                 [object, ..] => object,
                 [] => return None,
             };
-            Some((call.line, var, object_keys(object)?))
+            let keys = sent_keys(text, &var, object_keys(object)?)?;
+            Some((call.line, var, keys))
         })
         .collect();
     if decls.is_empty() {
@@ -229,15 +230,24 @@ pub(super) fn extract(rel: &str, text: &str, calls: &[Call]) -> Vec<Site> {
 /// Egy objektum-literál felső szintű kulcsai: `{ name: '', 'e-mail': '', password }`; ha az argumentum nem
 /// literál, vagy egy elem spread / számított kulcs: `None`.
 pub(super) fn object_keys(arg: &str) -> Option<Vec<String>> {
+    let (keys, spread) = object_entries(arg)?;
+    (!spread).then_some(keys)
+}
+
+/// Egy objektum-literál felső szintű kulcsai és hogy volt-e benne spread (`...data`); nem literál / számított kulcs:
+/// `None`.
+fn object_entries(arg: &str) -> Option<(Vec<String>, bool)> {
     let inner = arg.trim().strip_prefix('{')?.strip_suffix('}')?;
     let mut keys = Vec::new();
+    let mut spread = false;
     for entry in split_top(inner, ",") {
         let entry = entry.trim();
         if entry.is_empty() {
             continue;
         }
         if entry.starts_with("...") {
-            return None;
+            spread = true;
+            continue;
         }
         let head = split_top(entry, ":")[0].trim();
         let key = match head.chars().next()? {
@@ -254,7 +264,65 @@ pub(super) fn object_keys(arg: &str) -> Option<Vec<String>> {
             keys.push(key);
         }
     }
-    Some(keys)
+    Some((keys, spread))
+}
+
+/// Az űrlap-változó neve a `useForm` hívás előtti szövegből: `const form = useForm(` → `form`.
+pub(super) fn declared_var(before: &str) -> Option<String> {
+    static DECL: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:await\s+)?$")
+            .expect("valid regex")
+    });
+    DECL.captures(before).map(|found| found[1].to_owned())
+}
+
+/// A ténylegesen küldött kulcsok: ha az űrlapra van `<var>.transform(<függvény>)`, a függvény által visszaadott
+/// objektum kulcsai (spreadnél — `...data` — a deklarált mezők is); nem értelmezhető transformnál `None` (az űrlap
+/// kimarad, mint a nem literál). Transform nélkül a deklarált mezők.
+pub(super) fn sent_keys(text: &str, var: &str, declared: Vec<String>) -> Option<Vec<String>> {
+    let needle = format!("{var}.transform(");
+    let found = text.match_indices(&needle).map(|(at, _)| at).find(|&at| {
+        !text
+            .get(..at)
+            .and_then(|before| before.chars().next_back())
+            .is_some_and(|c| c.is_alphanumeric() || matches!(c, '_' | '$' | '.'))
+    });
+    let Some(at) = found else {
+        return Some(declared);
+    };
+    let open = at + needle.len() - 1;
+    let close = matching(text, open, text.len())?;
+    let object = returned_object(text.get(open + 1..close)?)?;
+    let (keys, spread) = object_entries(object)?;
+    if !spread {
+        return Some(keys);
+    }
+    let mut all = declared;
+    for key in keys {
+        if !all.contains(&key) {
+            all.push(key);
+        }
+    }
+    Some(all)
+}
+
+/// A transform-függvény által visszaadott objektum-literál szövege: `(d) => ({ .. })`, `d => { return { .. }; }`,
+/// `function (d) { return { .. } }`; más alak: `None`.
+fn returned_object(function: &str) -> Option<&str> {
+    let body = match function.find("=>") {
+        Some(arrow) => function.get(arrow + 2..)?.trim(),
+        None => function.trim(),
+    };
+    if body.starts_with('(') {
+        let close = matching(body, 0, body.len())?;
+        let inner = body.get(1..close)?.trim();
+        return inner.starts_with('{').then_some(inner);
+    }
+    let rest = body
+        .get(body.find("return")? + "return".len()..)?
+        .trim_start();
+    let close = matching(rest, 0, rest.len()).filter(|_| rest.starts_with('{'))?;
+    rest.get(..=close)
 }
 
 /// A `composer.json` `autoload` / `autoload-dev` PSR-4 leképezése: (előtag `\\`-rel a végén, mappa `/` nélkül).
