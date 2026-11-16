@@ -9,6 +9,15 @@
   <author><name>Gergő Makra</name></author>
   <icon>https://callgraph.eu/assets/favicon.svg</icon>
   <entry>
+    <title>callgraph v1.0.2</title>
+    <link rel="alternate" type="text/html" href="https://callgraph.eu/changelog/#v1.0.2"/>
+    <link rel="related" type="text/html" href="https://github.com/GeRiY/callgraph/releases/tag/v1.0.2"/>
+    <id>https://github.com/GeRiY/callgraph/releases/tag/v1.0.2</id>
+    <updated>2026-11-16T00:00:00Z</updated>
+    <published>2026-11-16T00:00:00Z</published>
+    <content type="html">&lt;h3&gt;Changed&lt;/h3&gt;&lt;ul&gt;&lt;li&gt;&lt;strong&gt;The &lt;code&gt;root:&lt;/code&gt; line shows the git branch:&lt;/strong&gt; the &lt;code&gt;root:&lt;/code&gt; line at the top of multi-file outputs (and &lt;code&gt;locate&lt;/code&gt;) now ends with the branch of the project root, e.g. &lt;code&gt;root: /x/app (branch: feature/z)&lt;/code&gt;; on a detached HEAD it shows &lt;code&gt;detached &amp;lt;sha7&amp;gt;&lt;/code&gt;, and without git it is unchanged. An agent sees at once when it looks at another checkout than the one where the branch was switched (a &lt;code&gt;--project&lt;/code&gt; alias pointing to another clone or worktree, an MCP server started in another folder).&lt;/li&gt;&lt;/ul&gt;&lt;h3&gt;Fixed&lt;/h3&gt;&lt;ul&gt;&lt;li&gt;&lt;strong&gt;Short &lt;code&gt;::method&lt;/code&gt; selector works in a multi-selector call:&lt;/strong&gt; &lt;code&gt;callgraph.sh src/Sample.php::alpha ::beta --body&lt;/code&gt; now shows both bodies; &lt;code&gt;::beta&lt;/code&gt; reuses the file of the previous selector. Before, it answered "Not found: &amp;lt;root&amp;gt;/". A &lt;code&gt;::method&lt;/code&gt; with no file before it gives a clear usage error, and the help lists the form.&lt;/li&gt;&lt;/ul&gt;</content>
+  </entry>
+  <entry>
     <title>callgraph v1.0.1</title>
     <link rel="alternate" type="text/html" href="https://callgraph.eu/changelog/#v1.0.1"/>
     <link rel="related" type="text/html" href="https://github.com/GeRiY/callgraph/releases/tag/v1.0.1"/>

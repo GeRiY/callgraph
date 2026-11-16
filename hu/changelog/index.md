@@ -8,6 +8,20 @@ Minden kiadás dátummal, a legújabb elöl: mi új, mi változott és mi javult
 
 [A legújabb verzió telepítése](https://callgraph.eu/hu/#install)[Legfrissebb kiadás a GitHubon](https://github.com/GeRiY/callgraph/releases/latest)
 
+## v1.0.2 — 2026-11-16
+
+[Kiadási jegyzet és letöltések a GitHubon](https://github.com/GeRiY/callgraph/releases/tag/v1.0.2)
+
+### Változás
+
+
+- **A `gyökér:` sor mutatja a git ágat:** a többfájlos kimenetek (és a `locate`) tetején álló gyökérsor mostantól a projektgyökér ágával végződik, pl. `gyökér: /x/app (ág: feature/z)`; detached HEAD esetén `detached <sha7>` áll benne, git nélkül pedig nem változik. Az agent azonnal látja, ha nem abban a checkoutban néz körül, ahol az ágat váltották (másik klónra vagy worktree-re mutató `--project` alias, más mappában indított MCP-szerver).
+
+### Javítás
+
+
+- **A rövid `::method` kijelölő működik többkijelölős hívásban:** a `callgraph.sh src/Sample.php::alpha ::beta --body` mostantól mindkét törzset mutatja; a `::beta` az előző kijelölő fájlját használja újra. Korábban „Not found: <root>/" választ adott. A fájl nélküli, elöl álló `::method` érthető használati hibát ad, a súgó pedig felsorolja ezt az alakot.
+
 ## v1.0.1 — 2026-11-16
 
 [Kiadási jegyzet és letöltések a GitHubon](https://github.com/GeRiY/callgraph/releases/tag/v1.0.1)

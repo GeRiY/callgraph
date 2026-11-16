@@ -2,13 +2,13 @@
 
 Source: https://callgraph.eu/hu/
 
-[v1.0.1 — újdonságok →](https://callgraph.eu/hu/changelog/)
+[v1.0.2 — újdonságok →](https://callgraph.eu/hu/changelog/)
 
 # Értsd meg a kódot, olvasás nélkül.
 
 A **callgraph** token-hatékony kód-térkép AI kódoló agenteknek. Megmutatja a szerkezetet, a kategorizált hívás-gráfot, egy-egy metódus törzsét, hogy *„ki hívja?”*, és a hatáselemzést — pár tucat sorban, a teljes fájlok helyett.
 
-[Telepítés egy sorral](https://callgraph.eu/hu/#install) [Letöltés: v1.0.1](https://github.com/GeRiY/callgraph/releases/latest) [Megnézem a GitHubon](https://github.com/GeRiY/callgraph)
+[Telepítés egy sorral](https://callgraph.eu/hu/#install) [Letöltés: v1.0.2](https://github.com/GeRiY/callgraph/releases/latest) [Megnézem a GitHubon](https://github.com/GeRiY/callgraph)
 
 ```
 $ callgraph.sh --project shop app/Models/Order.php

@@ -8,6 +8,20 @@ Every release with its date, newest first: what was added, changed and fixed. Do
 
 [Install the latest version](https://callgraph.eu/#install)[Latest release on GitHub](https://github.com/GeRiY/callgraph/releases/latest)
 
+## v1.0.2 — 2026-11-16
+
+[Release notes and downloads on GitHub](https://github.com/GeRiY/callgraph/releases/tag/v1.0.2)
+
+### Changed
+
+
+- **The `root:` line shows the git branch:** the `root:` line at the top of multi-file outputs (and `locate`) now ends with the branch of the project root, e.g. `root: /x/app (branch: feature/z)`; on a detached HEAD it shows `detached <sha7>`, and without git it is unchanged. An agent sees at once when it looks at another checkout than the one where the branch was switched (a `--project` alias pointing to another clone or worktree, an MCP server started in another folder).
+
+### Fixed
+
+
+- **Short `::method` selector works in a multi-selector call:** `callgraph.sh src/Sample.php::alpha ::beta --body` now shows both bodies; `::beta` reuses the file of the previous selector. Before, it answered "Not found: <root>/". A `::method` with no file before it gives a clear usage error, and the help lists the form.
+
 ## v1.0.1 — 2026-11-16
 
 [Release notes and downloads on GitHub](https://github.com/GeRiY/callgraph/releases/tag/v1.0.1)
