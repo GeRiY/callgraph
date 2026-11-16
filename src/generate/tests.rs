@@ -8,7 +8,7 @@ use std::path::Path;
 use super::ast::TypeKind;
 use super::backup::Backups;
 use super::fs::{DirEntry, Env, FileSystem, stamp, walk_php};
-use super::generator::{GenRequest, Generator, Output, ReplaceAt, Target};
+use super::generator::{GenRequest, Generator, Opts, Output, ReplaceAt, Target};
 use super::php::PhpEmitter;
 use super::project::Psr4;
 use super::testing::{FixedClock, MemFs, ROOT};
@@ -30,6 +30,7 @@ fn request(expr: &str, dry: bool, target: Target) -> GenRequest {
         expr: expr.to_owned(),
         dry,
         target,
+        opts: Default::default(),
     }
 }
 
@@ -624,6 +625,159 @@ fn into_reports_missing_class_and_method() {
         e.contains("no method `nope`") && e.contains("charge, other"),
         "{e}"
     );
+}
+
+/// `--into` az `app/A.php` osztályába, `opts` kapcsolókkal.
+fn into_with(expr: &str, dry: bool, after: Option<&str>, opts: Opts) -> GenRequest {
+    GenRequest {
+        expr: expr.to_owned(),
+        dry,
+        target: Target::Into {
+            file: "app/A.php".into(),
+            class: None,
+            after: after.map(str::to_owned),
+        },
+        opts,
+    }
+}
+
+#[test]
+fn into_before_a_method_goes_above_its_docblock() {
+    let fs = MemFs::with(&[("app/A.php", DOCUMENTED)]);
+    let clock = FixedClock(Cell::new(T0));
+    let opts = Opts {
+        before: Some("go".into()),
+        ..Opts::default()
+    };
+    let dry = run(
+        &fs,
+        &clock,
+        &into_with("+mid():int{ return 5; }", true, None, opts.clone()),
+    )
+    .unwrap();
+    assert_eq!(dry.lines[0], "→ app/A.php::A before go (L5)");
+    assert_eq!(fs.get("app/A.php").unwrap(), DOCUMENTED);
+    let out = run(
+        &fs,
+        &clock,
+        &into_with("+mid():int{ return 5; }", false, None, opts),
+    )
+    .unwrap();
+    assert!(out.lines[0].contains("A before go (L5-8)"), "{out:?}");
+    let text = fs.get("app/A.php").unwrap();
+    assert!(
+        text.contains("{\n    public function mid(): int\n    {\n        return 5;\n    }\n\n    /**\n     * Old doc."),
+        "{text}"
+    );
+}
+
+#[test]
+fn into_at_a_line_stays_inside_the_class_body() {
+    let fs = MemFs::with(&[("app/A.php", DOCUMENTED)]);
+    let clock = FixedClock(Cell::new(T0));
+    let at = |n: usize| Opts {
+        at: Some(n),
+        ..Opts::default()
+    };
+    let dry = run(
+        &fs,
+        &clock,
+        &into_with("+mid():int{ return 5; }", true, None, at(13)),
+    )
+    .unwrap();
+    assert_eq!(dry.lines[0], "→ app/A.php::A at L13 (L13)");
+    for bad in [1, 3, 99] {
+        let err = run(&fs, &clock, &into_with("+mid():int", true, None, at(bad))).unwrap_err();
+        assert!(err.contains("outside"), "{err}");
+    }
+    assert_eq!(fs.get("app/A.php").unwrap(), DOCUMENTED);
+}
+
+#[test]
+fn upsert_replaces_an_existing_member_and_inserts_a_new_one() {
+    let fs = MemFs::with(&[("app/A.php", DOCUMENTED)]);
+    let clock = FixedClock(Cell::new(T0));
+    let upsert = Opts {
+        upsert: true,
+        ..Opts::default()
+    };
+    let out = run(
+        &fs,
+        &clock,
+        &into_with("+keep():int{ return 9; }", false, None, upsert.clone()),
+    )
+    .unwrap();
+    assert!(
+        out.lines[0].starts_with("replaced app/A.php L13-16"),
+        "{out:?}"
+    );
+    assert!(fs.get("app/A.php").unwrap().contains("return 9;"));
+    let out = run(
+        &fs,
+        &clock,
+        &into_with("+fresh():int{ return 7; }", false, None, upsert),
+    )
+    .unwrap();
+    assert!(out.lines[0].starts_with("inserted 1 member(s)"), "{out:?}");
+    assert!(
+        fs.get("app/A.php")
+            .unwrap()
+            .contains("public function fresh(): int")
+    );
+}
+
+#[test]
+fn diff_shows_only_the_changed_lines_of_a_replace() {
+    let fs = MemFs::with(&[("app/A.php", DOCUMENTED)]);
+    let clock = FixedClock(Cell::new(T0));
+    let req = GenRequest {
+        expr: "+keep():int{ return 9; }".to_owned(),
+        dry: true,
+        target: Target::Replace {
+            file: "app/A.php".into(),
+            at: ReplaceAt::Method {
+                class: None,
+                name: "keep".into(),
+            },
+            expect: None,
+        },
+        opts: Opts {
+            diff: true,
+            ..Opts::default()
+        },
+    };
+    let out = run(&fs, &clock, &req).unwrap();
+    assert_eq!(out.lines[0], "→ app/A.php replace L13-16 → L13-16 (keep)");
+    assert!(
+        out.lines.contains(&"-         return 2;".to_owned()),
+        "{out:?}"
+    );
+    assert!(
+        out.lines.contains(&"+         return 9;".to_owned()),
+        "{out:?}"
+    );
+    assert!(
+        !out.lines.iter().any(|l| l.contains("function keep")),
+        "{out:?}"
+    );
+    assert_eq!(fs.get("app/A.php").unwrap(), DOCUMENTED);
+}
+
+#[test]
+fn diff_helper_trims_the_common_edges() {
+    let l = |v: &[&str]| v.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>();
+    assert_eq!(
+        super::report::diff(&l(&["a", "b", "c"]), &l(&["a", "x", "c"])),
+        l(&["  a", "- b", "+ x", "  c"])
+    );
+    assert_eq!(
+        super::report::diff(&l(&["a"]), &l(&["a"])),
+        l(&["= no change"])
+    );
+    let long: Vec<String> = (0..100).map(|i| format!("n{i}")).collect();
+    let out = super::report::diff(&[], &long);
+    assert_eq!(out.len(), 61);
+    assert_eq!(out.last().map(String::as_str), Some("… +40 lines"));
 }
 
 const DOCUMENTED: &str = "<?php\n\nclass A\n{\n    /**\n     * Old doc.\n     */\n    public function go(): int\n    {\n        return 1;\n    }\n\n    public function keep(): int\n    {\n        return 2;\n    }\n}\n";

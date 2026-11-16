@@ -101,9 +101,13 @@ impl VueGenerator<'_> {
                 after.as_deref(),
                 request.dry,
             ),
-            Target::Replace { file, at, expect } => {
-                self.html_replace(program, file, at, expect.as_deref(), request.dry)
-            }
+            Target::Replace { file, at, expect } => self.html_replace(
+                program,
+                file,
+                at,
+                expect.as_deref(),
+                (request.dry, request.opts.diff),
+            ),
         }
     }
 
@@ -199,7 +203,7 @@ impl VueGenerator<'_> {
         file: &str,
         at: &ReplaceAt,
         expect: Option<&str>,
-        dry: bool,
+        (dry, diff): (bool, bool),
     ) -> GenResult<Output> {
         let HtmlProgram::Fragment(nodes) = program else {
             return Err(document_needs_write());
@@ -228,6 +232,7 @@ impl VueGenerator<'_> {
         let indent = doc.lines.get(from).map_or(0, |l| indent_of(l));
         let block = indent_block(&reindent(&render_nodes(&nodes), unit), indent);
         let fresh = block.join("\n");
+        let old = doc.lines[from..to].to_vec();
         doc.splice(from, to, block.clone());
         doc.mark("html", from, block.len());
         let new_text = doc.lines.join(eol);
@@ -237,7 +242,7 @@ impl VueGenerator<'_> {
         if dry {
             let header = report::replace_header(&rel, (from + 1, to), new, &label);
             return Ok(with_warnings(
-                report::with_header(header, block),
+                report::replace_preview(header, &old, block, diff),
                 &doc.text(),
                 &fresh,
             ));

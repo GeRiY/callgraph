@@ -270,7 +270,8 @@ members `+`/`-`/`#` visibility, `::` static, `name(Type $p):Type{body}`, `$prop:
 Unknown class names are imported from the project (`unresolved:` lists the ones it could not place). `--dry` prints the
 code; with `--into` / `--replace` a first `→ file::Class after method (L41)` line says where it would go.
 `--replace ...:L42-L87 --expect <sha256-prefix>` refuses if those lines changed since you read them.
-MCP `generate` parameters: `expr`, `dry`, `write`, `into`, `after`, `replace`, `expect`, `project`.
+Placement: `--into <file>::Class` takes `--after <method>`, `--before <method>` or `--at L<n>`; `--into x.vue::template#id` appends to that element; `--upsert` replaces the member if it already exists. `--diff` (with `--replace`) prints only the old / new lines of the change instead of the new code (nothing is written).
+MCP `generate` parameters: `expr`, `dry`, `write`, `into`, `after`, `before`, `at`, `upsert`, `diff`, `replace`, `expect`, `project`.
 
 Also Vue / JS / TS / HTML (by the file extension) and `laravel:Fee>create(name:str)+index` (a whole feature, one undo).
 MCP: the `generate`, `rename` and `undo` tools are listed only when the server runs with `--generate` (`CALLGRAPH_GENERATE=1`).

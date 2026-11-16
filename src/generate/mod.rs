@@ -57,7 +57,7 @@ mod tests;
 pub use emitter::Emitter;
 pub use error::{GenError, GenResult};
 pub use fs::{Clock, Env, FileSystem, RealFs, SystemClock};
-pub use generator::{GenRequest, Generator, Output, ReplaceAt, Target, undo};
+pub use generator::{GenRequest, Generator, Opts, Output, ReplaceAt, Target, undo};
 pub use php::PhpEmitter;
 pub use preset::{PresetGenerator, wants_preset};
 pub use vue::{VueGenerator, wants_vue};

@@ -274,7 +274,8 @@ tagok: `+`/`-`/`#` láthatóság, `::` statikus, `név(Típus $p):Típus{törzs}
 promotált. Az ismeretlen osztályneveket a projektből importálja (az `unresolved:` felsorolja, amit nem tudott elhelyezni).
 A `--dry` a kódot írja ki; `--into` / `--replace` mellett az első `→ fájl::Osztály after metódus (L41)` sor megmondja,
 hova kerülne. A `--replace ...:L42-L87 --expect <sha256-előtag>` visszautasít, ha a sorok azóta megváltoztak.
-MCP `generate` paraméterek: `expr`, `dry`, `write`, `into`, `after`, `replace`, `expect`, `project`.
+Hely: az `--into <fájl>::Osztály` mellé `--after <metódus>`, `--before <metódus>` vagy `--at L<n>` adható; az `--into x.vue::template#id` az elem végére szúr; az `--upsert` lecseréli a tagot, ha már létezik. A `--diff` (`--replace` mellett) az új kód helyett csak a változás régi / új sorait írja ki (nem ír semmit).
+MCP `generate` paraméterek: `expr`, `dry`, `write`, `into`, `after`, `before`, `at`, `upsert`, `diff`, `replace`, `expect`, `project`.
 
 Vue / JS / TS / HTML is (a fájl kiterjesztése szerint), és `laravel:Fee>create(name:str)+index` (egy teljes funkció, egy undo).
 MCP: a `generate`, `rename` és `undo` eszköz csak akkor szerepel a listában, ha a szerver `--generate`-tel

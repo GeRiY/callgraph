@@ -1,17 +1,18 @@
 //! A `gen` és az `undo` parancs kapcsolói:
-//! `callgraph gen '<kifejezés>' [--dry] [--write <fájl> | --into <fájl>[::Osztály] [--after <metódus>] |
+//! `callgraph gen '<kifejezés>' [--dry] [--diff] [--write <fájl> | --into <fájl>[::Osztály | ::template#id]
+//! [--after <metódus> | --before <metódus> | --at L<n>] [--upsert] |
 //! --replace <fájl>(:L<a>-L<b> | ::<metódus>) [--expect <sha256-előtag>]] [--project alias|mappa]`,
 //! `callgraph undo [<fájl>] [--project alias|mappa]`. Külön fájlban, hogy az `args.rs` csak egy-egy sorral bővüljön.
 
 use crate::error::{CallgraphError, Result};
-use crate::generate::{GenRequest, ReplaceAt, Target};
+use crate::generate::{GenRequest, Opts, ReplaceAt, Target};
 
 use super::CliArgs;
 
 fn gen_usage() -> String {
     crate::t!(
-        "callgraph gen '<expr>' [--dry] [--write <file> | --into <file>[::Class] [--after <method>] | --replace <file>(:L<a>-L<b> | ::<method>) [--expect <sha256-prefix>]] [--project alias]  (e.g. gen 'c!:Pay<Base> > ctor(-Client $http) + +charge(Order $o):Receipt' --write app/Pay.php)",
-        "callgraph gen '<kifejezés>' [--dry] [--write <fájl> | --into <fájl>[::Osztály] [--after <metódus>] | --replace <fájl>(:L<a>-L<b> | ::<metódus>) [--expect <sha256-előtag>]] [--project alias]  (pl. gen 'c!:Pay<Base> > ctor(-Client $http) + +charge(Order $o):Receipt' --write app/Pay.php)"
+        "callgraph gen '<expr>' [--dry|--diff] [--write <file> | --into <file>[::Class] [--after <method> | --before <method> | --at L<n>] [--upsert] | --replace <file>(:L<a>-L<b> | ::<method>) [--expect <sha256-prefix>]] [--project alias]  (e.g. gen 'c!:Pay<Base> > ctor(-Client $http) + +charge(Order $o):Receipt' --write app/Pay.php)",
+        "callgraph gen '<kifejezés>' [--dry|--diff] [--write <fájl> | --into <fájl>[::Osztály] [--after <metódus> | --before <metódus> | --at L<n>] [--upsert] | --replace <fájl>(:L<a>-L<b> | ::<metódus>) [--expect <sha256-előtag>]] [--project alias]  (pl. gen 'c!:Pay<Base> > ctor(-Client $http) + +charge(Order $o):Receipt' --write app/Pay.php)"
     )
     .to_owned()
 }
@@ -84,15 +85,36 @@ fn parse_replace(spec: &str) -> Result<(String, ReplaceAt)> {
     }
 }
 
+/// `--at L42` / `--at 42`: pozitív sorszám.
+fn parse_line(text: &str) -> Result<usize> {
+    text.trim()
+        .trim_start_matches(['L', 'l'])
+        .parse::<usize>()
+        .ok()
+        .filter(|n| *n > 0)
+        .ok_or_else(|| {
+            CallgraphError::Usage(crate::tf!(
+                "Bad --at line: {text} (expected L<n>). {}",
+                "Hibás --at sor: {text} (L<n> a jó alak). {}",
+                gen_usage()
+            ))
+        })
+}
+
 /// `gen '<kifejezés>' [kapcsolók]`.
 pub(crate) fn parse_gen(args: &[String]) -> Result<CliArgs> {
     let (mut dry, mut project) = (false, None);
     let (mut write, mut into, mut after, mut replace, mut expect) = (None, None, None, None, None);
+    let (mut diff, mut upsert, mut before, mut at) = (false, false, None, None);
     let mut positional = Vec::new();
     let mut it = args.iter();
     while let Some(arg) = it.next() {
         match arg.as_str() {
             "--dry" => dry = true,
+            "--diff" => diff = true,
+            "--upsert" => upsert = true,
+            "--before" => before = Some(value(&mut it, &gen_usage)?),
+            "--at" => at = Some(parse_line(&value(&mut it, &gen_usage)?)?),
             "--write" => write = Some(value(&mut it, &gen_usage)?),
             "--into" => into = Some(value(&mut it, &gen_usage)?),
             "--after" => after = Some(value(&mut it, &gen_usage)?),
@@ -119,10 +141,18 @@ pub(crate) fn parse_gen(args: &[String]) -> Result<CliArgs> {
             gen_usage()
         )));
     }
-    if after.is_some() && into.is_none() {
+    if (after.is_some() || before.is_some() || at.is_some() || upsert) && into.is_none() {
         return Err(CallgraphError::Usage(crate::tf!(
-            "--after only works with --into (insert after that method). {}",
-            "Az --after csak az --into-val megy (az adott metódus után szúr be). {}",
+            "--after, --before, --at and --upsert only work with --into. {}",
+            "Az --after, --before, --at és --upsert csak az --into-val megy. {}",
+            gen_usage()
+        )));
+    }
+    if usize::from(after.is_some()) + usize::from(before.is_some()) + usize::from(at.is_some()) > 1
+    {
+        return Err(CallgraphError::Usage(crate::tf!(
+            "Only one place: --after, --before or --at. {}",
+            "Csak egy hely adható meg: --after, --before vagy --at. {}",
             gen_usage()
         )));
     }
@@ -150,8 +180,15 @@ pub(crate) fn parse_gen(args: &[String]) -> Result<CliArgs> {
     Ok(CliArgs::Generate {
         request: GenRequest {
             expr: expr.clone(),
-            dry,
+            // a --diff csak előnézet: semmi nem íródik
+            dry: dry || diff,
             target,
+            opts: Opts {
+                diff,
+                upsert,
+                before,
+                at,
+            },
         },
         project,
     })
@@ -246,6 +283,26 @@ mod tests {
     }
 
     #[test]
+    fn diff_before_at_and_upsert_parse() {
+        let r = request(&["+x()", "--replace", "a.php::go", "--diff"]);
+        assert!(r.dry && r.opts.diff);
+        let r = request(&["+x()", "--into", "a.php::A", "--before", "go", "--upsert"]);
+        assert_eq!(r.opts.before.as_deref(), Some("go"));
+        assert!(r.opts.upsert && !r.opts.diff && !r.dry);
+        let r = request(&["+x()", "--into", "a.php", "--at", "L42"]);
+        assert_eq!(r.opts.at, Some(42));
+        let r = request(&["+x()", "--into", "a.vue::template#list"]);
+        assert_eq!(
+            r.target,
+            Target::Into {
+                file: "a.vue".into(),
+                class: Some("template#list".into()),
+                after: None
+            }
+        );
+    }
+
+    #[test]
     fn a_member_expression_may_start_with_a_dash() {
         assert_eq!(request(&["-sign():string", "--dry"]).expr, "-sign():string");
     }
@@ -257,6 +314,10 @@ mod tests {
             &["c:A", "c:B"],
             &["c:A", "--write", "a.php", "--into", "b.php"],
             &["c:A", "--after", "x"],
+            &["c:A", "--upsert"],
+            &["+x()", "--into", "a.php", "--after", "x", "--before", "y"],
+            &["+x()", "--into", "a.php", "--at", "x"],
+            &["+x()", "--into", "a.php", "--at", "0"],
             &["c:A", "--expect", "ab"],
             &["c:A", "--write"],
             &["c:A", "--replace", "a.php"],

@@ -5,12 +5,22 @@ use std::path::Path;
 
 use super::{VueGenerator, wants_vue};
 use crate::generate::fs::Env;
-use crate::generate::generator::{GenRequest, Output, ReplaceAt, Target};
+use crate::generate::generator::{GenRequest, Opts, Output, ReplaceAt, Target};
 use crate::generate::testing::{FixedClock, MemFs, ROOT};
 
 const T0: u64 = 1_700_000_000;
 
 fn go(fs: &MemFs, expr: &str, dry: bool, target: Target) -> Result<Output, String> {
+    go_with(fs, expr, dry, target, Opts::default())
+}
+
+fn go_with(
+    fs: &MemFs,
+    expr: &str,
+    dry: bool,
+    target: Target,
+    opts: Opts,
+) -> Result<Output, String> {
     let clock = FixedClock(Cell::new(T0));
     let env = Env {
         root: Path::new(ROOT),
@@ -21,6 +31,7 @@ fn go(fs: &MemFs, expr: &str, dry: bool, target: Target) -> Result<Output, Strin
         expr: expr.to_owned(),
         dry,
         target,
+        opts,
     };
     VueGenerator::new(env)
         .run(&request)
@@ -438,6 +449,146 @@ fn into_script_after_a_named_statement() {
 }
 
 #[test]
+fn expect_guards_vue_and_html_replaces() {
+    let fs = MemFs::with(&[("src/A.vue", EXISTING_SFC)]);
+    let target = |file: &str, at: ReplaceAt| Target::Replace {
+        file: file.to_owned(),
+        at,
+        expect: Some("deadbeef".to_owned()),
+    };
+    let err = go(
+        &fs,
+        "template>p{y}",
+        false,
+        target("src/A.vue", ReplaceAt::Lines(9, 9)),
+    )
+    .unwrap_err();
+    assert!(err.contains("changed"), "{err}");
+    assert_eq!(fs.get("src/A.vue").unwrap(), EXISTING_SFC);
+
+    let html = "<div id=\"a\">\n  <p>x</p>\n</div>\n";
+    let fs = MemFs::with(&[("page.html", html)]);
+    let err = go(
+        &fs,
+        "p{y}",
+        false,
+        target(
+            "page.html",
+            ReplaceAt::Method {
+                class: None,
+                name: "#a".to_owned(),
+            },
+        ),
+    )
+    .unwrap_err();
+    assert!(err.contains("changed"), "{err}");
+    assert_eq!(fs.get("page.html").unwrap(), html);
+}
+
+#[test]
+fn crlf_vue_files_keep_their_line_endings() {
+    let crlf = EXISTING_SFC.replace('\n', "\r\n");
+    let fs = MemFs::with(&[("src/A.vue", crlf.as_str())]);
+    go(&fs, "template>span{y}", false, into("src/A.vue", None)).unwrap();
+    let file = fs.get("src/A.vue").unwrap();
+    assert!(file.contains("<span>y</span>"), "{file:?}");
+    assert!(!file.replace("\r\n", "").contains('\n'), "{file:?}");
+}
+
+const NESTED_SFC: &str = "\
+<script setup lang=\"ts\">
+import { ref } from 'vue';
+</script>
+
+<template>
+  <div>
+    <ul id=\"list\">
+      <li>a</li>
+    </ul>
+    <p>x</p>
+  </div>
+</template>
+";
+
+#[test]
+fn into_template_element_by_id_appends_as_its_last_child() {
+    let fs = MemFs::with(&[("src/A.vue", NESTED_SFC)]);
+    let target = |class: &str| Target::Into {
+        file: "src/A.vue".to_owned(),
+        class: Some(class.to_owned()),
+        after: None,
+    };
+    go(&fs, "template>li{b}", false, target("template#list")).unwrap();
+    let file = fs.get("src/A.vue").unwrap();
+    assert!(
+        file.contains("      <li>a</li>\n      <li>b</li>\n    </ul>\n    <p>x</p>"),
+        "{file}"
+    );
+    // a `template` előtag nélkül is megy, és a hiányzó elem hiba
+    go(&fs, "template>li{c}", false, target("#list")).unwrap();
+    assert!(
+        fs.get("src/A.vue")
+            .unwrap()
+            .contains("<li>c</li>\n    </ul>")
+    );
+    let err = go(&fs, "template>li{d}", false, target("template#nope")).unwrap_err();
+    assert!(err.contains("no element matches"), "{err}");
+}
+
+#[test]
+fn upsert_and_diff_work_on_class_members() {
+    let fs = MemFs::with(&[("src/svc.ts", SERVICE_TS)]);
+    let upsert = Opts {
+        upsert: true,
+        ..Opts::default()
+    };
+    let out = go_with(
+        &fs,
+        "+run():void{ this.n = 5 }",
+        false,
+        into_class("src/svc.ts", "Svc", None),
+        upsert,
+    )
+    .unwrap();
+    assert!(out.lines[0].starts_with("replaced src/svc.ts"), "{out:?}");
+    assert!(fs.get("src/svc.ts").unwrap().contains("this.n = 5"));
+
+    let fs = MemFs::with(&[("src/svc.ts", SERVICE_TS)]);
+    let diff = Opts {
+        diff: true,
+        ..Opts::default()
+    };
+    let out = go_with(
+        &fs,
+        "+run():void{ this.n = 5 }",
+        true,
+        Target::Replace {
+            file: "src/svc.ts".to_owned(),
+            at: ReplaceAt::Method {
+                class: Some("Svc".to_owned()),
+                name: "run".to_owned(),
+            },
+            expect: None,
+        },
+        diff,
+    )
+    .unwrap();
+    assert!(
+        out.lines
+            .iter()
+            .any(|l| l.starts_with("- ") && l.contains("this.n++")),
+        "{out:?}"
+    );
+    assert!(
+        out.lines
+            .iter()
+            .any(|l| l.starts_with("+ ") && l.contains("this.n = 5")),
+        "{out:?}"
+    );
+    assert_eq!(fs.get("src/svc.ts").unwrap(), SERVICE_TS);
+}
+
+#[test]
 fn into_template_after_a_line_or_before_the_root_end() {
     let fs = MemFs::with(&[("src/A.vue", EXISTING_SFC)]);
     go(
@@ -727,6 +878,7 @@ fn only_vue_js_ts_targets_and_heads_are_routed_here() {
         expr: expr.to_owned(),
         dry: false,
         target,
+        opts: Default::default(),
     };
     assert!(!wants_vue(&req("c:A", write("app/A.php"))));
     assert!(!wants_vue(&req("c:A", Target::Preview)));
@@ -1464,6 +1616,7 @@ fn module_errors_and_routing() {
         expr: expr.to_owned(),
         dry: false,
         target,
+        opts: Default::default(),
     };
     assert!(wants_vue(&req("mod:x>fn:a", Target::Preview)));
     assert!(wants_vue(&req("class:A>+x():int", Target::Preview)));

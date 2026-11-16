@@ -317,6 +317,7 @@ fn unbalanced_existing_file_and_dispatch() {
         expr: expr.to_owned(),
         dry: false,
         target,
+        opts: Default::default(),
     };
     assert!(wants_vue(&req("html:T>p", Target::Preview)));
     assert!(wants_vue(&req("p", write("a.htm"))));

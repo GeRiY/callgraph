@@ -41,6 +41,31 @@ pub fn insert_after_line(lines: &mut Vec<String>, method_end: usize, block: &[St
     at + 1
 }
 
+/// Blokk beszúrása az `line`. (1-alapú) sor elé (`--before <metódus>`, `--at L<n>`): a blokk első sora lesz az
+/// `line`. sor helyén; ha az előző sor nem üres és nem `{`-re végződik, egy üres sor választja el, és (ha a következő
+/// sor nem üres és nem a záró `}`) a következőtől is. Az első beszúrt tag sorának 0-alapú indexét adja vissza.
+pub fn insert_before_line(lines: &mut Vec<String>, line: usize, block: &[String]) -> usize {
+    let at = line.saturating_sub(1).min(lines.len());
+    let mut inserted = Vec::new();
+    if at > 0
+        && lines
+            .get(at - 1)
+            .is_some_and(|l| !l.trim().is_empty() && !l.trim_end().ends_with('{'))
+    {
+        inserted.push(String::new());
+    }
+    let first = at + inserted.len();
+    inserted.extend(block.iter().cloned());
+    if lines
+        .get(at)
+        .is_some_and(|l| !l.trim().is_empty() && l.trim() != "}")
+    {
+        inserted.push(String::new());
+    }
+    insert_all(lines, at, inserted);
+    first
+}
+
 /// Blokk beszúrása az osztály végére: `close_line` a záró `}` sora (1-alapú); az utolsó tag után, üres sorral
 /// elválasztva (üres törzsnél a `{` után azonnal). Az első beszúrt tag sorának 0-alapú indexét adja vissza.
 pub fn insert_at_end(lines: &mut Vec<String>, close_line: usize, block: &[String]) -> usize {

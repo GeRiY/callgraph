@@ -3,11 +3,12 @@
 //! (`WriteNew` / `InsertInto` / `ReplaceRange`, mentéssel). Semmi nem íródik, amíg a teljes új szöveg hibátlan.
 
 use super::builder::{SfcBuilder, composable_file, script_body, script_open, style_open};
-use super::check::check_script_file;
+use super::check::{Problem, check_script_file};
 use super::edit::{
     Doc, declared_names, find_statement, indent_block, indent_of, indent_unit, last_nonblank,
     reindent,
 };
+use super::html_scan::{col_of, find, line_of, parse_selector, scan as scan_html};
 use super::imports::{ImportSet, plan, scan};
 use super::locate::{ClassSpan, class_names, find_class};
 use super::model::{Element, Import, Kind, Member, Program};
@@ -129,13 +130,7 @@ impl<'a> VueGenerator<'a> {
                 class: Some(class),
                 after,
             } if is_script_file(file) => {
-                return self.insert_class(
-                    &request.expr,
-                    file,
-                    class,
-                    after.as_deref(),
-                    request.dry,
-                );
+                return self.insert_class(&request.expr, file, class, after.as_deref(), request);
             }
             Target::Replace {
                 file,
@@ -151,7 +146,7 @@ impl<'a> VueGenerator<'a> {
                     file,
                     (class.as_str(), name.as_str()),
                     expect.as_deref(),
-                    request.dry,
+                    (request.dry, request.opts.diff),
                 );
             }
             _ => {}
@@ -160,12 +155,20 @@ impl<'a> VueGenerator<'a> {
         match &request.target {
             Target::Preview => self.preview(&program),
             Target::Write { file } => self.write(&program, file, request.dry),
-            Target::Into { file, after, .. } => {
-                self.insert(&program, file, after.as_deref(), request.dry)
-            }
-            Target::Replace { file, at, expect } => {
-                self.replace(&program, file, at, expect.as_deref(), request.dry)
-            }
+            Target::Into { file, class, after } => self.insert_vue_or_script(
+                &program,
+                file,
+                class.as_deref(),
+                after.as_deref(),
+                request.dry,
+            ),
+            Target::Replace { file, at, expect } => self.replace(
+                &program,
+                file,
+                at,
+                expect.as_deref(),
+                (request.dry, request.opts.diff),
+            ),
         }
     }
 
@@ -480,6 +483,92 @@ impl<'a> VueGenerator<'a> {
 
     // ---- --into -----------------------------------------------------------------------------------------------
 
+    /// `--into`: a `.vue` fájl `::template#id` célja (egy elem utolsó gyereke) vagy a sima beszúrás.
+    fn insert_vue_or_script(
+        &self,
+        program: &Program,
+        file: &str,
+        class: Option<&str>,
+        after: Option<&str>,
+        dry: bool,
+    ) -> GenResult<Output> {
+        let selector = class
+            .map(|c| c.strip_prefix("template").unwrap_or(c))
+            .filter(|c| c.starts_with(['#', '.']))
+            .filter(|_| file.ends_with(".vue"));
+        match selector {
+            Some(sel) if after.is_none() => {
+                let anchor = self.template_anchor(file, sel)?;
+                self.insert(program, file, Some(anchor.as_str()), dry)
+            }
+            Some(_) => Err(GenError::new(
+                crate::t!(
+                    "::template#id already names the place: drop --after",
+                    "a ::template#id már megnevezi a helyet: hagyd el az --after-t"
+                )
+                .to_owned(),
+            )),
+            None => self.insert(program, file, after, dry),
+        }
+    }
+
+    /// A `::template#id` elem zárótagja előtti sor `L<n>` alakban (az `--after L<n>` számolja így).
+    fn template_anchor(&self, file: &str, selector: &str) -> GenResult<String> {
+        let rel = self.rel(file)?;
+        let Loaded { lines, .. } = self.load(&rel)?;
+        let doc = Doc::new(lines);
+        let Some((tag, close)) = block_range(&doc, SfcBlockKind::Template, "template")? else {
+            return Err(GenError::new(crate::tf!(
+                "no <template> in {}",
+                "nincs <template> ebben: {}",
+                rel
+            )));
+        };
+        let inner = doc.lines[tag + 1..close].join("\n");
+        let spans = scan_html(&inner).map_err(|(off, message)| {
+            problem(&Problem {
+                section: rel.clone(),
+                line: tag + 2 + line_of(&inner, off),
+                message,
+            })
+        })?;
+        let sel = parse_selector(selector).ok_or_else(|| {
+            GenError::new(crate::tf!(
+                "bad element selector `{}` (use #id, .class or tag)",
+                "hibás elem-választó: `{}` (#id, .class vagy tag kell)",
+                selector
+            ))
+        })?;
+        let Some(idx) = find(&inner, &spans, &sel) else {
+            return Err(GenError::new(crate::tf!(
+                "no element matches `{}` in the <template> of {}",
+                "nincs elem, ami illene: `{}` ebben: {} <template>",
+                selector,
+                rel
+            )));
+        };
+        let span = &spans[idx];
+        let Some((close_at, _)) = span.close else {
+            return Err(GenError::new(crate::tf!(
+                "`<{}>` has no closing tag: nothing can be appended inside it",
+                "a(z) `<{}>` nincs lezárva: nem lehet bele beszúrni",
+                span.name
+            )));
+        };
+        let (open_line, close_line) = (line_of(&inner, span.open.0), line_of(&inner, close_at));
+        let before = doc.lines[tag + 1 + close_line]
+            .get(..col_of(&inner, close_at))
+            .unwrap_or("");
+        if open_line == close_line || !before.trim().is_empty() {
+            return Err(GenError::new(crate::tf!(
+                "`{}` must have its opening and closing tags on their own lines",
+                "a(z) `{}` nyitó- és zárótagja külön sorban legyen",
+                selector
+            )));
+        }
+        Ok(format!("L{}", tag + 1 + close_line))
+    }
+
     fn insert(
         &self,
         program: &Program,
@@ -542,8 +631,9 @@ impl<'a> VueGenerator<'a> {
         file: &str,
         class: &str,
         after: Option<&str>,
-        dry: bool,
+        request: &GenRequest,
     ) -> GenResult<Output> {
+        let dry = request.dry;
         let parts = parse_class_members(expr)?;
         let rel = self.rel(file)?;
         let kind = file_kind(&rel)?;
@@ -560,6 +650,15 @@ impl<'a> VueGenerator<'a> {
         }
         for m in &parts.members {
             if span.members.iter().any(|x| x.name == m.name()) {
+                if request.opts.upsert && parts.members.len() == 1 {
+                    return self.replace_member(
+                        expr,
+                        file,
+                        (class, m.name()),
+                        None,
+                        (request.dry, request.opts.diff),
+                    );
+                }
                 return Err(GenError::new(crate::tf!(
                     "`{}` is already a member of {} (to change it use --replace <file>::{}::{})",
                     "a(z) `{}` már tagja a(z) {} osztálynak (módosításhoz: --replace <fájl>::{}::{})",
@@ -636,7 +735,7 @@ impl<'a> VueGenerator<'a> {
         file: &str,
         (class, name): (&str, &str),
         expect: Option<&str>,
-        dry: bool,
+        (dry, diff): (bool, bool),
     ) -> GenResult<Output> {
         let parts = parse_class_members(expr)?;
         if parts.members.len() != 1 {
@@ -684,6 +783,7 @@ impl<'a> VueGenerator<'a> {
             &reindent(&em.class_members(&parts.members), indent_unit(&doc.lines)),
             indent,
         );
+        let old = doc.lines[from..to].to_vec();
         doc.splice(from, to, block.clone());
         doc.mark("members", from, block.len());
         let mut wanted = ImportSet::new();
@@ -701,7 +801,7 @@ impl<'a> VueGenerator<'a> {
         if dry {
             let header = report::replace_header(&rel, (from + 1, to), new, &label);
             return Ok(Output {
-                lines: report::with_header(header, block),
+                lines: report::replace_preview(header, &old, block, diff),
                 unresolved: Vec::new(),
             });
         }
@@ -726,7 +826,7 @@ impl<'a> VueGenerator<'a> {
         file: &str,
         at: &ReplaceAt,
         expect: Option<&str>,
-        dry: bool,
+        (dry, diff): (bool, bool),
     ) -> GenResult<Output> {
         let rel = self.rel(file)?;
         let kind = file_kind(&rel)?;
@@ -760,6 +860,7 @@ impl<'a> VueGenerator<'a> {
         };
         let indent = doc.lines.get(from).map_or(0, |l| indent_of(l));
         let block = indent_block(&reindent(&block, indent_unit(&doc.lines)), indent);
+        let old = doc.lines[from..to].to_vec();
         doc.splice(from, to, block.clone());
         doc.mark(section, from, block.len());
         match kind {
@@ -787,7 +888,7 @@ impl<'a> VueGenerator<'a> {
         if dry {
             let header = report::replace_header(&rel, (from + 1, to), new, &label);
             return Ok(Output {
-                lines: report::with_header(header, block),
+                lines: report::replace_preview(header, &old, block, diff),
                 unresolved: rendered.unresolved,
             });
         }

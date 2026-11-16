@@ -7,7 +7,9 @@ use std::collections::BTreeSet;
 
 use super::ast::{Member, Program, TypeKind};
 use super::command::{EditCommand, InsertInto, ReplaceRange, Undo, WriteNew};
-use super::edit::{add_imports, extend_over_docs, insert_after_line, insert_at_end, join_lines};
+use super::edit::{
+    add_imports, extend_over_docs, insert_after_line, insert_at_end, insert_before_line, join_lines,
+};
 use super::emitter::{Emitter, FileSpec};
 use super::error::{GenError, GenResult, Kind};
 use super::fs::Env;
@@ -48,6 +50,19 @@ pub enum ReplaceAt {
     Method { class: Option<String>, name: String },
 }
 
+/// A célzás és a kimenet kiegészítő kapcsolói (alapértelmezésben mind kikapcsolt).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Opts {
+    /// `--diff`: a `--replace` előnézete a régi / új különbség (a `dry` ilyenkor is be van kapcsolva).
+    pub diff: bool,
+    /// `--upsert`: az `--into` a már létező tagot lecseréli (egy csupasz taggal).
+    pub upsert: bool,
+    /// `--before <metódus>`: az `--into` ennek a metódusnak (a docblockjának) az elé szúr.
+    pub before: Option<String>,
+    /// `--at L<n>`: az `--into` az n. sor elé szúr (a célosztály törzsében).
+    pub at: Option<usize>,
+}
+
 /// Egy generálási kérés.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GenRequest {
@@ -55,6 +70,29 @@ pub struct GenRequest {
     /// Csak kiírás: semmi nem íródik, a kimenet a generált kód.
     pub dry: bool,
     pub target: Target,
+    pub opts: Opts,
+}
+
+/// Hová szúr be az `--into` az osztályon belül.
+#[derive(Debug, Clone, Copy)]
+enum Anchor<'a> {
+    /// Az osztály végére.
+    End,
+    After(&'a str),
+    Before(&'a str),
+    /// Az n. (1-alapú) sor elé.
+    Line(usize),
+}
+
+impl<'a> Anchor<'a> {
+    fn of(after: Option<&'a str>, opts: &'a Opts) -> Self {
+        match (after, opts.before.as_deref(), opts.at) {
+            (Some(m), _, _) => Self::After(m),
+            (None, Some(m), _) => Self::Before(m),
+            (None, None, Some(n)) => Self::Line(n),
+            (None, None, None) => Self::End,
+        }
+    }
 }
 
 /// A parancs kimenete: az egy-egy soros jelentés (`--dry`-nál a kód) és a feloldatlan nevek.
@@ -126,16 +164,17 @@ impl<'a, E: Emitter> Generator<'a, E> {
         match &request.target {
             Target::Preview => self.preview(&program),
             Target::Write { file } => self.write(&program, file, request.dry),
-            Target::Into { file, class, after } => self.insert_members(
+            Target::Into { file, class, after } => {
+                let anchor = Anchor::of(after.as_deref(), &request.opts);
+                self.insert_members(&program, file, class.as_deref(), anchor, request)
+            }
+            Target::Replace { file, at, expect } => self.replace(
                 &program,
                 file,
-                class.as_deref(),
-                after.as_deref(),
-                request.dry,
+                at,
+                expect.as_deref(),
+                (request.dry, request.opts.diff),
             ),
-            Target::Replace { file, at, expect } => {
-                self.replace(&program, file, at, expect.as_deref(), request.dry)
-            }
         }
     }
 
@@ -357,9 +396,10 @@ impl<'a, E: Emitter> Generator<'a, E> {
         program: &Program,
         file: &str,
         class: Option<&str>,
-        after: Option<&str>,
-        dry: bool,
+        anchor: Anchor<'_>,
+        request: &GenRequest,
     ) -> GenResult<Output> {
+        let dry = request.dry;
         let rel = self.rel(file)?;
         self.check_extension(&rel)?;
         let members = self.member_source(program)?;
@@ -369,6 +409,9 @@ impl<'a, E: Emitter> Generator<'a, E> {
             graph,
         } = self.load(&rel)?;
         let container = pick_container(&graph, class, &rel)?;
+        if let Some(at) = upsert_target(request, program, &graph, container) {
+            return self.replace(program, file, &at, None, (request.dry, request.opts.diff));
+        }
         let kind = TypeKind::from_graph(&container.kind);
         let block: Vec<String> = self.emitter.members(kind, members).collect();
         let names = self.emitter.referenced_names(&[], members);
@@ -382,12 +425,30 @@ impl<'a, E: Emitter> Generator<'a, E> {
             &psr4,
             &scan,
         );
-        let first = match after {
-            Some(method) => {
-                let end = find_method(&graph, container, method)?;
+        let first = match anchor {
+            Anchor::After(method) => {
+                let (_, end) = find_method(&graph, container, method)?;
                 insert_after_line(&mut lines, end, &block)
             }
-            None => {
+            Anchor::Before(method) => {
+                let (start, _) = find_method(&graph, container, method)?;
+                let start = extend_over_docs(&lines, start);
+                insert_before_line(&mut lines, start, &block)
+            }
+            Anchor::Line(n) => {
+                if n <= container.line as usize || n > container.end_line as usize {
+                    return Err(GenError::new(crate::tf!(
+                        "--at L{} is outside the body of {} (L{}-L{})",
+                        "az --at L{} a(z) {} törzsén kívül van (L{}-L{})",
+                        n,
+                        container.name,
+                        container.line + 1,
+                        container.end_line
+                    )));
+                }
+                insert_before_line(&mut lines, n, &block)
+            }
+            Anchor::End => {
                 if container.line >= container.end_line {
                     return Err(GenError::new(crate::tf!(
                         "{} is declared on one line; reformat it so its `{{` and `}}` are on separate lines",
@@ -404,9 +465,11 @@ impl<'a, E: Emitter> Generator<'a, E> {
         self.validate(&rel, &text)?;
         let start = first + added + 1;
         let end = start + block.len().saturating_sub(1);
-        let place = match after {
-            Some(method) => format!("{}::{} after {method}", rel, container.name),
-            None => format!("{}::{}", rel, container.name),
+        let place = match anchor {
+            Anchor::After(method) => format!("{}::{} after {method}", rel, container.name),
+            Anchor::Before(method) => format!("{}::{} before {method}", rel, container.name),
+            Anchor::Line(n) => format!("{}::{} at L{n}", rel, container.name),
+            Anchor::End => format!("{}::{}", rel, container.name),
         };
         if dry {
             return Ok(Output {
@@ -428,7 +491,7 @@ impl<'a, E: Emitter> Generator<'a, E> {
         file: &str,
         at: &ReplaceAt,
         expect: Option<&str>,
-        dry: bool,
+        (dry, diff): (bool, bool),
     ) -> GenResult<Output> {
         let rel = self.rel(file)?;
         self.check_extension(&rel)?;
@@ -487,6 +550,7 @@ impl<'a, E: Emitter> Generator<'a, E> {
             &psr4,
             &scan,
         );
+        let old: Vec<String> = lines[from - 1..to].to_vec();
         let tail = lines.split_off(to);
         lines.truncate(from - 1);
         lines.extend(block.iter().cloned());
@@ -500,7 +564,7 @@ impl<'a, E: Emitter> Generator<'a, E> {
         if dry {
             let header = report::replace_header(&rel, (from, to), (new_from, new_to), label);
             return Ok(Output {
-                lines: report::with_header(header, block),
+                lines: report::replace_preview(header, &old, block, diff),
                 unresolved,
             });
         }
@@ -556,8 +620,31 @@ pub(super) fn pick_container<'g>(
     }
 }
 
-/// A konténer metódusai közül a megnevezett utolsó sora (1-alapú).
-fn find_method(graph: &FileGraph, container: &Container, name: &str) -> GenResult<usize> {
+/// `--upsert`: ha egyetlen csupasz tagot kell beszúrni, és a konténernek már van ilyen nevű metódusa, a csere célja.
+fn upsert_target(
+    request: &GenRequest,
+    program: &Program,
+    graph: &FileGraph,
+    container: &Container,
+) -> Option<ReplaceAt> {
+    if !request.opts.upsert || !program.decls.is_empty() {
+        return None;
+    }
+    let [member] = program.loose.as_slice() else {
+        return None;
+    };
+    let exists = graph
+        .methods
+        .iter()
+        .any(|m| m.name == member.name && m.container.as_deref() == Some(container.name.as_str()));
+    exists.then(|| ReplaceAt::Method {
+        class: Some(container.name.clone()),
+        name: member.name.clone(),
+    })
+}
+
+/// A konténer megnevezett metódusának első és utolsó sora (1-alapú).
+fn find_method(graph: &FileGraph, container: &Container, name: &str) -> GenResult<(usize, usize)> {
     let own: Vec<_> = graph
         .methods
         .iter()
@@ -565,7 +652,7 @@ fn find_method(graph: &FileGraph, container: &Container, name: &str) -> GenResul
         .collect();
     own.iter()
         .find(|m| m.name == name)
-        .map(|m| m.end_line.unwrap_or(m.line) as usize)
+        .map(|m| (m.line as usize, m.end_line.unwrap_or(m.line) as usize))
         .ok_or_else(|| {
             GenError::new(crate::tf!(
                 "no method `{}` in {} (has: {})",

@@ -18,6 +18,8 @@ use crate::generate::fs::{FileSystem, MemoWalk};
 const SAMPLE: usize = 30;
 /// A komponens-keresés gyökerei (az `@/` alias célja).
 const ROOTS: [&str; 2] = ["resources/js", "src"];
+/// Az alias-mappákból ennyi `.vue` fájlt vizsgál a komponens-keresés (aliasonként).
+const ALIAS_SCAN_LIMIT: usize = 400;
 
 /// Az alias-beállítások fájljai (a `tsconfig` `paths` / a Vite `resolve.alias`).
 const ALIAS_FILES: [&str; 6] = [
@@ -443,6 +445,13 @@ impl<'a> VueProject<'a> {
                 .collect();
             return Some(format!("@/{}", rel.join("/")));
         }
-        None
+        // külön UI-csomag mögötti komponens (tsconfig / vite alias, pl. `@ui/components/Card.vue`)
+        self.alias_components(ALIAS_SCAN_LIMIT)
+            .into_iter()
+            .find(|(_, file)| {
+                file.file_name()
+                    .is_some_and(|n| n.to_str() == Some(wanted.as_str()))
+            })
+            .map(|(path, _)| path)
     }
 }

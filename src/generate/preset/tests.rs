@@ -99,6 +99,7 @@ fn request(expr: &str, dry: bool) -> GenRequest {
         expr: expr.to_owned(),
         dry,
         target: Target::Preview,
+        opts: Default::default(),
     }
 }
 
@@ -644,6 +645,7 @@ fn a_later_single_edit_makes_undo_single_file_again() {
             class: None,
             after: None,
         },
+        opts: Default::default(),
     };
     generator.run(&replace).unwrap();
     let out = generator.undo(None).unwrap().lines.join("\n");
@@ -699,6 +701,7 @@ fn a_preset_takes_no_file_target() {
         target: Target::Write {
             file: "app/X.php".to_owned(),
         },
+        opts: Default::default(),
     };
     let err = PresetGenerator::new(env(&fs, &clock))
         .run(&req)
@@ -1114,4 +1117,34 @@ fn components_in_an_aliased_ui_package_are_found() {
     assert!(create.contains(":error=\"form.errors.name\""), "{create}");
     assert!(create.contains("<BaseTextarea"), "{create}");
     assert!(!create.contains("<label for=\"name\""), "{create}");
+}
+
+/// A `.callgraph/gen.toml`-ban megnevezett komponens az alias-mappából is feloldódik (nem csak `resources/js` / `src`).
+#[test]
+fn gen_toml_component_behind_an_alias_is_found() {
+    let fs = bare_project();
+    fs.put(
+        "tsconfig.json",
+        r#"{"compilerOptions":{"paths":{"@ui/*":["ui/src/*"],"@/*":["resources/js/*"]}}}"#,
+    );
+    fs.put(
+        "ui/src/components/atoms/BaseInput/BaseInput.vue",
+        BASE_INPUT,
+    );
+    fs.put(
+        ".callgraph/gen.toml",
+        "[components]\ninput = \"BaseInput\"\n",
+    );
+    let clock = FixedClock(Cell::new(T0));
+    let out = run(&fs, &clock, CREATE, false).unwrap();
+    let create = fs.get("resources/js/Pages/Fees/Create.vue").unwrap();
+    assert!(
+        create.contains("import BaseInput from '@ui/components/atoms/BaseInput/BaseInput.vue';"),
+        "{create}"
+    );
+    assert!(
+        out.contains("components (gen.toml): input=BaseInput"),
+        "{out}"
+    );
+    assert!(!out.contains("component not found"), "{out}");
 }

@@ -227,6 +227,18 @@ pub(crate) struct GenerateParams {
     /// With `into`: insert after this method (default: at the end of the class).
     #[serde(default)]
     pub after: Option<String>,
+    /// With `into`: insert before this method instead.
+    #[serde(default)]
+    pub before: Option<String>,
+    /// With `into`: insert before this line (`L42`) instead.
+    #[serde(default)]
+    pub at: Option<String>,
+    /// With `into`: an existing method of that name is replaced.
+    #[serde(default)]
+    pub upsert: bool,
+    /// Return only the old / new difference of a `replace` (implies `dry`).
+    #[serde(default)]
+    pub diff: bool,
     /// `path::method` or `path:L42-L87`: replace that method / line range (a backup is made first).
     #[serde(default)]
     pub replace: Option<String>,
@@ -242,13 +254,21 @@ impl GenerateParams {
     /// A CLI `gen` argumentumai (a kifejezés külön argumentum; a `--project` a hívónál jön).
     pub(crate) fn to_args(&self) -> Vec<String> {
         let mut args = vec!["gen".to_owned(), self.expr.clone()];
-        if self.dry {
-            args.push("--dry".to_owned());
+        for (on, flag) in [
+            (self.dry, "--dry"),
+            (self.diff, "--diff"),
+            (self.upsert, "--upsert"),
+        ] {
+            if on {
+                args.push(flag.to_owned());
+            }
         }
         for (flag, value) in [
             ("--write", &self.write),
             ("--into", &self.into),
             ("--after", &self.after),
+            ("--before", &self.before),
+            ("--at", &self.at),
             ("--replace", &self.replace),
             ("--expect", &self.expect),
         ] {

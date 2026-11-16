@@ -11,6 +11,55 @@ pub fn with_header(header: String, block: Vec<String>) -> Vec<String> {
     lines
 }
 
+/// A `--diff` kimenetének sorkorlátja (a hosszabb változás végén egy `… +N lines` sor jelzi a maradékot).
+const DIFF_MAX: usize = 60;
+
+/// A `--diff` kimenete: a régi és az új tartomány közös eleje / vége nélkül, `- ` / `+ ` előtaggal, a változás körül
+/// egy-egy környezet-sorral (két szóköz előtaggal). Azonos szövegnél egyetlen jelzés-sor.
+pub fn diff(old: &[String], new: &[String]) -> Vec<String> {
+    let pre = old.iter().zip(new).take_while(|(a, b)| a == b).count();
+    let room = old.len().min(new.len()) - pre;
+    let suf = old
+        .iter()
+        .rev()
+        .zip(new.iter().rev())
+        .take(room)
+        .take_while(|(a, b)| a == b)
+        .count();
+    if pre == old.len() && pre == new.len() {
+        return vec![crate::t!("= no change", "= nincs változás").to_owned()];
+    }
+    let mut out = Vec::new();
+    if pre > 0 {
+        out.push(format!("  {}", old[pre - 1]));
+    }
+    out.extend(old[pre..old.len() - suf].iter().map(|l| format!("- {l}")));
+    out.extend(new[pre..new.len() - suf].iter().map(|l| format!("+ {l}")));
+    if suf > 0 {
+        out.push(format!("  {}", old[old.len() - suf]));
+    }
+    if out.len() > DIFF_MAX {
+        let more = out.len() - DIFF_MAX;
+        out.truncate(DIFF_MAX);
+        out.push(format!("… +{more} lines"));
+    }
+    out
+}
+
+/// A `--replace --dry` / `--diff` kimenete: hely-fejléc, utána az új kód, vagy (`diff`) a régi / új különbsége.
+pub fn replace_preview(
+    header: String,
+    old: &[String],
+    block: Vec<String>,
+    diff_mode: bool,
+) -> Vec<String> {
+    if diff_mode {
+        with_header(header, diff(old, &block))
+    } else {
+        with_header(header, block)
+    }
+}
+
 /// A címke ` (név)` alakban, vagy semmi.
 fn label_suffix(label: &str) -> String {
     if label.is_empty() {
