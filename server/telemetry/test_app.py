@@ -367,5 +367,42 @@ class SchemaTwo(unittest.TestCase):
         self.assertEqual(self.post(payload(batch="dddd-0001")), 204)
 
 
+class DailyDownloads(unittest.TestCase):
+    """The GitHub download totals are snapshotted per day (the day's last value), so per-day downloads are the
+    difference of two days."""
+
+    def test_release_totals_sum_assets_and_skip_non_release_tags(self):
+        answer = [
+            {"tag_name": "v1.0.1", "assets": [{"download_count": 7}, {"download_count": 5}]},
+            {"tag_name": "dev", "assets": [{"download_count": 99}]},
+            {"tag_name": "v1.0.0", "assets": []},
+            "junk",
+        ]
+        self.assertEqual(counts.release_totals(answer), {"v1.0.1": 12, "v1.0.0": 0})
+        self.assertEqual(counts.release_totals({"message": "rate limited"}), {})
+
+    def test_a_later_snapshot_of_the_same_day_overwrites(self):
+        con = app.db()
+        try:
+            con.execute("DELETE FROM gh_downloads")
+            counts.record_downloads(con, {"v1.0.1": 3, "v1.0.0": 19}, day="2026-11-16")
+            counts.record_downloads(con, {"v1.0.1": 12}, day="2026-11-16")
+            counts.record_downloads(con, {"v1.0.1": 20}, day="2026-11-17")
+            rows = con.execute("SELECT day, tag, total FROM gh_downloads ORDER BY day, tag").fetchall()
+        finally:
+            con.close()
+        self.assertEqual(
+            rows,
+            [("2026-11-16", "v1.0.0", 19), ("2026-11-16", "v1.0.1", 12), ("2026-11-17", "v1.0.1", 20)],
+        )
+
+    def test_fetch_failure_gives_nothing(self):
+        class Failing:
+            def open(self, *args, **kwargs):
+                raise urllib.error.URLError("offline")
+
+        self.assertEqual(counts.fetch_release_totals(Failing()), {})
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=1)

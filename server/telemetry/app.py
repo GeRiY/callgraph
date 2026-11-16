@@ -469,8 +469,26 @@ class Handler(BaseHTTPRequestHandler):
         return self._reply(204)
 
 
+def snapshot_downloads_forever(fetch=None, every: float = counts.DOWNLOADS_EVERY) -> None:
+    """Background loop: the GitHub download totals into today's row once per `every` seconds (a failed fetch is
+    retried in the next round; the day's last value stays)."""
+    fetch = fetch or counts.fetch_release_totals
+    while True:
+        totals = fetch()
+        if totals:
+            con = db()
+            try:
+                counts.record_downloads(con, totals)
+            except sqlite3.Error:
+                pass
+            finally:
+                con.close()
+        time.sleep(every)
+
+
 def main() -> None:
     db().close()
+    threading.Thread(target=snapshot_downloads_forever, daemon=True).start()
     ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
 
 
