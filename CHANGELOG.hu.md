@@ -6,6 +6,8 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ## [Unreleased]
 
+## [1.0.1] — 2026-11-16
+
 ### Javítás
 
 - **A csoportból betöltött Laravel route-fájlok megkapják a csoport előtagjait:** a `->group(base_path('routes/admin.php'))`,
@@ -747,7 +749,8 @@ Első kiadás.
 - Beépített frissítés: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Előre fordított csomagok macOS-re (arm64, x86_64), Linuxra (x86_64, ARM64, statikus musl) és Windowsra.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v1.0.0...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v1.0.1...develop
+[1.0.1]: https://github.com/GeRiY/callgraph/releases/tag/v1.0.1
 [1.0.0]: https://github.com/GeRiY/callgraph/releases/tag/v1.0.0
 [0.9.5]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.5
 [0.9.4]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.4
