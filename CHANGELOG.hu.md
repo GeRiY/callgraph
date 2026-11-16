@@ -18,6 +18,31 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   `type $name = default` alakban látszanak, és a prop nem számít kötelezőnek; a `defineModel` `model:` sorként jelenik
   meg a vázlatban, a `--format api`-ban pedig `model` szakaszként. A csak típust használó `defineEmits` is a valódi
   sorát mutatja.
+- **Kotlin-támogatás (`.kt`, `.kts`):** osztályok, data/sealed/enum osztályok, objektumok és companion objectek,
+  interfészek, felső szintű és extension függvények, `suspend` és `@Composable` függvények, property-k (a `by lazy`
+  és a `by viewModels()` is), hívások fogadótípus-feloldással, `::ref` / `Type::name` hivatkozások és vezérlési
+  ágak. A kategóriák lefedik a Compose-t (nézetek, modifierek, API), a coroutine-okat, az Androidot és a Kotlin
+  standard könyvtárat; a `*.gradle.kts` fájlok Gradle build scriptként vannak jelölve.
+- **Swift: callback-ek, protokollok és navigáció:** a callback-argumentumként átadott metódushivatkozás
+  (`Composer(onSend: vm.send)`) a hivatkozott metódus hívása. A callback-property-ben tárolt closure
+  (`socket.onFrame = { … }`) össze van kötve azzal a hellyel, ahol a property-t meghívják; `--depth 2` mellett a
+  meghívó metódus `via <Type>::onFrame` hívóként jelenik meg. A protokollmetódus és a megvalósításai hívói látják
+  egymást (`via`), és az `extension`-ben deklarált megfelelés is számít. A `.environment(store)` /
+  `.environmentObject` injektálási él, a `navigationDestination`, `sheet`, `fullScreenCover`, `popover` vagy
+  `NavigationLink` alatt épített nézetek navigációs élek. A fogadótípust a `@State`, `@Bindable`, `let x: T`,
+  `@Environment(T.self)` és a paraméterek adják.
+- **`callgraph mcp --allow <mappa>`:** az MCP-szerver egy további mappát is olvashat, pl. egy testvér `../android`
+  mappát. A kapcsoló ismételhető, vagy a `CALLGRAPH_MCP_ALLOW` környezeti változó használható; alapból a szerver a
+  projektgyökérre korlátozott marad.
+- **Rust: függvényhivatkozások és több fogadótípus:** az értékként átadott függvény vagy metódus (`.map(Self::parse)`,
+  `.and_then(Foo::new)`, `.map(helper)`) hívásnak számít. A generikus korláttal (`T: Trait`, `where`) vagy a metódus
+  visszatérési típusával (`self.make()?`, `Type::open().unwrap()`) típusozott fogadók feloldódnak.
+- **TypeScript interfész-tagok property-ként:** az `interface` tagjai property-ként szerepelnek, az opcionálisak
+  `?`-lel.
+- **A hibás hivatkozások jelölve vannak Markdownban és HTML-ben:** a hiányzó fájlra mutató relatív link, illetve a
+  megfelelő címsor nélküli `#anchor` `⚠ missing` jelölést kap.
+- **Zárolt verziók a `package.json` / `composer.json` vázlatában:** a függőségi kulcsok mellett látszik a zárolt
+  verzió.
 
 ### Változás
 
@@ -39,6 +64,18 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   szabályuk alatt jelennek meg, és a `--grep` megtalálja őket. A metódus nélküli JSON-fájl rövid kulcsindexet kap a
   metódusindexben (a felső kulcsok gyerekszámmal, a skalár sorozatok összevonva). A `--format summary` JSON-nál,
   Markdown/HTML-nél és stíluslapoknál „0 metódus" helyett kulcsokat, szakaszokat vagy szabályokat számol.
+- **Pontosabb SCSS-vázlat:** a `&--#{$x}` és a `.span-#{$i}` megtartja a teljes szelektornevét; a többsoros
+  szelektorokat és a mixin paraméterlistákat helyesen olvassa; a zárójel nélküli `@mixin` és a `@include x;` (hívás)
+  is működik; a kommentekből és a szelektorfejekből már nem jelent hívást; az ugyanabban a scope-ban újraértékelt
+  `$var` írás, nem második konstans; a sor végi `//` kommentek rögzítve vannak. A CSS és az SCSS egy közös motort
+  használ.
+- **Összevont Markdown-linkek:** a vázlat ugyanazt a link-célt egyszer listázza, `×N` jelöléssel.
+- **Nincs ismétlődő tipp MCP-n:** a záró 💡 tipp sor már nem kerül minden MCP-válaszba (a CLI megtartja). A skill
+  mostantól az md, json, css, scss és html fájlok szerkezetére is a callgraphot ajánlja.
+- **Swift projektprofil:** az olyan mappák, mint a Features, Core, Shared, Networking, UI és Persistence, rétegeket
+  kapnak; az `@Observable` / `ObservableObject` osztály store-jelölt, a `View`-t megvalósítók nézetek, a `Codable` /
+  `Identifiable` típusok modellek. Több Swift- és Foundation-beépített van kategorizálva (`pow`, `defer`,
+  matematikai függvények, `os_log`, UIKit- és Foundation-típusok).
 
 ### Javítás
 
@@ -46,6 +83,10 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   csak a PHP- és Vue-fájlokat ellenőrizte.
 - **Projekten kívüli JS/TS-fájlok modulútvonala:** a `package.json`, `tsconfig` vagy `jsconfig` nélküli fájl
   `home/…` alakú modulútvonalat kapott; most a fájl mappájához képest relatív.
+- **Rust: a crate saját moduljai saját kódnak számítanak:** a `mod x;` és az inline `mod` útvonalak már nem számítanak
+  csomagnak.
+- **Swift: az `Extensions` mappa saját kód:** a Swift-fájlokat tartalmazó `Extensions` mappát korábban vendorként
+  kezelte.
 
 ## [1.0.2] — 2026-11-16
 

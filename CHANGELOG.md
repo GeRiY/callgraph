@@ -16,6 +16,30 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   or type alias (including `extends` and `A & B`); `withDefaults` defaults are shown as `type $name = default` and the
   prop is not marked required; `defineModel` appears as `model:` in the outline and as a `model` section in
   `--format api`. A type-only `defineEmits` now shows its real line.
+- **Kotlin support (`.kt`, `.kts`):** classes, data/sealed/enum classes, objects and companion objects, interfaces,
+  top-level and extension functions, `suspend` and `@Composable` functions, properties (including `by lazy` and
+  `by viewModels()`), calls with receiver type resolution, `::ref` / `Type::name` references and control flow.
+  Categories cover Compose (views, modifiers, API), coroutines, Android and the Kotlin standard library;
+  `*.gradle.kts` files are marked as Gradle build scripts.
+- **Swift callbacks, protocols and navigation:** a method reference passed as a callback argument
+  (`Composer(onSend: vm.send)`) is a call of that method. A closure stored in a callback property
+  (`socket.onFrame = { … }`) is linked to where the property is invoked; with `--depth 2` the invoking method shows
+  as a caller `via <Type>::onFrame`. Callers of a protocol method and of its implementations see each other (`via`),
+  and a conformance declared in an `extension` counts. `.environment(store)` / `.environmentObject` are injection
+  edges, and views built in `navigationDestination`, `sheet`, `fullScreenCover`, `popover` or `NavigationLink` are
+  navigation edges. Receiver types are taken from `@State`, `@Bindable`, `let x: T`, `@Environment(T.self)` and
+  parameters.
+- **`callgraph mcp --allow <dir>`:** lets the MCP server read an extra folder, e.g. a sibling `../android`. Repeat
+  the flag or set `CALLGRAPH_MCP_ALLOW`; by default the server stays restricted to the project root.
+- **Rust: function references and more receiver types:** a function or method passed as a value (`.map(Self::parse)`,
+  `.and_then(Foo::new)`, `.map(helper)`) is a call. Receivers typed by a generic bound (`T: Trait`, `where`) or by a
+  method's return type (`self.make()?`, `Type::open().unwrap()`) are resolved.
+- **TypeScript interface members as properties:** the members of an `interface` are listed as properties, optional
+  ones with `?`.
+- **Broken links in Markdown and HTML are marked:** a relative link to a missing file, or a `#anchor` with no
+  matching heading, shows `⚠ missing`.
+- **Locked versions in `package.json` / `composer.json`:** the outline shows the locked version next to each
+  dependency key.
 
 ### Changed
 
@@ -37,6 +61,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   under their rule and are found by `--grep`. A JSON file without methods gets a short key index in the method index
   (top keys with child counts, runs of scalars collapsed). `--format summary` counts keys, sections or rules instead
   of "0 methods" for JSON, Markdown/HTML and stylesheets.
+- **More accurate SCSS outline:** `&--#{$x}` and `.span-#{$i}` keep their full selector name; multi-line selectors and
+  mixin parameter lists are read correctly; `@mixin` without parentheses and `@include x;` (a call) work; calls in
+  comments and selector headers are no longer reported; a reassigned `$var` in the same scope is a write, not a second
+  constant; trailing `//` comments are recorded. CSS and SCSS now share one engine.
+- **Markdown links merged:** the outline lists the same link target once, with `×N`.
+- **No repeated tip over MCP:** the closing 💡 tip line is no longer added to every MCP answer (the CLI keeps it).
+  The skill now also recommends callgraph for the structure of md, json, css, scss and html files.
+- **Swift project profile:** folders such as Features, Core, Shared, Networking, UI and Persistence get layers; an
+  `@Observable` / `ObservableObject` class is a store candidate, `View` conformers are views, and `Codable` /
+  `Identifiable` types are models. More Swift and Foundation built-ins are categorized (`pow`, `defer`, math
+  functions, `os_log`, UIKit and Foundation types).
 
 ### Fixed
 
@@ -44,6 +79,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   and Vue files were checked.
 - **Module paths of JS/TS files outside a project:** a file with no `package.json`, `tsconfig` or `jsconfig` above it
   got module paths like `home/…`; the path is now relative to the file's folder.
+- **Rust: the crate's own modules are own code:** `mod x;` and inline `mod` paths no longer count as a package.
+- **Swift: an `Extensions` folder is own code:** a folder named `Extensions` with Swift files was treated as vendor.
 
 ## [1.0.2] — 2026-11-16
 
