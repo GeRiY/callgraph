@@ -103,6 +103,9 @@ Project profile (architecture, layers and patterns from folder / file names, che
     --format forms     useForm fields vs the action's FormRequest / validate rules; outline: form: … · N fields ✓ / ⚠ …
     --format models    models: table, columns from the migrations, relations; fillable / cast not a column, table created twice
     --format inertia   pages: render sites, props the page does not declare, pages never rendered
+  Cross-file views (any project; on a folder or file; lang files and stylesheets also get a summary line in the outline):
+    --format i18n      translation keys missing per locale / unused, $t('a.b') / __('x') with a missing key; lang/en.json::board.title: where one key is used
+    --format classes   stylesheet classes: which templates use them, classes nothing uses (lenient: dynamic class names and Tailwind utilities are never reported)
   bash ~/.claude/skills/callgraph/callgraph.sh <dir> --layer service           only the files of that layer (name,name...;
                                                 one ecosystem: controller:php, controller:js, …:swift, …:rust)
   bash ~/.claude/skills/callgraph/callgraph.sh <dir> --layers                  summary grouped by layer, [role] on FILE lines

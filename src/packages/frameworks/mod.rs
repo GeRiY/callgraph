@@ -33,9 +33,12 @@ pub(crate) use laravel::Laravel;
 /// nélkül a sorok érintetlenek. A projekt-szintű nézetek (`ziggy`, `forms`, `models`, `inertia`) a teljes
 /// projekt-gráfot töltik; az egy-fájlos outline / json csak a szükséges fájlokat (`targeted.rs`).
 pub(crate) fn annotate(rows: &mut [QueryResult], root: &Path, format: &str) {
-    let Some(first) = rows.first() else {
+    if rows.is_empty() {
         return;
-    };
+    }
+    // fájltípusok közti kapcsolatok (i18n-kulcsok, CSS-osztályok): framework-tól függetlenül
+    crate::packages::crossref::attach(rows, root, format);
+    let first = &rows[0];
     let packages = match &first.packages {
         Some(packages) => Arc::clone(packages),
         None => Arc::new(super::open(root)),

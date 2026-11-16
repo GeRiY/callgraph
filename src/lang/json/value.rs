@@ -68,6 +68,50 @@ fn find(value: &Value<'_>, path: &str) -> Option<(usize, usize)> {
     }
 }
 
+/// Egy JSON-levél: kulcs-út, sor, és a string-érték (más típusnál `None`).
+pub(crate) type Leaf = (String, u32, Option<String>);
+
+/// A JSON-objektum levelei: `(kulcs-út, sor, érték)`; az út a beágyazott kulcsok pontos összefűzése (`a.b`). `None`,
+/// ha a szöveg nem JSON-objektum. A string-levél értéke `Some`, a más típusú levélé (szám, bool, null, tömb) `None`
+/// — az i18n-fájl felismerése ebből dönt.
+pub(crate) fn leaves(text: &str) -> Option<Vec<Leaf>> {
+    let options = (CollectOptions::default(), ParseOptions::default());
+    let parsed = parse_to_ast(text, &options.0, &options.1).ok()?;
+    let root = parsed.value.as_ref()?;
+    let Value::Object(_) = root else {
+        return None;
+    };
+    let lines = crate::core::LineIndex::new(text);
+    let mut out = Vec::new();
+    collect_leaves(root, "", &lines, &mut out);
+    Some(out)
+}
+
+fn collect_leaves(
+    value: &Value<'_>,
+    path: &str,
+    lines: &crate::core::LineIndex,
+    out: &mut Vec<Leaf>,
+) {
+    let Value::Object(object) = value else {
+        return;
+    };
+    for prop in &object.properties {
+        let key = prop.name.as_str();
+        let child = if path.is_empty() {
+            key.to_owned()
+        } else {
+            format!("{path}.{key}")
+        };
+        let at = lines.line_of(prop.name.range().start);
+        match &prop.value {
+            Value::Object(_) => collect_leaves(&prop.value, &child, lines, out),
+            Value::StringLit(text) => out.push((child, at, Some(text.value.to_string()))),
+            _ => out.push((child, at, None)),
+        }
+    }
+}
+
 fn line(text: &str, offset: usize) -> u32 {
     let before = &text.as_bytes()[..offset.min(text.len())];
     (before.iter().filter(|&&b| b == b'\n').count() + 1) as u32

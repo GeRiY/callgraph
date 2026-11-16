@@ -162,7 +162,15 @@ impl Command for ShowCommand {
         if !self.body
             && matches!(
                 self.format.as_str(),
-                "outline" | "json" | "jsonl" | "inertia" | "ziggy" | "forms" | "models"
+                "outline"
+                    | "json"
+                    | "jsonl"
+                    | "inertia"
+                    | "ziggy"
+                    | "forms"
+                    | "models"
+                    | "i18n"
+                    | "classes"
             )
             && self.lines.is_none()
             && self.strings.is_none()

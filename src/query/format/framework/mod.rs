@@ -4,6 +4,7 @@
 //! (`inertia.rs`): fájlokon átívelő (PHP render-hívás ↔ page-komponens), a projekt-szintű kötésekből; ugyanígy a
 //! `ziggy` nézet (`ziggy.rs`: JS `route('név')` ↔ a Laravel route-tábla) és a `forms` nézet (`forms.rs`: `useForm` ↔ validáció).
 
+mod crossref;
 mod forms;
 mod inertia;
 mod models;
@@ -122,6 +123,8 @@ pub(super) fn register(registry: &mut FormatterRegistry) {
     registry.register("ziggy", Box::new(ziggy::ZiggyView));
     registry.register("forms", Box::new(forms::FormsView));
     registry.register("models", Box::new(models::ModelsView));
+    registry.register("i18n", Box::new(crossref::I18nView));
+    registry.register("classes", Box::new(crossref::ClassesView));
 }
 
 /// `<ns><container|__top__>::<caller>` — a hívás helye.
@@ -247,6 +250,22 @@ mod tests {
             let text = registry
                 .render("forms", std::slice::from_ref(&row))
                 .unwrap();
+            assert_eq!(text, want);
+        }
+    }
+
+    #[test]
+    fn i18n_and_classes_views_without_bindings_report_empty() {
+        let row = QueryResult::new(FileGraphBuilder::new("app/x.php").build(), None);
+        for (name, lang, want) in [
+            ("i18n", Lang::En, "(no translation files found)\n"),
+            ("i18n", Lang::Hu, "(nincs nyelvfájl találat)\n"),
+            ("classes", Lang::En, "(no stylesheet classes found)\n"),
+            ("classes", Lang::Hu, "(nincs stíluslap-osztály találat)\n"),
+        ] {
+            let mut registry = FormatterRegistry::default().in_lang(lang);
+            register(&mut registry);
+            let text = registry.render(name, std::slice::from_ref(&row)).unwrap();
             assert_eq!(text, want);
         }
     }

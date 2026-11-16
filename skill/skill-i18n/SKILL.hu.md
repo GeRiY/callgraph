@@ -159,7 +159,11 @@ réteg elöl (a hívásirányban a legmélyebb: model → repository → service
 **Framework-nézetek** (`--format …`): `routes`, `middleware`, `validation`, `jobs`, `events`, `providers`,
 `magic`, `di`, `views`. Mappára futtasd (pl. `bash $CG --project myapp routes --format routes`). Laravel +
 Inertia, a projekt gyökerén: `ziggy` (ismeretlen route-nevek), `forms` (useForm ↔ validációs szabályok), `models`
-(táblák és oszlopok a migrációkból), `inertia` (oldalak, render-helyek, props).
+(táblák és oszlopok a migrációkból), `inertia` (oldalak, render-helyek, props). Bármely projektben, mappán vagy
+fájlon: `i18n` (nyelvenként hiányzó és nem használt fordítási kulcsok, `$t('a.b')` / `__('x')` hívások nem létező
+kulccsal; a `lang/en.json::board.title` megmutatja, hol használják a kulcsot) és `classes` (stíluslap-osztályok és a
+őket használó sablonok, plusz a sehol nem használt osztályok). A nyelvfájl és a stíluslap outline-ja is kap egy
+összegző sort.
 
 ## JS / TS / Vue
 
@@ -243,7 +247,8 @@ relatívak: regisztrált alias (`project`, lista: `projects`) vagy a szerver mun
   kulcsok: `useForm.js::submit` (export), `route::orders.show`, `i18n::orders.title`, `vue::emit:save`, `Atoms/AtomButton.vue`.
 - `search` `{kind: strings | constants, pattern}`: hol van egy string-literál (hibaüzenet, kulcs) vagy konstans.
 - `framework_view` `{view, path}`: egy mappa `routes`, `middleware`, `validation`, `jobs`, `events`, `providers`,
-  `magic`, `di`, `views` nézete; Laravel + Inertia (projekt gyökere): `ziggy`, `forms`, `models`, `inertia`.
+  `magic`, `di`, `views` nézete; Laravel + Inertia (projekt gyökere): `ziggy`, `forms`, `models`, `inertia`; bármely
+  projekt: `i18n` (fordítási kulcsok ↔ `$t()` / `__()`), `classes` (CSS-osztályok ↔ sablonok).
 - `notes`: fájlokhoz / metódusokhoz írt jegyzetek (`📝`, csak olvas). `guide`: ez az útmutató teljes terjedelmében
   (CLI-példák, nyelvek).
 - `next` `{result_id, choice}`: ha a szerver `callgraph mcp --next`-tel fut, egyes eredmények végén

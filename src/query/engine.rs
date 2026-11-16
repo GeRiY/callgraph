@@ -34,6 +34,10 @@ pub struct QueryResult {
     /// A Laravel route-tábla (`crate::packages::annotate_frameworks`): csak Laravel-projektben, és csak ha a kimenet
     /// kéri (JS `route('név')` hívás, controller-fájl, `ziggy` nézet); `None` = a kimenet a régi.
     pub(crate) laravel: Option<std::sync::Arc<crate::packages::Laravel>>,
+    /// A fájltípusok közti kapcsolatok (`crate::packages::crossref`: i18n-kulcsok ↔ `$t()`, CSS-osztály ↔ sablon):
+    /// csak az `i18n` / `classes` nézet és az outline (nyelvfájl, `$t()` hívás, stíluslap) előtt töltődik; `None` =
+    /// a kimenet a régi.
+    pub(crate) crossref: Option<std::sync::Arc<crate::packages::CrossRef>>,
 }
 
 /// Egy rokon típuson át illesztett hívás: sor + cél (a `resolved` / `target`), és a hívás típusának rövid neve.
@@ -54,6 +58,7 @@ impl QueryResult {
             packages: None,
             inertia: None,
             laravel: None,
+            crossref: None,
         }
     }
 
@@ -68,6 +73,18 @@ impl QueryResult {
         self.laravel
             .as_ref()?
             .link_text(call, &self.graph.calls, self.inertia.as_deref(), lang)
+    }
+
+    /// Az outline fejléc-sora a fájlhoz (nyelvfájl: `i18n: missing in en: 3 · unused: 2`, stíluslap: `classes: unused
+    /// .a, .b`); kapcsolatok nélkül vagy ha nincs mit mondani, `None`.
+    pub(crate) fn crossref_header(&self, lang: crate::i18n::Lang) -> Option<String> {
+        self.crossref.as_ref()?.header(&self.graph.file, lang)
+    }
+
+    /// `$t('a.b')` hívásnál a figyelmeztetés az outline-hoz (` ⚠ missing in hu.json` / ` ⚠ no key`); kapcsolatok
+    /// nélkül mindig `None`.
+    pub(crate) fn i18n_link(&self, call: &Call, lang: crate::i18n::Lang) -> Option<String> {
+        self.crossref.as_ref()?.i18n_link(call, lang)
     }
 
     /// A hívás csomagja (a hívás nyers minősítőjéből, a fájlhoz legközelebbi manifest szerint), ha a sorhoz
@@ -298,6 +315,7 @@ impl QueryEngine {
             kept.packages.clone_from(&row.packages);
             kept.inertia.clone_from(&row.inertia);
             kept.laravel.clone_from(&row.laravel);
+            kept.crossref.clone_from(&row.crossref);
             if let Some((regex, matcher)) = &via {
                 kept.via = kept
                     .graph

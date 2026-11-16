@@ -43,6 +43,8 @@ pub(crate) enum FrameworkView {
     Ziggy,
     Forms,
     Models,
+    I18n,
+    Classes,
 }
 
 // `outline`: egy fájl / mappa szerkezete vagy egy metódus hívás-gráfja.
@@ -459,6 +461,8 @@ impl FrameworkView {
             Self::Ziggy => "ziggy",
             Self::Forms => "forms",
             Self::Models => "models",
+            Self::I18n => "i18n",
+            Self::Classes => "classes",
         }
     }
 }

@@ -13,12 +13,14 @@
 //! - `stack.rs`: a kiemelt csomagok sora;
 //! - `usage/`: `uses <csomag>` / MCP `package_usage` — hol és hogyan használja a projekt egy függőségét;
 //! - `deps/`: `deps` / MCP `project_profile` `deps: true` — fölösleges, hiányzó és csak dev függőségek (Specification);
+//! - `crossref/`: kapcsolatok a fájltípusok között — fordítási kulcsok ↔ `$t()` / `__()`, CSS-osztály ↔ sablon (`--format i18n`, `--format classes`);
 //! - `frameworks/`: a `frameworks()` szerint aktív framework-kötések a kimenetekben (Inertia: render-hívás ↔ page).
 //!
 //! Minden hibatűrő: hiányzó vagy hibás manifest / lock → az a rész üres, soha nem hiba.
 
 mod builder;
 mod cache;
+pub(crate) mod crossref;
 mod deps;
 mod files;
 pub(crate) mod frameworks;
@@ -41,6 +43,7 @@ use crate::i18n::Lang;
 use crate::model::Call;
 use crate::query::QueryResult;
 
+pub(crate) use crossref::CrossRef;
 pub(crate) use deps::{DepsQuery, user_ignores};
 pub(crate) use frameworks::{
     DiskProjectFiles, Inertia, Laravel, PageLink, annotate as annotate_frameworks,

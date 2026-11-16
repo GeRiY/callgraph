@@ -2,7 +2,7 @@
 
 mod value;
 
-pub(crate) use value::key_lines;
+pub(crate) use value::{key_lines, leaves};
 
 use std::path::{Path, PathBuf};
 

@@ -88,6 +88,10 @@ fn outline(
     if let Some(by) = row.inertia.as_ref().and_then(|i| i.rendered_by(&g.file)) {
         writeln!(s, "{}{by}", lang.pick("rendered by: ", "renderelő: ")).unwrap();
     }
+    // nyelvfájl / stíluslap: a kapcsolatok összegzése (nincs mit mondani: nincs sor)
+    if let Some(text) = row.crossref_header(lang) {
+        writeln!(s, "{text}").unwrap();
+    }
     // jegyzetek (PILOT): fájl-jegyzetek, és a nem listázott (konténer nélküli) függvényeiké
     crate::notes::file_lines(&mut s, &row.notes);
     crate::notes::unlisted_lines(&mut s, &row.notes, g);
@@ -463,6 +467,10 @@ pub(super) fn shown_target(row: &QueryResult, call: &Call, lang: Lang) -> String
     let target = call.resolved.as_deref().unwrap_or(&call.target);
     // Ziggy `route('név')` hívásnál a Laravel route-tábla linkje (` → POST /uri · X@m`, vagy ` ⚠ no route`)
     if let Some(link) = row.route_link(call, lang) {
+        return format!("{target}{link}");
+    }
+    // `$t('a.b')`: a kulcs hiánya a nyelvfájlokból (` ⚠ missing in hu.json` / ` ⚠ no key`)
+    if let Some(link) = row.i18n_link(call, lang) {
         return format!("{target}{link}");
     }
     // dokumentum-link: a nem létező fájl / saját címsor ` ⚠ missing`
