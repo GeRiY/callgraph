@@ -108,6 +108,15 @@ pub(crate) fn composer_requires(json: &str) -> Vec<(String, bool)> {
         .unwrap_or_default()
 }
 
+/// A `package.json` szövegének függőségei (`dependencies`, `devDependencies`, `peerDependencies`) névsorban, a lemez
+/// érintése nélkül — a generátor preset-je ebből dönt (Ziggy, i18n-könyvtár) a saját fájlrendszerén át.
+pub fn npm_requires(json: &str) -> std::collections::BTreeSet<String> {
+    sources::Npm
+        .read(json)
+        .map(|manifest| manifest.deps.into_iter().map(|dep| dep.name).collect())
+        .unwrap_or_default()
+}
+
 /// A `package.json` szövegének frameworkjei a `FRAMEWORKS` sorrendjében (a profil egységtesztjeihez).
 #[cfg(test)]
 pub(crate) fn node_frameworks(json: &str) -> Vec<&'static str> {

@@ -74,13 +74,21 @@ fn method(name: &str, params: Vec<Param>, ret: TypeRef, body: String) -> Member 
     member
 }
 
-/// A teljes FormRequest-fájl. `pipe`: a szabályok `'required|string'` alakban (a projekt kérései szerint).
+/// A mező fordítási kulcsa (`fees.fields.name`): az oldalak címkéi és a kérés `attributes()`-e ugyanezt használják.
+pub fn field_key(prefix: &str, field: &Field) -> String {
+    format!("{prefix}.fields.{}", field.name)
+}
+
+/// A teljes FormRequest-fájl. `pipe`: a szabályok `'required|string'` alakban (a projekt kérései szerint);
+/// `translate`: a kulcs-előtag (`fees`), ha a projekt fordít: akkor az `attributes()` a mezőnevekhez `__('kulcs')`-ot ad,
+/// így a validációs üzenetek a fordított mezőnevet használják.
 pub fn request_file(
     strict: bool,
     namespace: &str,
     class: &str,
     fields: &[Field],
     pipe: bool,
+    translate: Option<&str>,
 ) -> String {
     let mut body = vec!["return [".to_owned()];
     for field in fields {
@@ -116,6 +124,23 @@ pub fn request_file(
             body.join("\n"),
         ),
     ];
+    if let Some(prefix) = translate {
+        let mut names = vec!["return [".to_owned()];
+        for field in fields {
+            names.push(format!(
+                "{IND}'{}' => __('{}'),",
+                field.name,
+                field_key(prefix, field)
+            ));
+        }
+        names.push("];".to_owned());
+        decl.members.push(method(
+            "attributes",
+            Vec::new(),
+            TypeRef::Map(Box::new(TypeRef::Str), Box::new(TypeRef::Str)),
+            names.join("\n"),
+        ));
+    }
     file_text(
         strict,
         namespace,

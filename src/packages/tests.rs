@@ -10,7 +10,7 @@ use super::cache::{CacheStore, load_or_build};
 use super::files::{SourceFiles, Stamp};
 use super::model::{Ecosystem, Package};
 use super::project::{EcosystemPackages, ProjectPackages};
-use super::{Packages, composer_requires};
+use super::{Packages, composer_requires, npm_requires};
 use crate::i18n::Lang;
 
 /// Memóriabeli fájlrendszer: út → (szöveg, bélyeg); az olvasásokat számolja.
@@ -507,6 +507,14 @@ fn composer_requires_keeps_the_dev_flag_and_skips_the_platform() {
         ]
     );
     assert!(composer_requires("nope").is_empty());
+}
+
+#[test]
+fn npm_requires_lists_all_dependency_sections() {
+    let json = r#"{"dependencies":{"vue":"^3"},"devDependencies":{"ziggy-js":"^2","vite":"^5"}}"#;
+    let names: Vec<String> = npm_requires(json).into_iter().collect();
+    assert_eq!(names, ["vite", "vue", "ziggy-js"]);
+    assert!(npm_requires("nope").is_empty());
 }
 
 /// A tömör (MCP-indító) stack-sor: rövid nevek, főverzió, a teszt- és build-eszközök nélkül.

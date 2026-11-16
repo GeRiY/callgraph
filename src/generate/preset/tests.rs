@@ -859,3 +859,200 @@ fn ziggy_is_read_from_the_manifest_keys() {
     let page = fs.get("resources/js/Pages/Fees/Create.vue").unwrap();
     assert!(page.contains("form.post(route('fees.store'))"), "{page}");
 }
+
+// ---- projekt-tudatos komponensek és fordítás (F1) ----
+
+const BASE_INPUT: &str = "<script setup>
+defineProps({ modelValue: String });
+</script>
+
+<template>
+    <input />
+</template>
+";
+
+const FIELD_LABEL: &str = "<script setup>
+defineProps({ label: String });
+</script>
+
+<template>
+    <label>{{ label }}</label>
+</template>
+";
+
+const FIELD_ERROR: &str = "<script setup>
+defineProps({ message: String });
+</script>
+
+<template>
+    <p>{{ message }}</p>
+</template>
+";
+
+const ACTION_BUTTON: &str = "<template>
+    <button><slot /></button>
+</template>
+";
+
+/// A `project()` a Breeze-komponensek és a layout nélkül.
+fn bare_project() -> MemFs {
+    let fs = project();
+    fs.files.borrow_mut().retain(|path, _| {
+        let path = path.to_string_lossy();
+        !path.contains("/Components/") && !path.contains("/Layouts/")
+    });
+    fs
+}
+
+/// A projekt saját komponensei (nem Breeze-nevek) + vue-i18n + egy hiányos `lang/hu.json`: a komponenseket
+/// felismeri, a feliratok `$t()` kulcsok, a hiányzó kulcsokat jegyzet sorolja, nyelvi fájlt nem ír.
+#[test]
+fn own_components_and_translation_are_detected() {
+    let fs = bare_project();
+    fs.put("package.json", r#"{"dependencies":{"vue-i18n":"^9.0.0"}}"#);
+    fs.put("resources/js/Components/BaseInput.vue", BASE_INPUT);
+    fs.put("resources/js/Components/FieldLabel.vue", FIELD_LABEL);
+    fs.put("resources/js/Components/FieldError.vue", FIELD_ERROR);
+    fs.put("resources/js/Components/ActionButton.vue", ACTION_BUTTON);
+    fs.put("resources/js/Components/DangerButton.vue", ACTION_BUTTON);
+    fs.put("resources/js/Layouts/MainLayout.vue", INPUT_LABEL);
+    fs.put("resources/js/Layouts/GuestLayout.vue", INPUT_LABEL);
+    let lang = r#"{"fees.save":"Mentés","fees":{"new":"Új"}}"#;
+    fs.put("lang/hu.json", lang);
+    let clock = FixedClock(Cell::new(T0));
+    let out = run(
+        &fs,
+        &clock,
+        "laravel:Fee>create(name:str,paid?:bool)+index+destroy",
+        false,
+    )
+    .unwrap();
+
+    let create = fs.get("resources/js/Pages/Fees/Create.vue").unwrap();
+    assert!(create.contains("import BaseInput from '@/Components/BaseInput.vue';"));
+    assert!(create.contains("<BaseInput"), "{create}");
+    assert!(create.contains("<FieldLabel"), "{create}");
+    assert!(
+        create.contains(":label=\"$t('fees.fields.name')\""),
+        "{create}"
+    );
+    assert!(create.contains("<ActionButton"), "{create}");
+    assert!(create.contains("{{ $t('fees.save') }}"), "{create}");
+    assert!(create.contains("<MainLayout"), "{create}");
+    assert!(!create.contains("PrimaryButton") && !create.contains("GuestLayout"));
+    assert!(create.contains("$t('fees.create_title')"), "{create}");
+
+    let index = fs.get("resources/js/Pages/Fees/Index.vue").unwrap();
+    assert!(
+        index.contains("destroy(item.id, $t('fees.delete_confirm'))"),
+        "{index}"
+    );
+    assert!(index.contains("if (confirm(message))"), "{index}");
+    assert!(!index.contains("Delete this item?"));
+
+    // a validációs üzenetek a fordított mezőnevet használják
+    let request = fs.get("app/Http/Requests/StoreFeeRequest.php").unwrap();
+    assert!(
+        request.contains("public function attributes()"),
+        "{request}"
+    );
+    assert!(
+        request.contains("'name' => __('fees.fields.name'),"),
+        "{request}"
+    );
+
+    // a döntések és a hiányzó kulcsok egy-egy sorban; a már meglévők (fees.save, fees.new) nem szerepelnek
+    assert!(out.contains("components guessed:"), "{out}");
+    assert!(out.contains("input=BaseInput"), "{out}");
+    assert!(out.contains("layout=MainLayout"), "{out}");
+    assert!(!out.contains("DangerButton"), "{out}");
+    assert!(out.contains("keys missing in lang/hu.json"), "{out}");
+    assert!(out.contains(" … +"), "{out}");
+    assert!(
+        !out.contains("fees.save") && !out.contains("fees.new"),
+        "{out}"
+    );
+    assert!(out.contains("✓ form ↔ rules"), "{out}");
+    // a nyelvi fájlt a generátor nem ír
+    assert_eq!(fs.get("lang/hu.json").as_deref(), Some(lang));
+    assert_eq!(fs.names_under("lang").len(), 1);
+}
+
+/// Komponens és fordítás nélkül a kimenet a mai sima HTML, jegyzet-sor nélkül.
+#[test]
+fn a_project_with_nothing_keeps_the_plain_output() {
+    let fs = bare_project();
+    let clock = FixedClock(Cell::new(T0));
+    let out = run(
+        &fs,
+        &clock,
+        "laravel:Fee>create(name:str,paid?:bool)+index+destroy",
+        false,
+    )
+    .unwrap();
+    let create = fs.get("resources/js/Pages/Fees/Create.vue").unwrap();
+    assert!(create.contains("<label"), "{create}");
+    assert!(create.contains("<input"), "{create}");
+    assert!(create.contains("Save"), "{create}");
+    assert!(!create.contains("$t("), "{create}");
+    let index = fs.get("resources/js/Pages/Fees/Index.vue").unwrap();
+    assert!(index.contains("confirm('Delete this item?')"), "{index}");
+    assert!(index.contains("@click=\"destroy(item.id)\""), "{index}");
+    let request = fs.get("app/Http/Requests/StoreFeeRequest.php").unwrap();
+    assert!(!request.contains("attributes()"), "{request}");
+    assert!(
+        !out.contains("components") && !out.contains("i18n:"),
+        "{out}"
+    );
+}
+
+/// A `.callgraph/gen.toml` a megszokott neveket is felülírja; a hibás név jelzett, nem végzetes.
+#[test]
+fn gen_toml_overrides_the_heuristic() {
+    let fs = project();
+    fs.put("resources/js/Components/BaseInput.vue", BASE_INPUT);
+    fs.put("package.json", r#"{"dependencies":{"vue-i18n":"^9.0.0"}}"#);
+    fs.put(
+        ".callgraph/gen.toml",
+        "# a projekt komponensei\n[components]\ninput = \"BaseInput\"  # saját\nbutton = \"Nope\"\n\n[i18n]\nenabled = false\n",
+    );
+    let clock = FixedClock(Cell::new(T0));
+    let out = run(&fs, &clock, CREATE, false).unwrap();
+    let create = fs.get("resources/js/Pages/Fees/Create.vue").unwrap();
+    assert!(create.contains("<BaseInput"), "{create}");
+    assert!(!create.contains("<TextInput"), "{create}");
+    // a hibás név a megszokottra esik vissza
+    assert!(create.contains("<PrimaryButton"), "{create}");
+    // a gen.toml kikapcsolta a fordítást
+    assert!(!create.contains("$t("), "{create}");
+    assert!(
+        out.contains("components (gen.toml): input=BaseInput"),
+        "{out}"
+    );
+    assert!(
+        out.contains("⚠ gen.toml: component not found: Nope"),
+        "{out}"
+    );
+    assert!(!out.contains("i18n:"), "{out}");
+}
+
+#[test]
+fn gen_toml_parser_reads_sections_comments_and_booleans() {
+    let config = super::ui::Config::parse(
+        "[components]\ninput = \"A#B\" # megjegyzés\nlabel = 'L'\n[i18n]\nenabled = true\n[other]\ninput = \"x\"\n",
+    );
+    assert_eq!(
+        config.components.get("input").map(String::as_str),
+        Some("A#B")
+    );
+    assert_eq!(
+        config.components.get("label").map(String::as_str),
+        Some("L")
+    );
+    assert_eq!(config.components.len(), 2);
+    assert_eq!(config.i18n, Some(true));
+    assert_eq!(
+        super::ui::Config::parse("nonsense"),
+        super::ui::Config::default()
+    );
+}

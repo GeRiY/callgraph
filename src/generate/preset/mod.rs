@@ -41,6 +41,7 @@ mod page;
 mod php;
 mod plan;
 mod spec;
+mod ui;
 
 #[cfg(test)]
 mod tests;

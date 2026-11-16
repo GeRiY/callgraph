@@ -1,11 +1,13 @@
 //! A preset terve: minden érintett fájl teljes új szövege, a memóriában (a lemezhez nem nyúl). A tervet a hívó
 //! előbb ellenőrzi (minden fájl), és csak ezután írja ki egyetlen tranzakcióban.
 
+use std::cell::RefCell;
 use std::collections::BTreeSet;
 
-use super::page::{Kind, Page, Parts};
+use super::page::{Kind, Page};
 use super::php::{self, ControllerCtx};
 use super::spec::{Action, Field, FieldType, Names, Op, Spec};
+use super::ui;
 use crate::generate::ast::TypeKind;
 use crate::generate::edit::{add_imports, insert_at_end, join_lines, split_lines};
 use crate::generate::emitter::Emitter;
@@ -136,48 +138,15 @@ fn pages_dir(env: Env<'_>) -> &'static str {
     }
 }
 
-/// A projekt komponensei, amelyeket az oldalak használnak; `composer`: a már beolvasott `composer.json` szövege.
-fn parts(env: Env<'_>, project: &vue::VueProject<'_>, composer: Option<&str>) -> Parts {
-    let path = |name: &str| vue::component_path(project, name);
-    Parts {
-        layout: ["AuthenticatedLayout", "AppLayout"]
-            .iter()
-            .find_map(|name| path(name).map(|p| ((*name).to_owned(), p))),
-        label: path("InputLabel"),
-        input: path("TextInput"),
-        error: path("InputError"),
-        button: path("PrimaryButton"),
-        ziggy: has_ziggy(env, composer),
-    }
-}
-
 /// Ziggy a projektben: `tightenco/ziggy` a composer.json-ban vagy `ziggy-js` a package.json-ban (a manifestek
 /// értelmezve, nem szöveg-kereséssel: a `require` / `require-dev` és a `dependencies` / `devDependencies` kulcsai).
-/// A `composer.json` szövegét a hívó már beolvasta (egy futás egyszer olvassa); a fájlokat a generátor fájlrendszerén
-/// olvassa (nem a lemezen), ezért nem a `packages::open` csomagtérképe.
-fn has_ziggy(env: Env<'_>, composer: Option<&str>) -> bool {
-    let in_composer = composer.is_some_and(|text| {
+/// A manifestek szövegét a hívó már beolvasta (egy futás egyszer olvassa); `npm`: a `package.json` függőségei.
+fn has_ziggy(composer: Option<&str>, npm: &BTreeSet<String>) -> bool {
+    composer.is_some_and(|text| {
         crate::packages::composer_requires(text)
             .iter()
             .any(|(name, _)| name == "tightenco/ziggy")
-    });
-    in_composer
-        || env
-            .fs
-            .read(&env.root.join("package.json"))
-            .is_ok_and(|text| npm_has(&text, "ziggy-js"))
-}
-
-/// A `package.json` szövege függőségként (vagy fejlesztői függőségként) tartalmazza-e a csomagot.
-fn npm_has(manifest: &str, package: &str) -> bool {
-    let Ok(doc) = serde_json::from_str::<serde_json::Value>(manifest) else {
-        return false;
-    };
-    ["dependencies", "devDependencies"].iter().any(|section| {
-        doc.get(section)
-            .and_then(serde_json::Value::as_object)
-            .is_some_and(|deps| deps.contains_key(package))
-    })
+    }) || npm.contains("ziggy-js")
 }
 
 /// Az utolsó nem üres sor után, egy üres sorral elválasztva; a záró újsor megmarad.
@@ -413,6 +382,12 @@ pub fn build(env: Env<'_>, spec: &Spec) -> GenResult<Plan> {
     let names = Names::of(spec);
     // a composer.json egyszer olvasódik: a PSR-4 térkép és a Ziggy-észlelés is ebből dolgozik
     let composer = env.fs.read(&env.root.join("composer.json")).ok();
+    // a package.json is egyszer: Ziggy és fordító-könyvtár észleléséhez (a lemezhez nem a `packages::open` nyúl)
+    let npm = env
+        .fs
+        .read(&env.root.join("package.json"))
+        .map(|text| crate::packages::npm_requires(&text))
+        .unwrap_or_default();
     let psr4 = composer.as_deref().map(Psr4::parse).unwrap_or_default();
     let scan = PhpScan::new(env.fs, env.root, &psr4);
     let strict = detect_strict_types(&scan);
@@ -456,6 +431,21 @@ pub fn build(env: Env<'_>, spec: &Spec) -> GenResult<Plan> {
         ..Plan::default()
     };
 
+    // a projekt-ismeret az oldalaknak és a kéréseknek: a bejárások és a mintafájlok egyszer olvasódnak
+    let vue_project = vue::VueProject::new(env.fs, env.root);
+    let facts = vue::project_facts(&vue_project);
+    let config = ui::Config::load(env);
+    let found = ui::discover(
+        env,
+        &vue_project,
+        &config,
+        &npm,
+        has_ziggy(composer.as_deref(), &npm),
+    );
+    let parts = found.parts;
+    // a használt fordítási kulcsok: a kérések mezőnevei és az oldalak feliratai
+    let mut keys: BTreeSet<String> = BTreeSet::new();
+
     // hosszú szövegnek tűnő `str` mező: a `max:255` valószínűleg nem kell
     let long: BTreeSet<&str> = [Action::Create, Action::Edit]
         .into_iter()
@@ -483,7 +473,11 @@ pub fn build(env: Env<'_>, spec: &Spec) -> GenResult<Plan> {
         };
         let rel = format!("app/Http/Requests/{class}.php");
         ensure_new(env, &rel)?;
-        let text = php::request_file(strict, &request_ns, &class, fields, pipe);
+        let translate = found.php_i18n.then_some(names.vars.as_str());
+        if let Some(prefix) = translate {
+            keys.extend(fields.iter().map(|f| php::field_key(prefix, f)));
+        }
+        let text = php::request_file(strict, &request_ns, &class, fields, pipe, translate);
         request_texts.push((action, text.clone()));
         plan.files.push(Planned::new_file(rel, text));
     }
@@ -513,10 +507,6 @@ pub fn build(env: Env<'_>, spec: &Spec) -> GenResult<Plan> {
     plan.verified_routes = routes.verified;
 
     // 4. oldalak
-    // egy projekt-ismeret az oldalaknak: a bejárások és a mintafájlok egyszer olvasódnak
-    let vue_project = vue::VueProject::new(env.fs, env.root);
-    let facts = vue::project_facts(&vue_project);
-    let parts = parts(env, &vue_project, composer.as_deref());
     let dir = pages_dir(env);
     // az oldalak a Vue-generátor SFC-útján épülnek (modell → script / template emitter → builder)
     let sfc = vue::VueGenerator::new(env);
@@ -542,12 +532,19 @@ pub fn build(env: Env<'_>, spec: &Spec) -> GenResult<Plan> {
             facts,
             parts: &parts,
             routes: &plan.route_names,
+            used: RefCell::default(),
         };
         let text = page.render(&sfc);
+        keys.extend(page.used.take());
         if let Some((_, request)) = request_texts.iter().find(|(a, _)| *a == action) {
             plan.forms.push((text.clone(), request.clone()));
         }
         plan.files.push(Planned::new_file(rel, text));
+    }
+    // a döntések egy-egy sorban; a hiányzó fordítási kulcsok (nyelvi fájlt a generátor nem ír)
+    plan.notes.extend(found.notes);
+    if parts.i18n {
+        plan.notes.extend(ui::i18n_notes(env, &keys));
     }
     Ok(plan)
 }

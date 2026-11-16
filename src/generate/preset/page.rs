@@ -4,6 +4,7 @@
 //! `InputError`, `PrimaryButton`, az `AuthenticatedLayout`), és sima HTML-lel, ahol nincs ilyen komponens.
 //! Az ellenőrzést (oxc / tag-egyensúly) a hívó végzi.
 
+use std::cell::RefCell;
 use std::collections::BTreeSet;
 
 use super::spec::{Field, FieldType, Names, Op, humanize, humanize_model};
@@ -40,14 +41,26 @@ impl Kind {
     }
 }
 
+/// Egy űrlap-komponens a projektből.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Comp {
+    pub name: String,
+    /// Az import-út (`@/Components/TextInput.vue`).
+    pub path: String,
+    /// Az a prop, amelyen a szöveget / a hibát kapja (címke: `value` / `label`, `None` = slot; hiba: `message`).
+    pub prop: Option<String>,
+}
+
 /// A projektben talált komponensek: `(név, import-út)`.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Parts {
     pub layout: Option<(String, String)>,
-    pub label: Option<String>,
-    pub input: Option<String>,
-    pub error: Option<String>,
-    pub button: Option<String>,
+    pub label: Option<Comp>,
+    pub input: Option<Comp>,
+    pub error: Option<Comp>,
+    pub button: Option<Comp>,
+    /// Fordít-e a projekt (`$t()`): a feliratok kulcsként íródnak, a kulcsokat a hívó jegyzetben sorolja fel.
+    pub i18n: bool,
     /// Van-e Ziggy (`tightenco/ziggy` / `ziggy-js`): `route('név')`; különben sima URL-ek (`'/fees'`).
     pub ziggy: bool,
 }
@@ -61,6 +74,8 @@ pub struct Page<'a> {
     pub parts: &'a Parts,
     /// A tudott route-nevek (a linkekhez: csak létező route-ra linkelünk).
     pub routes: &'a BTreeSet<String>,
+    /// A használt fordítási kulcsok (teljes alakban, `fees.save`): a `render` közben gyűlnek.
+    pub used: RefCell<BTreeSet<String>>,
 }
 
 fn is_textlike(ty: FieldType) -> bool {
@@ -158,6 +173,41 @@ impl Page<'_> {
         if self.facts.semi { ";" } else { "" }
     }
 
+    /// A fordítási kulcs teljes alakja (`fees.save`); a használtak közé kerül.
+    fn key(&self, key: &str) -> String {
+        let full = format!("{}.{key}", self.names.vars);
+        self.used.borrow_mut().insert(full.clone());
+        full
+    }
+
+    /// Elem-szöveg: fordításkor `{{ $t('kulcs') }}`, különben a felirat.
+    fn text_of(&self, key: &str, literal: impl Into<String>) -> String {
+        if self.parts.i18n {
+            format!("{{{{ $t('{}') }}}}", self.key(key))
+        } else {
+            literal.into()
+        }
+    }
+
+    /// Attribútum: fordításkor `:név="$t('kulcs')"`, különben `név="felirat"`.
+    fn bind(&self, element: Element, name: &str, key: &str, literal: impl Into<String>) -> Element {
+        if self.parts.i18n {
+            element.attr(&format!(":{name}"), format!("$t('{}')", self.key(key)))
+        } else {
+            element.attr(name, literal)
+        }
+    }
+
+    /// Az oldal-cím kulcsa.
+    fn title_key(&self) -> &'static str {
+        match self.kind {
+            Kind::Create => "create_title",
+            Kind::Edit => "edit_title",
+            Kind::Index => "index_title",
+            Kind::Show => "show_title",
+        }
+    }
+
     fn title(&self) -> String {
         let model = humanize_model(&self.names.model);
         match self.kind {
@@ -206,22 +256,20 @@ impl Page<'_> {
         }
         if self.is_form() {
             let pairs = [
-                ("InputError", &self.parts.error, true),
+                (&self.parts.error, true),
                 (
-                    "InputLabel",
                     &self.parts.label,
                     self.fields.iter().any(|f| f.ty != FieldType::Bool),
                 ),
-                ("PrimaryButton", &self.parts.button, true),
+                (&self.parts.button, true),
                 (
-                    "TextInput",
                     &self.parts.input,
                     self.fields.iter().any(|f| is_textlike(f.ty)),
                 ),
             ];
-            for (name, path, used) in pairs {
-                if let (Some(path), true) = (path, used) {
-                    out.push((name.to_owned(), path.clone()));
+            for (comp, used) in pairs {
+                if let (Some(comp), true) = (comp, used) {
+                    out.push((comp.name.clone(), comp.path.clone()));
                 }
             }
         }
@@ -332,18 +380,28 @@ impl Page<'_> {
 
     fn destroy_member(&self) -> Member {
         let e = self.semi();
+        // fordításkor a megerősítő szöveget a template adja át (a `$t` a script-ben nem érhető el)
+        let ask = if self.parts.i18n {
+            "message"
+        } else {
+            "'Delete this item?'"
+        };
         let body = format!(
-            "if (confirm('Delete this item?')) {{\n  router.delete({}){e}\n}}",
+            "if (confirm({ask})) {{\n  router.delete({}){e}\n}}",
             self.href(Op::Destroy, Some("id"))
         );
-        let id = VParam {
-            name: "id".to_owned(),
-            ty: Some(TypeRef::Int),
+        let param = |name: &str, ty: TypeRef| VParam {
+            name: name.to_owned(),
+            ty: Some(ty),
             default: None,
             optional: false,
             rest: false,
         };
-        Self::func("destroy", vec![id], body)
+        let mut params = vec![param("id", TypeRef::Int)];
+        if self.parts.i18n {
+            params.push(param("message", TypeRef::Str));
+        }
+        Self::func("destroy", params, body)
     }
 
     /// A TS-objektumtípus (`{ id: number; name: string }`): `id` + a mezők, a típusok a közös `ts_type`-pal.
@@ -381,22 +439,29 @@ impl Page<'_> {
 
     fn label_el(&self, field: &Field) -> Element {
         let (name, text) = (&field.name, humanize(&field.name));
-        if self.parts.label.is_some() {
-            el("InputLabel").attr("for", name).attr("value", text)
-        } else {
-            el("label")
+        let key = format!("fields.{name}");
+        match &self.parts.label {
+            Some(comp) => {
+                let label = el(&comp.name).attr("for", name);
+                match &comp.prop {
+                    Some(prop) => self.bind(label, prop, &key, text),
+                    None => label.text(self.text_of(&key, text)),
+                }
+            }
+            None => el("label")
                 .attr("for", name)
                 .attr("class", "block text-sm font-medium text-gray-700")
-                .text(text)
+                .text(self.text_of(&key, text)),
         }
     }
 
     fn error_el(&self, field: &Field) -> Element {
         let name = &field.name;
-        if self.parts.error.is_some() {
-            el("InputError")
+        if let Some(comp) = &self.parts.error {
+            let prop = comp.prop.as_deref().unwrap_or("message");
+            el(&comp.name)
                 .attr("class", "mt-2")
-                .attr(":message", format!("form.errors.{name}"))
+                .attr(&format!(":{prop}"), format!("form.errors.{name}"))
         } else {
             el("p")
                 .attr("v-if", format!("form.errors.{name}"))
@@ -432,7 +497,7 @@ impl Page<'_> {
                             )
                             .attr("v-model", &model),
                     )
-                    .kid(el("span").text(humanize(name))),
+                    .kid(el("span").text(self.text_of(&format!("fields.{name}"), humanize(name)))),
             ),
             FieldType::Text => block.kid(self.label_el(field)).kid(mark(
                 el("textarea")
@@ -459,10 +524,9 @@ impl Page<'_> {
                     FieldType::DateTime => "datetime-local",
                     _ => "text",
                 };
-                let (tag, class) = if self.parts.input.is_some() {
-                    ("TextInput", "mt-1 block w-full")
-                } else {
-                    ("input", INPUT_CLASS)
+                let (tag, class) = match &self.parts.input {
+                    Some(comp) => (comp.name.as_str(), "mt-1 block w-full"),
+                    None => ("input", INPUT_CLASS),
                 };
                 block.kid(self.label_el(field)).kid(mark(
                     el(tag)
@@ -477,16 +541,17 @@ impl Page<'_> {
     }
 
     fn form_body(&self) -> Element {
-        let submit = if self.parts.button.is_some() {
-            el("PrimaryButton")
+        let save = self.text_of("save", "Save");
+        let submit = if let Some(comp) = &self.parts.button {
+            el(&comp.name)
                 .attr(":disabled", "form.processing")
-                .text("Save")
+                .text(save)
         } else {
             el("button")
                 .attr("type", "submit")
                 .attr(":disabled", "form.processing")
                 .attr("class", format!("{BUTTON_CLASS} disabled:opacity-25"))
-                .text("Save")
+                .text(save)
         };
         el("form")
             .attr("@submit.prevent", "submit")
@@ -500,8 +565,15 @@ impl Page<'_> {
     }
 
     /// A `{{ item.x }}` cella-kifejezés.
-    fn cell(item: &str, field: &Field) -> String {
-        if field.ty == FieldType::Bool {
+    fn cell(&self, item: &str, field: &Field) -> String {
+        if field.ty == FieldType::Bool && self.parts.i18n {
+            format!(
+                "{{{{ {item}.{} ? $t('{}') : $t('{}') }}}}",
+                field.name,
+                self.key("yes"),
+                self.key("no")
+            )
+        } else if field.ty == FieldType::Bool {
             format!("{{{{ {item}.{} ? 'Yes' : 'No' }}}}", field.name)
         } else {
             format!("{{{{ {item}.{} }}}}", field.name)
@@ -516,7 +588,12 @@ impl Page<'_> {
                     el("Link")
                         .attr(":href", self.href(Op::Create, None))
                         .attr("class", BUTTON_CLASS)
-                        .text(format!("New {}", humanize_model(&self.names.model))),
+                        .text(
+                            self.text_of(
+                                "new",
+                                format!("New {}", humanize_model(&self.names.model)),
+                            ),
+                        ),
                 ),
             );
         }
@@ -529,7 +606,11 @@ impl Page<'_> {
         let th = "px-4 py-3 text-left text-xs font-medium uppercase text-gray-500";
         let mut head = el("tr").kid(el("th").attr("class", th).text("ID"));
         for field in self.fields {
-            head = head.kid(el("th").attr("class", th).text(humanize(&field.name)));
+            head = head.kid(
+                el("th")
+                    .attr("class", th)
+                    .text(self.text_of(&format!("fields.{}", field.name), humanize(&field.name))),
+            );
         }
         if actions {
             head = head.kid(el("th").attr("class", "px-4 py-3"));
@@ -540,7 +621,7 @@ impl Page<'_> {
             .attr(":key", "item.id")
             .kid(el("td").attr("class", td).text("{{ item.id }}"));
         for field in self.fields {
-            row = row.kid(el("td").attr("class", td).text(Self::cell("item", field)));
+            row = row.kid(el("td").attr("class", td).text(self.cell("item", field)));
         }
         if actions {
             let link = "ml-3 text-indigo-600 hover:text-indigo-900";
@@ -550,7 +631,7 @@ impl Page<'_> {
                     el("Link")
                         .attr(":href", self.href(Op::Show, Some("item.id")))
                         .attr("class", link)
-                        .text("Show"),
+                        .text(self.text_of("show", "Show")),
                 );
             }
             if edit.is_some() {
@@ -558,16 +639,21 @@ impl Page<'_> {
                     el("Link")
                         .attr(":href", self.href(Op::Edit, Some("item.id")))
                         .attr("class", link)
-                        .text("Edit"),
+                        .text(self.text_of("edit", "Edit")),
                 );
             }
             if destroy.is_some() {
+                let click = if self.parts.i18n {
+                    format!("destroy(item.id, $t('{}'))", self.key("delete_confirm"))
+                } else {
+                    "destroy(item.id)".to_owned()
+                };
                 cell = cell.kid(
                     el("button")
                         .attr("type", "button")
                         .attr("class", "ml-3 text-red-600 hover:text-red-900")
-                        .attr("@click", "destroy(item.id)")
-                        .text("Delete"),
+                        .attr("@click", click)
+                        .text(self.text_of("delete", "Delete")),
                 );
             }
             row = row.kid(cell);
@@ -596,26 +682,31 @@ impl Page<'_> {
             "divide-y divide-gray-200 bg-white px-6 shadow sm:rounded-lg",
         );
         for field in self.fields {
-            list = list.kid(
-                el("div")
-                    .attr("class", "py-4")
-                    .kid(
-                        el("dt")
-                            .attr("class", "text-sm font-medium text-gray-500")
-                            .text(humanize(&field.name)),
-                    )
-                    .kid(
-                        el("dd")
-                            .attr("class", "mt-1 text-sm text-gray-900")
-                            .text(Self::cell(var, field)),
-                    ),
-            );
+            list =
+                list.kid(
+                    el("div")
+                        .attr("class", "py-4")
+                        .kid(
+                            el("dt")
+                                .attr("class", "text-sm font-medium text-gray-500")
+                                .text(self.text_of(
+                                    &format!("fields.{}", field.name),
+                                    humanize(&field.name),
+                                )),
+                        )
+                        .kid(
+                            el("dd")
+                                .attr("class", "mt-1 text-sm text-gray-900")
+                                .text(self.cell(var, field)),
+                        ),
+                );
         }
         list
     }
 
     fn template(&self) -> Vec<Element> {
         let title = self.title();
+        let title_key = self.title_key();
         let header_slot = self
             .parts
             .layout
@@ -626,7 +717,7 @@ impl Page<'_> {
             body.push(
                 el("h1")
                     .attr("class", "mb-4 text-xl font-semibold text-gray-800")
-                    .text(&title),
+                    .text(self.text_of(title_key, title.clone())),
             );
         }
         match self.kind {
@@ -639,7 +730,7 @@ impl Page<'_> {
                 .attr("class", "mx-auto max-w-7xl sm:px-6 lg:px-8")
                 .kids(body),
         );
-        let head = el("Head").attr("title", &title);
+        let head = self.bind(el("Head"), "title", title_key, title.clone());
         let Some((name, _)) = &self.parts.layout else {
             return vec![head, page];
         };
@@ -649,7 +740,7 @@ impl Page<'_> {
                 el("template").flag("#header").kid(
                     el("h2")
                         .attr("class", "text-xl font-semibold leading-tight text-gray-800")
-                        .text(&title),
+                        .text(self.text_of(title_key, title.clone())),
                 ),
             );
         }

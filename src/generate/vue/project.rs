@@ -129,12 +129,25 @@ impl<'a> VueProject<'a> {
     }
 
     /// A fájl szövege, legfeljebb egyszer olvasva (az olvasási hiba is megjegyződik).
-    fn text(&self, path: &Path) -> Option<Rc<String>> {
+    pub fn text(&self, path: &Path) -> Option<Rc<String>> {
         let mut texts = self.texts.borrow_mut();
         texts
             .entry(path.to_path_buf())
             .or_insert_with(|| self.fs.read(path).ok().map(Rc::new))
             .clone()
+    }
+
+    /// A gyökérhez képesti mappa `.vue` fájljai (legfeljebb `limit` darab), a memoizált bejárással; nem létező
+    /// mappára üres.
+    pub fn vue_files(&self, rel: &str, limit: usize) -> Vec<PathBuf> {
+        self.walk(&self.root.join(rel)).iter().take(limit).collect()
+    }
+
+    /// Igaz-e valamelyik mintafájl (az első `SAMPLE` `.vue` fájl) szövegére a feltétel; a szövegeket a közös memó adja.
+    pub fn sample_any(&self, pred: impl Fn(&str) -> bool) -> bool {
+        self.sample_files()
+            .iter()
+            .any(|file| self.text(file).is_some_and(|text| pred(&text)))
     }
 
     fn sample_roots(&self) -> &[PathBuf] {
