@@ -168,7 +168,7 @@ pub fn model_notes(env: Env<'_>, plan: &Plan, names: &Names, fields: &[Field]) -
 }
 
 /// A migrációk szövege fájlnév-sorrendben.
-fn migrations(env: Env<'_>) -> Vec<String> {
+pub(super) fn migrations(env: Env<'_>) -> Vec<String> {
     let mut files: Vec<_> = env
         .fs
         .list(&env.root.join("database/migrations"))

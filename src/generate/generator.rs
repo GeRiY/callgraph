@@ -35,6 +35,9 @@ pub enum Target {
         place: Place,
         /// `--upsert`: a már létező tagot lecseréli (egy csupasz taggal).
         upsert: bool,
+        /// `--expect` az `--upsert`-tel: csak akkor ellenőrzi, ha a tag már létezik (csere); beszúrásnál nincs mit
+        /// ellenőrizni, ezért ott figyelmen kívül marad.
+        expect: Option<String>,
     },
     /// Egy tartomány / metódus cseréje.
     Replace {
@@ -204,12 +207,14 @@ impl<'a, E: Emitter> Generator<'a, E> {
                 class,
                 place,
                 upsert,
+                expect,
             } => self.insert_members(
                 &program,
                 file,
                 class.as_deref(),
                 place,
                 *upsert,
+                expect.as_deref(),
                 request.mode,
             ),
             Target::Replace { file, at, expect } => {
@@ -431,6 +436,7 @@ impl<'a, E: Emitter> Generator<'a, E> {
         Ok(members)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn insert_members(
         &self,
         program: &Program,
@@ -438,6 +444,7 @@ impl<'a, E: Emitter> Generator<'a, E> {
         class: Option<&str>,
         place: &Place,
         upsert: bool,
+        expect: Option<&str>,
         mode: Mode,
     ) -> GenResult<Output> {
         let rel = self.rel(file)?;
@@ -450,7 +457,7 @@ impl<'a, E: Emitter> Generator<'a, E> {
         } = self.load(&rel)?;
         let container = pick_container(&graph, class, &rel)?;
         if let Some(at) = upsert_target(upsert, program, &graph, container) {
-            return self.replace(program, file, &at, None, mode);
+            return self.replace(program, file, &at, expect, mode);
         }
         let kind = TypeKind::from_graph(&container.kind);
         let block: Vec<String> = self.emitter.members(kind, members).collect();
@@ -476,13 +483,15 @@ impl<'a, E: Emitter> Generator<'a, E> {
                 insert_before_line(&mut lines, start, &block)
             }
             &Place::Line(n) => {
-                if n <= container.line as usize || n > container.end_line as usize {
+                // a törzs az osztály nyitó `{` sorát követő sorral kezdődik (Allman-stílusnál a `{` külön sorban van)
+                let open = body_open_line(&lines, container);
+                if n <= open || n > container.end_line as usize {
                     return Err(GenError::new(crate::tf!(
-                        "--at L{} is outside the body of {} (L{}-L{})",
-                        "az --at L{} a(z) {} törzsén kívül van (L{}-L{})",
+                        "--at L{} is not inside the body of {} (L{}-L{})",
+                        "az --at L{} nincs a(z) {} törzsében (L{}-L{})",
                         n,
                         container.name,
-                        container.line + 1,
+                        open + 1,
                         container.end_line
                     )));
                 }
@@ -681,6 +690,15 @@ fn upsert_target(
         class: Some(container.name.clone()),
         name: member.name.clone(),
     })
+}
+
+/// A konténer nyitó `{` jelét tartalmazó sor (1-alapú); ha nem található, a deklaráció sora.
+fn body_open_line(lines: &[String], container: &Container) -> usize {
+    let decl = container.line as usize;
+    let end = (container.end_line as usize).min(lines.len());
+    (decl..=end)
+        .find(|&i| i >= 1 && lines[i - 1].contains('{'))
+        .unwrap_or(decl)
 }
 
 /// A konténer megnevezett metódusának első és utolsó sora (1-alapú).

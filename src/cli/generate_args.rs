@@ -134,10 +134,10 @@ pub(crate) fn parse_gen(args: &[String]) -> Result<CliArgs> {
     };
     let targets =
         usize::from(write.is_some()) + usize::from(into.is_some()) + usize::from(replace.is_some());
-    if expect.is_some() && replace.is_none() {
+    if expect.is_some() && replace.is_none() && !(upsert && into.is_some()) {
         return Err(CallgraphError::Usage(crate::tf!(
-            "--expect only works with --replace: it is the sha256 prefix of the replaced lines (not of the whole file); a wrong value prints the current one. {}",
-            "Az --expect csak a --replace-szel megy: a lecserélt sorok (nem a teljes fájl) sha256-előtagja; hibás értéknél kiírja a jelenlegit. {}",
+            "--expect only works with --replace (or --into --upsert, checked only when the member exists): it is the sha256 prefix of the replaced lines (not of the whole file); a wrong value prints the current one. {}",
+            "Az --expect csak a --replace-szel (vagy --into --upsert-tel, csak ha a tag már létezik) megy: a lecserélt sorok (nem a teljes fájl) sha256-előtagja; hibás értéknél kiírja a jelenlegit. {}",
             gen_usage()
         )));
     }
@@ -175,6 +175,7 @@ pub(crate) fn parse_gen(args: &[String]) -> Result<CliArgs> {
             class,
             place: Place::of(after, before, at),
             upsert,
+            expect,
         }
     } else if let Some(spec) = replace {
         let (file, at) = parse_replace(&spec)?;
@@ -250,7 +251,8 @@ mod tests {
                 file: "app/A.php".into(),
                 class: Some("A".into()),
                 place: Place::After("go".into()),
-                upsert: false
+                upsert: false,
+                expect: None
             }
         );
         assert_eq!(
@@ -307,7 +309,8 @@ mod tests {
                 file: "a.vue".into(),
                 class: Some("template#list".into()),
                 place: Place::End,
-                upsert: false
+                upsert: false,
+                expect: None
             }
         );
     }
@@ -339,6 +342,13 @@ mod tests {
             .unwrap_err()
             .to_string();
         assert!(err.contains("--replace"), "{err}");
+        // --upsert-tel az --expect megengedett (csere esetén ellenőriz)
+        let r = request(&["+x()", "--into", "a.php", "--upsert", "--expect", "ab12"]);
+        assert!(
+            matches!(r.target, Target::Into { upsert: true, expect: Some(ref e), .. } if e == "ab12"),
+            "{:?}",
+            r.target
+        );
     }
 
     #[test]

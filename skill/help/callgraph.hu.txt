@@ -214,7 +214,7 @@ Kódgenerátor (fájlt ír; az MCP `generate`, `rename` és `undo` eszköz alapb
     route-nevek ('profile.*' = az egész csoport, resource route-ok ->names()-szel), PHP-osztályok (fájl-áthelyezés, use,
     ::class, típusok), PHP-metódusok (feloldott hívások, felülírások, route-akciók) PHP / Blade / JS / Vue fájlokban; a
     dinamikus hivatkozást csak listázza; fájlonként egy sor; egy undo a teljes átnevezést visszavonja
-  bash ~/.claude/skills/callgraph/callgraph.sh undo [<fájl>]    a legutóbbi mentés visszaállítása (a fájlé, vagy a legutóbb módosítotté / csoporté); az undo is visszavonható
+  bash ~/.claude/skills/callgraph/callgraph.sh undo [<fájl>]    a legutóbbi mentés visszaállítása (a fájlé, vagy a legutóbb módosítotté / csoporté); verem: minden undo egy írással lép vissza (fájlonként az utolsó 20)
 
 Kimenet-korlát: 400 sor fölött a mappás outline summary-ra, az egyfájlos metódus-indexre vált;
 

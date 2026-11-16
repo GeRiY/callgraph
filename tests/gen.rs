@@ -152,7 +152,7 @@ fn gen_write_into_replace_and_undo_end_to_end() {
     );
     assert!(!replaced.contains("$this->last"), "{replaced}");
 
-    // undo: visszaállítja a csere előtti állapotot, és maga is visszavonható
+    // undo: visszaállítja a csere előtti állapotot, verem (a következő undo a régebbit hozza)
     let out = p.run(&["undo", "app/Services/Pay.php"]);
     assert!(out.status.success(), "{}", stderr(&out));
     assert!(
@@ -161,9 +161,10 @@ fn gen_write_into_replace_and_undo_end_to_end() {
         stdout(&out)
     );
     assert_eq!(p.read("app/Services/Pay.php"), inserted);
+    // verem: a következő undo a beszúrás előtti állapotot hozza vissza, nem kapcsol vissza
     let out = p.run(&["undo"]);
     assert!(out.status.success(), "{}", stderr(&out));
-    assert_eq!(p.read("app/Services/Pay.php"), replaced);
+    assert_eq!(p.read("app/Services/Pay.php"), original);
 }
 
 #[test]
@@ -242,4 +243,41 @@ fn the_help_documents_the_generator() {
     let help = stdout(&out);
     assert!(help.contains("Code generator"), "{help}");
     assert!(help.contains("callgraph undo [<file>]"), "{help}");
+}
+
+/// A súgó által hirdetett `callgraph.sh <alparancs>` mind továbbítva van a csomagoló szkriptben (a `rename` hiányzott).
+#[test]
+fn the_wrapper_forwards_every_subcommand_the_help_advertises() {
+    let root = env!("CARGO_MANIFEST_DIR");
+    let wrapper = std::fs::read_to_string(format!("{root}/skill/callgraph.sh")).expect("wrapper");
+    let help =
+        std::fs::read_to_string(format!("{root}/skill/help/callgraph.en.txt")).expect("help");
+    assert!(
+        help.contains("callgraph.sh rename"),
+        "the help advertises rename"
+    );
+    for sub in [
+        "gen",
+        "rename",
+        "undo",
+        "uses",
+        "deps",
+        "stats",
+        "telemetry",
+        "next",
+        "note",
+        "profile",
+        "refresh",
+        "hook",
+        "update",
+        "set-lang",
+        "locate",
+    ] {
+        if help.contains(&format!("callgraph.sh {sub}")) {
+            assert!(
+                wrapper.contains(&format!("== {sub}")),
+                "the wrapper does not forward `{sub}`"
+            );
+        }
+    }
 }

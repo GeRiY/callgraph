@@ -92,8 +92,9 @@ if [[ "${1:-}" == next ]]; then
     run_callgraph "$@"
 fi
 # kódgenerátor: `callgraph.sh gen '<kifejezés>' [--dry|--write|--into|--replace …]` → `callgraph gen …`;
-# az utolsó módosítás visszavonása: `callgraph.sh undo [<fájl>]` → `callgraph undo …`
-if [[ "${1:-}" == gen || "${1:-}" == undo ]]; then
+# biztonságos átnevezés: `callgraph.sh rename route|class|method <régi> <új> [--dry]` → `callgraph rename …`;
+# a legutóbbi módosítás visszavonása (verem, lépésenként): `callgraph.sh undo [<fájl>]` → `callgraph undo …`
+if [[ "${1:-}" == gen || "${1:-}" == rename || "${1:-}" == undo ]]; then
     run_callgraph "$@"
 fi
 # verzió: `callgraph.sh --version|-V|version` → `callgraph --version` + a bináris helye (nem a show-súgó)

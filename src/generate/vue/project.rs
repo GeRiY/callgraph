@@ -329,6 +329,13 @@ impl<'a> VueProject<'a> {
                 None => {}
             }
         }
+        // nincs minta `.vue` fájl: a `package.json` `typescript` függősége (dependencies / devDependencies) dönt
+        if !ts && self.sample_files().is_empty() {
+            ts = self
+                .fs
+                .read(&self.root.join("package.json"))
+                .is_ok_and(|text| text.contains("\"typescript\""));
+        }
         CodeStyle {
             ts,
             semi: with >= without,

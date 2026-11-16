@@ -358,7 +358,7 @@ impl CallgraphServer {
             idempotent_hint = false,
             open_world_hint = false
         ),
-        description = "Undo the last change made by generate or rename: restores the file (or, without file, the whole last group) from its backup."
+        description = "Undo the last change made by generate or rename: a stack, each call goes one write back; without file, a whole group."
     )]
     async fn undo(&self, Parameters(p): Parameters<UndoParams>) -> CallToolResult {
         let started = Instant::now();

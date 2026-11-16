@@ -536,6 +536,7 @@ fn into_inserts_after_a_method_and_merges_imports() {
                 class: Some("Pay".into()),
                 place: Place::After("charge".into()),
                 upsert: false,
+                expect: None,
             },
         ),
     )
@@ -570,6 +571,7 @@ fn into_appends_at_the_end_when_no_method_is_given() {
                 class: None,
                 place: Place::End,
                 upsert: false,
+                expect: None,
             },
         ),
     )
@@ -596,6 +598,7 @@ fn into_an_empty_class_has_no_leading_blank_line() {
                 class: None,
                 place: Place::End,
                 upsert: false,
+                expect: None,
             },
         ),
     )
@@ -622,6 +625,7 @@ fn into_reports_missing_class_and_method() {
                     class: class.map(str::to_owned),
                     place: place_after(after),
                     upsert: false,
+                    expect: None,
                 },
             ),
         )
@@ -645,6 +649,7 @@ fn into_with(expr: &str, mode: Mode, place: Place, upsert: bool) -> GenRequest {
             class: None,
             place,
             upsert,
+            expect: None,
         },
     }
 }
@@ -695,9 +700,74 @@ fn into_at_a_line_stays_inside_the_class_body() {
             &into_with("+mid():int", Mode::Dry, at(bad), false),
         )
         .unwrap_err();
-        assert!(err.contains("outside"), "{err}");
+        assert!(err.contains("not inside the body"), "{err}");
     }
     assert_eq!(fs.get("app/A.php").unwrap(), DOCUMENTED);
+}
+
+#[test]
+fn upsert_with_expect_checks_only_an_existing_member() {
+    let fs = MemFs::with(&[("app/A.php", DOCUMENTED)]);
+    let clock = FixedClock(Cell::new(T0));
+    let with_expect = |expr: &str, expect: &str| GenRequest {
+        expr: expr.to_owned(),
+        mode: Mode::Write,
+        target: Target::Into {
+            file: "app/A.php".into(),
+            class: None,
+            place: Place::End,
+            upsert: true,
+            expect: Some(expect.to_owned()),
+        },
+    };
+    // létező tag + hibás hash: a csere megtagadva, semmi nem íródik
+    let err = run(
+        &fs,
+        &clock,
+        &with_expect("+keep():int{ return 9; }", "deadbeef"),
+    )
+    .unwrap_err();
+    assert!(err.contains("changed"), "{err}");
+    assert_eq!(fs.get("app/A.php").unwrap(), DOCUMENTED);
+    // új tag: az --expect figyelmen kívül marad, beszúrás történik
+    let out = run(
+        &fs,
+        &clock,
+        &with_expect("+fresh():int{ return 3; }", "deadbeef"),
+    )
+    .unwrap();
+    assert!(out.lines[0].starts_with("inserted"), "{out:?}");
+}
+
+#[test]
+fn into_at_the_opening_brace_line_is_rejected_upfront() {
+    // Pay: `class Pay` a 9., a `{` a 10. sorban (Allman), a záró `}` a 19. sorban
+    let fs = project();
+    let clock = FixedClock(Cell::new(T0));
+    for bad in [9, 10, 20, 99] {
+        let err = run(
+            &fs,
+            &clock,
+            &GenRequest {
+                expr: "+late():void".to_owned(),
+                mode: Mode::Write,
+                target: Target::Into {
+                    file: "app/Services/Pay.php".into(),
+                    class: None,
+                    place: Place::Line(bad),
+                    upsert: false,
+                    expect: None,
+                },
+            },
+        )
+        .unwrap_err();
+        assert!(
+            err.contains(&format!("--at L{bad} is not inside the body")),
+            "{err}"
+        );
+        assert!(err.contains("(L11-L19)"), "{err}");
+    }
+    assert!(!fs.get("app/Services/Pay.php").unwrap().contains("late"));
 }
 
 #[test]
@@ -917,6 +987,7 @@ fn a_syntax_error_writes_nothing() {
                 class: None,
                 place: Place::End,
                 upsert: false,
+                expect: None,
             },
         ),
     )
@@ -941,6 +1012,7 @@ fn crlf_files_keep_their_line_endings() {
                 class: None,
                 place: Place::End,
                 upsert: false,
+                expect: None,
             },
         ),
     )
@@ -956,23 +1028,23 @@ fn crlf_files_keep_their_line_endings() {
 // ---- mentések, undo ----
 
 #[test]
-fn backups_keep_the_newest_ten_per_file() {
+fn backups_keep_the_newest_twenty_per_file() {
     let fs = MemFs::with(&[("app/A.php", "x")]);
     let clock = FixedClock(Cell::new(T0));
     let e = env(&fs, &clock);
     let backups = Backups::new(e);
-    for i in 0..12u64 {
+    for i in 0..22u64 {
         clock.0.set(T0 + i);
         backups.save("app/A.php", &format!("v{i}")).unwrap();
     }
     let kept = backups.list("app/A.php");
-    assert_eq!(kept.len(), 10);
-    assert_eq!(kept[0].0, stamp(T0 + 11));
-    assert_eq!(kept[9].0, stamp(T0 + 2));
-    assert_eq!(fs.read(&kept[0].1).unwrap(), "v11");
+    assert_eq!(kept.len(), 20);
+    assert_eq!(kept[0].0, stamp(T0 + 21));
+    assert_eq!(kept[19].0, stamp(T0 + 2));
+    assert_eq!(fs.read(&kept[0].1).unwrap(), "v21");
     // egy másik fájl mentései nem keverednek bele
     backups.save("app/AB.php", "other").unwrap();
-    assert_eq!(backups.list("app/A.php").len(), 10);
+    assert_eq!(backups.list("app/A.php").len(), 20);
     assert_eq!(backups.list("app/AB.php").len(), 1);
 }
 
@@ -989,7 +1061,7 @@ fn two_backups_in_one_second_do_not_overwrite_each_other() {
 }
 
 #[test]
-fn undo_restores_and_is_itself_undoable() {
+fn undo_restores_the_previous_state() {
     let fs = MemFs::with(&[("app/A.php", DOCUMENTED)]);
     let clock = FixedClock(Cell::new(T0));
     let edit = request(
@@ -1017,9 +1089,42 @@ fn undo_restores_and_is_itself_undoable() {
     );
     assert_eq!(fs.get("app/A.php").unwrap(), DOCUMENTED);
 
-    // az undo is visszavonható: a következő undo a szerkesztett állapotot hozza vissza
+    // verem: nincs több lépés, az undo nem kapcsol vissza a szerkesztett állapotra
+    assert!(generator.undo(None).is_err());
+    assert_eq!(fs.get("app/A.php").unwrap(), DOCUMENTED);
+    assert_ne!(edited, DOCUMENTED);
+}
+
+#[test]
+fn undo_is_a_multi_step_stack() {
+    let fs = MemFs::with(&[("app/A.php", DOCUMENTED)]);
+    let clock = FixedClock(Cell::new(T0));
+    let edit = |body: &str| {
+        request(
+            &format!("+go():int{{ return {body}; }}"),
+            false,
+            Target::Replace {
+                file: "app/A.php".into(),
+                at: ReplaceAt::Method {
+                    class: None,
+                    name: "go".into(),
+                },
+                expect: None,
+            },
+        )
+    };
+    run(&fs, &clock, &edit("1")).unwrap();
+    let after_a1 = fs.get("app/A.php").unwrap();
+    run(&fs, &clock, &edit("2")).unwrap();
+    let after_a2 = fs.get("app/A.php").unwrap();
+    assert_ne!(after_a1, after_a2);
+    let generator = Generator::new(env(&fs, &clock), PhpEmitter);
     generator.undo(None).unwrap();
-    assert_eq!(fs.get("app/A.php").unwrap(), edited);
+    assert_eq!(fs.get("app/A.php").unwrap(), after_a1);
+    generator.undo(None).unwrap();
+    assert_eq!(fs.get("app/A.php").unwrap(), DOCUMENTED);
+    let e = generator.undo(None).unwrap_err().to_string();
+    assert!(e.contains("no backups yet"), "{e}");
 }
 
 #[test]
@@ -1083,6 +1188,7 @@ fn protected_files_are_not_modified() {
                 class: None,
                 place: Place::End,
                 upsert: false,
+                expect: None,
             },
         ))
         .unwrap_err()
@@ -1248,6 +1354,7 @@ fn dry_into_and_replace_print_a_placement_header() {
         class: None,
         place: Place::After("charge".into()),
         upsert: false,
+        expect: None,
     };
     let clock = FixedClock(Cell::new(T0));
     let dry = run(
@@ -1336,7 +1443,8 @@ fn errors_carry_a_kind() {
                 file: "app/Missing.php".into(),
                 class: None,
                 place: Place::End,
-                upsert: false
+                upsert: false,
+                expect: None
             }
         ),
         Kind::NotFound
@@ -1348,7 +1456,8 @@ fn errors_carry_a_kind() {
                 file: "app/Services/Pay.php".into(),
                 class: None,
                 place: Place::End,
-                upsert: false
+                upsert: false,
+                expect: None
             }
         ),
         Kind::Syntax
@@ -1384,6 +1493,7 @@ fn several_unknown_names_share_one_project_walk() {
                 class: None,
                 place: Place::End,
                 upsert: false,
+                expect: None,
             },
         ),
     )

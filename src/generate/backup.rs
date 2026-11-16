@@ -1,6 +1,6 @@
 //! Memento minta: minden módosítás előtt a fájl korábbi állapota a `.callgraph/backups/<relatív út>.<UTC
 //! yyyymmddThhmmss>.bak` fájlba kerül (a projekt mappái között nem marad szemét, és a `.callgraph/` gitignore-olt);
-//! fájlonként az utolsó 10 marad. Az `undo` ugyanebből állít vissza.
+//! fájlonként az utolsó 20 marad (az `undo` ezekből áll: minden `undo` egyet fogyaszt). Az `undo` ugyanebből állít vissza.
 
 use std::fmt::Write;
 use std::path::{Path, PathBuf};
@@ -11,7 +11,7 @@ use super::project::relative;
 use crate::project::STORE_DIR;
 
 /// Fájlonként ennyi mentés marad.
-pub const KEEP: usize = 10;
+pub const KEEP: usize = 20;
 
 /// A legutóbbi csoportos írás (preset) naplója a mentések mappájában; a neve nem `.bak`, ezért a mentés-listák
 /// nem látják.

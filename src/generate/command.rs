@@ -1,7 +1,7 @@
 //! Command minta: minden fájlt módosító lépés egy parancs-objektum (`WriteNew`, `InsertInto`, `ReplaceRange`,
 //! `Undo`), egységes `execute` felülettel. Az új szöveget a `Generator` már elkészítette és ellenőrizte; a parancs
 //! csak írja. Minden meglévő fájlt érintő parancs előtt mentés készül (`Backups`, Memento), így az `Undo` is
-//! egységesen működik — és maga is visszavonható, mert a visszaállítás előtt a jelenlegi állapotot is menti.
+//! egységesen működik — az `undo` többlépéses verem: minden írás egy mentést tesz rá, minden `undo` egyet vesz le (nincs ide-oda kapcsolás).
 
 use std::io::ErrorKind;
 
@@ -264,6 +264,23 @@ fn rollback(env: Env<'_>, done: &[JournalEntry]) {
     }
 }
 
+/// Visszaállítás: a fájl tartalmának visszaírása mentés készítése nélkül (az `undo` verem: kivétel, nem újabb
+/// írás, ezért nem lesz belőle ide-oda kapcsolgatás).
+fn restore(env: Env<'_>, rel: &str, content: &str) -> GenResult<()> {
+    let path = env.root.join(rel);
+    if env.fs.is_protected(&path) {
+        return Err(protected(rel));
+    }
+    env.fs.write(&path, content).map_err(|e| {
+        GenError::new(crate::tf!(
+            "cannot write {}: {}",
+            "nem írható: {}: {}",
+            rel,
+            e
+        ))
+    })
+}
+
 /// A csoportos írás visszavonása egy lépésben: a mentésből visszaállított fájlok és a törölt új fájlok sorai.
 fn undo_group(env: Env<'_>, backups: &Backups<'_>, journal: &Journal) -> GenResult<String> {
     // előbb minden mentés beolvasása: ha bármelyik hiányzik, semmi nem változik
@@ -286,7 +303,9 @@ fn undo_group(env: Env<'_>, backups: &Backups<'_>, journal: &Journal) -> GenResu
     for (entry, content) in plan {
         match (&entry.backup, content) {
             (Some(backup), Some(old)) => {
-                commit(env, &entry.rel, &old)?;
+                restore(env, &entry.rel, &old)?;
+                // a visszaállított mentés elfogyott: az `undo` verem, a következő lépés a régebbi állapot
+                let _ = env.fs.remove(&env.root.join(backup));
                 lines.push(crate::tf!(
                     "restored {} from {}",
                     "visszaállítva: {} ← {}",
@@ -319,7 +338,7 @@ fn undo_group(env: Env<'_>, backups: &Backups<'_>, journal: &Journal) -> GenResu
     Ok(lines.join("\n"))
 }
 
-/// A fájl legutóbbi mentésének visszaállítása (fájl nélkül: a legutóbb mentetté; ha az utolsó művelet egy preset
+/// A fájl legutóbbi mentésének visszaállítása és elfogyasztása (fájl nélkül: a legutóbb mentetté; ha az utolsó művelet egy preset
 /// volt, annak összes fájlja egy lépésben).
 pub struct Undo {
     pub rel: Option<String>,
@@ -359,15 +378,18 @@ impl EditCommand for Undo {
                 e
             ))
         })?;
-        let backup = commit(env, &rel, &content)?;
+        restore(env, &rel, &content)?;
         let from = super::project::relative(env.root, &source)
             .unwrap_or_else(|| source.display().to_string());
+        // verem: a felhasznált mentés kikerül, a következő `undo` a régebbi állapotot hozza vissza
+        let _ = env.fs.remove(&source);
+        let left = backups.list(&rel).len();
         Ok(crate::tf!(
-            "restored {} from {} · {}",
-            "visszaállítva: {} ← {} · {}",
+            "restored {} from {} · {} older step(s) left",
+            "visszaállítva: {} ← {} · {} régebbi lépés maradt",
             rel,
             from,
-            backup_note(backup.as_deref())
+            left
         ))
     }
 }

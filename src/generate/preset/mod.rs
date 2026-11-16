@@ -15,7 +15,7 @@
 //!
 //! # Mit ír
 //! - `app/Http/Requests/Store<M>Request.php` (`create`) / `Update<M>Request.php` (`edit`): `authorize()` → `true`,
-//!   `rules()` a típusból (`str` → `required|string|max:255`, `text` → `required|string`, `int` → `required|integer`,
+//!   `rules()` a típusból (`str` → `required|string|max:255` (a migráció `text` oszlopára `max` nélkül, `string('x', 100)`-ra `max:100`), `text` → `required|string`, `int` → `required|integer`,
 //!   `float` → `required|numeric`, `bool` → `boolean` (sosem kötelező), `date` / `datetime` → `required|date`,
 //!   `email` → `required|email`; az opcionális `nullable` a `required` helyett);
 //! - `app/Http/Controllers/<M>Controller.php`: új fájl, vagy a metódusok beszúrása a meglévő osztály végére (létező
@@ -37,6 +37,7 @@
 //! generál).
 
 mod check;
+mod columns;
 mod page;
 mod php;
 mod plan;

@@ -263,8 +263,8 @@ CLI-megfelelők: `locate` = `bash $CG locate <kifejezés>…`, `outline` = `bash
 ## Generálás és undo (fájlokat ír; MCP-n opt-in)
 
 A `gen '<kifejezés>'` rövid kifejezésből kódot ír, és egy sort ad vissza; fájlt soha nem ír felül, minden módosítás előtt
-mentést készít, és az egész új szöveget megparse-olja írás előtt (szintaktikai hibánál semmi nem íródik). Az `undo` az
-utolsó módosítást állítja vissza.
+mentést készít, és az egész új szöveget megparse-olja írás előtt (szintaktikai hibánál semmi nem íródik). Az `undo` verem: minden hívás egy
+írással lép vissza (fájlonként az utolsó 20; ha nincs több, egyértelmű üzenet).
 
 ```bash
 bash $CG gen 'c!:Pay<Base> > ctor(-Client $http) + +charge(Order $o):Receipt' --write app/Pay.php --project myapp   # új fájl

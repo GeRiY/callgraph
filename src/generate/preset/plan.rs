@@ -4,6 +4,8 @@
 use std::cell::RefCell;
 use std::collections::BTreeSet;
 
+use super::check;
+use super::columns;
 use super::page::{Kind, Page};
 use super::php::{self, ControllerCtx};
 use super::spec::{Action, Field, FieldType, Names, Op, Spec};
@@ -463,6 +465,16 @@ pub fn build(env: Env<'_>, spec: &Spec) -> GenResult<Plan> {
 
     // 1. kérés-osztályok
     let pipe = pipe_style(env);
+    // a migráció szöveg-oszlopai: `text` oszlopra nincs `max:255`, `string('x', 100)`-ra `max:100`
+    let table = plan
+        .model_file
+        .as_ref()
+        .and_then(|rel| env.fs.read(&env.root.join(rel)).ok())
+        .map_or_else(
+            || laravel::table_name(&names.model),
+            |text| laravel::model_facts(&plan.model_class, "", &text, &[]).table,
+        );
+    let limits = columns::limits(&check::migrations(env), &table);
     let mut request_texts: Vec<(Action, String)> = Vec::new();
     for (action, class) in [
         (Action::Create, ctx.store_request()),
@@ -477,7 +489,15 @@ pub fn build(env: Env<'_>, spec: &Spec) -> GenResult<Plan> {
         if let Some(prefix) = translate {
             keys.extend(fields.iter().map(|f| php::field_key(prefix, f)));
         }
-        let text = php::request_file(strict, &request_ns, &class, fields, pipe, translate);
+        let text = php::request_file(
+            strict,
+            &request_ns,
+            &class,
+            fields,
+            pipe,
+            translate,
+            &limits,
+        );
         request_texts.push((action, text.clone()));
         plan.files.push(Planned::new_file(rel, text));
     }

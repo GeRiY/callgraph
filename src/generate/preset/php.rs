@@ -2,6 +2,7 @@
 //! (`ast::TypeDecl` / `Member`), a `PhpEmitter` és a `PhpFileBuilder` útján, valamint a route-sorok szövege.
 //! I/O nélküli; az ellenőrzést és az írást a hívó végzi.
 
+use super::columns::StrLimit;
 use super::spec::{Field, FieldType, Names, Op};
 use crate::generate::PhpEmitter;
 use crate::generate::ast::{Member, MemberKind, Param, TypeDecl, TypeKind, TypeRef, Visibility};
@@ -10,22 +11,31 @@ use crate::generate::emitter::{Emitter, FileSpec};
 /// Behúzás egy szinten a nyers törzsekben (a `PhpEmitter` a törzset további két szinttel húzza be).
 const IND: &str = "    ";
 
-/// A mező validációs tokenjei: `str` → `required|string|max:255`, a `bool` sosem kötelező, az opcionális `nullable`.
-pub fn rules(field: &Field) -> Vec<&'static str> {
+/// A mező validációs tokenjei: `str` → `required|string|max:255` (a migráció hosszkorlátja szerint: `text` oszlopra
+/// `max` nélkül, `string('x', 100)`-ra `max:100`), a `bool` sosem kötelező, az opcionális `nullable`.
+pub fn rules(field: &Field, limit: StrLimit) -> Vec<String> {
     let presence = if field.optional {
         "nullable"
     } else {
         "required"
     };
-    match field.ty {
+    let base: Vec<&str> = match field.ty {
         FieldType::Bool => vec!["boolean"],
-        FieldType::Str => vec![presence, "string", "max:255"],
-        FieldType::Text => vec![presence, "string"],
+        FieldType::Str | FieldType::Text => vec![presence, "string"],
         FieldType::Int => vec![presence, "integer"],
         FieldType::Float => vec![presence, "numeric"],
         FieldType::Date | FieldType::DateTime => vec![presence, "date"],
         FieldType::Email => vec![presence, "email"],
+    };
+    let mut tokens: Vec<String> = base.into_iter().map(str::to_owned).collect();
+    if field.ty == FieldType::Str {
+        match limit {
+            StrLimit::Default => tokens.push("max:255".to_owned()),
+            StrLimit::Len(n) => tokens.push(format!("max:{n}")),
+            StrLimit::Unlimited => {}
+        }
     }
+    tokens
 }
 
 /// Az osztály-névből és a névtérből a teljes név.
@@ -89,10 +99,11 @@ pub fn request_file(
     fields: &[Field],
     pipe: bool,
     translate: Option<&str>,
+    limits: &std::collections::BTreeMap<String, StrLimit>,
 ) -> String {
     let mut body = vec!["return [".to_owned()];
     for field in fields {
-        let tokens = rules(field);
+        let tokens = rules(field, limits.get(&field.name).copied().unwrap_or_default());
         let value = if pipe {
             format!("'{}'", tokens.join("|"))
         } else {

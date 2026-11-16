@@ -258,7 +258,7 @@ CLI equivalents: `locate` = `bash $CG locate <term>…`, `outline` = `bash $CG <
 ## Generate and undo (writes files; opt-in over MCP)
 
 `gen '<expr>'` writes code from a short expression and prints one line; it never overwrites a file, backs up every change
-first and parses the whole new text before writing (on a syntax error nothing is written). `undo` restores the last change.
+first and parses the whole new text before writing (on a syntax error nothing is written). `undo` is a stack: each call steps one write further back (last 20 per file; nothing left → a clear message).
 
 ```bash
 bash $CG gen 'c!:Pay<Base> > ctor(-Client $http) + +charge(Order $o):Receipt' --write app/Pay.php --project myapp   # new file

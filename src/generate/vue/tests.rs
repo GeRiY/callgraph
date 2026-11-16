@@ -43,6 +43,7 @@ fn into(file: &str, after: Option<&str>) -> Target {
         class: None,
         place: place_after(after),
         upsert: false,
+        expect: None,
     }
 }
 
@@ -510,6 +511,24 @@ import { ref } from 'vue';
 ";
 
 #[test]
+fn into_a_template_element_parses_the_expression_as_markup_by_default() {
+    let fs = MemFs::with(&[("src/A.vue", NESTED_SFC)]);
+    let target = |class: &str| Target::Into {
+        file: "src/A.vue".to_owned(),
+        class: Some(class.to_owned()),
+        place: Place::End,
+        upsert: false,
+        expect: None,
+    };
+    go(&fs, "li.extra2{X}", false, target("#list")).unwrap();
+    go(&fs, "li.extra3{Y} + li{Z}", false, target("template#list")).unwrap();
+    let file = fs.get("src/A.vue").unwrap();
+    assert!(file.contains("<li class=\"extra2\">X</li>"), "{file}");
+    assert!(file.contains("<li class=\"extra3\">Y</li>"), "{file}");
+    assert!(file.contains("<li>Z</li>\n    </ul>"), "{file}");
+}
+
+#[test]
 fn into_template_element_by_id_appends_as_its_last_child() {
     let fs = MemFs::with(&[("src/A.vue", NESTED_SFC)]);
     let target = |class: &str| Target::Into {
@@ -517,6 +536,7 @@ fn into_template_element_by_id_appends_as_its_last_child() {
         class: Some(class.to_owned()),
         place: Place::End,
         upsert: false,
+        expect: None,
     };
     go(&fs, "template>li{b}", false, target("template#list")).unwrap();
     let file = fs.get("src/A.vue").unwrap();
@@ -543,6 +563,7 @@ fn upsert_and_diff_work_on_class_members() {
         class: Some("Svc".to_owned()),
         place: Place::End,
         upsert: true,
+        expect: None,
     };
     let out = go_with(&fs, "+run():void{ this.n = 5 }", Mode::Write, upsert).unwrap();
     assert!(out.lines[0].starts_with("replaced src/svc.ts"), "{out:?}");
@@ -1186,6 +1207,7 @@ fn into_class(file: &str, class: &str, after: Option<&str>) -> Target {
         class: Some(class.to_owned()),
         place: place_after(after),
         upsert: false,
+        expect: None,
     }
 }
 

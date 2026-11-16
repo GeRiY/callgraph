@@ -157,6 +157,59 @@ fn bad_expressions_are_one_line_errors() {
 // ---- create egy üres projekten ----
 
 #[test]
+fn a_typescript_project_without_vue_samples_gets_a_typed_script_setup() {
+    // nincs mintafájl `.vue`: a `package.json` `typescript` függősége dönt
+    let fs_ts = MemFs::with(&[
+        ("composer.json", COMPOSER),
+        ("routes/web.php", WEB),
+        ("app/Models/Fee.php", MODEL),
+        (
+            "package.json",
+            "{\"devDependencies\": {\"typescript\": \"^5.0.0\", \"vue\": \"^3.4.0\"}}",
+        ),
+    ]);
+    let clock = FixedClock(Cell::new(T0));
+    run(&fs_ts, &clock, CREATE, false).unwrap();
+    let page = fs_ts.get("resources/js/Pages/Fees/Create.vue").unwrap();
+    assert!(page.contains("<script setup lang=\"ts\">"), "{page}");
+}
+
+#[test]
+fn str_fields_follow_the_migration_column_length() {
+    let fs = project();
+    fs.put(
+        "database/migrations/2024_02_01_000000_extend_fees.php",
+        "<?php\nSchema::table('fees', function (Blueprint $table) {\n    $table->string('code', 100);\n    $table->longText('story');\n});\n",
+    );
+    let clock = FixedClock(Cell::new(T0));
+    run(
+        &fs,
+        &clock,
+        "laravel:Fee>create(name:str,note:str,code:str,story:str)",
+        false,
+    )
+    .unwrap();
+    let request = fs.get("app/Http/Requests/StoreFeeRequest.php").unwrap();
+    // `string('name')` → max:255; `text('note')` / `longText('story')` → nincs max; `string('code', 100)` → max:100
+    assert!(
+        request.contains("'name' => ['required', 'string', 'max:255'],"),
+        "{request}"
+    );
+    assert!(
+        request.contains("'note' => ['required', 'string'],"),
+        "{request}"
+    );
+    assert!(
+        request.contains("'story' => ['required', 'string'],"),
+        "{request}"
+    );
+    assert!(
+        request.contains("'code' => ['required', 'string', 'max:100'],"),
+        "{request}"
+    );
+}
+
+#[test]
 fn create_writes_request_controller_routes_and_page() {
     let fs = project();
     let clock = FixedClock(Cell::new(T0));
@@ -644,6 +697,7 @@ fn a_later_single_edit_makes_undo_single_file_again() {
             class: None,
             place: Place::End,
             upsert: false,
+            expect: None,
         },
     };
     generator.run(&replace).unwrap();

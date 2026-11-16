@@ -160,6 +160,7 @@ impl VueGenerator<'_> {
     }
 
     /// `--into x.ts::Osztály [--after tag]`: osztálytagok az osztály törzsébe (a hely az oxc-span alapján).
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn insert_class(
         &self,
         expr: &str,
@@ -167,6 +168,7 @@ impl VueGenerator<'_> {
         class: &str,
         after: Option<&str>,
         upsert: bool,
+        expect: Option<&str>,
         mode: Mode,
     ) -> GenResult<Output> {
         let parts = parse_class_members(expr)?;
@@ -186,7 +188,7 @@ impl VueGenerator<'_> {
         for m in &parts.members {
             if span.members.iter().any(|x| x.name == m.name()) {
                 if upsert && parts.members.len() == 1 {
-                    return self.replace_member(expr, file, (class, m.name()), None, mode);
+                    return self.replace_member(expr, file, (class, m.name()), expect, mode);
                 }
                 return Err(GenError::new(crate::tf!(
                     "`{}` is already a member of {} (to change it use --replace <file>::{}::{})",

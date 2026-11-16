@@ -9,7 +9,7 @@
 //! - **Chain of Responsibility** — `resolve`: rövid név → FQCN: explicit `use:` → projekt osztály-index →
 //!   a projektben már használt importok → PHP globális osztályai → feloldatlan;
 //! - **Command** — `command`: `WriteNew` / `InsertInto` / `ReplaceRange` / `Undo`, mind mentéssel, így az undo egységes;
-//! - **Memento** — `backup`: `.callgraph/backups/<út>.<UTC yyyymmddThhmmss>.bak`, fájlonként az utolsó 10;
+//! - **Memento** — `backup`: `.callgraph/backups/<út>.<UTC yyyymmddThhmmss>.bak`, fájlonként az utolsó 20; az `undo` verem (minden hívás egy írást von vissza);
 //! - **Facade** — `Generator`: a CLI és az MCP ezt hívja; a fájlrendszer és az óra DI-trait mögött (`fs`).
 //!
 //! Biztonság: létező fájlt a `--write` soha nem ír felül; minden módosítást mentés előz meg; a teljes új szöveget

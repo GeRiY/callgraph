@@ -211,7 +211,7 @@ Code generator (writes files; the MCP `generate`, `rename` and `undo` tools are 
     route names ('profile.*' = whole group, resource routes via ->names()), PHP classes (file move, use, ::class, types),
     PHP methods (resolved calls, overrides, route actions) across PHP / Blade / JS / Vue; dynamic references are only
     listed; one line per file; one undo reverts the whole rename
-  bash ~/.claude/skills/callgraph/callgraph.sh undo [<file>]    restore the newest backup (of the file, or of the last changed one / group); itself undoable
+  bash ~/.claude/skills/callgraph/callgraph.sh undo [<file>]    restore the newest backup (of the file, or of the last changed one / group); a stack: each undo steps one write further back (last 20 per file)
 
 Output limit: above 400 lines the directory outline switches to summary, the single-file one to a method index;
 

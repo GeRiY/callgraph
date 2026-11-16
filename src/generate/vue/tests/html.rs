@@ -29,6 +29,7 @@ fn into_at(file: &str, class: &str) -> Target {
         class: Some(class.to_owned()),
         place: Place::End,
         upsert: false,
+        expect: None,
     }
 }
 

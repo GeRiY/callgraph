@@ -64,6 +64,37 @@ pub fn wants_vue(request: &GenRequest) -> bool {
     file_kind(file).is_ok()
 }
 
+/// `--into x.vue::#id` / `::.class` / `::template#id`: a cél egy sablon-elem, ezért a kifejezés alapból sablon-markup
+/// (nem kell elé a `template >`); a kifejezetten szakasz-fejű (`template`, `script`, `style`, `vue:`) marad, ahogy van.
+fn template_markup_expr(request: &GenRequest) -> String {
+    let Target::Into {
+        file,
+        class: Some(class),
+        ..
+    } = &request.target
+    else {
+        return request.expr.clone();
+    };
+    let selector = class.strip_prefix("template").unwrap_or(class);
+    if !file.ends_with(".vue") || !selector.starts_with(['#', '.']) {
+        return request.expr.clone();
+    }
+    let expr = request.expr.trim_start();
+    let head: String = expr
+        .chars()
+        .take_while(|c| c.is_ascii_alphanumeric() || matches!(c, '!' | '_' | '-'))
+        .collect();
+    let section = matches!(
+        head.as_str(),
+        "template" | "script" | "vue" | "mod" | "comp"
+    ) || head.starts_with("style");
+    if section {
+        request.expr.clone()
+    } else {
+        format!("template > {expr}")
+    }
+}
+
 fn is_script_file(file: &str) -> bool {
     matches!(file_kind(file), Ok(FileKind::Script { .. }))
 }
@@ -107,6 +138,7 @@ impl<'a> VueGenerator<'a> {
                 class: Some(class),
                 place,
                 upsert,
+                expect,
             } if is_script_file(file) => {
                 return self.insert_class(
                     &request.expr,
@@ -114,6 +146,7 @@ impl<'a> VueGenerator<'a> {
                     class,
                     place.after_name(),
                     *upsert,
+                    expect.as_deref(),
                     request.mode,
                 );
             }
@@ -136,7 +169,7 @@ impl<'a> VueGenerator<'a> {
             }
             _ => {}
         }
-        let program = super::parse::parse(&request.expr)?;
+        let program = super::parse::parse(&template_markup_expr(request))?;
         match &request.target {
             Target::Preview => self.preview(&program),
             Target::Write { file } => self.write(&program, file, request.mode),
