@@ -141,7 +141,7 @@ fn unknown_stays_unknown_and_non_code_is_skipped() {
     assert_eq!(support.reason, Reason::Unknown);
     assert_eq!(support.confidence, Confidence::Low);
     assert_eq!(role("src/main.ts"), None);
-    assert_eq!(role("src/main.rs"), None);
+    assert_eq!(role("src/main.rs"), Some("entry"));
     assert!(c.classify("README.md").is_none());
     assert!(c.classify("app/Http/Controllers/x.json").is_none());
     assert!(c.classify("Makefile").is_none());

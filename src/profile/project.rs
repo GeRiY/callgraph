@@ -81,6 +81,8 @@ pub(crate) struct ProjectProfile {
     pub warnings: Vec<String>,
     /// A kiemelt csomagok (`stack:` sor; `crate::packages`), a projekt-gyökér manifestjeiből és lockjaiból.
     pub stack: Stack,
+    /// A Rust workspace tagjai (`crates/x`), egy crate-nél üres.
+    pub crates: Vec<String>,
 }
 
 impl ProjectProfile {
@@ -194,6 +196,7 @@ impl ProjectProfile {
             overrides: None,
             warnings: Vec::new(),
             stack: Stack::default(),
+            crates: Vec::new(),
         }
     }
 

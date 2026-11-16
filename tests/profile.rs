@@ -206,7 +206,7 @@ fn layer_filter_keeps_only_that_layer() {
     assert!(!wrong.status.success());
     let stderr = String::from_utf8_lossy(&wrong.stderr);
     assert!(
-        stderr.contains("Unknown layer: nope (known: route, "),
+        stderr.contains("Unknown layer: nope (known: entry, route, "),
         "{stderr}"
     );
 }

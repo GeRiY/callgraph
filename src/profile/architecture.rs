@@ -136,6 +136,16 @@ pub(crate) static ARCHITECTURES: &[ArchRule] = &[
         subsumed_by: &[],
     },
     ArchRule {
+        id: "rust-cli",
+        label: "Rust CLI / library (entry points → modules)",
+        frameworks: &[],
+        eco: Some(Eco::Rust),
+        all: &[],
+        any: &["entry", "module"],
+        min_any: 1,
+        subsumed_by: &["rust-web"],
+    },
+    ArchRule {
         id: "layered",
         label: "layered (controller → service → repository)",
         frameworks: &[],

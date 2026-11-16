@@ -77,6 +77,16 @@ fn header(out: &mut String, profile: &ProjectProfile, lang: Lang, compact_stack:
         Lang::En => writeln!(out, "profile: {architecture} · confidence: {confidence}"),
         Lang::Hu => writeln!(out, "profil: {architecture} · bizonyosság: {confidence}"),
     };
+    if !profile.crates.is_empty() {
+        let shown: Vec<&str> = profile.crates.iter().take(6).map(String::as_str).collect();
+        let more = profile.crates.len().saturating_sub(shown.len());
+        let more = if more > 0 {
+            format!(", +{more}")
+        } else {
+            String::new()
+        };
+        let _ = writeln!(out, "workspace (rust): {}{more}", shown.join(", "));
+    }
     // a kiemelt csomagok (frameworkök, a kódírást meghatározó könyvtárak) a lock verziójával
     let stack = if compact_stack {
         profile.stack.compact_line()

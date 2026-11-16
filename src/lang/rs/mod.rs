@@ -26,3 +26,5 @@ mod tests_flow_types;
 mod tests_receivers;
 #[cfg(test)]
 mod tests_refs;
+#[cfg(test)]
+mod tests_traits;

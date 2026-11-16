@@ -176,6 +176,16 @@ impl Classifier {
                     ..base
                 }
             }
+            (None, None) if eco == Eco::Rust => match rust_layout(dir, stem) {
+                Some(layout) => Classification {
+                    role: Role::named(layout.role),
+                    confidence: layout.confidence,
+                    reason: layout.reason,
+                    anchor: layout.anchor,
+                    ..base
+                },
+                None => base,
+            },
             (None, None) => base,
             (Some(folder), None) => Classification {
                 role: Some(folder.role),
@@ -229,6 +239,46 @@ impl Classifier {
                 ..base
             },
         })
+    }
+}
+
+/// A Rust crate elrendezéséből adódó besorolás (`src/main.rs`, `src/bin/*`, `src/<modul>/…`).
+struct RustLayout {
+    role: &'static str,
+    confidence: Confidence,
+    reason: Reason,
+    anchor: String,
+}
+
+/// Rust-fájl, amelyet sem mappa-, sem névszabály nem sorolt be: a crate `src/` mappájához képest az útja dönt
+/// (a workspace-tag `crates/x/src/…` és az egyszerű `src/…` ugyanígy). `src/main.rs`, `src/lib.rs`,
+/// `src/bin/*` → `entry`; `src/<modul>/…` → `module`, a modul (a legfelső mappa) a horgony; a közvetlenül
+/// `src/` alatti többi fájl is `module`. A `src/` mappán kívüli fájl (`build.rs`, `xtask/…`) nem kap szerepet.
+fn rust_layout(dir: &str, stem: &str) -> Option<RustLayout> {
+    let segments: Vec<&str> = dir.split('/').collect();
+    let src = segments.iter().position(|s| *s == "src")?;
+    let rest = &segments[src + 1..];
+    let entry = |anchor: String, shown: String| RustLayout {
+        role: "entry",
+        confidence: Confidence::High,
+        reason: Reason::Name(shown),
+        anchor,
+    };
+    match rest.first() {
+        None if matches!(stem, "main" | "lib") => Some(entry(dir.to_owned(), format!("{stem}.rs"))),
+        None => Some(RustLayout {
+            role: "module",
+            confidence: Confidence::Medium,
+            reason: Reason::Folder("src".to_owned()),
+            anchor: dir.to_owned(),
+        }),
+        Some(&"bin") => Some(entry(segments[..=src + 1].join("/"), "bin".to_owned())),
+        Some(module) => Some(RustLayout {
+            role: "module",
+            confidence: Confidence::Medium,
+            reason: Reason::Folder((*module).to_owned()),
+            anchor: segments[..=src + 1].join("/"),
+        }),
     }
 }
 

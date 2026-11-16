@@ -246,6 +246,17 @@ pub(crate) static FOLDER_RULES: &[FolderRule] = &[
         High,
         ANY,
     ),
+    // minta- / fixture-mappák (golden/samples/*, tests/fixtures/*): a bennük lévő, akár más nyelvű mintakód nem a
+    // projekt architektúrája
+    folder(
+        &["golden", "fixtures", "fixture", "testdata"],
+        None,
+        "test",
+        High,
+        ANY,
+    ),
+    folder(&["benches", "benchmarks"], None, "bench", High, RUST),
+    folder(&["examples", "example"], None, "example", High, RUST),
     folder(
         &["config", "configs", "configuration"],
         None,

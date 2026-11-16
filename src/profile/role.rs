@@ -38,6 +38,7 @@ const fn role(name: &'static str, kind: Kind, rank: u8, pattern: Option<&'static
 
 /// Az ismert szerepek, a kiírás sorrendjében (a rang szerint rendezve íródnak ki).
 pub(crate) static ROLES: &[RoleInfo] = &[
+    role("entry", Kind::Layer, 0, None),
     role("route", Kind::Layer, 0, None),
     role("middleware", Kind::Layer, 1, None),
     role("controller", Kind::Layer, 2, None),
@@ -54,6 +55,7 @@ pub(crate) static ROLES: &[RoleInfo] = &[
     role("viewmodel", Kind::Layer, 4, None),
     role("composable", Kind::Layer, 4, None),
     role("store", Kind::Layer, 5, None),
+    role("module", Kind::Layer, 5, None),
     role("event", Kind::Layer, 5, None),
     role("service", Kind::Layer, 6, None),
     role("api", Kind::Layer, 7, None),
@@ -78,6 +80,8 @@ pub(crate) static ROLES: &[RoleInfo] = &[
     role("config", Kind::Support, 10, None),
     role("enum", Kind::Support, 10, None),
     role("util", Kind::Support, 10, None),
+    role("bench", Kind::Support, 10, None),
+    role("example", Kind::Support, 10, None),
     role("test", Kind::Support, 11, None),
 ];
 

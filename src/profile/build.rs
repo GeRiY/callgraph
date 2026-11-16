@@ -100,7 +100,19 @@ pub(crate) fn with_graph(root: &Path, with_vendor: bool) -> ProjectProfile {
     }
     let packages = crate::packages::open(root);
     let mut frameworks = manifest_frameworks(root, &packages);
-    let present: Vec<&FileGraph> = graphs.iter().flatten().copied().collect();
+    // a teszt-, minta- (fixture), példa- és benchmark-fájlok keretrendszere nem a projekté (egy Rust crate
+    // `golden/samples/js` mintái ne adjanak neki „Vue”-t)
+    let present: Vec<&FileGraph> = entries
+        .iter()
+        .zip(&graphs)
+        .filter(|(entry, _)| {
+            !entry
+                .class
+                .role
+                .is_some_and(|role| matches!(role.name(), "test" | "example" | "bench"))
+        })
+        .filter_map(|(_, graph)| *graph)
+        .collect();
     for name in present.iter().filter_map(|g| g.framework.as_deref()) {
         if GRAPH_FRAMEWORKS.contains(&name) && !frameworks.iter().any(|have| have == name) {
             frameworks.push(name.to_owned());
@@ -119,7 +131,7 @@ pub(crate) fn with_graph(root: &Path, with_vendor: bool) -> ProjectProfile {
         .collect();
     let flow = flow::compute(&flow_files);
     let profile = ProjectProfile::aggregate(&entries, frameworks, flow, true);
-    finish(profile, &classifier, skipped, &packages)
+    finish(profile, root, &classifier, skipped, &packages)
 }
 
 /// A megerősítés (C jel); kód-jelet kívánó szerepnél megerősítés nélkül a tartalék besorolás (és annak megerősítése).
@@ -226,7 +238,7 @@ fn names_only(root: &Path, files: &[PathBuf], with_vendor: bool) -> ProjectProfi
     let packages = crate::packages::open(root);
     let frameworks = manifest_frameworks(root, &packages);
     let profile = ProjectProfile::aggregate(&entries, frameworks, None, false);
-    finish(profile, &classifier, skipped, &packages)
+    finish(profile, root, &classifier, skipped, &packages)
 }
 
 /// A gyökér kódfájljai a bejárás (és a hívó-index) sorrendjében.
@@ -280,6 +292,7 @@ fn by_count(counts: HashMap<String, usize>) -> Vec<(String, usize)> {
 /// A `.callgraph-layers` helye és figyelmeztetései, a kihagyott kód és a kiemelt csomagok (`stack:`) a profilba.
 fn finish(
     mut profile: ProjectProfile,
+    root: &Path,
     classifier: &Classifier,
     skipped: Skipped,
     packages: &Packages,
@@ -290,5 +303,6 @@ fn finish(
     profile.vendor = by_count(skipped.vendor);
     profile.generated = by_count(skipped.generated);
     profile.stack = packages.stack();
+    profile.crates = super::ecosystem::rust_crates(root);
     profile
 }

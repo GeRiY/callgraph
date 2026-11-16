@@ -36,6 +36,8 @@ mod tests;
 mod tests_layers;
 #[cfg(test)]
 mod tests_roles;
+#[cfg(test)]
+mod tests_rust;
 
 use std::path::Path;
 
