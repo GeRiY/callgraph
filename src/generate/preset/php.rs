@@ -1,8 +1,13 @@
-//! A preset PHP-oldala: a FormRequest-osztály, a controller-metódusok (új fájlhoz és beszúráshoz) és a route-sorok
-//! szövege. Tiszta szövegépítés (I/O nélkül); az ellenőrzést és az írást a hívó végzi.
+//! A preset PHP-oldala: a FormRequest-osztály és a controller-metódusok (új fájlhoz és beszúráshoz) a közös AST-ből
+//! (`ast::TypeDecl` / `Member`), a `PhpEmitter` és a `PhpFileBuilder` útján, valamint a route-sorok szövege.
+//! I/O nélküli; az ellenőrzést és az írást a hívó végzi.
 
 use super::spec::{Field, FieldType, Names, Op};
+use crate::generate::PhpEmitter;
+use crate::generate::ast::{Member, MemberKind, Param, TypeDecl, TypeKind, TypeRef, Visibility};
+use crate::generate::emitter::{Emitter, FileSpec};
 
+/// Behúzás egy szinten a nyers törzsekben (a `PhpEmitter` a törzset további két szinttel húzza be).
 const IND: &str = "    ";
 
 /// A mező validációs tokenjei: `str` → `required|string|max:255`, a `bool` sosem kötelező, az opcionális `nullable`.
@@ -23,29 +28,6 @@ pub fn rules(field: &Field) -> Vec<&'static str> {
     }
 }
 
-/// A `<?php` fejléc: `declare(strict_types=1)` (ha kell), névtér, rendezett importok; záró üres sorral.
-fn header(strict: bool, namespace: &str, imports: &[String]) -> Vec<String> {
-    let mut lines = vec!["<?php".to_owned(), String::new()];
-    if strict {
-        lines.push("declare(strict_types=1);".to_owned());
-        lines.push(String::new());
-    }
-    if !namespace.is_empty() {
-        lines.push(format!("namespace {namespace};"));
-        lines.push(String::new());
-    }
-    let mut sorted: Vec<&String> = imports.iter().collect();
-    sorted.sort_by_key(|i| i.to_ascii_lowercase());
-    sorted.dedup();
-    for import in &sorted {
-        lines.push(format!("use {import};"));
-    }
-    if !sorted.is_empty() {
-        lines.push(String::new());
-    }
-    lines
-}
-
 /// Az osztály-névből és a névtérből a teljes név.
 pub fn qualify(namespace: &str, class: &str) -> String {
     if namespace.is_empty() {
@@ -53,6 +35,43 @@ pub fn qualify(namespace: &str, class: &str) -> String {
     } else {
         format!("{namespace}\\{class}")
     }
+}
+
+/// A fájl az emitter fejléc-építőjén át: `declare(strict_types=1)` (ha kell), névtér, rendezett importok.
+fn file_text(strict: bool, namespace: &str, imports: Vec<String>, decl: &TypeDecl) -> String {
+    let imports: Vec<(String, Option<String>)> = imports.into_iter().map(|i| (i, None)).collect();
+    let spec = FileSpec {
+        namespace: (!namespace.is_empty()).then_some(namespace),
+        imports: &imports,
+        strict_types: strict,
+    };
+    PhpEmitter.file(&spec, std::slice::from_ref(decl))
+}
+
+fn named(name: &str) -> TypeRef {
+    TypeRef::Named(name.to_owned())
+}
+
+fn param(name: &str, ty: &str) -> Param {
+    Param {
+        name: name.to_owned(),
+        ty: Some(named(ty)),
+        default: None,
+        variadic: false,
+        by_ref: false,
+        promote: None,
+        readonly: false,
+    }
+}
+
+/// Egy publikus metódus a megadott visszatérési típussal és nyers törzzsel.
+fn method(name: &str, params: Vec<Param>, ret: TypeRef, body: String) -> Member {
+    let mut member = Member::new(MemberKind::Method, name);
+    member.visibility = Some(Visibility::Public);
+    member.params = params;
+    member.ty = Some(ret);
+    member.body = Some(body);
+    member
 }
 
 /// A teljes FormRequest-fájl. `pipe`: a szabályok `'required|string'` alakban (a projekt kérései szerint).
@@ -63,26 +82,7 @@ pub fn request_file(
     fields: &[Field],
     pipe: bool,
 ) -> String {
-    let mut lines = header(
-        strict,
-        namespace,
-        &["Illuminate\\Foundation\\Http\\FormRequest".to_owned()],
-    );
-    lines.push(format!("class {class} extends FormRequest"));
-    lines.push("{".to_owned());
-    lines.push(format!("{IND}public function authorize(): bool"));
-    lines.push(format!("{IND}{{"));
-    lines.push(format!("{IND}{IND}return true;"));
-    lines.push(format!("{IND}}}"));
-    lines.push(String::new());
-    lines.push(format!("{IND}/**"));
-    lines.push(format!(
-        "{IND} * @return array<string, array<int, string>|string>"
-    ));
-    lines.push(format!("{IND} */"));
-    lines.push(format!("{IND}public function rules(): array"));
-    lines.push(format!("{IND}{{"));
-    lines.push(format!("{IND}{IND}return ["));
+    let mut body = vec!["return [".to_owned()];
     for field in fields {
         let tokens = rules(field);
         let value = if pipe {
@@ -91,13 +91,37 @@ pub fn request_file(
             let quoted: Vec<String> = tokens.iter().map(|t| format!("'{t}'")).collect();
             format!("[{}]", quoted.join(", "))
         };
-        lines.push(format!("{IND}{IND}{IND}'{}' => {value},", field.name));
+        body.push(format!("{IND}'{}' => {value},", field.name));
     }
-    lines.push(format!("{IND}{IND}];"));
-    lines.push(format!("{IND}}}"));
-    lines.push("}".to_owned());
-    lines.push(String::new());
-    lines.join("\n")
+    body.push("];".to_owned());
+    // a docblock a szabály alakját írja le: csöves szabály `string`, tömbös `list<string>`
+    let rule = if pipe {
+        TypeRef::Str
+    } else {
+        TypeRef::Union(vec![TypeRef::List(Box::new(TypeRef::Str)), TypeRef::Str])
+    };
+    let mut decl = TypeDecl::new(TypeKind::Class, class);
+    decl.extends = vec![named("FormRequest")];
+    decl.members = vec![
+        method(
+            "authorize",
+            Vec::new(),
+            TypeRef::Bool,
+            "return true;".to_owned(),
+        ),
+        method(
+            "rules",
+            Vec::new(),
+            TypeRef::Map(Box::new(TypeRef::Str), Box::new(rule)),
+            body.join("\n"),
+        ),
+    ];
+    file_text(
+        strict,
+        namespace,
+        vec!["Illuminate\\Foundation\\Http\\FormRequest".to_owned()],
+        &decl,
+    )
 }
 
 /// A controller-generálás környezete.
@@ -156,108 +180,87 @@ impl ControllerCtx<'_> {
         out
     }
 
-    /// A művelet metódusa (4 szóközös behúzással).
-    pub fn method(&self, op: Op) -> Vec<String> {
+    /// A művelet metódusa az AST-ben (a törzs nyers PHP, a kiírást a `PhpEmitter` végzi).
+    pub fn method(&self, op: Op) -> Member {
         let n = self.names;
         let (model, var) = (&n.model, &n.var);
-        let m = |text: String| format!("{IND}{text}");
-        let b = |text: String| format!("{IND}{IND}{text}");
-        let mut lines: Vec<String> = Vec::new();
         match op {
-            Op::Index => {
-                lines.push(m("public function index(): Response".to_owned()));
-                lines.push(m("{".to_owned()));
-                lines.push(b(format!(
-                    "return Inertia::render('{}', [",
-                    n.page("Index")
-                )));
-                lines.push(format!(
-                    "{IND}{IND}{IND}'{}' => {model}::latest()->paginate(20),",
+            Op::Index => method(
+                "index",
+                Vec::new(),
+                named("Response"),
+                format!(
+                    "return Inertia::render('{}', [\n{IND}'{}' => {model}::latest()->paginate(20),\n]);",
+                    n.page("Index"),
                     n.vars
-                ));
-                lines.push(b("]);".to_owned()));
-            }
-            Op::Create => {
-                lines.push(m("public function create(): Response".to_owned()));
-                lines.push(m("{".to_owned()));
-                lines.push(b(format!(
-                    "return Inertia::render('{}');",
-                    n.page("Create")
-                )));
-            }
-            Op::Store => {
-                lines.push(m(format!(
-                    "public function store({} $request): RedirectResponse",
-                    self.store_request()
-                )));
-                lines.push(m("{".to_owned()));
-                lines.push(b(format!("{model}::create($request->validated());")));
-                lines.push(String::new());
-                lines.push(b(format!("return {};", self.redirect())));
-            }
+                ),
+            ),
+            Op::Create => method(
+                "create",
+                Vec::new(),
+                named("Response"),
+                format!("return Inertia::render('{}');", n.page("Create")),
+            ),
+            Op::Store => method(
+                "store",
+                vec![param("request", &self.store_request())],
+                named("RedirectResponse"),
+                format!(
+                    "{model}::create($request->validated());\n\nreturn {};",
+                    self.redirect()
+                ),
+            ),
             Op::Show | Op::Edit => {
                 let (word, page) = if op == Op::Show {
                     ("show", "Show")
                 } else {
                     ("edit", "Edit")
                 };
-                lines.push(m(format!(
-                    "public function {word}({model} ${var}): Response"
-                )));
-                lines.push(m("{".to_owned()));
-                lines.push(b(format!("return Inertia::render('{}', [", n.page(page))));
-                lines.push(format!("{IND}{IND}{IND}'{var}' => ${var},"));
-                lines.push(b("]);".to_owned()));
+                method(
+                    word,
+                    vec![param(var, model)],
+                    named("Response"),
+                    format!(
+                        "return Inertia::render('{}', [\n{IND}'{var}' => ${var},\n]);",
+                        n.page(page)
+                    ),
+                )
             }
-            Op::Update => {
-                lines.push(m(format!(
-                    "public function update({} $request, {model} ${var}): RedirectResponse",
-                    self.update_request()
-                )));
-                lines.push(m("{".to_owned()));
-                lines.push(b(format!("${var}->update($request->validated());")));
-                lines.push(String::new());
-                lines.push(b(format!("return {};", self.redirect())));
-            }
-            Op::Destroy => {
-                lines.push(m(format!(
-                    "public function destroy({model} ${var}): RedirectResponse"
-                )));
-                lines.push(m("{".to_owned()));
-                lines.push(b(format!("${var}->delete();")));
-                lines.push(String::new());
-                lines.push(b(format!("return {};", self.redirect())));
-            }
+            Op::Update => method(
+                "update",
+                vec![param("request", &self.update_request()), param(var, model)],
+                named("RedirectResponse"),
+                format!(
+                    "${var}->update($request->validated());\n\nreturn {};",
+                    self.redirect()
+                ),
+            ),
+            Op::Destroy => method(
+                "destroy",
+                vec![param(var, model)],
+                named("RedirectResponse"),
+                format!("${var}->delete();\n\nreturn {};", self.redirect()),
+            ),
         }
-        lines.push(m("}".to_owned()));
-        lines
     }
 
-    /// A metódusok egymás után, üres sorral elválasztva.
-    pub fn methods(&self, ops: &[Op]) -> Vec<String> {
-        let mut block: Vec<String> = Vec::new();
-        for op in ops {
-            if !block.is_empty() {
-                block.push(String::new());
-            }
-            block.extend(self.method(*op));
-        }
-        block
+    /// A metódusok az AST-ben, a műveletek sorrendjében.
+    pub fn members(&self, ops: &[Op]) -> Vec<Member> {
+        ops.iter().map(|op| self.method(*op)).collect()
+    }
+
+    /// A metódusok sorai a `PhpEmitter`-rel (4 szóközös behúzás, üres sorral elválasztva); `kind`: a befogadó típus.
+    pub fn methods(&self, kind: TypeKind, ops: &[Op]) -> Vec<String> {
+        PhpEmitter.members(kind, &self.members(ops)).collect()
     }
 
     /// A teljes új controller-fájl.
     pub fn file(&self, strict: bool, namespace: &str, ops: &[Op]) -> String {
         let imports: Vec<String> = ops.iter().flat_map(|op| self.imports(*op)).collect();
-        let mut lines = header(strict, namespace, &imports);
-        lines.push(format!(
-            "class {} extends Controller",
-            self.names.controller
-        ));
-        lines.push("{".to_owned());
-        lines.extend(self.methods(ops));
-        lines.push("}".to_owned());
-        lines.push(String::new());
-        lines.join("\n")
+        let mut decl = TypeDecl::new(TypeKind::Class, &self.names.controller);
+        decl.extends = vec![named("Controller")];
+        decl.members = self.members(ops);
+        file_text(strict, namespace, imports, &decl)
     }
 }
 

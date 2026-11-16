@@ -292,6 +292,16 @@ impl<'a> VueGenerator<'a> {
         }
     }
 
+    /// Egy kész `.vue` oldal a preset számára: az `sfc_file` szövege a projekt behúzás-egységében (`unit`).
+    /// A komponenseknek a modellben explicit importjuk van, ezért a projekt-keresés nem fut.
+    pub(crate) fn sfc_page(&self, program: &Program, style: CodeStyle, unit: usize) -> String {
+        let (text, _) = self.sfc_file(program, style);
+        let lines: Vec<String> = text.lines().map(str::to_owned).collect();
+        let mut out = reindent(&lines, unit).join("\n");
+        out.push('\n');
+        out
+    }
+
     /// A teljes új `.vue` fájl.
     fn sfc_file(&self, program: &Program, style: CodeStyle) -> (String, Vec<String>) {
         let rendered = self.render(program, style, &[]);

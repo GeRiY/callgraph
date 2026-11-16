@@ -206,17 +206,18 @@ fn create_writes_request_controller_routes_and_page() {
     assert!(page.contains("<InputLabel for=\"name\" value=\"Name\" />"));
     assert!(page.contains("<InputError class=\"mt-2\" :message=\"form.errors.name\" />"));
     assert!(page.contains("<PrimaryButton :disabled=\"form.processing\">Save</PrimaryButton>"));
-    // a kötelező mezőn `required`, az opcionálison és a boolon nincs
-    let line_of = |id: &str| {
-        page.lines()
-            .find(|l| l.contains(&format!("id=\"{id}\"")))
-            .unwrap()
-            .to_owned()
+    // a kötelező mezőn `required`, az opcionálison és a boolon nincs (a hosszú elem attribútumonként tördelődik,
+    // ezért az elem teljes szövegét nézzük)
+    let element_of = |id: &str| {
+        let at = page.find(&format!("id=\"{id}\"")).unwrap();
+        let start = page[..at].rfind('<').unwrap();
+        let end = at + page[at..].find('>').unwrap();
+        page[start..=end].to_owned()
     };
-    assert!(line_of("name").contains(" required"));
-    assert!(line_of("amount").contains(" required"));
-    assert!(!line_of("note").contains("required"));
-    assert!(!line_of("paid").contains("required"));
+    assert!(element_of("name").contains("required"));
+    assert!(element_of("amount").contains("required"));
+    assert!(!element_of("note").contains("required"));
+    assert!(!element_of("paid").contains("required"));
 
     assert!(
         out.contains("wrote app/Http/Requests/StoreFeeRequest.php ("),
@@ -256,7 +257,7 @@ fn several_actions_link_the_index_route() {
     assert!(controller.contains("public function destroy(Fee $fee): RedirectResponse"));
     let index = fs.get("resources/js/Pages/Fees/Index.vue").unwrap();
     assert!(index.contains("<tr v-for=\"item in fees.data\" :key=\"item.id\">"));
-    assert!(index.contains("<Link :href=\"route('fees.edit', item.id)\""));
+    assert!(index.contains(":href=\"route('fees.edit', item.id)\""));
     assert!(
         index.contains("router.delete(route('fees.destroy', item.id))")
             || index.contains("router.delete(route('fees.destroy', id))")
@@ -525,8 +526,15 @@ fn a_missing_model_is_reported_not_generated() {
     assert!(fs.get("app/Models/Fee.php").is_none());
     // komponens nélkül sima HTML
     let page = fs.get("resources/js/Pages/Fees/Create.vue").unwrap();
-    assert!(page.contains("<label for=\"name\""));
-    assert!(page.contains("<button type=\"submit\" :disabled=\"form.processing\""));
+    assert!(
+        page.contains("<label ") && page.contains("for=\"name\""),
+        "{page}"
+    );
+    assert!(
+        page.contains("<button") && page.contains("type=\"submit\""),
+        "{page}"
+    );
+    assert!(!page.contains("<PrimaryButton"), "{page}");
     assert!(!page.contains("AuthenticatedLayout"));
 }
 
@@ -557,7 +565,7 @@ fn without_ziggy_the_pages_use_plain_urls() {
         pages[1]
     );
     let index = &pages[2];
-    assert!(index.contains("<Link :href=\"'/fees/create'\""), "{index}");
+    assert!(index.contains(":href=\"'/fees/create'\""), "{index}");
     assert!(
         index.contains(":href=\"`/fees/${item.id}/edit`\""),
         "{index}"
@@ -747,4 +755,107 @@ fn a_preset_run_reads_each_project_file_once() {
         assert!(fs.reads_of(rel) <= 1, "{rel}: {}", fs.reads_of(rel));
     }
     assert!(fs.list_calls() <= 16, "lists: {}", fs.list_calls());
+}
+
+/// A FormRequest és a controller a `PhpEmitter` kimenete: PSR-12 tagok, docblock a szabály-alakról, rendezett importok.
+#[test]
+fn php_files_come_from_the_emitter() {
+    let fs = project();
+    let clock = FixedClock(Cell::new(T0));
+    run(&fs, &clock, CREATE, false).unwrap();
+    let request = fs.get("app/Http/Requests/StoreFeeRequest.php").unwrap();
+    assert!(
+        request.starts_with(
+            "<?php\n\nnamespace App\\Http\\Requests;\n\nuse Illuminate\\Foundation\\Http\\FormRequest;\n\nclass StoreFeeRequest extends FormRequest\n{\n    public function authorize(): bool\n    {\n        return true;\n    }\n"
+        ),
+        "{request}"
+    );
+    assert!(
+        request.contains(
+            "    /**\n     * @return array<string, list<string>|string>\n     */\n    public function rules(): array\n    {\n        return [\n            'name' => ['required', 'string', 'max:255'],"
+        ),
+        "{request}"
+    );
+    assert!(request.ends_with("        ];\n    }\n}\n"), "{request}");
+    let controller = fs.get("app/Http/Controllers/FeeController.php").unwrap();
+    assert!(
+        controller.contains(
+            "    public function create(): Response\n    {\n        return Inertia::render('Fees/Create');\n    }\n\n    public function store("
+        ),
+        "{controller}"
+    );
+    // rendezett importok
+    let at = |needle: &str| controller.find(needle).unwrap();
+    assert!(at("use App\\Http\\Requests\\StoreFeeRequest;") < at("use App\\Models\\Fee;"));
+    assert!(at("use Illuminate\\Http\\RedirectResponse;") < at("use Inertia\\Inertia;"));
+}
+
+/// Az oldalak a Vue-generátor SFC-útján épülnek: a projekt behúzás-egysége, az Inertia-import elöl, a komponensek út
+/// szerint, a `Head` és a `useForm` egy sorban.
+#[test]
+fn pages_come_from_the_sfc_path() {
+    let fs = project();
+    let clock = FixedClock(Cell::new(T0));
+    run(&fs, &clock, CREATE, false).unwrap();
+    let page = fs.get("resources/js/Pages/Fees/Create.vue").unwrap();
+    assert!(
+        page.starts_with(
+            "<script setup>\nimport { Head, useForm } from '@inertiajs/vue3';\nimport InputError from '@/Components/InputError.vue';"
+        ),
+        "{page}"
+    );
+    assert!(
+        page.contains("function submit() {\n    form.post(route('fees.store'));\n}\n"),
+        "{page}"
+    );
+    assert!(
+        page.contains("\n    <Head title=\"Create Fee\" />\n"),
+        "{page}"
+    );
+    assert!(page.contains("<template #header>"), "{page}");
+    assert!(page.ends_with("</template>\n"), "{page}");
+}
+
+/// A `const props =` kötés csak az Edit-nél marad (ott a script használja), az Index / Show csupasz `defineProps`.
+#[test]
+fn props_are_bound_only_when_the_script_reads_them() {
+    let fs = project();
+    let clock = FixedClock(Cell::new(T0));
+    run(
+        &fs,
+        &clock,
+        "laravel:Fee>create(name:str)+edit+index+show",
+        false,
+    )
+    .unwrap();
+    let page = |p: &str| fs.get(&format!("resources/js/Pages/Fees/{p}.vue")).unwrap();
+    assert!(page("Edit").contains("const props = defineProps("));
+    for name in ["Index", "Show"] {
+        let text = page(name);
+        assert!(text.contains("\ndefineProps("), "{text}");
+        assert!(!text.contains("const props"), "{text}");
+    }
+}
+
+/// A Ziggy-felismerés a manifestek értelmezett kulcsaiból jön, nem szöveg-keresésből.
+#[test]
+fn ziggy_is_read_from_the_manifest_keys() {
+    let fs = project();
+    fs.put(
+        "composer.json",
+        r#"{"description":"tightenco/ziggy is great","autoload":{"psr-4":{"App\\":"app/"}}}"#,
+    );
+    let clock = FixedClock(Cell::new(T0));
+    run(&fs, &clock, CREATE, false).unwrap();
+    let page = fs.get("resources/js/Pages/Fees/Create.vue").unwrap();
+    assert!(page.contains("form.post('/fees')"), "{page}");
+
+    let fs = project();
+    fs.put(
+        "composer.json",
+        r#"{"require-dev":{"tightenco/ziggy":"^2.0"},"autoload":{"psr-4":{"App\\":"app/"}}}"#,
+    );
+    run(&fs, &clock, CREATE, false).unwrap();
+    let page = fs.get("resources/js/Pages/Fees/Create.vue").unwrap();
+    assert!(page.contains("form.post(route('fees.store'))"), "{page}");
 }

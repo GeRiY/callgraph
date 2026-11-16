@@ -6,6 +6,7 @@ use std::collections::BTreeSet;
 use super::page::{Kind, Page, Parts};
 use super::php::{self, ControllerCtx};
 use super::spec::{Action, Field, FieldType, Names, Op, Spec};
+use crate::generate::ast::TypeKind;
 use crate::generate::edit::{add_imports, insert_at_end, join_lines, split_lines};
 use crate::generate::emitter::Emitter;
 use crate::generate::error::{GenError, GenResult, Kind as ErrorKind};
@@ -150,14 +151,33 @@ fn parts(env: Env<'_>, project: &vue::VueProject<'_>, composer: Option<&str>) ->
     }
 }
 
-/// Ziggy a projektben: `tightenco/ziggy` a composer.json-ban vagy `ziggy-js` a package.json-ban.
-/// A `composer.json` szövegét a hívó már beolvasta (egy futás egyszer olvassa).
+/// Ziggy a projektben: `tightenco/ziggy` a composer.json-ban vagy `ziggy-js` a package.json-ban (a manifestek
+/// értelmezve, nem szöveg-kereséssel: a `require` / `require-dev` és a `dependencies` / `devDependencies` kulcsai).
+/// A `composer.json` szövegét a hívó már beolvasta (egy futás egyszer olvassa); a fájlokat a generátor fájlrendszerén
+/// olvassa (nem a lemezen), ezért nem a `packages::open` csomagtérképe.
 fn has_ziggy(env: Env<'_>, composer: Option<&str>) -> bool {
-    composer.is_some_and(|text| text.contains("\"tightenco/ziggy\""))
+    let in_composer = composer.is_some_and(|text| {
+        crate::packages::composer_requires(text)
+            .iter()
+            .any(|(name, _)| name == "tightenco/ziggy")
+    });
+    in_composer
         || env
             .fs
             .read(&env.root.join("package.json"))
-            .is_ok_and(|text| text.contains("\"ziggy-js\""))
+            .is_ok_and(|text| npm_has(&text, "ziggy-js"))
+}
+
+/// A `package.json` szövege függőségként (vagy fejlesztői függőségként) tartalmazza-e a csomagot.
+fn npm_has(manifest: &str, package: &str) -> bool {
+    let Ok(doc) = serde_json::from_str::<serde_json::Value>(manifest) else {
+        return false;
+    };
+    ["dependencies", "devDependencies"].iter().any(|section| {
+        doc.get(section)
+            .and_then(serde_json::Value::as_object)
+            .is_some_and(|deps| deps.contains_key(package))
+    })
 }
 
 /// Az utolsó nem üres sor után, egy üres sorral elválasztva; a záró újsor megmarad.
@@ -365,7 +385,7 @@ fn plan_controller(
             container.name
         )));
     }
-    let block = ctx.methods(ops);
+    let block = ctx.methods(TypeKind::from_graph(&container.kind), ops);
     insert_at_end(&mut lines, container.end_line as usize, &block);
     let own_ns = graph.namespace.as_deref();
     let imports: Vec<(String, Option<String>)> = ops
@@ -498,6 +518,8 @@ pub fn build(env: Env<'_>, spec: &Spec) -> GenResult<Plan> {
     let facts = vue::project_facts(&vue_project);
     let parts = parts(env, &vue_project, composer.as_deref());
     let dir = pages_dir(env);
+    // az oldalak a Vue-generátor SFC-útján épülnek (modell → script / template emitter → builder)
+    let sfc = vue::VueGenerator::new(env);
     for (action, kind) in [
         (Action::Index, Kind::Index),
         (Action::Create, Kind::Create),
@@ -521,7 +543,7 @@ pub fn build(env: Env<'_>, spec: &Spec) -> GenResult<Plan> {
             parts: &parts,
             routes: &plan.route_names,
         };
-        let text = page.render();
+        let text = page.render(&sfc);
         if let Some((_, request)) = request_texts.iter().find(|(a, _)| *a == action) {
             plan.forms.push((text.clone(), request.clone()));
         }

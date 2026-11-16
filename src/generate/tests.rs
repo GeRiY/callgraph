@@ -257,7 +257,7 @@ fn neutral_types_map_to_php_with_docblocks() {
         "c:Svc > +c(): iter<int> + +d(list<Order> $orders, map<str,int> $m, opt<int> $o):list<Order> + +s(str $a, bytes $b, float $f, bool $c):mixed",
     );
     assert!(text.contains("     * @return iterable<int>\n     */\n    public function c(): iterable\n    {\n        yield from [];"), "{text}");
-    assert!(text.contains("@param list<Order> $orders\n     * @param array<string,int> $m\n     * @return list<Order>\n     */\n    public function d(array $orders, array $m, ?int $o): array"), "{text}");
+    assert!(text.contains("@param list<Order> $orders\n     * @param array<string, int> $m\n     * @return list<Order>\n     */\n    public function d(array $orders, array $m, ?int $o): array"), "{text}");
     assert!(
         text.contains("public function s(string $a, string $b, float $f, bool $c): mixed"),
         "{text}"

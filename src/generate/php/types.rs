@@ -27,11 +27,11 @@ pub fn php_type(ty: &TypeRef) -> String {
     }
 }
 
-/// A docblock-típus (`@param list<Order> $orders`, `array<string,int>`, `iterable<T>`, `T|null`).
+/// A docblock-típus (`@param list<Order> $orders`, `array<string, int>`, `iterable<T>`, `T|null`).
 pub fn doc_type(ty: &TypeRef) -> String {
     match ty {
         TypeRef::List(t) => format!("list<{}>", doc_type(t)),
-        TypeRef::Map(k, v) => format!("array<{},{}>", doc_type(k), doc_type(v)),
+        TypeRef::Map(k, v) => format!("array<{}, {}>", doc_type(k), doc_type(v)),
         TypeRef::Iter(t) => format!("iterable<{}>", doc_type(t)),
         TypeRef::Opt(t) => format!("{}|null", doc_type(t)),
         TypeRef::Union(items) => items.iter().map(doc_type).collect::<Vec<_>>().join("|"),

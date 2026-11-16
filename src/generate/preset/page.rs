@@ -1,14 +1,23 @@
-//! A preset Inertia / Vue oldalai (`Create`, `Edit`, `Index`, `Show`): a `<script setup>` a projekt stílusában
-//! (TS / JS, pontosvessző, behúzás), a template a projekt meglévő komponenseivel (`InputLabel`, `TextInput`,
+//! A preset Inertia / Vue oldalai (`Create`, `Edit`, `Index`, `Show`): a `vue::model::Program` (script-tagok és
+//! template-elemek) a Vue-generátor SFC-útján épül fel — `ScriptEmitter`, template-emitter, `SfcBuilder` —, a
+//! projekt stílusában (TS / JS, pontosvessző, behúzás), a projekt meglévő komponenseivel (`InputLabel`, `TextInput`,
 //! `InputError`, `PrimaryButton`, az `AuthenticatedLayout`), és sima HTML-lel, ahol nincs ilyen komponens.
-//! Tiszta szövegépítés; az ellenőrzést (oxc / tag-egyensúly) a hívó végzi.
+//! Az ellenőrzést (oxc / tag-egyensúly) a hívó végzi.
 
 use std::collections::BTreeSet;
 
 use super::spec::{Field, FieldType, Names, Op, humanize, humanize_model};
-use crate::generate::vue::ProjectFacts;
+use crate::generate::ast::TypeRef;
+use crate::generate::vue::model::{
+    Attr, Element, FormField, Import, Kind as ProgramKind, Member, Program, Prop, Script,
+    TypeField, VParam,
+};
+use crate::generate::vue::types::object_ts;
+use crate::generate::vue::{CodeStyle, ProjectFacts, VueGenerator};
 
 const INPUT_CLASS: &str = "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500";
+const BUTTON_CLASS: &str =
+    "rounded-md bg-gray-800 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white";
 
 /// Az oldal fajtája.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -54,24 +63,6 @@ pub struct Page<'a> {
     pub routes: &'a BTreeSet<String>,
 }
 
-/// Behúzással író sor-gyűjtő.
-struct Out {
-    unit: usize,
-    lines: Vec<String>,
-}
-
-impl Out {
-    fn push(&mut self, level: usize, text: impl AsRef<str>) {
-        let text = text.as_ref();
-        if text.is_empty() {
-            self.lines.push(String::new());
-        } else {
-            self.lines
-                .push(format!("{}{text}", " ".repeat(self.unit * level)));
-        }
-    }
-}
-
 fn is_textlike(ty: FieldType) -> bool {
     matches!(
         ty,
@@ -79,6 +70,7 @@ fn is_textlike(ty: FieldType) -> bool {
     )
 }
 
+/// A mező `useForm` alapértéke (JS-kifejezés): a `bool` `false`, a szám `null` (TS-ben típus-állítással), a többi `''`.
 fn default_value(field: &Field, ts: bool) -> String {
     match field.ty {
         FieldType::Bool => "false".to_owned(),
@@ -93,16 +85,71 @@ fn default_value(field: &Field, ts: bool) -> String {
     }
 }
 
-fn ts_type(field: &Field) -> String {
+/// A mező nyelvfüggetlen típusa (az opcionális `opt<…>`): a TS-típust a közös `vue::types::ts_type` adja.
+fn field_type(field: &Field) -> TypeRef {
     let base = match field.ty {
-        FieldType::Int | FieldType::Float => "number",
-        FieldType::Bool => "boolean",
-        _ => "string",
+        FieldType::Int => TypeRef::Int,
+        FieldType::Float => TypeRef::Float,
+        FieldType::Bool => TypeRef::Bool,
+        _ => TypeRef::Str,
     };
     if field.optional {
-        format!("{base} | null")
+        TypeRef::Opt(Box::new(base))
     } else {
-        base.to_owned()
+        base
+    }
+}
+
+/// Template-elem építő: `el("div").attr("class", "x").text("…")`.
+trait Build: Sized {
+    fn attr(self, name: &str, value: impl Into<String>) -> Self;
+    fn flag(self, name: &str) -> Self;
+    fn text(self, text: impl Into<String>) -> Self;
+    fn kid(self, child: Element) -> Self;
+    fn kids(self, children: Vec<Element>) -> Self;
+}
+
+fn el(tag: &str) -> Element {
+    Element {
+        tag: tag.to_owned(),
+        id: None,
+        classes: Vec::new(),
+        attrs: Vec::new(),
+        text: None,
+        children: Vec::new(),
+    }
+}
+
+impl Build for Element {
+    fn attr(mut self, name: &str, value: impl Into<String>) -> Self {
+        self.attrs.push(Attr {
+            name: name.to_owned(),
+            value: Some(value.into()),
+        });
+        self
+    }
+
+    fn flag(mut self, name: &str) -> Self {
+        self.attrs.push(Attr {
+            name: name.to_owned(),
+            value: None,
+        });
+        self
+    }
+
+    fn text(mut self, text: impl Into<String>) -> Self {
+        self.text = Some(text.into());
+        self
+    }
+
+    fn kid(mut self, child: Element) -> Self {
+        self.children.push(child);
+        self
+    }
+
+    fn kids(mut self, children: Vec<Element>) -> Self {
+        self.children.extend(children);
+        self
     }
 }
 
@@ -182,26 +229,19 @@ impl Page<'_> {
         out
     }
 
-    fn inertia_import(&self) -> String {
+    /// Az Inertia névvel importált tagjai: `Head`, a form-oldalon a `useForm` (a `form` tag igényli, az emitter
+    /// adja hozzá), az index-oldalon a `Link` és a `router`.
+    fn inertia_names(&self) -> Vec<String> {
         let mut names = vec!["Head"];
-        match self.kind {
-            Kind::Create | Kind::Edit => names.push("useForm"),
-            Kind::Index => {
-                if self.row_links() {
-                    names.push("Link");
-                }
-                if self.known(Op::Destroy).is_some() {
-                    names.push("router");
-                }
+        if self.kind == Kind::Index {
+            if self.row_links() {
+                names.push("Link");
             }
-            Kind::Show => {}
+            if self.known(Op::Destroy).is_some() {
+                names.push("router");
+            }
         }
-        names.sort_by_key(|n| n.to_ascii_lowercase());
-        format!(
-            "import {{ {} }} from '@inertiajs/vue3'{}",
-            names.join(", "),
-            self.semi()
-        )
+        names.into_iter().map(str::to_owned).collect()
     }
 
     /// Kell-e a `Link` az index-oldalon (új / szerkesztés / megnézés link).
@@ -211,202 +251,206 @@ impl Page<'_> {
             || self.known(Op::Show).is_some()
     }
 
-    fn script(&self, out: &mut Out) {
-        let e = self.semi();
-        out.push(
-            0,
-            if self.facts.ts {
-                "<script setup lang=\"ts\">"
-            } else {
-                "<script setup>"
-            },
-        );
-        for (name, path) in self.components() {
-            out.push(0, format!("import {name} from '{path}'{e}"));
-        }
-        out.push(0, self.inertia_import());
-        out.push(0, "");
-        match self.kind {
-            Kind::Create => {
-                self.form_decl(out, None);
-                out.push(0, "");
-                self.submit_fn(out, "post", Op::Store, None);
-            }
+    fn script(&self) -> Script {
+        let members = match self.kind {
+            Kind::Create => vec![
+                self.form_member(None),
+                self.submit_member("post", Op::Store, None),
+            ],
             Kind::Edit => {
-                self.props_decl(out, true);
-                out.push(0, "");
-                self.form_decl(out, Some(self.names.var.as_str()));
-                out.push(0, "");
                 let id = format!("props.{}.id", self.names.var);
-                self.submit_fn(out, "put", Op::Update, Some(id.as_str()));
+                vec![
+                    self.props_member(),
+                    self.form_member(Some(self.names.var.as_str())),
+                    self.submit_member("put", Op::Update, Some(id.as_str())),
+                ]
             }
             Kind::Index => {
-                self.props_decl(out, false);
+                let mut members = vec![self.props_member()];
                 if self.known(Op::Destroy).is_some() {
-                    out.push(0, "");
-                    let arg = if self.facts.ts { "id: number" } else { "id" };
-                    out.push(0, format!("const destroy = ({arg}) => {{"));
-                    out.push(1, "if (confirm('Delete this item?')) {");
-                    out.push(
-                        2,
-                        format!("router.delete({}){e}", self.href(Op::Destroy, Some("id"))),
-                    );
-                    out.push(1, "}");
-                    out.push(0, format!("}}{e}"));
+                    members.push(self.destroy_member());
                 }
+                members
             }
-            Kind::Show => self.props_decl(out, false),
+            Kind::Show => vec![self.props_member()],
+        };
+        let mut imports: Vec<Import> = self
+            .components()
+            .into_iter()
+            .map(|(name, source)| Import {
+                source,
+                default: Some(name),
+                named: Vec::new(),
+            })
+            .collect();
+        imports.push(Import {
+            source: "@inertiajs/vue3".to_owned(),
+            default: None,
+            named: self.inertia_names(),
+        });
+        Script {
+            members,
+            imports,
+            guess: Vec::new(),
         }
-        out.push(0, "</script>");
     }
 
     /// `const form = useForm({ … })`; `prop`: az Edit-nél a prop neve, ahonnan az értékek jönnek.
-    fn form_decl(&self, out: &mut Out, prop: Option<&str>) {
-        out.push(0, "const form = useForm({");
-        for field in self.fields {
-            let value = match prop {
-                Some(var) => format!("props.{var}.{}", field.name),
-                None => default_value(field, self.facts.ts),
-            };
-            out.push(1, format!("{}: {value},", field.name));
-        }
-        out.push(0, format!("}}){}", self.semi()));
-    }
-
-    fn submit_fn(&self, out: &mut Out, verb: &str, op: Op, id: Option<&str>) {
-        let e = self.semi();
-        out.push(0, "const submit = () => {");
-        out.push(1, format!("form.{verb}({}){e}", self.href(op, id)));
-        out.push(0, format!("}}{e}"));
-    }
-
-    /// A TS-típus mezői (`id` + a mezők), a megadott szinttől.
-    fn ts_members(&self, out: &mut Out, level: usize) {
-        let sep = if self.facts.semi { ";" } else { "" };
-        out.push(level, format!("id: number{sep}"));
-        for field in self.fields {
-            out.push(level, format!("{}: {}{sep}", field.name, ts_type(field)));
+    fn form_member(&self, prop: Option<&str>) -> Member {
+        let fields = self
+            .fields
+            .iter()
+            .map(|field| FormField {
+                name: field.name.clone(),
+                ty: None,
+                default: Some(match prop {
+                    Some(var) => format!("props.{var}.{}", field.name),
+                    None => default_value(field, self.facts.ts),
+                }),
+            })
+            .collect();
+        Member::Form {
+            name: "form".to_owned(),
+            fields,
         }
     }
 
-    /// A `defineProps`: Edit / Show: az `item` objektum (`const props =` csak az Edit-nél, ott a script használja);
-    /// Index: a lapozott lista.
-    fn props_decl(&self, out: &mut Out, bind: bool) {
+    fn func(name: &str, params: Vec<VParam>, body: String) -> Member {
+        Member::Func {
+            name: name.to_owned(),
+            params,
+            ret: None,
+            body: Some(body),
+            is_async: false,
+        }
+    }
+
+    fn submit_member(&self, verb: &str, op: Op, id: Option<&str>) -> Member {
+        let body = format!("form.{verb}({}){}", self.href(op, id), self.semi());
+        Self::func("submit", Vec::new(), body)
+    }
+
+    fn destroy_member(&self) -> Member {
         let e = self.semi();
-        let sep = if self.facts.semi { ";" } else { "" };
-        let prefix = if bind { "const props = " } else { "" };
-        let single = matches!(self.kind, Kind::Edit | Kind::Show);
-        let key = if single {
-            &self.names.var
-        } else {
-            &self.names.vars
+        let body = format!(
+            "if (confirm('Delete this item?')) {{\n  router.delete({}){e}\n}}",
+            self.href(Op::Destroy, Some("id"))
+        );
+        let id = VParam {
+            name: "id".to_owned(),
+            ty: Some(TypeRef::Int),
+            default: None,
+            optional: false,
+            rest: false,
         };
-        if self.facts.ts {
-            out.push(0, format!("{prefix}defineProps<{{"));
-            out.push(1, format!("{key}: {{"));
-            if single {
-                self.ts_members(out, 2);
-            } else {
-                out.push(2, "data: {");
-                self.ts_members(out, 3);
-                out.push(2, format!("}}[]{sep}"));
-            }
-            out.push(1, format!("}}{sep}"));
-            out.push(0, format!("}}>(){e}"));
+        Self::func("destroy", vec![id], body)
+    }
+
+    /// A TS-objektumtípus (`{ id: number; name: string }`): `id` + a mezők, a típusok a közös `ts_type`-pal.
+    fn row_type(&self) -> String {
+        let mut fields = vec![TypeField {
+            name: "id".to_owned(),
+            optional: false,
+            ty: TypeRef::Int,
+        }];
+        fields.extend(self.fields.iter().map(|f| TypeField {
+            name: f.name.clone(),
+            optional: false,
+            ty: field_type(f),
+        }));
+        object_ts(&fields, "; ")
+    }
+
+    /// A `defineProps`: Edit / Show: az `item` objektum; Index: a lapozott lista (`{ data: item[] }`).
+    fn props_member(&self) -> Member {
+        let row = self.row_type();
+        let (name, ty) = if matches!(self.kind, Kind::Edit | Kind::Show) {
+            (self.names.var.clone(), row)
         } else {
-            out.push(0, format!("{prefix}defineProps({{"));
-            out.push(1, format!("{key}: {{"));
-            out.push(2, "type: Object,");
-            out.push(2, "required: true,");
-            out.push(1, "},");
-            out.push(0, format!("}}){e}"));
-        }
+            (self.names.vars.clone(), format!("{{ data: {row}[] }}"))
+        };
+        Member::Props(vec![Prop {
+            name,
+            ty: Some(TypeRef::Named(ty)),
+            required: true,
+            default: None,
+        }])
     }
 
     // ---- template ---------------------------------------------------------------------------------------------
 
-    fn label_lines(&self, out: &mut Out, level: usize, field: &Field) {
+    fn label_el(&self, field: &Field) -> Element {
         let (name, text) = (&field.name, humanize(&field.name));
         if self.parts.label.is_some() {
-            out.push(
-                level,
-                format!("<InputLabel for=\"{name}\" value=\"{text}\" />"),
-            );
+            el("InputLabel").attr("for", name).attr("value", text)
         } else {
-            out.push(
-                level,
-                format!(
-                    "<label for=\"{name}\" class=\"block text-sm font-medium text-gray-700\">{text}</label>"
-                ),
-            );
+            el("label")
+                .attr("for", name)
+                .attr("class", "block text-sm font-medium text-gray-700")
+                .text(text)
         }
     }
 
-    fn error_lines(&self, out: &mut Out, level: usize, field: &Field) {
+    fn error_el(&self, field: &Field) -> Element {
         let name = &field.name;
         if self.parts.error.is_some() {
-            out.push(
-                level,
-                format!("<InputError class=\"mt-2\" :message=\"form.errors.{name}\" />"),
-            );
+            el("InputError")
+                .attr("class", "mt-2")
+                .attr(":message", format!("form.errors.{name}"))
         } else {
-            out.push(
-                level,
-                format!(
-                    "<p v-if=\"form.errors.{name}\" class=\"mt-2 text-sm text-red-600\">{{{{ form.errors.{name} }}}}</p>"
-                ),
-            );
+            el("p")
+                .attr("v-if", format!("form.errors.{name}"))
+                .attr("class", "mt-2 text-sm text-red-600")
+                .text(format!("{{{{ form.errors.{name} }}}}"))
         }
     }
 
     /// Egy mező blokkja: címke, beviteli elem, hibaüzenet.
-    fn field_block(&self, out: &mut Out, level: usize, field: &Field) {
+    fn field_block(&self, field: &Field) -> Element {
         let name = &field.name;
-        let required = if field.optional || field.ty == FieldType::Bool {
-            ""
-        } else {
-            " required"
+        let model = format!("form.{name}");
+        let required = !(field.optional || field.ty == FieldType::Bool);
+        let mark = |element: Element| {
+            if required {
+                element.flag("required")
+            } else {
+                element
+            }
         };
-        let model = format!("v-model=\"form.{name}\"");
-        out.push(level, "<div>");
-        let inner = level + 1;
-        match field.ty {
-            FieldType::Bool => {
-                out.push(
-                    inner,
-                    "<label class=\"flex items-center gap-2 text-sm text-gray-700\">",
-                );
-                out.push(
-                    inner + 1,
-                    format!(
-                        "<input id=\"{name}\" type=\"checkbox\" class=\"rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500\" {model} />"
-                    ),
-                );
-                out.push(inner + 1, format!("<span>{}</span>", humanize(name)));
-                out.push(inner, "</label>");
-            }
-            FieldType::Text => {
-                self.label_lines(out, inner, field);
-                out.push(
-                    inner,
-                    format!(
-                        "<textarea id=\"{name}\" rows=\"4\" class=\"{INPUT_CLASS}\" {model}{required}></textarea>"
-                    ),
-                );
-            }
+        let block = el("div");
+        let block = match field.ty {
+            FieldType::Bool => block.kid(
+                el("label")
+                    .attr("class", "flex items-center gap-2 text-sm text-gray-700")
+                    .kid(
+                        el("input")
+                            .attr("id", name)
+                            .attr("type", "checkbox")
+                            .attr(
+                                "class",
+                                "rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500",
+                            )
+                            .attr("v-model", &model),
+                    )
+                    .kid(el("span").text(humanize(name))),
+            ),
+            FieldType::Text => block.kid(self.label_el(field)).kid(mark(
+                el("textarea")
+                    .attr("id", name)
+                    .attr("rows", "4")
+                    .attr("class", INPUT_CLASS)
+                    .attr("v-model", &model),
+            )),
             FieldType::Int | FieldType::Float => {
-                self.label_lines(out, inner, field);
-                let step = if field.ty == FieldType::Float {
-                    " step=\"any\""
-                } else {
-                    ""
-                };
-                out.push(
-                    inner,
-                    format!(
-                        "<input id=\"{name}\" type=\"number\"{step} class=\"{INPUT_CLASS}\" {model}{required} />"
-                    ),
-                );
+                let mut input = el("input").attr("id", name).attr("type", "number");
+                if field.ty == FieldType::Float {
+                    input = input.attr("step", "any");
+                }
+                block.kid(self.label_el(field)).kid(mark(
+                    input
+                        .attr("class", INPUT_CLASS)
+                        .attr("v-model", &model),
+                ))
             }
             FieldType::Str | FieldType::Email | FieldType::Date | FieldType::DateTime => {
                 let kind = match field.ty {
@@ -415,74 +459,66 @@ impl Page<'_> {
                     FieldType::DateTime => "datetime-local",
                     _ => "text",
                 };
-                self.label_lines(out, inner, field);
-                if self.parts.input.is_some() {
-                    out.push(
-                        inner,
-                        format!(
-                            "<TextInput id=\"{name}\" type=\"{kind}\" class=\"mt-1 block w-full\" {model}{required} />"
-                        ),
-                    );
+                let (tag, class) = if self.parts.input.is_some() {
+                    ("TextInput", "mt-1 block w-full")
                 } else {
-                    out.push(
-                        inner,
-                        format!(
-                            "<input id=\"{name}\" type=\"{kind}\" class=\"{INPUT_CLASS}\" {model}{required} />"
-                        ),
-                    );
-                }
+                    ("input", INPUT_CLASS)
+                };
+                block.kid(self.label_el(field)).kid(mark(
+                    el(tag)
+                        .attr("id", name)
+                        .attr("type", kind)
+                        .attr("class", class)
+                        .attr("v-model", &model),
+                ))
             }
-        }
-        self.error_lines(out, inner, field);
-        out.push(level, "</div>");
+        };
+        block.kid(self.error_el(field))
     }
 
-    fn form_body(&self, out: &mut Out, level: usize) {
-        out.push(
-            level,
-            "<form @submit.prevent=\"submit\" class=\"space-y-6 bg-white p-6 shadow sm:rounded-lg\">",
-        );
-        for field in self.fields {
-            self.field_block(out, level + 1, field);
-        }
-        out.push(level + 1, "<div class=\"flex items-center gap-4\">");
-        if self.parts.button.is_some() {
-            out.push(
-                level + 2,
-                "<PrimaryButton :disabled=\"form.processing\">Save</PrimaryButton>",
-            );
+    fn form_body(&self) -> Element {
+        let submit = if self.parts.button.is_some() {
+            el("PrimaryButton")
+                .attr(":disabled", "form.processing")
+                .text("Save")
         } else {
-            out.push(
-                level + 2,
-                "<button type=\"submit\" :disabled=\"form.processing\" class=\"rounded-md bg-gray-800 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white disabled:opacity-25\">Save</button>",
-            );
-        }
-        out.push(level + 1, "</div>");
-        out.push(level, "</form>");
+            el("button")
+                .attr("type", "submit")
+                .attr(":disabled", "form.processing")
+                .attr("class", format!("{BUTTON_CLASS} disabled:opacity-25"))
+                .text("Save")
+        };
+        el("form")
+            .attr("@submit.prevent", "submit")
+            .attr("class", "space-y-6 bg-white p-6 shadow sm:rounded-lg")
+            .kids(self.fields.iter().map(|f| self.field_block(f)).collect())
+            .kid(
+                el("div")
+                    .attr("class", "flex items-center gap-4")
+                    .kid(submit),
+            )
     }
 
     /// A `{{ item.x }}` cella-kifejezés.
-    fn cell(field: &Field) -> String {
+    fn cell(item: &str, field: &Field) -> String {
         if field.ty == FieldType::Bool {
-            format!("{{{{ item.{} ? 'Yes' : 'No' }}}}", field.name)
+            format!("{{{{ {item}.{} ? 'Yes' : 'No' }}}}", field.name)
         } else {
-            format!("{{{{ item.{} }}}}", field.name)
+            format!("{{{{ {item}.{} }}}}", field.name)
         }
     }
 
-    fn index_body(&self, out: &mut Out, level: usize) {
-        let vars = &self.names.vars;
+    fn index_body(&self) -> Vec<Element> {
+        let mut out = Vec::new();
         if self.known(Op::Create).is_some() {
-            out.push(level, "<div class=\"mb-4 flex justify-end\">");
             out.push(
-                level + 1,
-                format!(
-                    "<Link :href=\"{}\" class=\"rounded-md bg-gray-800 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white\">New {}</Link>",
-                    self.href(Op::Create, None),
-                    humanize_model(&self.names.model)
+                el("div").attr("class", "mb-4 flex justify-end").kid(
+                    el("Link")
+                        .attr(":href", self.href(Op::Create, None))
+                        .attr("class", BUTTON_CLASS)
+                        .text(format!("New {}", humanize_model(&self.names.model))),
                 ),
             );
-            out.push(level, "</div>");
         }
         let (edit, show, destroy) = (
             self.known(Op::Edit),
@@ -490,162 +526,156 @@ impl Page<'_> {
             self.known(Op::Destroy),
         );
         let actions = edit.is_some() || show.is_some() || destroy.is_some();
-        let th = "class=\"px-4 py-3 text-left text-xs font-medium uppercase text-gray-500\"";
-        out.push(
-            level,
-            "<div class=\"overflow-hidden bg-white shadow sm:rounded-lg\">",
-        );
-        out.push(
-            level + 1,
-            "<table class=\"min-w-full divide-y divide-gray-200\">",
-        );
-        out.push(level + 2, "<thead class=\"bg-gray-50\">");
-        out.push(level + 3, "<tr>");
-        out.push(level + 4, format!("<th {th}>ID</th>"));
+        let th = "px-4 py-3 text-left text-xs font-medium uppercase text-gray-500";
+        let mut head = el("tr").kid(el("th").attr("class", th).text("ID"));
         for field in self.fields {
-            out.push(
-                level + 4,
-                format!("<th {th}>{}</th>", humanize(&field.name)),
-            );
+            head = head.kid(el("th").attr("class", th).text(humanize(&field.name)));
         }
         if actions {
-            out.push(level + 4, "<th class=\"px-4 py-3\"></th>");
+            head = head.kid(el("th").attr("class", "px-4 py-3"));
         }
-        out.push(level + 3, "</tr>");
-        out.push(level + 2, "</thead>");
-        out.push(level + 2, "<tbody class=\"divide-y divide-gray-200\">");
-        out.push(
-            level + 3,
-            format!("<tr v-for=\"item in {vars}.data\" :key=\"item.id\">"),
-        );
-        let td = "class=\"px-4 py-3 text-sm text-gray-900\"";
-        out.push(level + 4, format!("<td {td}>{{{{ item.id }}}}</td>"));
+        let td = "px-4 py-3 text-sm text-gray-900";
+        let mut row = el("tr")
+            .attr("v-for", format!("item in {}.data", self.names.vars))
+            .attr(":key", "item.id")
+            .kid(el("td").attr("class", td).text("{{ item.id }}"));
         for field in self.fields {
-            out.push(level + 4, format!("<td {td}>{}</td>", Self::cell(field)));
+            row = row.kid(el("td").attr("class", td).text(Self::cell("item", field)));
         }
         if actions {
-            out.push(level + 4, "<td class=\"px-4 py-3 text-right text-sm\">");
-            let link = "class=\"ml-3 text-indigo-600 hover:text-indigo-900\"";
+            let link = "ml-3 text-indigo-600 hover:text-indigo-900";
+            let mut cell = el("td").attr("class", "px-4 py-3 text-right text-sm");
             if show.is_some() {
-                out.push(
-                    level + 5,
-                    format!(
-                        "<Link :href=\"{}\" {link}>Show</Link>",
-                        self.href(Op::Show, Some("item.id"))
-                    ),
+                cell = cell.kid(
+                    el("Link")
+                        .attr(":href", self.href(Op::Show, Some("item.id")))
+                        .attr("class", link)
+                        .text("Show"),
                 );
             }
             if edit.is_some() {
-                out.push(
-                    level + 5,
-                    format!(
-                        "<Link :href=\"{}\" {link}>Edit</Link>",
-                        self.href(Op::Edit, Some("item.id"))
-                    ),
+                cell = cell.kid(
+                    el("Link")
+                        .attr(":href", self.href(Op::Edit, Some("item.id")))
+                        .attr("class", link)
+                        .text("Edit"),
                 );
             }
             if destroy.is_some() {
-                out.push(
-                    level + 5,
-                    "<button type=\"button\" class=\"ml-3 text-red-600 hover:text-red-900\" @click=\"destroy(item.id)\">Delete</button>",
+                cell = cell.kid(
+                    el("button")
+                        .attr("type", "button")
+                        .attr("class", "ml-3 text-red-600 hover:text-red-900")
+                        .attr("@click", "destroy(item.id)")
+                        .text("Delete"),
                 );
             }
-            out.push(level + 4, "</td>");
+            row = row.kid(cell);
         }
-        out.push(level + 3, "</tr>");
-        out.push(level + 2, "</tbody>");
-        out.push(level + 1, "</table>");
-        out.push(level, "</div>");
+        out.push(
+            el("div")
+                .attr("class", "overflow-hidden bg-white shadow sm:rounded-lg")
+                .kid(
+                    el("table")
+                        .attr("class", "min-w-full divide-y divide-gray-200")
+                        .kid(el("thead").attr("class", "bg-gray-50").kid(head))
+                        .kid(
+                            el("tbody")
+                                .attr("class", "divide-y divide-gray-200")
+                                .kid(row),
+                        ),
+                ),
+        );
+        out
     }
 
-    fn show_body(&self, out: &mut Out, level: usize) {
-        let var = &self.names.var;
-        out.push(
-            level,
-            "<dl class=\"divide-y divide-gray-200 bg-white px-6 shadow sm:rounded-lg\">",
+    fn show_body(&self) -> Element {
+        let var = self.names.var.as_str();
+        let mut list = el("dl").attr(
+            "class",
+            "divide-y divide-gray-200 bg-white px-6 shadow sm:rounded-lg",
         );
         for field in self.fields {
-            out.push(level + 1, "<div class=\"py-4\">");
-            out.push(
-                level + 2,
-                format!(
-                    "<dt class=\"text-sm font-medium text-gray-500\">{}</dt>",
-                    humanize(&field.name)
-                ),
+            list = list.kid(
+                el("div")
+                    .attr("class", "py-4")
+                    .kid(
+                        el("dt")
+                            .attr("class", "text-sm font-medium text-gray-500")
+                            .text(humanize(&field.name)),
+                    )
+                    .kid(
+                        el("dd")
+                            .attr("class", "mt-1 text-sm text-gray-900")
+                            .text(Self::cell(var, field)),
+                    ),
             );
-            let value = if field.ty == FieldType::Bool {
-                format!("{{{{ {var}.{} ? 'Yes' : 'No' }}}}", field.name)
-            } else {
-                format!("{{{{ {var}.{} }}}}", field.name)
-            };
-            out.push(
-                level + 2,
-                format!("<dd class=\"mt-1 text-sm text-gray-900\">{value}</dd>"),
-            );
-            out.push(level + 1, "</div>");
         }
-        out.push(level, "</dl>");
+        list
     }
 
-    fn template(&self, out: &mut Out) {
+    fn template(&self) -> Vec<Element> {
         let title = self.title();
-        out.push(0, "<template>");
-        out.push(1, format!("<Head title=\"{title}\" />"));
-        out.push(0, "");
-        let mut level = 1;
-        let mut header_slot = false;
-        if let Some((name, _)) = &self.parts.layout {
-            out.push(level, format!("<{name}>"));
-            level += 1;
-            if name == "AuthenticatedLayout" {
-                header_slot = true;
-                out.push(level, "<template #header>");
-                out.push(
-                    level + 1,
-                    "<h2 class=\"text-xl font-semibold leading-tight text-gray-800\">",
-                );
-                out.push(level + 2, &title);
-                out.push(level + 1, "</h2>");
-                out.push(level, "</template>");
-                out.push(0, "");
-            }
-        }
-        out.push(level, "<div class=\"py-12\">");
-        out.push(
-            level + 1,
-            "<div class=\"mx-auto max-w-7xl sm:px-6 lg:px-8\">",
-        );
-        let body = level + 2;
+        let header_slot = self
+            .parts
+            .layout
+            .as_ref()
+            .is_some_and(|(name, _)| name == "AuthenticatedLayout");
+        let mut body = Vec::new();
         if !header_slot {
-            out.push(
-                body,
-                format!("<h1 class=\"mb-4 text-xl font-semibold text-gray-800\">{title}</h1>"),
+            body.push(
+                el("h1")
+                    .attr("class", "mb-4 text-xl font-semibold text-gray-800")
+                    .text(&title),
             );
         }
         match self.kind {
-            Kind::Create | Kind::Edit => self.form_body(out, body),
-            Kind::Index => self.index_body(out, body),
-            Kind::Show => self.show_body(out, body),
+            Kind::Create | Kind::Edit => body.push(self.form_body()),
+            Kind::Index => body.extend(self.index_body()),
+            Kind::Show => body.push(self.show_body()),
         }
-        out.push(level + 1, "</div>");
-        out.push(level, "</div>");
-        if let Some((name, _)) = &self.parts.layout {
-            out.push(1, format!("</{name}>"));
+        let page = el("div").attr("class", "py-12").kid(
+            el("div")
+                .attr("class", "mx-auto max-w-7xl sm:px-6 lg:px-8")
+                .kids(body),
+        );
+        let head = el("Head").attr("title", &title);
+        let Some((name, _)) = &self.parts.layout else {
+            return vec![head, page];
+        };
+        let mut layout = el(name);
+        if header_slot {
+            layout = layout.kid(
+                el("template").flag("#header").kid(
+                    el("h2")
+                        .attr("class", "text-xl font-semibold leading-tight text-gray-800")
+                        .text(&title),
+                ),
+            );
         }
-        out.push(0, "</template>");
+        vec![head, layout.kid(page)]
     }
 
-    /// A teljes `.vue` fájl, záró újsorral.
-    pub fn render(&self) -> String {
-        let mut out = Out {
-            unit: self.facts.unit,
-            lines: Vec::new(),
+    /// A teljes `.vue` fájl, záró újsorral: a modell a Vue-generátor SFC-útján, a projekt behúzás-egységében.
+    pub fn render(&self, sfc: &VueGenerator<'_>) -> String {
+        let program = Program {
+            kind: ProgramKind::Sfc,
+            name: None,
+            script: Some(self.script()),
+            template: Some(self.template()),
+            style: None,
         };
-        self.script(&mut out);
-        out.push(0, "");
-        self.template(&mut out);
-        let mut text = out.lines.join("\n");
-        text.push('\n');
-        text
+        let style = CodeStyle {
+            ts: self.facts.ts,
+            semi: self.facts.semi,
+        };
+        let text = sfc.sfc_page(&program, style, self.facts.unit);
+        // a `const props =` kötés csak ott marad, ahol a script használja (`props.<var>.id`): máshol a
+        // `noUnusedLocals` (vue-tsc) „declared but never read” hibát adna
+        if text.contains("props.") {
+            text
+        } else {
+            text.replacen("const props = ", "", 1)
+        }
     }
 }

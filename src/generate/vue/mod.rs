@@ -109,13 +109,13 @@ mod html_gen;
 mod html_scan;
 mod imports;
 mod locate;
-mod model;
+pub(crate) mod model;
 mod parse;
 mod project;
 mod script;
 mod style;
 mod template;
-mod types;
+pub(crate) mod types;
 
 #[cfg(test)]
 mod tests;
@@ -125,7 +125,7 @@ pub use generator::{VueGenerator, wants_vue};
 pub(crate) use check::{Problem, check_script_file, check_vue};
 pub(crate) use html_gen::is_html_file;
 pub(crate) use html_scan::check_html;
-pub(crate) use project::VueProject;
+pub(crate) use project::{CodeStyle, VueProject};
 
 /// A projekt Vue-stílusa a preset számára: TypeScript-e, pontosvesszős-e, és a behúzás-egység.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
