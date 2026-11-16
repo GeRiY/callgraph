@@ -8,6 +8,13 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ### Új
 
+- **A Blade sablonok (`.blade.php`) önálló nyelvként elemződnek** (korábban üres eredmény): fájlonként egy nézet,
+  `admin.users.index` formájú névvel, a szekciók, push-ok és slotok sortartománnyal; az `@extends` / `@include` /
+  `@each` / `<x-…>` / `<livewire:…>` a nézetfájlokra oldódik fel, így egy layout hívói között megjelennek a rá
+  épülő nézetek; a `@props` property-ként látszik; a `{{ }}`, `{!! !!}`, `@php` és a direktíva-argumentumok PHP-ja
+  is elemződik; az `@if` / `@foreach` … vezérlési ágként jelenik meg; a `route('x')` a Laravel route-ra mutat
+  (`→ POST /users · Controller@method`, ismeretlen név jelölve); a `__()` / `@lang` részt vesz az i18n-ellenőrzésben;
+  a „rendered by” sor pedig a controllerek `view('…')` hívásait mutatja.
 - **MCP `undo` eszköz:** visszaállítja a `generate` vagy a `rename` utolsó változtatását — fájl megadásakor azt az
   egy fájlt, egyébként az utolsó változtatáscsoport egészét. A `generate`-hez és a `rename`-hez hasonlóan csak akkor
   létezik, ha a szerver `--generate` / `CALLGRAPH_GENERATE=1` móddal fut, és `readOnlyHint: false` jelölést kap.

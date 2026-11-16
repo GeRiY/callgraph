@@ -7,6 +7,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ### Added
 
+- **Blade templates (`.blade.php`) are analysed as their own language** (before, the result was empty): one view per
+  file, named like `admin.users.index`, with sections, pushes and slots as line ranges; `@extends` / `@include` /
+  `@each` / `<x-…>` / `<livewire:…>` resolve to the view files, so the callers of a layout list the views extending
+  it; `@props` show as properties; PHP inside `{{ }}`, `{!! !!}`, `@php` and directive arguments is analysed;
+  `@if` / `@foreach` … appear as control flow; `route('x')` links to the Laravel route
+  (`→ POST /users · Controller@method`, unknown names are flagged); `__()` / `@lang` take part in the i18n check; and
+  a "rendered by" line lists the `view('…')` calls in controllers.
 - **MCP `undo` tool:** restores the last change made by `generate` or `rename` — one file when a file is given,
   otherwise the whole last group of changes. Like `generate` and `rename`, it only exists when the server runs with
   `--generate` / `CALLGRAPH_GENERATE=1`, and it is marked `readOnlyHint: false`.
