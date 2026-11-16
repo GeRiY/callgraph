@@ -5,6 +5,22 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+## [1.0.2] — 2026-11-16
+
+### Changed
+
+- **The `root:` line shows the git branch:** the `root:` line at the top of multi-file outputs (and `locate`) now ends
+  with the branch of the project root, e.g. `root: /x/app (branch: feature/z)`; on a detached HEAD it shows
+  `detached <sha7>`, and without git it is unchanged. An agent sees at once when it looks at another checkout than the
+  one where the branch was switched (a `--project` alias pointing to another clone or worktree, an MCP server started
+  in another folder).
+
+### Fixed
+
+- **Short `::method` selector works in a multi-selector call:** `callgraph.sh src/Sample.php::alpha ::beta --body`
+  now shows both bodies; `::beta` reuses the file of the previous selector. Before, it answered "Not found: <root>/".
+  A `::method` with no file before it gives a clear usage error, and the help lists the form.
+
 ## [1.0.1] — 2026-11-16
 
 ### Fixed
@@ -702,7 +718,8 @@ First release.
 - Built-in update: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Prebuilt packages for macOS (arm64, x86_64), Linux (x86_64, ARM64, static musl) and Windows.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v1.0.1...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v1.0.2...develop
+[1.0.2]: https://github.com/GeRiY/callgraph/releases/tag/v1.0.2
 [1.0.1]: https://github.com/GeRiY/callgraph/releases/tag/v1.0.1
 [1.0.0]: https://github.com/GeRiY/callgraph/releases/tag/v1.0.0
 [0.9.5]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.5

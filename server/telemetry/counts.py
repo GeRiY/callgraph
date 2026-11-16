@@ -10,6 +10,7 @@ from its own local state. Client addresses are only used in memory for the reque
 Only daily aggregate counters are written.
 """
 
+import json
 import re
 import threading
 import time
@@ -43,7 +44,15 @@ CREATE TABLE IF NOT EXISTS updates (
     target TEXT NOT NULL, count INTEGER NOT NULL,
     PRIMARY KEY (day, event, version, platform, target)
 );
+CREATE TABLE IF NOT EXISTS gh_downloads (
+    day TEXT NOT NULL, tag TEXT NOT NULL, total INTEGER NOT NULL,
+    PRIMARY KEY (day, tag)
+);
 """
+# GitHub only reports a running total per release; a daily snapshot (the day's last value) turns it into per-day
+# downloads: the difference of two days' totals.
+RELEASES_API = "https://api.github.com/repos/GeRiY/callgraph/releases?per_page=100"
+DOWNLOADS_EVERY = 3600  # seconds between two snapshots
 
 _latest_lock = threading.Lock()
 _latest = {"tag": None, "at": 0.0, "refreshing": False}
@@ -100,6 +109,44 @@ def latest_tag(fetch=None, now: float | None = None) -> str | None:
     if tag is None or now - at > LATEST_MAX_AGE:
         return None
     return tag
+
+
+def release_totals(payload) -> dict[str, int]:
+    """{tag: download total over all assets} from the GitHub releases API answer (only `vX.Y.Z` tags)."""
+    out: dict[str, int] = {}
+    if not isinstance(payload, list):
+        return out
+    for release in payload:
+        tag = release.get("tag_name", "") if isinstance(release, dict) else ""
+        if not TAG_RE.match(tag):
+            continue
+        assets = release.get("assets") or []
+        out[tag] = sum(int(a.get("download_count") or 0) for a in assets if isinstance(a, dict))
+    return out
+
+
+def fetch_release_totals(opener=None) -> dict[str, int]:
+    """The current download totals per release from GitHub; {} if GitHub does not answer."""
+    opener = opener or urllib.request.build_opener()
+    request = urllib.request.Request(
+        RELEASES_API, headers={"Accept": "application/vnd.github+json", "User-Agent": "callgraph-telemetry"}
+    )
+    try:
+        with opener.open(request, timeout=10) as response:
+            return release_totals(json.loads(response.read().decode("utf-8")))
+    except (urllib.error.URLError, OSError, ValueError):
+        return {}
+
+
+def record_downloads(con, totals: dict[str, int], day: str | None = None) -> None:
+    """Today's snapshot of the totals (a later snapshot of the same day overwrites the earlier one)."""
+    day = day or date.today().isoformat()
+    con.executemany(
+        "INSERT INTO gh_downloads (day, tag, total) VALUES (?,?,?) "
+        "ON CONFLICT(day, tag) DO UPDATE SET total = excluded.total",
+        [(day, tag, total) for tag, total in totals.items()],
+    )
+    con.commit()
 
 
 def _one(query: dict, key: str) -> str:
