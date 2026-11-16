@@ -10,12 +10,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 - **MCP `undo` tool:** restores the last change made by `generate` or `rename` — one file when a file is given,
   otherwise the whole last group of changes. Like `generate` and `rename`, it only exists when the server runs with
   `--generate` / `CALLGRAPH_GENERATE=1`, and it is marked `readOnlyHint: false`.
+- **`gen --dry` shows where the code would go:** with `--into` / `--replace`, the dry run first prints the placement,
+  e.g. `→ app/Pay.php::Pay after charge (L41)` or `→ f.vue: script L12-14`.
 
 ### Changed
 
 - **The Laravel form check follows `form.transform(...)`:** `--format forms`, the `form:` lines and the form ↔ rules
   check of the `laravel:` generator now check the keys the transform returns; with a `...data` spread, the form
   fields plus the added keys.
+- **`gen` is faster in large PHP projects:** unknown type names are resolved with a single project walk (before: one
+  walk per unresolved name), each project file is read at most once per call, and the Laravel preset reads
+  `composer.json` once.
+- **Shorter MCP usage errors:** a usage error of `generate`, `rename` or `undo` over MCP no longer appends the whole
+  usage text; the CLI is unchanged. The `generate` tool description is shorter too — the grammar is in the guide and
+  in the SKILL `gen` section.
 
 ### Fixed
 

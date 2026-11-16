@@ -11,12 +11,20 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 - **MCP `undo` eszköz:** visszaállítja a `generate` vagy a `rename` utolsó változtatását — fájl megadásakor azt az
   egy fájlt, egyébként az utolsó változtatáscsoport egészét. A `generate`-hez és a `rename`-hez hasonlóan csak akkor
   létezik, ha a szerver `--generate` / `CALLGRAPH_GENERATE=1` móddal fut, és `readOnlyHint: false` jelölést kap.
+- **A `gen --dry` megmutatja, hová kerülne a kód:** `--into` / `--replace` mellett a próbafutás először kiírja az
+  elhelyezést, pl. `→ app/Pay.php::Pay after charge (L41)` vagy `→ f.vue: script L12-14`.
 
 ### Változás
 
 - **A Laravel űrlapellenőrzés követi a `form.transform(...)`-ot:** a `--format forms`, a `form:` sorok és a `laravel:`
   generátor űrlap ↔ szabály ellenőrzése mostantól azokat a kulcsokat vizsgálja, amelyeket a transform visszaad;
   `...data` szórás esetén az űrlapmezőket és a hozzáadott kulcsokat.
+- **A `gen` gyorsabb nagy PHP-projektekben:** az ismeretlen típusneveket egyetlen projektbejárással oldja fel
+  (korábban nevenként egy bejárás), minden projektfájlt hívásonként legfeljebb egyszer olvas be, a Laravel preset
+  pedig egyszer olvassa a `composer.json`-t.
+- **Rövidebb MCP használati hibák:** a `generate`, `rename` vagy `undo` használati hibája MCP-n már nem fűzi hozzá a
+  teljes használati szöveget; a CLI nem változik. A `generate` eszköz leírása is rövidebb — a nyelvtan az útmutatóban
+  és a SKILL `gen` szakaszában van.
 
 ### Javítás
 
