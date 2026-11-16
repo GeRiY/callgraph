@@ -13,6 +13,12 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   létezik, ha a szerver `--generate` / `CALLGRAPH_GENERATE=1` móddal fut, és `readOnlyHint: false` jelölést kap.
 - **A `gen --dry` megmutatja, hová kerülne a kód:** `--into` / `--replace` mellett a próbafutás először kiírja az
   elhelyezést, pl. `→ app/Pay.php::Pay after charge (L41)` vagy `→ f.vue: script L12-14`.
+- **`gen --diff` és további elhelyezési lehetőségek:** a `--diff` a `--replace`-t rövid unified diffként mutatja,
+  semmit nem ír. PHP `--into` mellett a `--before <metódus>` és az `--at L<n>` egy metódus elé vagy egy sorba teszi a
+  kódot, az `--upsert` pedig egy létező metódus `--into`-ját cserévé alakítja. A Vue `--into fajl.vue::template#id`
+  (vagy `::#id`, `::.class`) az adott template-elem belsejébe fűz. A `.callgraph/gen.toml`-ban megnevezett
+  komponenseket a tsconfig / Vite aliasok mögött is megtalálja. Az MCP `generate` eszköz megkapta a `before`, `at`,
+  `upsert` és `diff` paramétert.
 - **Vue prop-ok interfészből, alapértékekkel és `defineModel`-lel:** a `defineProps<Props>()` mostantól feloldja a
   helyi `interface`-t vagy típusaliast (az `extends`-et és az `A & B`-t is); a `withDefaults` alapértékei
   `type $name = default` alakban látszanak, és a prop nem számít kötelezőnek; a `defineModel` `model:` sorként jelenik
@@ -28,7 +34,9 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   A `NavHost` `composable("route") { Screen() }` és a `navController.navigate("…")` navigációs él (a típusbiztos
   útvonalak is). Az interfészmetódus és a megvalósításai hívói látják egymást. Az Android-projektek profilt kapnak
   (ui / view model / data / domain / di rétegek; a `*.gradle.kts` nem számít alkalmazáskódnak), a Kotlin pedig
-  megjelenik a használati statisztikában.
+  megjelenik a használati statisztikában. A `!!` nem rejti el a hívás fogadóját, a `*Test.kt` fájlok és az
+  `androidTest` mappák a `locate`-ban tesztnek számítanak, a metódustörzsek szűrése pedig helyes (kommentek, raw
+  stringek).
 - **Swift: callback-ek, protokollok és navigáció:** a callback-argumentumként átadott metódushivatkozás
   (`Composer(onSend: vm.send)`) a hivatkozott metódus hívása. A callback-property-ben tárolt closure
   (`socket.onFrame = { … }`) össze van kötve azzal a hellyel, ahol a property-t meghívják; `--depth 2` mellett a
@@ -39,7 +47,10 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   `@Environment(T.self)` és a paraméterek adják. A pozícionálisan (`.onChange(of: x, vm.changed)`) vagy `#selector(…)`
   útján átadott hivatkozás hivatkozás-hívás; a key path nem hívás. A SwiftData `@Query var items: [Item]` modell-él,
   a `modelContext` hívásai pedig kategorizáltak. A `navigationDestination { switch … }` minden nézete navigációs él,
-  a generikus nézetek (`List<Item>(…)`) komponenshasználatnak számítanak, az actor metódusok pedig feloldódnak.
+  a generikus nézetek (`List<Item>(…)`) komponenshasználatnak számítanak, az actor metódusok pedig feloldódnak. A
+  fájlokon átívelő property-láncon át indított hívás (`self.store.session.user.load()`) az utolsó property típusának
+  metódusára oldódik fel. A tárolt closure-t meghívó metódus (`onFrame?(…)`) a closure hívottjainak közvetlen
+  hívójaként jelenik meg, a „called through a stored closure” alatt, `via <Type>::<property>` jelöléssel.
 - **`callgraph mcp --allow <mappa>`:** az MCP-szerver egy további mappát is olvashat, pl. egy testvér `../android`
   mappát. A kapcsoló ismételhető, vagy a `CALLGRAPH_MCP_ALLOW` környezeti változó használható; alapból a szerver a
   projektgyökérre korlátozott marad.
@@ -50,7 +61,12 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   iterátor-closure paraméterek (`items.iter().map(|x| x.name())`) megkapják az elemtípusukat, így a metódushívásaik
   feloldódnak; `T: A + B` esetén a metódust deklaráló trait számít. A `#[test]` / `#[tokio::test]` függvények és a
   `#[cfg(test)]` modulok tesztként vannak jelölve, a `Some` / `Ok` / `Err` / `Box::new` / `Default::default` már nem
-  zsúfolja a híváslistát, a helyi closure hívása pedig dinamikusnak van jelölve.
+  zsúfolja a híváslistát, a helyi closure hívása pedig dinamikusnak van jelölve. A trait-metódus és a megvalósításai
+  hívói mindkét irányban látják egymást (`via`).
+- **Rust CLI- és könyvtárprofil:** a `main.rs`, `lib.rs` vagy `bin` célt tartalmazó crate profilt kap a belépési
+  pontjaival, a `src/<modul>` mappákkal mint modulrétegekkel és a felsorolt workspace-tagokkal. A `tests`, `benches`,
+  `examples` és a fixture- vagy golden-minta mappák már nem teszik a projektet webes, Vue- vagy SwiftUI-projektnek
+  látszóvá.
 - **TypeScript interfész-tagok property-ként:** az `interface` tagjai property-ként szerepelnek, az opcionálisak
   `?`-lel.
 - **A hibás hivatkozások jelölve vannak Markdownban és HTML-ben:** a hiányzó fájlra mutató relatív link, illetve a
@@ -97,6 +113,8 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 - **Összevont Markdown-linkek:** a vázlat ugyanazt a link-célt egyszer listázza, `×N` jelöléssel.
 - **Nincs ismétlődő tipp MCP-n:** a záró 💡 tipp sor már nem kerül minden MCP-válaszba (a CLI megtartja). A skill
   mostantól az md, json, css, scss és html fájlok szerkezetére is a callgraphot ajánlja.
+- **A többfájlos `--format summary` mutatja a mappát:** az azonos mappa sorai egy `mappa/` fejlécsor alatt
+  csoportosulnak; az egyedülálló fájl a relatív útvonalával jelenik meg.
 - **Swift projektprofil:** az olyan mappák, mint a Features, Core, Shared, Networking, UI és Persistence, rétegeket
   kapnak; az `@Observable` / `ObservableObject` osztály store-jelölt, a `View`-t megvalósítók nézetek, a `Codable` /
   `Identifiable` típusok modellek. Több Swift- és Foundation-beépített van kategorizálva (`pow`, `defer`,

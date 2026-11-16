@@ -12,6 +12,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   `--generate` / `CALLGRAPH_GENERATE=1`, and it is marked `readOnlyHint: false`.
 - **`gen --dry` shows where the code would go:** with `--into` / `--replace`, the dry run first prints the placement,
   e.g. `→ app/Pay.php::Pay after charge (L41)` or `→ f.vue: script L12-14`.
+- **`gen --diff` and more placement options:** `--diff` shows a `--replace` as a short unified diff without writing
+  anything. For PHP `--into`, `--before <method>` and `--at L<n>` place the code before a method or at a line, and
+  `--upsert` turns an `--into` of an existing method into a replace. Vue `--into file.vue::template#id` (or `::#id`,
+  `::.class`) appends inside that template element. Components named in `.callgraph/gen.toml` are also found behind
+  tsconfig / Vite aliases. The MCP `generate` tool got `before`, `at`, `upsert` and `diff`.
 - **Vue props from interfaces, defaults and `defineModel`:** `defineProps<Props>()` now resolves a local `interface`
   or type alias (including `extends` and `A & B`); `withDefaults` defaults are shown as `type $name = default` and the
   prop is not marked required; `defineModel` appears as `model:` in the outline and as a `model` section in
@@ -25,7 +30,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   `@Binds` show what is injected and which method provides a type. `NavHost` `composable("route") { Screen() }` and
   `navController.navigate("…")` are navigation edges (type-safe routes too). Callers of an interface method and of
   its implementations see each other. Android projects get a profile (ui / view model / data / domain / di layers;
-  `*.gradle.kts` is not counted as app code), and Kotlin appears in the usage statistics.
+  `*.gradle.kts` is not counted as app code), and Kotlin appears in the usage statistics. `!!` does not hide the
+  receiver of a call, `*Test.kt` files and `androidTest` folders count as tests in `locate`, and method bodies are
+  filtered correctly (comments, raw strings).
 - **Swift callbacks, protocols and navigation:** a method reference passed as a callback argument
   (`Composer(onSend: vm.send)`) is a call of that method. A closure stored in a callback property
   (`socket.onFrame = { … }`) is linked to where the property is invoked; with `--depth 2` the invoking method shows
@@ -36,7 +43,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   parameters. A reference passed positionally (`.onChange(of: x, vm.changed)`) or via `#selector(…)` is a reference
   call; key paths are not calls. SwiftData `@Query var items: [Item]` is a model edge and `modelContext` calls are
   categorized. Each view in a `navigationDestination { switch … }` is a navigation edge, generic views
-  (`List<Item>(…)`) count as component uses, and actor methods resolve.
+  (`List<Item>(…)`) count as component uses, and actor methods resolve. A call through a property chain that spans
+  files (`self.store.session.user.load()`) resolves to the method of the last property's type. The method that
+  invokes a stored closure (`onFrame?(…)`) is listed as a direct caller of the closure's callees, under "called
+  through a stored closure", as `via <Type>::<property>`.
 - **`callgraph mcp --allow <dir>`:** lets the MCP server read an extra folder, e.g. a sibling `../android`. Repeat
   the flag or set `CALLGRAPH_MCP_ALLOW`; by default the server stays restricted to the project root.
 - **Rust: function references and more receiver types:** a function or method passed as a value (`.map(Self::parse)`,
@@ -46,7 +56,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   (`items.iter().map(|x| x.name())`) get their element type, so their method calls resolve; with `T: A + B` the trait
   that declares the method is used. `#[test]` / `#[tokio::test]` functions and `#[cfg(test)]` modules are marked as
   tests, `Some` / `Ok` / `Err` / `Box::new` / `Default::default` no longer clutter the call list, and calls of a local
-  closure are marked dynamic.
+  closure are marked dynamic. Callers of a trait method and of its implementations see each other in both directions
+  (`via`).
+- **Rust CLI and library profile:** a crate with `main.rs`, `lib.rs` or `bin` targets gets a profile with its entry
+  points, `src/<module>` folders as module layers, and workspace members listed. `tests`, `benches`, `examples` and
+  fixture or golden-sample folders no longer make the project look like a web, Vue or SwiftUI project.
 - **TypeScript interface members as properties:** the members of an `interface` are listed as properties, optional
   ones with `?`.
 - **Broken links in Markdown and HTML are marked:** a relative link to a missing file, or a `#anchor` with no
@@ -90,6 +104,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 - **Markdown links merged:** the outline lists the same link target once, with `×N`.
 - **No repeated tip over MCP:** the closing 💡 tip line is no longer added to every MCP answer (the CLI keeps it).
   The skill now also recommends callgraph for the structure of md, json, css, scss and html files.
+- **Multi-file `--format summary` shows the folder:** rows of the same folder are grouped under a `folder/` header
+  line; a lone file shows its relative path.
 - **Swift project profile:** folders such as Features, Core, Shared, Networking, UI and Persistence get layers; an
   `@Observable` / `ObservableObject` class is a store candidate, `View` conformers are views, and `Codable` /
   `Identifiable` types are models. More Swift and Foundation built-ins are categorized (`pow`, `defer`, math
