@@ -327,3 +327,56 @@ struct Host: View {
     assert_eq!(call(&g, "Row").kind, "new");
     assert_eq!(call(&g, "DetailView").category, "component_use");
 }
+
+#[test]
+fn cross_file_receiver_chain_resolves_through_property_types() {
+    let screen = graph_of(
+        "/p/Screen.swift",
+        r#"final class Screen {
+    let store: Store
+    init(store: Store) { self.store = store }
+    func go() { self.store.session.user.load() }
+}
+"#,
+    );
+    let store = graph_of(
+        "/p/Store.swift",
+        "final class Store {\n    @Published var session: Session?\n}\n",
+    );
+    let session = graph_of(
+        "/p/Session.swift",
+        "final class Session {\n    var user: User!\n    var all: [User] = []\n}\n",
+    );
+    let user = graph_of(
+        "/p/User.swift",
+        "final class User {\n    func load() {}\n}\n",
+    );
+    let index = CallerIndex::build([
+        ("/p/Screen.swift", &screen),
+        ("/p/Store.swift", &store),
+        ("/p/Session.swift", &session),
+        ("/p/User.swift", &user),
+    ]);
+    let rows = index.callers("User::load", 1).unwrap();
+    assert_eq!(rows.len(), 1, "{rows:?}");
+    assert_eq!(
+        (rows[0].caller.as_str(), rows[0].target.as_str()),
+        ("go", "User::load")
+    );
+}
+
+#[test]
+fn the_closure_invoker_is_a_level_one_row_via_the_stored_property() {
+    let sockets = graph_of("/p/Sockets.swift", SOCKETS);
+    let connection = graph_of("/p/Connection.swift", CONNECTION);
+    let index = CallerIndex::build([
+        ("/p/Sockets.swift", &sockets),
+        ("/p/Connection.swift", &connection),
+    ]);
+    let direct = index.callers("ChatConnection::handle", 1).unwrap();
+    let wired = index.wire_invokers(&direct);
+    assert_eq!(wired.len(), 1, "{wired:?}");
+    assert_eq!(wired[0].caller, "pump");
+    assert_eq!(wired[0].via.as_deref(), Some("RealtimeSocket::onFrame"));
+    assert!(index.wire_invokers(&[]).is_empty());
+}

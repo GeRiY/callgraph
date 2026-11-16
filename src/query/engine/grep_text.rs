@@ -46,7 +46,7 @@ impl QueryEngine {
         }
         if depth <= 1 {
             // nulla találat: a generikus „törzs-logika” tipp helyett a helyreállító üzenet
-            let base = if rows.is_empty() {
+            let mut base = if rows.is_empty() {
                 hint::empty_grep(lang, pattern, &self.take_scope_catalog())
             } else {
                 let layers = self.layers.as_ref().filter(|scope| scope.by_layer());
@@ -72,6 +72,13 @@ impl QueryEngine {
                         source.remember(&caller.file, snippets);
                     }
                 }
+                let wired = graph.caller_index().wire_invokers(&direct_rows(rows));
+                for caller in &wired {
+                    if let Some(snippets) = graph.snippets(&caller.file) {
+                        source.remember(&caller.file, snippets);
+                    }
+                }
+                let base = with_wired(base, &wired, graph, &source, lang, &marks);
                 return Ok(render_single(SingleView {
                     rows,
                     base,
@@ -101,6 +108,8 @@ impl QueryEngine {
                     let all = self.all_graphs(scope)?;
                     let index =
                         CallerIndex::build(all.iter().map(|(path, graph)| (path.as_str(), graph)));
+                    let wired = index.wire_invokers(&direct_rows(rows));
+                    base = with_wired(base, &wired, &all, &source, lang, &marks);
                     (index.name_only_callers(name), all)
                 }
                 None => (
@@ -202,6 +211,65 @@ impl QueryEngine {
             marks: &marks,
             no_caller: &no_caller,
         }))
+    }
+}
+
+/// A bekötött closure-t meghívó metódusok szakasza (`== via stored closure`), a záró tipp (`---` + `💡`) elé
+/// szúrva; bekötés nélkül a kimenet változatlan.
+fn with_wired(
+    base: String,
+    wired: &[CallerRow],
+    ranges: &dyn MethodRanges,
+    source: &SourceLines,
+    lang: Lang,
+    marks: &NoteMarks,
+) -> String {
+    if wired.is_empty() {
+        return base;
+    }
+    let mut add = String::from(t!(
+        "== called through a stored closure\n",
+        "== tárolt closure-on át hívva\n"
+    ));
+    for caller in wired {
+        let range = ranges
+            .range(&caller.file, caller.container.as_deref(), &caller.caller)
+            .unwrap_or((caller.line, caller.line));
+        let code = source.get(&caller.file, caller.line);
+        let _ = writeln!(
+            add,
+            "  {}  {}::{}()  L{}-{}{}  ← {}\n    {}",
+            caller.file,
+            caller.container.as_deref().unwrap_or("__top__"),
+            caller.caller,
+            range.0,
+            range.1,
+            marks.caller_mark(
+                &caller.file,
+                caller.container.as_deref(),
+                Some(caller.caller.as_str())
+            ),
+            caller.target,
+            snippet::sites_line_ref(
+                lang,
+                &[caller.line],
+                false,
+                caller.via.as_deref(),
+                code.as_deref()
+            )
+        );
+    }
+    match base.rfind("\n---\n💡") {
+        Some(at) => {
+            let mut out = base[..at].to_owned();
+            if !out.ends_with('\n') {
+                out.push('\n');
+            }
+            out.push_str(&add);
+            out.push_str(&base[at..]);
+            out
+        }
+        None => format!("{base}{add}"),
     }
 }
 

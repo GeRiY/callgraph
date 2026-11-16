@@ -105,6 +105,21 @@ attribútumú tag törzse.
 - **Protokoll ↔ implementáció:** a protokoll-metódus hívói az implementációnál és fordítva is megjelennek (`via`);
   az extension a típus csomópontjához olvad.
 
+## Használat (felhasználói összefoglaló)
+- **Metódus-hivatkozás:** `Composer(onSend: vm.send)` a `ChatViewModel::send` hívói között is megjelenik, `(ref)`
+  jelöléssel (hivatkozás, nem hívás). Tesztfüggvény `[test]`-tel jelölve.
+- **Kapcsolat-élek:** a kimenet kategória-oszlopában `wire` (closure-bekötés: `socket.onFrame = { … }`), `inject`
+  (`.environment(…)`, `@Environment`), `nav` (`navigationDestination`, `sheet`, `NavigationLink`) és `query`
+  (`@Query` a nézetben, `modelContext` hívások: SwiftData) látszik.
+- **Bekötött closure hívója:** `find_callers ChatConnection::handle` az 1. szinten is mutatja a tárolt closure-t
+  meghívó metódust (`onFrame?(f)`), `via RealtimeSocket::onFrame` jelöléssel, külön „tárolt closure-on át hívva”
+  szakaszban. Bekötés nélkül a kimenet nem változik.
+- **Fájlok közötti lánc:** `self.store.session.user.load()` akkor is a `User::load` hívója, ha a `Store`, `Session` és
+  `User` külön fájlban van: a property-típusokon át követi (`@Published var session: Session?` → `Session`).
+  Tömb, szótár és generikus típus (`[User]`) megállítja a láncot (ismeretlen marad).
+- **`--allow`:** az MCP-szerver alapból csak a projekt-gyökér alatti utakat fogadja; a Swift-csomagok vagy más gyökéren
+  kívüli mappák elérése `callgraph mcp --allow <mappa>` (ismételhető).
+
 ## controlFlow
 `{container, caller, type, line, cond, branches[{label, startLine, endLine, fallThrough?}]}`.
 - `if`: az `else if` lánc a külső if ágaiként (`if (…)`, `elseif (…)`, `else`); az ág a kulcsszó sorától az `else`

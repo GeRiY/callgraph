@@ -59,13 +59,24 @@ impl CallerIndex {
     pub(crate) fn build<'a>(graphs: impl IntoIterator<Item = (&'a str, &'a FileGraph)>) -> Self {
         let records: Vec<(&str, &FileGraph)> = graphs.into_iter().collect();
         let hierarchy = TypeHierarchy::from_graphs(records.iter().map(|(_, graph)| *graph));
+        let properties = property_types(&records);
         let mut edges = Vec::new();
         for (path, graph) in records {
             let namespace = graph.namespace.as_deref().unwrap_or("");
             for call in &graph.calls {
                 let caller = call.caller.clone().unwrap_or_else(|| "__top__".to_string());
-                let target = call.resolved.clone().unwrap_or_else(|| call.target.clone());
-                let lookup = if call.resolved.is_none() && call.category == "internal_helper" {
+                // Swift: a másik fájlban elakadt fogadó-lánc (`Store::session.user`) feloldása a property-típusokon át
+                let chained = (call.resolved.is_none() && path.ends_with(".swift"))
+                    .then(|| chain_target(&properties, call.on.as_deref()?, &call.target))
+                    .flatten();
+                let target = chained
+                    .clone()
+                    .or_else(|| call.resolved.clone())
+                    .unwrap_or_else(|| call.target.clone());
+                let lookup = if chained.is_none()
+                    && call.resolved.is_none()
+                    && call.category == "internal_helper"
+                {
                     symbol_key(namespace, call.container.as_deref(), &call.target)
                 } else {
                     target.clone()
@@ -91,8 +102,9 @@ impl CallerIndex {
                     lookup,
                     caller_key,
                     caller_type,
-                    guessable: (call.resolved.is_none() && call.category == "external_call")
-                        || uncertain,
+                    guessable: chained.is_none()
+                        && ((call.resolved.is_none() && call.category == "external_call")
+                            || uncertain),
                     wire: (call.kind == "wire")
                         .then_some((call.line, call.end_line.unwrap_or(call.line))),
                 });
@@ -168,6 +180,54 @@ impl CallerIndex {
                 }
             }
         }
+        out
+    }
+
+    /// A megadott (1. szintű) hívó-sorok hívásai által hívott, tárolt closure-t meghívó metódusok: a bekötött
+    /// closure (`socket.onFrame = { … }`) hívottjának valódi kiváltói, `via Típus::tulajdonság` jelöléssel. A sor
+    /// célja a closure-ban hívott metódus. Bekötés (`wire` él) nélkül üres.
+    pub(crate) fn wire_invokers(&self, front: &[CallerRow]) -> Vec<CallerRow> {
+        if self.callbacks.is_empty() || front.is_empty() {
+            return Vec::new();
+        }
+        let wanted: HashSet<(&str, Option<&str>, &str, u32)> = front
+            .iter()
+            .map(|row| {
+                (
+                    row.file.as_str(),
+                    row.container.as_deref(),
+                    row.caller.as_str(),
+                    row.line,
+                )
+            })
+            .collect();
+        let mut out: Vec<CallerRow> = Vec::new();
+        for edge in &self.edges {
+            let key = (
+                edge.row.file.as_str(),
+                edge.row.container.as_deref(),
+                edge.row.caller.as_str(),
+                edge.row.line,
+            );
+            if !wanted.contains(&key) {
+                continue;
+            }
+            for invoker in self.callbacks.get(&edge_key(edge)).into_iter().flatten() {
+                let mut row = invoker.row.clone();
+                row.level = 1;
+                row.target = edge.row.target.clone();
+                row.reference = false;
+                if !out.iter().any(|seen| {
+                    seen.file == row.file
+                        && seen.container == row.container
+                        && seen.caller == row.caller
+                        && seen.line == row.line
+                }) {
+                    out.push(row);
+                }
+            }
+        }
+        out.sort_by(|a, b| (&a.file, a.line).cmp(&(&b.file, b.line)));
         out
     }
 
@@ -481,4 +541,58 @@ fn symbol_key(namespace: &str, container: Option<&str>, caller: &str) -> String 
         Some(container) => format!("{prefix}{container}::{caller}"),
         None => format!("{prefix}{caller}"),
     }
+}
+
+/// A projekt property-típusai: (konténer, property) → a típus rövid neve. A típus a deklaráció utolsó
+/// szóköz-tagja (`@Published User?` → `User`); tömb / szótár / generikus (`[User]`, `Foo<Bar>`) nem típus-lánc.
+fn property_types(records: &[(&str, &FileGraph)]) -> HashMap<(String, String), String> {
+    let mut out = HashMap::new();
+    for (path, graph) in records {
+        if !path.ends_with(".swift") {
+            continue;
+        }
+        for property in &graph.properties {
+            let (Some(container), Some(hint)) = (&property.container, &property.type_hint) else {
+                continue;
+            };
+            if let Some(ty) = chain_type(hint) {
+                out.entry((container.clone(), property.name.clone()))
+                    .or_insert(ty);
+            }
+        }
+    }
+    out
+}
+
+/// A property deklarált típusa láncolható névként (`?` / `!` nélkül), vagy `None` (gyűjtemény, generikus, üres).
+fn chain_type(hint: &str) -> Option<String> {
+    let token = hint.split_whitespace().next_back()?;
+    let token = token.trim_end_matches(['?', '!']);
+    let valid = token
+        .chars()
+        .next()
+        .is_some_and(|c| c.is_alphabetic() || c == '_')
+        && token
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '_' || c == '.');
+    valid.then(|| token.to_owned())
+}
+
+/// Az elakadt fogadó-lánc (`on` = `Típus::a.b`, `target` = `…a.b.metódus`) tényleges célja: a property-ösvény
+/// végigjárása a típusokon (`Típus` → `a` típusa → `b` típusa = `U`), eredménye `U::metódus`. Ismeretlen
+/// tagnál `None` (marad a mai viselkedés).
+fn chain_target(
+    properties: &HashMap<(String, String), String>,
+    on: &str,
+    target: &str,
+) -> Option<String> {
+    let (root, path) = on.split_once("::")?;
+    let method = target.rsplit('.').next().filter(|name| !name.is_empty())?;
+    let mut current = root.to_owned();
+    for segment in path.split('.').filter(|segment| !segment.is_empty()) {
+        current = properties
+            .get(&(current.clone(), segment.to_owned()))?
+            .clone();
+    }
+    Some(format!("{current}::{method}"))
 }
