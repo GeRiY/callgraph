@@ -351,6 +351,20 @@ impl Laravel {
             }
             return;
         }
+        // Blade-sablon: a `route('név')` hívás `resolved`-je `route::név` (a Blade-frontend adja), mint a JS-nél
+        if rel.ends_with(".blade.php") {
+            for call in &graph.calls {
+                if let Some(name) = route_name(call) {
+                    self.refs.push(Reference {
+                        file: rel.to_owned(),
+                        line: call.line,
+                        name: name.to_owned(),
+                        js: false,
+                    });
+                }
+            }
+            return;
+        }
         if !rel.ends_with(".php") {
             return;
         }

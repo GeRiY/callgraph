@@ -1,6 +1,7 @@
 //! Nyelv-réteg: a `Language` trait-család, a registry és a nyelv-modulok (`php`, később több).
 
 mod backend;
+pub mod blade;
 pub mod css;
 mod document;
 pub mod filetype;

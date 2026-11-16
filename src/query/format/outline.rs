@@ -297,7 +297,8 @@ pub(crate) fn parens(m: &Method) -> &'static str {
     let plain = matches!(
         m.kind.as_deref(),
         Some("rule" | "at-rule" | "key" | "title")
-    ) || heading_level(m).is_some();
+    ) || m.kind.as_deref() == Some(crate::lang::blade::BLOCK_KIND)
+        || heading_level(m).is_some();
     if plain { "" } else { "()" }
 }
 

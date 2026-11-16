@@ -362,6 +362,7 @@ fn views_and_headers_on_a_mini_project() {
     let need = Need {
         i18n: I18nNeed::Full,
         classes: true,
+        views: false,
     };
     let crossref = CrossRef::open(&root, need);
 
@@ -440,4 +441,24 @@ fn nothing_is_read_for_unrelated_files_and_nothing_is_said_without_data() {
     assert!(empty.i18n_view(&[], Lang::En).is_empty());
     assert!(empty.classes_view(&[], Lang::En).is_empty());
     assert_eq!(empty.header("lang/en.json", Lang::En), None);
+}
+
+#[test]
+fn blade_translation_calls_count_as_usages() {
+    let mut found = Found::default();
+    scan(
+        "resources/views/auth/login.blade.php",
+        "php",
+        "<p>{{ __('auth.failed') }}</p>\n@lang('auth.throttle')\n<x-input :label=\"trans('forms.email')\" />\n",
+        &mut found,
+    );
+    let keys: Vec<(&str, u32)> = found
+        .usages
+        .iter()
+        .map(|usage| (usage.key.as_str(), usage.line))
+        .collect();
+    assert_eq!(
+        keys,
+        [("auth.failed", 1), ("auth.throttle", 2), ("forms.email", 3)]
+    );
 }

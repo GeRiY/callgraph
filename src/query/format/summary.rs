@@ -23,6 +23,7 @@ fn count_label(
     };
     match container.kind.as_str() {
         "stylesheet" => plural(methods, ["rule", "rules"], "szabály"),
+        "view" => plural(methods, ["section", "sections"], "szakasz"),
         "document" => {
             let keys = row
                 .graph

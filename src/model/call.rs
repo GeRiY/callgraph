@@ -8,7 +8,7 @@ pub const DYNAMIC_CALL: &str = "dynamic_call";
 /// Az összes ismert hívás-kategória (a nyelvi frontendek kategorizálóinak közös listája): a `--category` ellenőrzése
 /// és az „ismeretlen kategória” hibaüzenet ebből jön. Ábécében, a `dynamic_call` a végén (`category_rank`).
 /// Új kategória a frontendben: ide is fel kell venni — a `known_categories_cover_every_frontend` teszt őrzi.
-pub const KNOWN_CATEGORIES: [&str; 48] = [
+pub const KNOWN_CATEGORIES: [&str; 49] = [
     "anchor",
     "android_api",
     "component_use",
@@ -52,6 +52,7 @@ pub const KNOWN_CATEGORIES: [&str; 48] = [
     "swiftui_modifier",
     "swiftui_view",
     "var",
+    "view_use",
     "vue_api",
     "vue_emit",
     "vue_macro",

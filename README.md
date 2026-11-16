@@ -94,6 +94,7 @@ Per-language guides with examples: [PHP](https://callgraph.eu/php/) · [Rust](ht
 | Language | Extensions | What you get |
 |---|---|---|
 | PHP | `.php` | classes, traits, enums, methods, properties, constants, calls with type tracking, framework detection (Laravel, Yii) |
+| Blade | `.blade.php` | one `view` per template named like Laravel (`admin.users.index`); `@section` / `@push` / `@slot` blocks as methods with line ranges; `@extends` / `@include` / `<x-alert>` / `<livewire:x>` as `view_use` / `component_use` calls resolved to the template file; PHP in `{{ }}`, `@php` and directives; `@if` / `@foreach` / `@auth` as control flow; `@props`; `route('x')` linked to the route table, `__('k')` / `@lang` to the language files; `rendered by:` / `used by:` lines |
 | Rust | `.rs` | modules, structs, enums, traits, `impl` blocks, functions with visibility / `async`, fields, consts, `use` trees, path / method / macro calls, `if` / `match` flow, framework detection from `Cargo.toml` (axum, actix-web, tokio, serde, …) |
 | JavaScript / TypeScript | `.js` `.mjs` `.cjs` `.jsx` `.ts` `.tsx` | modules, functions, classes, imports with alias resolution (`jsconfig` / `tsconfig`) |
 | Vue | `.vue` | props, emits, `setup`, template components and event handlers, `computed`, `watch`, lifecycle hooks, Options API |

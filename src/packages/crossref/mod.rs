@@ -16,6 +16,7 @@ mod classes_scan;
 mod i18n;
 mod i18n_scan;
 mod render;
+mod views;
 
 #[cfg(test)]
 mod tests;
@@ -28,6 +29,7 @@ use crate::query::QueryResult;
 
 pub(crate) use classes::Classes;
 pub(crate) use i18n::I18n;
+pub(crate) use views::Views;
 
 /// A beolvasott fájltípusok.
 const EXTS: [&str; 12] = [
@@ -56,6 +58,8 @@ pub(crate) enum I18nNeed {
 pub(crate) struct Need {
     pub(crate) i18n: I18nNeed,
     pub(crate) classes: bool,
+    /// A Blade-nézetek használata (ki rendereli, ki hivatkozik rá).
+    pub(crate) views: bool,
 }
 
 /// A nézet hatóköre: egy lekérdezett fájl (a gyökérhez relatív út) és a kért nevek (`fájl::név`).
@@ -72,6 +76,7 @@ pub(crate) struct CrossRef {
     canonical: Option<PathBuf>,
     pub(crate) i18n: Option<I18n>,
     pub(crate) classes: Option<Classes>,
+    pub(crate) views: Option<Views>,
 }
 
 fn read(path: &Path) -> Option<String> {
@@ -137,6 +142,21 @@ impl CrossRef {
                 _ => {}
             }
         }
+        let views = need.views.then(|| {
+            let mut views = Views::default();
+            for (rel, ext, path) in &files {
+                if ext != "php" || i18n::is_lang_path(rel) {
+                    continue;
+                }
+                let Some(text) = read(path) else { continue };
+                if rel.ends_with(".blade.php") {
+                    views.add_blade(rel, &text);
+                } else {
+                    views.add_php(rel, &text);
+                }
+            }
+            views
+        });
         let scan_i18n = need.i18n == I18nNeed::Full;
         let scan_classes = classes.as_ref().is_some_and(|c| c.defined_count() > 0);
         if scan_i18n || scan_classes {
@@ -165,6 +185,7 @@ impl CrossRef {
             canonical,
             i18n,
             classes,
+            views,
         }
     }
 
@@ -228,6 +249,9 @@ fn need_for(rows: &[QueryResult], format: &str) -> Need {
                 if (file.ends_with(".css") || file.ends_with(".scss")) && rows.len() <= 20 {
                     need.classes = true;
                 }
+                if file.ends_with(".blade.php") && rows.len() <= 20 {
+                    need.views = true;
+                }
             }
         }
         _ => {}
@@ -241,7 +265,7 @@ pub(crate) fn attach(rows: &mut [QueryResult], root: &Path, format: &str) {
         return;
     }
     let need = need_for(rows, format);
-    if need.i18n == I18nNeed::None && !need.classes {
+    if need.i18n == I18nNeed::None && !need.classes && !need.views {
         return;
     }
     let shared = Arc::new(CrossRef::open(root, need));

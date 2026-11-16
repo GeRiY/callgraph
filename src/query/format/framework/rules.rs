@@ -179,6 +179,21 @@ pub(super) fn views(g: &FileGraph, _ns: &str, out: &mut Vec<String>) {
         return;
     }
     let line = |label: &str, text: &str, at: u32| format!("{label}{text}  @  {}  L{at}", g.file);
+    // Blade-sablon: a nézet-használat (`@extends`, `@include`, `<x-…>`) a valódi gráfból
+    if g.file.to_ascii_lowercase().ends_with(".blade.php") {
+        for c in g
+            .calls
+            .iter()
+            .filter(|c| matches!(c.category.as_str(), "view_use" | "component_use"))
+        {
+            out.push(line(
+                "view      ",
+                &format!("{} {}", c.kind, c.target),
+                c.line,
+            ));
+        }
+        return;
+    }
     for c in g
         .calls
         .iter()

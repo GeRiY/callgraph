@@ -2,6 +2,7 @@
 
 use std::path::Path;
 
+use super::blade::BladeFrontend;
 use super::css::CssFrontend;
 use super::go::GoFrontend;
 use super::html::HtmlDocument;
@@ -30,11 +31,12 @@ impl LanguageRegistry {
         Self::default()
     }
 
-    /// Az alapértelmezett összeállítás: backend `PhpBackend`, `RustBackend`; frontend `CssFrontend`, `ScssFrontend`, `JsFrontend`, `SwiftFrontend`, `KotlinFrontend`, `PythonFrontend`, `GoFrontend`; dokumentum `JsonDocument`, `MdDocument`, `HtmlDocument`.
+    /// Az alapértelmezett összeállítás: backend `PhpBackend`, `RustBackend`; frontend `BladeFrontend` (`.blade.php`, a PHP elé illesztve), `CssFrontend`, `ScssFrontend`, `JsFrontend`, `SwiftFrontend`, `KotlinFrontend`, `PythonFrontend`, `GoFrontend`; dokumentum `JsonDocument`, `MdDocument`, `HtmlDocument`.
     pub fn with_defaults() -> Self {
         let mut registry = Self::new();
         registry.register_backend(Box::new(PhpBackend::with_defaults()));
         registry.register_backend(Box::new(RustBackend::with_defaults()));
+        registry.register_frontend(Box::new(BladeFrontend::with_defaults()));
         registry.register_frontend(Box::new(CssFrontend::new()));
         registry.register_frontend(Box::new(ScssFrontend::new()));
         registry.register_frontend(Box::new(JsFrontend::with_defaults()));
@@ -63,6 +65,12 @@ impl LanguageRegistry {
     /// A fájl kiterjesztését kezelő nyelv (kis-/nagybetűtől függetlenül: `B.PHP` is PHP); ismeretlen
     /// kiterjesztésre `None`.
     pub fn for_path(&self, path: &Path) -> Option<&dyn Language> {
+        // a `.blade.php` kiterjesztése `php`, de külön nyelv: a fájlnév vége dönt, a PHP előtt
+        if super::blade::is_blade_path(path)
+            && let Some(blade) = self.languages().find(|l| l.id() == "blade")
+        {
+            return Some(blade);
+        }
         let ext = super::filetype::extension_lower(path)?;
         self.languages()
             .find(|l| l.extensions().contains(&ext.as_str()))
@@ -77,10 +85,16 @@ impl LanguageRegistry {
 
     /// A megadott nyelv-azonosítókhoz tartozó kiterjesztések, regisztrációs sorrendben.
     pub fn extensions_for(&self, ids: &[&str]) -> Vec<&'static str> {
-        self.languages()
+        let mut found: Vec<&'static str> = self
+            .languages()
             .filter(|language| ids.contains(&language.id()))
             .flat_map(|language| language.extensions().iter().copied())
-            .collect()
+            .collect();
+        // a Blade a PHP kiterjesztését használja (`.blade.php`)
+        if ids.contains(&"blade") && !found.contains(&"php") {
+            found.push("php");
+        }
+        found
     }
 
     /// A regisztrált nyelvek azonosítói, regisztrációs sorrendben.
@@ -176,6 +190,13 @@ mod tests {
         );
         let php = r.for_path(Path::new("src/A.php")).unwrap();
         assert_eq!((php.id(), php.role()), ("php", LanguageRole::Backend));
+        let blade = r
+            .for_path(Path::new("resources/views/a/B.BLADE.php"))
+            .unwrap();
+        assert_eq!(
+            (blade.id(), blade.role()),
+            ("blade", LanguageRole::Frontend)
+        );
         let json = r.for_path(Path::new("package.json")).unwrap();
         assert_eq!((json.id(), json.role()), ("json", LanguageRole::Document));
         let md = r.for_path(Path::new("docs/README.md")).unwrap();
