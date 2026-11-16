@@ -255,7 +255,28 @@ impl Laravel {
         route_files.sort_by(|a, b| a.0.cmp(&b.0));
         let loaded = self.loaded_route_files(&route_files, files);
         let prefix = self.api_prefix(files);
-        let mut sources: Vec<(&str, &str, &crate::model::Imports)> = Vec::new();
+        // betöltött (`require`-olt), de a bejárásból kimaradt route-fájl — jellemzően a `.gitignore`-olt, csak helyben
+        // létező, feltételesen behúzott fájl (`if (app()->isLocal()) require __DIR__.'/local.php';`): a lemezről olvassuk
+        let present: std::collections::BTreeSet<&str> =
+            route_files.iter().map(|(rel, ..)| rel.as_str()).collect();
+        let extra: Vec<(String, String)> = loaded
+            .iter()
+            .flatten()
+            .filter(|rel| !present.contains(rel.as_str()))
+            .filter_map(|rel| Some((rel.clone(), files.read(&self.root.join(rel))?)))
+            .collect();
+        let no_imports = crate::model::Imports::default();
+        let mut sources: Vec<(&str, &str, &crate::model::Imports)> = extra
+            .iter()
+            .map(|(rel, text)| (rel.as_str(), text.as_str(), &no_imports))
+            .collect();
+        for (rel, text) in &extra {
+            self.dynamic_names.extend(
+                dynamic_name_lines(text)
+                    .into_iter()
+                    .map(|line| (rel.clone(), line)),
+            );
+        }
         for (rel, text, graph) in &route_files {
             if loaded.as_ref().is_some_and(|loaded| !loaded.contains(rel)) {
                 self.unloaded.push(rel.clone());
@@ -268,6 +289,7 @@ impl Laravel {
                     .map(|line| (rel.clone(), line)),
             );
         }
+        sources.sort_by(|a, b| a.0.cmp(b.0));
         for mut parsed in resolve_routes(&sources, self.entry_includes(files)) {
             // a `routes/api.php` route-jai elé a Laravel `/api`-t tesz (vagy a `bootstrap/app.php` `apiPrefix:`-át);
             // ha egy csoport tölti be (régi `RouteServiceProvider`), az előtagot a csoport adja

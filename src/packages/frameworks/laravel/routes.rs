@@ -392,7 +392,9 @@ impl Parser<'_> {
         let own = arg(uri_at).and_then(unquote);
         let uri = join_uri([ctx.prefix.as_str(), own.as_deref().unwrap_or("?")]);
         let route = Route {
-            name: named.then(|| ctx.name.clone()),
+            // a saját `->name()` nélküli route egy nevesített csoportban a csoport (összefűzött) nevét kapja — a
+            // Laravel `RouteGroup::merge`-e így adja: `$new['as'] = $old['as'] . ($new['as'] ?? '')`
+            name: (named || !ctx.name.is_empty()).then(|| ctx.name.clone()),
             verb,
             uri,
             action,
