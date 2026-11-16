@@ -22,7 +22,13 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   interfészek, felső szintű és extension függvények, `suspend` és `@Composable` függvények, property-k (a `by lazy`
   és a `by viewModels()` is), hívások fogadótípus-feloldással, `::ref` / `Type::name` hivatkozások és vezérlési
   ágak. A kategóriák lefedik a Compose-t (nézetek, modifierek, API), a coroutine-okat, az Androidot és a Kotlin
-  standard könyvtárat; a `*.gradle.kts` fájlok Gradle build scriptként vannak jelölve.
+  standard könyvtárat; a `*.gradle.kts` fájlok Gradle build scriptként vannak jelölve. A `hiltViewModel()`, a `viewModel()` és a
+  `by viewModels()` injektálási él, a view modelen hívott metódusok pedig a típusára oldódnak fel. A Hilt
+  `@Inject constructor`, `@Provides` és `@Binds` megmutatja, mi injektálódik és melyik metódus szolgáltat egy típust.
+  A `NavHost` `composable("route") { Screen() }` és a `navController.navigate("…")` navigációs él (a típusbiztos
+  útvonalak is). Az interfészmetódus és a megvalósításai hívói látják egymást. Az Android-projektek profilt kapnak
+  (ui / view model / data / domain / di rétegek; a `*.gradle.kts` nem számít alkalmazáskódnak), a Kotlin pedig
+  megjelenik a használati statisztikában.
 - **Swift: callback-ek, protokollok és navigáció:** a callback-argumentumként átadott metódushivatkozás
   (`Composer(onSend: vm.send)`) a hivatkozott metódus hívása. A callback-property-ben tárolt closure
   (`socket.onFrame = { … }`) össze van kötve azzal a hellyel, ahol a property-t meghívják; `--depth 2` mellett a
@@ -30,13 +36,21 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   egymást (`via`), és az `extension`-ben deklarált megfelelés is számít. A `.environment(store)` /
   `.environmentObject` injektálási él, a `navigationDestination`, `sheet`, `fullScreenCover`, `popover` vagy
   `NavigationLink` alatt épített nézetek navigációs élek. A fogadótípust a `@State`, `@Bindable`, `let x: T`,
-  `@Environment(T.self)` és a paraméterek adják.
+  `@Environment(T.self)` és a paraméterek adják. A pozícionálisan (`.onChange(of: x, vm.changed)`) vagy `#selector(…)`
+  útján átadott hivatkozás hivatkozás-hívás; a key path nem hívás. A SwiftData `@Query var items: [Item]` modell-él,
+  a `modelContext` hívásai pedig kategorizáltak. A `navigationDestination { switch … }` minden nézete navigációs él,
+  a generikus nézetek (`List<Item>(…)`) komponenshasználatnak számítanak, az actor metódusok pedig feloldódnak.
 - **`callgraph mcp --allow <mappa>`:** az MCP-szerver egy további mappát is olvashat, pl. egy testvér `../android`
   mappát. A kapcsoló ismételhető, vagy a `CALLGRAPH_MCP_ALLOW` környezeti változó használható; alapból a szerver a
   projektgyökérre korlátozott marad.
 - **Rust: függvényhivatkozások és több fogadótípus:** az értékként átadott függvény vagy metódus (`.map(Self::parse)`,
   `.and_then(Foo::new)`, `.map(helper)`) hívásnak számít. A generikus korláttal (`T: Trait`, `where`) vagy a metódus
   visszatérési típusával (`self.make()?`, `Type::open().unwrap()`) típusozott fogadók feloldódnak.
+  A ciklusváltozók (`for b in self.bars`), az `if let Some(x)` / `while let` / `match Some(x)` kötések és az
+  iterátor-closure paraméterek (`items.iter().map(|x| x.name())`) megkapják az elemtípusukat, így a metódushívásaik
+  feloldódnak; `T: A + B` esetén a metódust deklaráló trait számít. A `#[test]` / `#[tokio::test]` függvények és a
+  `#[cfg(test)]` modulok tesztként vannak jelölve, a `Some` / `Ok` / `Err` / `Box::new` / `Default::default` már nem
+  zsúfolja a híváslistát, a helyi closure hívása pedig dinamikusnak van jelölve.
 - **TypeScript interfész-tagok property-ként:** az `interface` tagjai property-ként szerepelnek, az opcionálisak
   `?`-lel.
 - **A hibás hivatkozások jelölve vannak Markdownban és HTML-ben:** a hiányzó fájlra mutató relatív link, illetve a
@@ -48,7 +62,18 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 - **A Laravel űrlapellenőrzés követi a `form.transform(...)`-ot:** a `--format forms`, a `form:` sorok és a `laravel:`
   generátor űrlap ↔ szabály ellenőrzése mostantól azokat a kulcsokat vizsgálja, amelyeket a transform visszaad;
-  `...data` szórás esetén az űrlapmezőket és a hozzáadott kulcsokat.
+  `...data` szórás esetén az űrlapmezőket és a hozzáadott kulcsokat. A láncolt `form.transform(…).post(…)` hívással
+  elküldött űrlapot is megtalálja.
+- **A Laravel preset gondosabban választ űrlapkomponenst:** a komponens csak akkor kap szerepet, ha megvan rajta a
+  kötött prop (a hibaállapot-blokkot már nem használja mezőhibaként). A mezőburkoló komponens (címke + hiba + slot,
+  pl. `FormField`) körbeveszi a mezőket, a textarea és a checkbox komponenseket pedig a `text` / `bool` mezők kapják;
+  a `.callgraph/gen.toml` kulcsai: `field`, `textarea`, `checkbox`. A preset a tsconfig `paths` / Vite alias mögötti
+  űrlapkomponenseket is megtalálja (pl. `@ui` egy különálló UI-csomagra), és előnyben részesíti azokat, amelyeket a
+  meglévő oldalak már importálnak.
+- **Egyértelműbb jelölések a kimenetben (minden nyelven):** a hivatkozás-hívások `(ref)` jelölést kapnak a vázlatban,
+  a `--grep` soraiban és a hívóknál. A teszt függvények `[test]`, a csak tesztből álló modul `[tests]` jelölést kap, és
+  egy darabszám-sorrá van összecsukva. Az injektálási, navigációs és callback-bekötési élek a fajtájukat (`inject`,
+  `nav`, `wire`) mutatják a kategória oszlopban.
 - **A `gen` gyorsabb nagy PHP-projektekben:** az ismeretlen típusneveket egyetlen projektbejárással oldja fel
   (korábban nevenként egy bejárás), minden projektfájlt hívásonként legfeljebb egyszer olvas be, a Laravel preset
   pedig egyszer olvassa a `composer.json`-t.
@@ -85,6 +110,12 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   `home/…` alakú modulútvonalat kapott; most a fájl mappájához képest relatív.
 - **Rust: a crate saját moduljai saját kódnak számítanak:** a `mod x;` és az inline `mod` útvonalak már nem számítanak
   csomagnak.
+- **A `--grep <Komponens>.vue --depth N` minden szinten követi a template-használatot:** a 2. szinttől üres volt.
+- **Ciklusban regisztrált Laravel-útvonalak:** az interpolált nevű útvonal (`->name("{$code}.x")`) miatt a
+  `route('en.x')` „dinamikus, nem ellenőrizhető" lesz ismeretlen helyett, a `routes/` mappán kívüli, ilyen útvonalakat
+  regisztráló segédfüggvényre pedig a program felhívja a figyelmet.
+- **A `locate` hívószámai a nyelvcsaládon belül maradnak:** egy Vue-függvény már nem számolja az azonos nevű PHP-metódus
+  hívóit.
 - **Swift: az `Extensions` mappa saját kód:** a Swift-fájlokat tartalmazó `Extensions` mappát korábban vendorként
   kezelte.
 

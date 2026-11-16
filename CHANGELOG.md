@@ -20,7 +20,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   top-level and extension functions, `suspend` and `@Composable` functions, properties (including `by lazy` and
   `by viewModels()`), calls with receiver type resolution, `::ref` / `Type::name` references and control flow.
   Categories cover Compose (views, modifiers, API), coroutines, Android and the Kotlin standard library;
-  `*.gradle.kts` files are marked as Gradle build scripts.
+  `*.gradle.kts` files are marked as Gradle build scripts. `hiltViewModel()`, `viewModel()` and `by viewModels()` are
+  injection edges, and calls on the view model resolve to its type. Hilt `@Inject constructor`, `@Provides` and
+  `@Binds` show what is injected and which method provides a type. `NavHost` `composable("route") { Screen() }` and
+  `navController.navigate("…")` are navigation edges (type-safe routes too). Callers of an interface method and of
+  its implementations see each other. Android projects get a profile (ui / view model / data / domain / di layers;
+  `*.gradle.kts` is not counted as app code), and Kotlin appears in the usage statistics.
 - **Swift callbacks, protocols and navigation:** a method reference passed as a callback argument
   (`Composer(onSend: vm.send)`) is a call of that method. A closure stored in a callback property
   (`socket.onFrame = { … }`) is linked to where the property is invoked; with `--depth 2` the invoking method shows
@@ -28,12 +33,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   and a conformance declared in an `extension` counts. `.environment(store)` / `.environmentObject` are injection
   edges, and views built in `navigationDestination`, `sheet`, `fullScreenCover`, `popover` or `NavigationLink` are
   navigation edges. Receiver types are taken from `@State`, `@Bindable`, `let x: T`, `@Environment(T.self)` and
-  parameters.
+  parameters. A reference passed positionally (`.onChange(of: x, vm.changed)`) or via `#selector(…)` is a reference
+  call; key paths are not calls. SwiftData `@Query var items: [Item]` is a model edge and `modelContext` calls are
+  categorized. Each view in a `navigationDestination { switch … }` is a navigation edge, generic views
+  (`List<Item>(…)`) count as component uses, and actor methods resolve.
 - **`callgraph mcp --allow <dir>`:** lets the MCP server read an extra folder, e.g. a sibling `../android`. Repeat
   the flag or set `CALLGRAPH_MCP_ALLOW`; by default the server stays restricted to the project root.
 - **Rust: function references and more receiver types:** a function or method passed as a value (`.map(Self::parse)`,
   `.and_then(Foo::new)`, `.map(helper)`) is a call. Receivers typed by a generic bound (`T: Trait`, `where`) or by a
-  method's return type (`self.make()?`, `Type::open().unwrap()`) are resolved.
+  method's return type (`self.make()?`, `Type::open().unwrap()`) are resolved. Loop variables (`for b in self.bars`),
+  `if let Some(x)` / `while let` / `match Some(x)` bindings and iterator-closure parameters
+  (`items.iter().map(|x| x.name())`) get their element type, so their method calls resolve; with `T: A + B` the trait
+  that declares the method is used. `#[test]` / `#[tokio::test]` functions and `#[cfg(test)]` modules are marked as
+  tests, `Some` / `Ok` / `Err` / `Box::new` / `Default::default` no longer clutter the call list, and calls of a local
+  closure are marked dynamic.
 - **TypeScript interface members as properties:** the members of an `interface` are listed as properties, optional
   ones with `?`.
 - **Broken links in Markdown and HTML are marked:** a relative link to a missing file, or a `#anchor` with no
@@ -45,7 +58,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 - **The Laravel form check follows `form.transform(...)`:** `--format forms`, the `form:` lines and the form ↔ rules
   check of the `laravel:` generator now check the keys the transform returns; with a `...data` spread, the form
-  fields plus the added keys.
+  fields plus the added keys. A form submitted with a chained `form.transform(…).post(…)` is found too.
+- **The Laravel preset picks form components more carefully:** a component only gets a role if it has the prop that is
+  bound (an error-state block is no longer used as the field error). A field wrapper component (label + error + slot,
+  e.g. `FormField`) wraps each field, and textarea and checkbox components are used for `text` / `bool` fields; the
+  `.callgraph/gen.toml` keys are `field`, `textarea` and `checkbox`. The preset also finds form components behind a
+  tsconfig `paths` / Vite alias (e.g. `@ui` pointing to a separate UI package), preferring components that existing
+  pages already import.
+- **Clearer marks in the output (all languages):** reference calls are marked `(ref)` in the outline, `--grep` rows
+  and callers. Test functions get `[test]`; a module of only tests gets `[tests]` and is collapsed to a count line.
+  Injection, navigation and callback-wiring edges show their kind (`inject`, `nav`, `wire`) in the category column.
 - **`gen` is faster in large PHP projects:** unknown type names are resolved with a single project walk (before: one
   walk per unresolved name), each project file is read at most once per call, and the Laravel preset reads
   `composer.json` once.
@@ -80,6 +102,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 - **Module paths of JS/TS files outside a project:** a file with no `package.json`, `tsconfig` or `jsconfig` above it
   got module paths like `home/…`; the path is now relative to the file's folder.
 - **Rust: the crate's own modules are own code:** `mod x;` and inline `mod` paths no longer count as a package.
+- **`--grep <Component>.vue --depth N` follows template usage at every level:** it was empty from level 2.
+- **Laravel routes registered in a loop:** a route with an interpolated name (`->name("{$code}.x")`) makes
+  `route('en.x')` "dynamic, not verifiable" instead of unknown, and a helper outside `routes/` that registers such
+  routes is pointed out.
+- **`locate` caller counts stay within the language family:** a Vue function no longer counts the PHP callers of a
+  same-named method.
 - **Swift: an `Extensions` folder is own code:** a folder named `Extensions` with Swift files was treated as vendor.
 
 ## [1.0.2] — 2026-11-16
