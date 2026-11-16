@@ -358,7 +358,8 @@ impl QueryEngine {
                 text.replace(&prefix, &format!("{shown}{}", std::path::MAIN_SEPARATOR))
             };
         }
-        let mut out = tf!("root: {shown}\n", "gyökér: {shown}\n");
+        let branch = super::branch::root_suffix(&self.root);
+        let mut out = tf!("root: {shown}{branch}\n", "gyökér: {shown}{branch}\n");
         out.push_str(&text.replace(&prefix, ""));
         out
     }

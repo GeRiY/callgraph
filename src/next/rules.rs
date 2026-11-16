@@ -156,7 +156,10 @@ fn callers(
             l.strip_prefix("root: ")
                 .or_else(|| l.strip_prefix("gyökér: "))
         })
-        .map_or_else(|| root.to_path_buf(), |r| Path::new(r.trim()).to_path_buf());
+        .map_or_else(
+            || root.to_path_buf(),
+            |r| Path::new(crate::query::branch::strip_root_suffix(r.trim())).to_path_buf(),
+        );
     let mut first: Option<(String, String)> = None;
     let mut files: Vec<String> = Vec::new();
     let mut current: Option<String> = None;

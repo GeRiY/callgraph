@@ -120,7 +120,8 @@ impl Locator {
         // azonos alakban
         let root = self.root.to_string_lossy();
         let shown = crate::query::strip_verbatim(&root);
-        let mut text = crate::tf!("root: {shown}\n", "gyökér: {shown}\n");
+        let branch = crate::query::branch::root_suffix(&self.root);
+        let mut text = crate::tf!("root: {shown}{branch}\n", "gyökér: {shown}{branch}\n");
         let report = Report {
             terms: &terms,
             ranked: &ranked,
