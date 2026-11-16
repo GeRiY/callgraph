@@ -91,12 +91,11 @@ fn css_outline_lists_var_and_function_calls_under_their_rule() {
     let project = Project::new();
     for graph in [true, false] {
         let out = project.run(&["show", "res/app.css"], graph);
-        let card = out.find("  .card  L5-7").unwrap_or(usize::MAX);
-        let var = out.find("var").unwrap_or(0);
-        assert!(card < var, "{graph}: {out}");
-        let title = out.find("  .card .title").unwrap_or(usize::MAX);
-        let calc = out.find("calc").unwrap_or(0);
-        assert!(title < calc, "{graph}: {out}");
+        // a keresés a szabály sorától indul: a FILE-fejléc útvonala (macOS: /private/var/…) is tartalmazhat „var”-t
+        let card = out.find("  .card  L5-7").expect("card rule");
+        assert!(out[card..].contains("var"), "{graph}: {out}");
+        let title = out.find("  .card .title").expect("title rule");
+        assert!(out[title..].contains("calc"), "{graph}: {out}");
     }
 }
 
