@@ -71,11 +71,13 @@ pub(crate) static ROLES: &[RoleInfo] = &[
     role("application", Kind::Context, 6, None),
     role("infrastructure", Kind::Context, 7, None),
     role("port", Kind::Context, 8, None),
+    role("feature", Kind::Context, 3, None),
     role("domain", Kind::Context, 9, None),
     role("provider", Kind::Support, 1, None),
     role("migration", Kind::Support, 10, None),
     role("config", Kind::Support, 10, None),
     role("enum", Kind::Support, 10, None),
+    role("util", Kind::Support, 10, None),
     role("test", Kind::Support, 11, None),
 ];
 

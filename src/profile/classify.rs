@@ -32,6 +32,8 @@ pub(crate) enum Reason {
     Override,
     /// A `.callgraph-layers` `ignore-role` sora.
     Ignored,
+    /// A név és a mappa nem mondott semmit: a gráf kód-jele döntött (`@Observable`, `conforms to View`).
+    Code(&'static str),
     /// Semmi sem illeszkedett.
     Unknown,
 }

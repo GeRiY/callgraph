@@ -91,7 +91,15 @@ impl SwiftVisitor<'_, '_> {
         } else {
             (qualified.clone(), keyword.clone())
         };
-        let (extends, implements) = self.split_inheritance(&keyword, &name, &qualified, inherited);
+        let (extends, mut implements) =
+            self.split_inheritance(&keyword, &name, &qualified, inherited);
+        // az `@Observable` makró az `Observable` protokollt valósítja meg
+        if keyword != "extension"
+            && self.attributes(node).iter().any(|a| a == "@Observable")
+            && !implements.iter().any(|i| i == "Observable")
+        {
+            implements.push("Observable".to_string());
+        }
         let modifiers = self.modifier_words(node);
         b.container(Container {
             kind,
@@ -173,6 +181,7 @@ impl SwiftVisitor<'_, '_> {
             container: self.module.clone(),
             caller: "__module__".to_string(),
             in_view: false,
+            locals: std::collections::HashMap::new(),
         };
         let (start, end) = (line(*first), end_line(*last));
         self.add_method_span(&scope.container, "__module__", start, end);

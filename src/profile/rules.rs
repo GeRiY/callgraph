@@ -250,6 +250,67 @@ pub(crate) static FOLDER_RULES: &[FolderRule] = &[
     ),
     folder(&["presentation"], None, "presentation", Medium, ANY),
     folder(&["ports", "port"], None, "port", High, ANY),
+    // Swift: a tipikus SwiftUI-projekt mappaszerkezete (`Features/Chat/Content`, `Core/Networking`, `Shared/UI`)
+    folder(
+        &[
+            "networking",
+            "network",
+            "api",
+            "apiclient",
+            "webservices",
+            "remote",
+        ],
+        None,
+        "api",
+        Medium,
+        SWIFT,
+    ),
+    folder(
+        &["persistence", "storage", "database", "db"],
+        None,
+        "repository",
+        Medium,
+        SWIFT,
+    ),
+    folder(
+        &[
+            "ui",
+            "uikit",
+            "designsystem",
+            "widgets",
+            "controls",
+            "cells",
+            "content",
+        ],
+        None,
+        "view",
+        Medium,
+        SWIFT,
+    ),
+    folder(
+        &["features", "feature", "modules", "scenes", "flows"],
+        None,
+        "feature",
+        Medium,
+        SWIFT,
+    ),
+    folder(
+        &[
+            "shared",
+            "common",
+            "core",
+            "utils",
+            "util",
+            "utilities",
+            "helpers",
+            "extensions",
+            "support",
+        ],
+        None,
+        "util",
+        Medium,
+        SWIFT,
+    ),
 ];
 
 /// Fájlnév-végződés (a kiterjesztés nélküli név vége, kis-/nagybetű érzékenyen: `UserService`).
@@ -318,6 +379,11 @@ pub(crate) static SUFFIX_RULES: &[SuffixRule] = &[
     suffix("Router", "route", Medium, ANY),
     suffix("Routes", "route", Medium, ANY),
     suffix("Model", "model", Medium, ANY),
+    suffix("Client", "api", Medium, SWIFT),
+    suffix("Manager", "service", Medium, SWIFT),
+    suffix("Row", "view", Medium, SWIFT),
+    suffix("Cell", "view", Medium, SWIFT),
+    suffix("Sheet", "view", Medium, SWIFT),
 ];
 
 /// JS / TS pontozott fájlnév (`user.store.ts`, `api.service.ts`, `a.spec.ts`): az utolsó pont utáni rész.

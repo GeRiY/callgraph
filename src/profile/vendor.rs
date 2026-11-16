@@ -114,6 +114,10 @@ impl Skipper {
                 continue;
             }
             if VENDOR_NAMES.contains(&name.as_str()) {
+                // Swift-projektben az `Extensions` mappa a saját kód (típus-kiterjesztések), nem külső csomag
+                if name == "extensions" && self.has_swift(&prefix) {
+                    continue;
+                }
                 let unit = segments[..=(at + 1).min(segments.len() - 1)].join("/");
                 return Some(Skip::Vendor(unit));
             }
@@ -129,6 +133,17 @@ impl Skipper {
         self.own
             .iter()
             .any(|own| prefix == own.as_str() || prefix.starts_with(&format!("{own}/")))
+    }
+
+    /// Van-e `.swift` fájl a mappában vagy alatta (gyorsítótárazva).
+    fn has_swift(&mut self, prefix: &str) -> bool {
+        let key = format!("swift:{prefix}");
+        if let Some(known) = self.cache.get(&key) {
+            return *known;
+        }
+        let found = dir_has_swift(&self.root.join(prefix), 3);
+        self.cache.insert(key, found);
+        found
     }
 
     /// Saját licenc / könyvtár-manifest van-e a mappában (gyorsítótárazva).
@@ -178,6 +193,21 @@ impl Skipper {
         let same_scope = self.root_scope.is_some() && npm_scope(name) == self.root_scope;
         !private && versioned && !same_scope
     }
+}
+
+/// Van-e `.swift` fájl a mappában, legfeljebb `depth` mélységig.
+fn dir_has_swift(dir: &Path, depth: usize) -> bool {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return false;
+    };
+    entries.filter_map(|e| e.ok()).any(|entry| {
+        let path = entry.path();
+        if path.is_dir() {
+            depth > 0 && dir_has_swift(&path, depth - 1)
+        } else {
+            path.extension().is_some_and(|ext| ext == "swift")
+        }
+    })
 }
 
 /// Licencfájl a mappában: `LICENSE`, `LICENCE`, `COPYING` (kis-/nagybetűtől függetlenül), kiterjesztés nélkül vagy
@@ -304,6 +334,11 @@ mod tests {
         // bemásolt framework-mag: csak a mag marad ki, az alkalmazás-kód mellette nem
         write("legacy/legacy/system/CodeIgniter.php", "<?php\n");
         write("legacy/legacy/index.php", "<?php\n");
+        // Swift: az `Extensions` mappa saját kód (típus-kiterjesztések), nem külső csomag
+        write(
+            "Shared/Extensions/String+Trim.swift",
+            "extension String {}\n",
+        );
         let mut skipper = Skipper::new(&root, true);
         let vendor = |s: &str| Some(Skip::Vendor(s.to_owned()));
         assert_eq!(
@@ -351,6 +386,7 @@ mod tests {
             "app/Models/License.php",
             "src/Illuminate/Support/Str.php",
             "index.php",
+            "Shared/Extensions/String+Trim.swift",
         ] {
             assert_eq!(skipper.skip(own), None, "{own}");
         }

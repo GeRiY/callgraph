@@ -8,10 +8,15 @@ pub const DYNAMIC_CALL: &str = "dynamic_call";
 /// Az összes ismert hívás-kategória (a nyelvi frontendek kategorizálóinak közös listája): a `--category` ellenőrzése
 /// és az „ismeretlen kategória” hibaüzenet ebből jön. Ábécében, a `dynamic_call` a végén (`category_rank`).
 /// Új kategória a frontendben: ide is fel kell venni — a `known_categories_cover_every_frontend` teszt őrzi.
-pub const KNOWN_CATEGORIES: [&str; 41] = [
+pub const KNOWN_CATEGORIES: [&str; 47] = [
     "anchor",
+    "android_api",
     "component_use",
     "composable_use",
+    "compose_api",
+    "compose_modifier",
+    "compose_view",
+    "coroutines_api",
     "extend",
     "external_call",
     "external_url",
@@ -33,6 +38,7 @@ pub const KNOWN_CATEGORIES: [&str; 41] = [
     "module_use",
     "native_go",
     "native_js",
+    "native_kotlin",
     "native_php",
     "native_python",
     "native_rust",
@@ -88,7 +94,8 @@ pub struct Call {
     pub category: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub args: Option<Vec<String>>,
-    /// JS template: puszta függvénynév-eseménykezelő.
+    /// Hivatkozás, nem hívás: JS template puszta függvénynév-eseménykezelő; Swift metódus-hivatkozás
+    /// (`Composer(onSend: vm.send)`) — a kimenet `(ref)`-fel jelölheti.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub handler: Option<bool>,
     /// JS / TS / Vue: a nem helyi import forrás-specifikátora (`axios`, `@vueuse/core`, `lodash/debounce`), amelyből

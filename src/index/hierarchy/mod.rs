@@ -24,6 +24,9 @@ struct TypeNode {
     parent_labels: Vec<String>,
     /// A típusban definiált metódusok, kisbetűvel.
     methods: HashSet<String>,
+    /// Swift protokoll: az implementációi akkor is rokonok, ha a metódust definiálják (a protokoll-metódus hívója
+    /// egy konkrét implementáción át fut le).
+    protocol: bool,
 }
 
 /// A hatókör típusai és a köztük lévő öröklési / megvalósítási kapcsolatok.
@@ -43,6 +46,16 @@ pub(crate) fn normalize(name: &str) -> String {
         .replace(['\\', '.'], "::")
         .trim_start_matches("::")
         .to_ascii_lowercase()
+}
+
+/// A container neve a hierarchiában: a Swift extension egyedivé tett nevéből (`Típus@L12`) a `@L…` jelölés
+/// elmarad, így az extension a típus csomópontjához olvad (metódusai és megfelelt protokolljai a típuséi).
+fn container_name(container: &crate::model::Container) -> &str {
+    if container.kind == "extension" {
+        container.name.split('@').next().unwrap_or(&container.name)
+    } else {
+        &container.name
+    }
 }
 
 /// Az utolsó szegmens (`app::x` → `x`).
@@ -89,10 +102,11 @@ impl TypeHierarchy {
         for graph in graphs {
             let namespace = graph.namespace.as_deref().unwrap_or("");
             for container in &graph.containers {
+                let name = container_name(container);
                 let full = if namespace.is_empty() {
-                    container.name.clone()
+                    name.to_owned()
                 } else {
-                    format!("{namespace}\\{}", container.name)
+                    format!("{namespace}\\{name}")
                 };
                 let key = normalize(&full);
                 if key.is_empty() {
@@ -106,7 +120,8 @@ impl TypeHierarchy {
                     hierarchy.nodes.len() - 1
                 });
                 let node = &mut hierarchy.nodes[at];
-                for form in [full, container.name.clone()] {
+                node.protocol |= container.kind == "protocol";
+                for form in [full, name.to_owned()] {
                     if !node.forms.contains(&form) {
                         node.forms.push(form);
                     }
@@ -212,9 +227,10 @@ impl TypeHierarchy {
         for (ancestor, label) in self.ancestors(key) {
             push(ancestor, label);
         }
+        let protocol = self.find(key).iter().any(|&at| self.nodes[at].protocol);
         for child in self.descendants(key) {
             let child = &self.nodes[child];
-            if !child.methods.contains(&method) {
+            if protocol || !child.methods.contains(&method) {
                 let label = child
                     .forms
                     .last()

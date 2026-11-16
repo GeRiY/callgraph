@@ -7,6 +7,9 @@ use std::path::{Component, Path, PathBuf};
 pub(crate) struct ProjectRoot {
     root: PathBuf,
     label: String,
+    /// Az indításkor engedélyezett további gyökerek (`callgraph mcp --allow <mappa>`): az alattuk lévő utak a
+    /// projekt-gyökéren kívül is elfogadottak (abszolút úttal adódnak tovább). Alapból üres: szigorú őr.
+    allowed: Vec<PathBuf>,
 }
 
 impl ProjectRoot {
@@ -23,7 +26,17 @@ impl ProjectRoot {
                     root.display()
                 )
             })?;
-        Ok(Self { root, label })
+        Ok(Self {
+            root,
+            label,
+            allowed: Vec::new(),
+        })
+    }
+
+    /// Az indításkor engedélyezett további gyökerek (kanonikus mappák).
+    pub(crate) fn with_allowed(mut self, allowed: &[PathBuf]) -> Self {
+        self.allowed = allowed.to_vec();
+        self
     }
 
     pub(crate) fn root(&self) -> &Path {
@@ -65,7 +78,15 @@ impl ProjectRoot {
             Err(_) if normalized.starts_with(&self.root) => normalized,
             Err(_) => return Err(outside()),
         };
-        let relative = resolved.strip_prefix(&self.root).map_err(|_| outside())?;
+        let Ok(relative) = resolved.strip_prefix(&self.root) else {
+            // a gyökéren kívül csak az engedélyezett (`--allow`) gyökerek alatti, meglévő út fogadható el
+            return if resolved.exists() && self.allowed.iter().any(|dir| resolved.starts_with(dir))
+            {
+                Ok(resolved.to_string_lossy().into_owned())
+            } else {
+                Err(outside())
+            };
+        };
         let text = relative.to_string_lossy().into_owned();
         Ok(match text.as_str() {
             "" => ".".to_owned(),
@@ -135,6 +156,30 @@ mod tests {
         let outside = std::env::temp_dir().display().to_string();
         assert!(root.resolve(&outside).is_err());
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn allowed_sibling_root_is_opt_in() {
+        let dir = temp_root("allow");
+        let sibling = temp_root("allow-sibling");
+        let name = sibling.file_name().unwrap().to_string_lossy().into_owned();
+        let requested = format!("../{name}/src/a.php");
+        let strict = ProjectRoot::new(&dir, "p".into()).unwrap();
+        assert!(strict.resolve(&requested).is_err());
+        let real = sibling.canonicalize().unwrap();
+        let open = ProjectRoot::new(&dir, "p".into())
+            .unwrap()
+            .with_allowed(std::slice::from_ref(&real));
+        let found = open.resolve(&requested).unwrap();
+        assert_eq!(found, real.join("src/a.php").display().to_string());
+        // más, nem engedélyezett mappa továbbra is tilos
+        assert!(
+            open.resolve(&std::env::temp_dir().display().to_string())
+                .is_err()
+        );
+        assert!(open.resolve("../nowhere-at-all").is_err());
+        let _ = std::fs::remove_dir_all(dir);
+        let _ = std::fs::remove_dir_all(sibling);
     }
 
     #[cfg(unix)]

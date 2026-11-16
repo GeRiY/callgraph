@@ -15,12 +15,14 @@ use crate::model::FileGraph;
 use crate::packages::Packages;
 
 use super::classify::{Classifier, Reason};
-use super::confirm::{confirm, enum_only};
+use super::confirm::{confirm, enum_only, swift_code_role};
 use super::ecosystem::manifest_frameworks;
 use super::flow::{self, FlowFile};
 use super::layer::Layer;
 use super::layers_file::slashed;
 use super::project::{FileEntry, ProjectProfile};
+use super::role::{Confidence, Kind, Role};
+use super::rules::Eco;
 use super::vendor::{Skip, Skipper};
 
 /// A fájlok `framework` mezőjéből ezek számítanak a profilban (a többi — `js`, `swift`, `serde`… — nem mond
@@ -144,6 +146,24 @@ pub(super) fn settle(
     {
         entry.class = *fallback;
         entry.confirmed = check(entry.class.role);
+    }
+    // Swift: a név és a mappa nem mondott semmit (vagy csak egy kontextus-mappa: `Features/…`), a gráf kód-jele
+    // (nézet, `@Observable`, `Codable`) dönt
+    let weak = entry.class.reason == Reason::Unknown
+        || (matches!(entry.class.reason, Reason::Folder(_))
+            && entry
+                .class
+                .role
+                .is_some_and(|role| role.kind() == Kind::Context));
+    if weak
+        && entry.class.eco == Eco::Swift
+        && let Some(graph) = graph
+        && let Some((role, label)) = swift_code_role(graph, hierarchy)
+    {
+        entry.class.role = Role::named(role);
+        entry.class.confidence = Confidence::Medium;
+        entry.class.reason = Reason::Code(label);
+        entry.confirmed = Some(label);
     }
 }
 

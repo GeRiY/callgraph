@@ -87,6 +87,24 @@ closure-ök hívásai a külső metódushoz tartoznak.
 **Nézet-törzs**: a `some View` / `View` / `AnyView` típusú computed property vagy függvény, illetve `@ViewBuilder`
 attribútumú tag törzse.
 
+### Kapcsolatok (nem puszta hívások)
+- **Fogadó-típus:** a tag-hívás `resolved` célja `Típus::név`, ha a fogadó típusa a fájlban deklarált property-ből
+  (`@State var vm = ChatViewModel()`, `let vm: X`, `@Bindable var vm: X`, `@Environment(X.self)`), paraméterből vagy
+  helyi `let` / `var`-ból következik (`self.a.b` láncon át is, amíg a típusok ugyanabban a fájlban vannak).
+- **Metódus-hivatkozás:** `Composer(onSend: vm.send)` hívás-él `handler: true` jelöléssel (nem hívás, a kimenet
+  `(ref)`-fel jelölheti). Csak visszahívást jelző címke (`on…`, `action`, `completion`…), `map` / `forEach` / `sink`, vagy a
+  fájlban definiált metódus neve esetén; a puszta property-olvasás (`Text(vm.title)`) nem.
+- **Closure-bekötés:** `socket.onFrame = { … }` `wire` fajtájú hívás (`resolved`: `Típus::onFrame`, ismeretlen
+  fogadónál `?::onFrame`; `line`–`endLine` a closure). A tárolt closure puszta hívása (`onFrame?(f)`) `Típus::onFrame`
+  célú `internal_helper`. A hívó-index ebből a closure hívottjainak hívójává teszi a meghívó metódust (`via onFrame`,
+  `--depth 2`-től).
+- **Befecskendezés:** `.environment(store)` / `.environmentObject(X())` `inject` fajtájú hívás, célja
+  `.environment(Store)`; a fogadó a `@Environment(Store.self)` property.
+- **Navigáció:** `navigationDestination` / `sheet` / `fullScreenCover` / `popover` / `NavigationLink` argumentumában
+  épített nézet vagy ViewModel `nav` fajtájú hívás.
+- **Protokoll ↔ implementáció:** a protokoll-metódus hívói az implementációnál és fordítva is megjelennek (`via`);
+  az extension a típus csomópontjához olvad.
+
 ## controlFlow
 `{container, caller, type, line, cond, branches[{label, startLine, endLine, fallThrough?}]}`.
 - `if`: az `else if` lánc a külső if ágaiként (`if (…)`, `elseif (…)`, `else`); az ág a kulcsszó sorától az `else`

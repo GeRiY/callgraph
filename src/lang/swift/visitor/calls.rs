@@ -9,14 +9,14 @@ use super::{Scope, SwiftVisitor, clip};
 use crate::model::{Call, FileGraphBuilder};
 
 /// A hívott kifejezés felbontása.
-struct Callee<'t> {
-    name_node: Node<'t>,
-    name: String,
-    member: bool,
+pub(super) struct Callee<'t> {
+    pub(super) name_node: Node<'t>,
+    pub(super) name: String,
+    pub(super) member: bool,
     /// A fogadó pontozott útja, ha csak azonosítókból áll (`self.store`, `DispatchQueue.main`).
-    path: Option<String>,
-    root: Option<String>,
-    chained: bool,
+    pub(super) path: Option<String>,
+    pub(super) root: Option<String>,
+    pub(super) chained: bool,
 }
 
 impl SwiftVisitor<'_, '_> {
@@ -40,19 +40,38 @@ impl SwiftVisitor<'_, '_> {
             chained: callee.chained,
             in_view: scope.in_view,
         };
-        let category = self.categorizer.categorize(&info, &self.symbols);
-        let kind = if callee.member {
+        let mut category = self.categorizer.categorize(&info, &self.symbols);
+        let mut kind = if callee.member {
             "method_call"
         } else if callee.name.chars().next().is_some_and(char::is_uppercase) {
             "new"
         } else {
             "func_call"
         };
-        let target = match (&callee.path, callee.member) {
+        let mut target = match (&callee.path, callee.member) {
             (Some(path), true) => format!("{path}.{}", callee.name),
             (None, true) => format!(".{}", callee.name),
             _ => callee.name.clone(),
         };
+        let mut resolved = None;
+        if callee.member {
+            resolved = self.resolve_member(callee.path.as_deref(), &callee.name, scope);
+            if let Some(ty) = self.injected_type(node, &callee.name, scope) {
+                target = format!(".{}({ty})", callee.name);
+                kind = "inject";
+                resolved = None;
+            }
+        } else if let Some(own) = self.stored_closure(&callee.name, scope) {
+            // a típus tárolt closure-property-jének hívása (`onFrame?(frame)`): a bekötés párja
+            resolved = Some(own);
+            category = "internal_helper";
+        }
+        if self.nav_depth > 0
+            && kind == "new"
+            && matches!(category, "component_use" | "instantiation")
+        {
+            kind = "nav";
+        }
         let start = line(callee.name_node);
         let end = end_line(node);
         b.call(Call {
@@ -62,7 +81,7 @@ impl SwiftVisitor<'_, '_> {
             end_line: (end > start).then_some(end),
             kind: kind.to_string(),
             target,
-            resolved: None,
+            resolved,
             on: callee
                 .root
                 .filter(|_| callee.member && !on_self && callee.path.is_some()),
@@ -73,7 +92,7 @@ impl SwiftVisitor<'_, '_> {
         });
     }
 
-    fn callee<'t>(&self, expr: Node<'t>) -> Option<Callee<'t>> {
+    pub(super) fn callee<'t>(&self, expr: Node<'t>) -> Option<Callee<'t>> {
         match expr.kind() {
             "simple_identifier" => Some(Callee {
                 name_node: expr,
@@ -117,7 +136,7 @@ impl SwiftVisitor<'_, '_> {
     }
 
     /// `a.b.c` alakú út (csak azonosítók / `self`).
-    fn path_of(&self, node: Node<'_>) -> Option<String> {
+    pub(super) fn path_of(&self, node: Node<'_>) -> Option<String> {
         match node.kind() {
             "simple_identifier" | "self_expression" => Some(self.text(node).to_string()),
             "navigation_expression" => {

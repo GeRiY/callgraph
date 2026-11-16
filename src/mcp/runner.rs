@@ -83,6 +83,8 @@ pub(crate) fn unknown_result(id: &str) -> String {
 pub(crate) struct ShowRunner {
     home: SkillHome,
     cwd: PathBuf,
+    /// A `--allow` gyökerek: a projekt-gyökéren kívül is elfogadott utak (alapból üres).
+    allowed: Vec<PathBuf>,
     /// A munkakönyvtár tömör profilja (egyszer számolva, az `initialize`-kor).
     startup: std::sync::OnceLock<String>,
 }
@@ -92,8 +94,15 @@ impl ShowRunner {
         Self {
             home,
             cwd,
+            allowed: Vec::new(),
             startup: std::sync::OnceLock::new(),
         }
+    }
+
+    /// Az indításkor engedélyezett további gyökerek (`callgraph mcp --allow`).
+    pub(crate) fn with_allowed(mut self, allowed: Vec<PathBuf>) -> Self {
+        self.allowed = allowed;
+        self
     }
 
     /// Egy CLI-parancs futtatása pufferbe: siker → a kimenet (bekapcsolt javaslatoknál a végén a javaslat-sorral,
@@ -144,7 +153,8 @@ impl ShowRunner {
     /// Alias → a registry gyökere; alias nélkül a munkakönyvtár.
     fn root(&self, project: Option<&str>) -> Result<ProjectRoot, String> {
         let Some(alias) = project.filter(|a| !a.is_empty()) else {
-            return ProjectRoot::new(&self.cwd, self.cwd.display().to_string());
+            return ProjectRoot::new(&self.cwd, self.cwd.display().to_string())
+                .map(|root| root.with_allowed(&self.allowed));
         };
         let path = self.registry()?.root(alias).ok_or_else(|| {
             crate::tf!(
@@ -153,6 +163,7 @@ impl ShowRunner {
             )
         })?;
         ProjectRoot::new(&PathBuf::from(path), alias.to_owned())
+            .map(|root| root.with_allowed(&self.allowed))
     }
 }
 

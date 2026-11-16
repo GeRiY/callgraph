@@ -1,9 +1,12 @@
 //! Típus- és fájl-szintű tagok: `func` / `init` / `deinit` / `subscript` / computed property → metódus,
 //! `var` / `let` → property (property wrapperrel a típus előtt), `static let` / enum case → konstans.
 
+use std::collections::HashMap;
+
 use tree_sitter::Node;
 
 use super::super::parser::{children, end_line, line, named_children};
+use super::scan;
 use super::signature::is_view_type;
 use super::{MethodSpan, Scope, SwiftVisitor, clip};
 use crate::model::{Constant, FileGraphBuilder, Method, Property};
@@ -152,6 +155,7 @@ impl SwiftVisitor<'_, '_> {
                 container: container.map(str::to_string),
                 caller: "__top__".to_string(),
                 in_view: false,
+                locals: HashMap::new(),
             };
             self.walk_body(value, &scope, b);
         }
@@ -247,8 +251,49 @@ impl SwiftVisitor<'_, '_> {
                 container,
                 caller: name,
                 in_view,
+                locals: self.locals_of(node, Some(body)),
             };
             self.walk_body(body, &scope, b);
+        }
+    }
+
+    /// A metódus paraméterei és a törzsben deklarált helyi változók: név → típusnév.
+    fn locals_of(&self, node: Node<'_>, body: Option<Node<'_>>) -> HashMap<String, String> {
+        let mut out = HashMap::new();
+        for param in children(node)
+            .into_iter()
+            .filter(|c| c.kind() == "parameter")
+        {
+            let (Some(name), Some(ty)) = (
+                param.child_by_field_name("name"),
+                param.child_by_field_name("type"),
+            ) else {
+                continue;
+            };
+            out.insert(
+                self.text(name).to_string(),
+                scan::base_type(self.text(ty)).unwrap_or_default(),
+            );
+        }
+        if let Some(body) = body {
+            self.collect_locals(body, &mut out);
+        }
+        out
+    }
+
+    /// A törzs `let` / `var` deklarációi (beágyazott típus / függvény nélkül).
+    fn collect_locals(&self, node: Node<'_>, out: &mut HashMap<String, String>) {
+        for child in named_children(node) {
+            match child.kind() {
+                "class_declaration" | "function_declaration" => continue,
+                "property_declaration" => {
+                    if let Some((name, ty)) = scan::property_type(self.parsed, child) {
+                        out.entry(name).or_insert(ty);
+                    }
+                }
+                _ => {}
+            }
+            self.collect_locals(child, out);
         }
     }
 

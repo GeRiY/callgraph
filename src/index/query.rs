@@ -34,6 +34,8 @@ struct Edge {
     /// A hívó metódus típusa normalizálva (`app::caller`) — a hierarchián át keresett szülő-hívásokhoz.
     caller_type: Option<String>,
     guessable: bool,
+    /// Swift closure-bekötés (`socket.onFrame = { … }`): a bekötés sora és a closure utolsó sora.
+    wire: Option<(u32, u32)>,
 }
 
 /// A teljes projektből épített, memóriabeli fordított hívó-index.
@@ -43,6 +45,9 @@ pub(crate) struct CallerIndex {
     /// A `Típus::metódus` alakú (feloldott) hívások metódusnév (kisbetű) szerint: (a cél típusa, az él indexe).
     by_method: HashMap<String, Vec<(String, usize)>>,
     hierarchy: TypeHierarchy,
+    /// A bekötött closure hívásai (`edge_key`) → a tárolt closure-t meghívó metódusok hívás-élei (`via <property>`):
+    /// a closure hívottjának a hívója a bekötő metódus mellett a valódi kiváltó is.
+    callbacks: HashMap<String, Vec<Edge>>,
 }
 
 impl CallerIndex {
@@ -84,6 +89,8 @@ impl CallerIndex {
                     caller_type,
                     guessable: (call.resolved.is_none() && call.category == "external_call")
                         || uncertain,
+                    wire: (call.kind == "wire")
+                        .then_some((call.line, call.end_line.unwrap_or(call.line))),
                 });
             }
         }
@@ -100,11 +107,13 @@ impl CallerIndex {
                 }
             }
         }
+        let callbacks = link_callbacks(&edges, &hierarchy);
         Self {
             edges,
             reverse,
             by_method,
             hierarchy,
+            callbacks,
         }
     }
 
@@ -116,6 +125,9 @@ impl CallerIndex {
             .get(&edge.caller_key)
             .cloned()
             .unwrap_or_default();
+        if let Some(invokers) = self.callbacks.get(&edge_key(edge)) {
+            out.extend(invokers.iter().cloned());
+        }
         let Some(caller_type) = edge.caller_type.as_deref() else {
             return out;
         };
@@ -362,6 +374,72 @@ impl CallerIndex {
         }
         (result, skipped)
     }
+}
+
+/// Az él azonosítója a bekötés-táblához: fájl, hívó metódus, sor.
+fn edge_key(edge: &Edge) -> String {
+    format!("{}:{}:{}", edge.row.file, edge.caller_key, edge.row.line)
+}
+
+/// A closure-bekötések (`wire` élek) és a tárolt closure-t meghívó élek párosítása: ha a bekötött tulajdonság
+/// (`RealtimeSocket::onFrame`) azonos vagy rokon (protokoll / implementáció) típuson, azonos nevű tulajdonságot
+/// hív egy metódus (`onFrame?(frame)`), az a closure hívásainak (a bekötés sortartományában lévő éleknek) is
+/// hívója — `via <tulajdonság>` jelöléssel. A `?::név` (ismeretlen fogadójú) bekötés bármely típusra illik.
+fn link_callbacks(edges: &[Edge], hierarchy: &TypeHierarchy) -> HashMap<String, Vec<Edge>> {
+    let mut out: HashMap<String, Vec<Edge>> = HashMap::new();
+    for wire in edges.iter().filter(|edge| edge.wire.is_some()) {
+        let (Some((start, end)), Some((wired, name))) = (wire.wire, split_target(&wire.lookup))
+        else {
+            continue;
+        };
+        let related: Vec<String> = hierarchy
+            .related(&wired, &name)
+            .into_iter()
+            .map(|(key, _)| key)
+            .collect();
+        let property = wire
+            .row
+            .target
+            .rsplit('.')
+            .next()
+            .unwrap_or(&wire.row.target)
+            .to_owned();
+        let invokers: Vec<&Edge> = edges
+            .iter()
+            .filter(|edge| {
+                edge.wire.is_none()
+                    && !(edge.row.file == wire.row.file
+                        && edge.row.container == wire.row.container
+                        && edge.row.caller == wire.row.caller)
+            })
+            .filter(|edge| {
+                split_target(&edge.lookup).is_some_and(|(ty, method)| {
+                    method == name
+                        && (wired == "?"
+                            || same_type(&ty, &wired)
+                            || related.iter().any(|key| same_type(&ty, key)))
+                })
+            })
+            .collect();
+        if invokers.is_empty() {
+            continue;
+        }
+        for callee in edges.iter().filter(|edge| {
+            edge.wire.is_none()
+                && edge.row.file == wire.row.file
+                && edge.row.container == wire.row.container
+                && edge.row.caller == wire.row.caller
+                && (start..=end).contains(&edge.row.line)
+        }) {
+            let parents = out.entry(edge_key(callee)).or_default();
+            for invoker in &invokers {
+                let mut parent = (*invoker).clone();
+                parent.row.via = Some(property.clone());
+                parents.push(parent);
+            }
+        }
+    }
+    out
 }
 
 /// A saját példányon át hívott (`$this->m()`, feloldatlan belső) él célja a hívó típusán: a `lookup`

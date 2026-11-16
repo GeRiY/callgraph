@@ -5,10 +5,13 @@ mod body;
 mod calls;
 mod decls;
 mod flow;
+mod links;
 mod members;
 mod scan;
 mod signature;
 mod text;
+
+use std::collections::HashMap;
 
 use tree_sitter::Node;
 
@@ -23,6 +26,8 @@ pub(super) struct Scope {
     pub caller: String,
     /// SwiftUI-nézetet építő törzs (`var body: some View`, `@ViewBuilder`).
     pub in_view: bool,
+    /// A metódus paraméterei és helyi változói: név → típusnév (a fogadó típusának feloldásához).
+    pub locals: HashMap<String, String>,
 }
 
 /// Egy felvett metódus sortartománya (a kommentek hozzárendeléséhez).
@@ -44,6 +49,8 @@ pub(crate) struct SwiftVisitor<'p, 's> {
     module: Option<String>,
     methods: Vec<MethodSpan>,
     containers: Vec<(String, u32, u32)>,
+    /// Hány navigációs hívás (`navigationDestination`, `sheet`, `NavigationLink`…) zárójelén belül járunk.
+    nav_depth: u32,
 }
 
 impl<'p, 's> SwiftVisitor<'p, 's> {
@@ -60,6 +67,7 @@ impl<'p, 's> SwiftVisitor<'p, 's> {
             module: None,
             methods: Vec::new(),
             containers: Vec::new(),
+            nav_depth: 0,
         }
     }
 
@@ -96,3 +104,5 @@ pub(super) fn clip(text: &str, max: usize) -> String {
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_links;

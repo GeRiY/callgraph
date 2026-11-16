@@ -85,6 +85,11 @@ kimeneti korlát és a statikus elemzés korlátai.
   külön paraméter).
 - **Hálózat csak a frissítéshez:** a lekérdezések soha nem használnak hálózatot; naponta legfeljebb egyszer a
   legutóbbi kiadás lekérdezése (és `--auto-update` mellett a letöltése) — lásd lent: [Frissítés](#frissítés).
+- **Testvér-mappa (opt-in):** az eszközök alapból a projekt-gyökéren belül maradnak (`Path is outside the project
+  root`). Egy gyökéren kívüli mappa (pl. a `../android` az iOS-projekt mellett) olvasásához indításkor add meg:
+  `"args": ["mcp", "--allow", "../android"]` (ismételhető), vagy a `CALLGRAPH_MCP_ALLOW` környezeti változóban
+  (Unixon `:`-tal elválasztva). A relatív út a szerver munkakönyvtárához képest oldódik fel; csak a megadott
+  mappák alatti, meglévő utak engedettek (a symlinkek feloldva), minden más továbbra is elutasított.
 - **Hibák:** eszköz-hibaként (`isError: true`) jönnek vissza a beállított nyelvű üzenettel — a szerver nem áll le.
 
 ## Frissítés

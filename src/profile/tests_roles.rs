@@ -148,3 +148,61 @@ fn mail_and_notification_need_a_code_signal() {
         (Some("notification"), Some("extends Notification"))
     );
 }
+
+#[test]
+fn swift_project_folders_get_layers() {
+    let role_of = |rel: &str| Classifier::default().role_of(rel).map(Role::name);
+    assert_eq!(role_of("Core/Networking/ApiClient.swift"), Some("api"));
+    assert_eq!(role_of("Core/Networking/Endpoints.swift"), Some("api"));
+    assert_eq!(role_of("Shared/UI/Avatar.swift"), Some("view"));
+    assert_eq!(role_of("Features/Chat/Content/Bubble.swift"), Some("view"));
+    assert_eq!(role_of("Features/Admin/AdminPanel.swift"), Some("feature"));
+    assert_eq!(role_of("Shared/Extensions/String+Trim.swift"), Some("util"));
+    // más ökoszisztémában a Swift-mappák nem számítanak
+    assert_eq!(role_of("src/Shared/UI/Avatar.php"), None);
+}
+
+#[test]
+fn swift_code_signals_decide_when_names_say_nothing() {
+    let c = Classifier::default();
+    let hierarchy = TypeHierarchy::from_graphs([]);
+    let typed = |kind: &str, name: &str, implements: &[&str]| {
+        graph(json!({
+            "containers": [{"type": kind, "name": name, "line": 1, "endLine": 9, "doc": null,
+                            "implements": implements}]
+        }))
+    };
+    let settled = |rel: &str, file_graph: &FileGraph| {
+        let mut entry = entries(&[rel]).remove(0);
+        settle(&mut entry, Some(file_graph), &hierarchy, &c);
+        entry.class.role.map(Role::name)
+    };
+    // `@Observable` osztály (a frontend az `Observable` protokollt adja) → store, a `Features/` kontextus-mappa ellenére
+    let connection = typed("class", "ChatConnection", &["Observable"]);
+    assert_eq!(
+        settled("Features/Chat/ChatConnection.swift", &connection),
+        Some("store")
+    );
+    let media = typed("struct", "ChatMedia", &["Codable", "Identifiable"]);
+    assert_eq!(
+        settled("Features/Chat/ChatMedia.swift", &media),
+        Some("model")
+    );
+    let screen = typed("component", "AdminPanel", &["View"]);
+    assert_eq!(
+        settled("Features/Admin/AdminPanel.swift", &screen),
+        Some("view")
+    );
+    // semmi jel: marad a kontextus-mappa
+    let plain = typed("struct", "Plain", &[]);
+    assert_eq!(
+        settled("Features/Chat/Plain.swift", &plain),
+        Some("feature")
+    );
+    // a névből jövő szerepet nem írja felül
+    let store = typed("class", "ChatViewModel", &["Observable"]);
+    assert_eq!(
+        settled("Features/Chat/ChatViewModel.swift", &store),
+        Some("viewmodel")
+    );
+}

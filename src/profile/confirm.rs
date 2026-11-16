@@ -143,7 +143,12 @@ pub(crate) static CONFIRM_RULES: &[ConfirmRule] = &[
     rule("factory", &["factory"], &[], "extends Factory"),
     rule("migration", &["migration"], &[], "extends Migration"),
     rule("test", &["*testcase"], &[], "extends TestCase"),
-    rule("viewmodel", &["observableobject"], &[], "ObservableObject"),
+    rule(
+        "viewmodel",
+        &["observableobject", "observable"],
+        &[],
+        "ObservableObject / @Observable",
+    ),
     rule("view", &["view"], &[], "conforms to View"),
     rule(
         "store",
@@ -184,6 +189,29 @@ pub(crate) fn confirm(
                 || method_signal(rule, graph)
         })
         .map(|rule| rule.label)
+}
+
+/// Swift fájl szerepe a kódjából, ha a név és a mappa nem mondott semmit: SwiftUI-nézet (`View`) → `view`,
+/// `@Observable` / `ObservableObject` osztály → `store`, `Codable` / `Identifiable` adat-típus → `model`.
+/// A szerep és a kiírt címke.
+pub(crate) fn swift_code_role(
+    graph: &FileGraph,
+    hierarchy: &TypeHierarchy,
+) -> Option<(&'static str, &'static str)> {
+    if graph.containers.iter().any(|c| c.kind == "component") {
+        return Some(("view", "conforms to View"));
+    }
+    let ancestors = ancestor_names(graph, hierarchy);
+    let has = |names: &[&str]| names.iter().any(|name| ancestors.contains(*name));
+    let data = graph
+        .containers
+        .iter()
+        .any(|c| matches!(c.kind.as_str(), "class" | "struct" | "actor"));
+    if data && has(&["observable", "observableobject"]) {
+        return Some(("store", "@Observable / ObservableObject"));
+    }
+    (data && has(&["codable", "decodable", "encodable", "identifiable"]))
+        .then_some(("model", "Codable / Identifiable"))
 }
 
 /// Csak enum(ok) van-e a fájlban: PHP / Rust / Swift-nél minden típus `enum` (az `impl` / `extension` blokkok és a

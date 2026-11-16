@@ -9,6 +9,7 @@ pub mod go;
 pub mod html;
 pub mod js;
 pub mod json;
+pub mod kotlin;
 mod language;
 pub mod markdown;
 pub mod php;

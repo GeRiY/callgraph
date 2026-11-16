@@ -1,4 +1,4 @@
-//! `callgraph mcp [--auto-update]` — MCP-szerver stdio-n (a CLI mellett egy további használati mód; a CLI
+//! `callgraph mcp [--auto-update] [--allow <mappa>]…` — MCP-szerver stdio-n (a CLI mellett egy további használati mód; a CLI
 //! változatlan). `--auto-update`: indításkor, a kézfogás előtt naponta egyszer frissít (`mcp::autoupdate`).
 
 use std::io::Write;
@@ -11,11 +11,17 @@ use crate::skill::SkillHome;
 pub struct McpCommand {
     home: SkillHome,
     auto_update: bool,
+    /// A `--allow` mappák (a projekt-gyökéren kívül is elérhető gyökerek).
+    allow: Vec<String>,
 }
 
 impl McpCommand {
-    pub fn new(home: SkillHome, auto_update: bool) -> Self {
-        Self { home, auto_update }
+    pub fn new(home: SkillHome, auto_update: bool, allow: Vec<String>) -> Self {
+        Self {
+            home,
+            auto_update,
+            allow,
+        }
     }
 }
 
@@ -25,7 +31,7 @@ impl Command for McpCommand {
             // sikeres frissítésnél nem tér vissza: az új binárissal indul újra (a stdout-ra itt sem ír)
             crate::mcp::auto_update(&self.home, err);
         }
-        crate::mcp::serve_stdio(self.home.clone(), self.auto_update)?;
+        crate::mcp::serve_stdio(self.home.clone(), self.auto_update, &self.allow, err)?;
         Ok(0)
     }
 }

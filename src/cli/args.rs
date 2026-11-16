@@ -17,8 +17,8 @@ use super::uses_args::{parse_deps, parse_uses};
 
 fn usage() -> &'static str {
     crate::t!(
-        "callgraph [--lang <id,...>] [--cache <file>] [--no-cache] <file|dir> [...] | callgraph prune [--cache <file>] [--dry-run] | callgraph set-lang [en|hu] | callgraph self-update [--check] | callgraph note add|list|rm … | callgraph refresh [--project <alias|dir>] [--background] [<path>…] | callgraph locate <term>... [--all] [--project <alias|dir>] | callgraph hook install|uninstall|status | callgraph stats [--events] [--days N] | callgraph mcp [--auto-update] | callgraph --version  (any command: --no-gitignore = ignore the .gitignore files)",
-        "callgraph [--lang <id,...>] [--cache <fájl>] [--no-cache] <fájl|mappa> [...] | callgraph prune [--cache <fájl>] [--dry-run] | callgraph set-lang [en|hu] | callgraph self-update [--check] | callgraph note add|list|rm … | callgraph refresh [--project <alias|mappa>] [--background] [<út>…] | callgraph locate <kifejezés>... [--all] [--project <alias|mappa>] | callgraph hook install|uninstall|status | callgraph stats [--events] [--days N] | callgraph mcp [--auto-update] | callgraph --version  (bármely parancsnál: --no-gitignore = a .gitignore fájlok nélkül)"
+        "callgraph [--lang <id,...>] [--cache <file>] [--no-cache] <file|dir> [...] | callgraph prune [--cache <file>] [--dry-run] | callgraph set-lang [en|hu] | callgraph self-update [--check] | callgraph note add|list|rm … | callgraph refresh [--project <alias|dir>] [--background] [<path>…] | callgraph locate <term>... [--all] [--project <alias|dir>] | callgraph hook install|uninstall|status | callgraph stats [--events] [--days N] | callgraph mcp [--auto-update] [--allow <dir>]... | callgraph --version  (any command: --no-gitignore = ignore the .gitignore files)",
+        "callgraph [--lang <id,...>] [--cache <fájl>] [--no-cache] <fájl|mappa> [...] | callgraph prune [--cache <fájl>] [--dry-run] | callgraph set-lang [en|hu] | callgraph self-update [--check] | callgraph note add|list|rm … | callgraph refresh [--project <alias|mappa>] [--background] [<út>…] | callgraph locate <kifejezés>... [--all] [--project <alias|mappa>] | callgraph hook install|uninstall|status | callgraph stats [--events] [--days N] | callgraph mcp [--auto-update] [--allow <mappa>]... | callgraph --version  (bármely parancsnál: --no-gitignore = a .gitignore fájlok nélkül)"
     )
 }
 
@@ -234,13 +234,45 @@ pub enum CliArgs {
     Version,
     /// `--help` / `-h` / `help`: a teljes súgó.
     Help,
-    /// `mcp [--auto-update]`: MCP-szerver stdio-n; `--auto-update`: indításkor naponta egyszer frissít.
-    Mcp { auto_update: bool },
+    /// `mcp [--auto-update] [--allow <mappa>]…`: MCP-szerver stdio-n; `--auto-update`: indításkor naponta egyszer
+    /// frissít; `--allow`: a projekt-gyökéren kívüli, engedélyezett mappa (alapból az őr szigorú).
+    Mcp {
+        auto_update: bool,
+        /// `--allow <mappa>` (ismételhető): további gyökerek, amelyek alatti utakat az MCP-őr elfogad.
+        allow: Vec<String>,
+    },
     /// Skill-parancs (`project`, `feedback`, `wrap`, `error`, `set-lang`, `self-update`, `skill-sync`) nyers argumentumokkal.
     Skill { command: String, args: Vec<String> },
 }
 
 impl CliArgs {
+    /// `mcp [--auto-update] [--allow <mappa>]…` (a `--allow=<mappa>` alak is jó).
+    fn parse_mcp(args: &[String]) -> Result<Self> {
+        let usage = || {
+            CallgraphError::Usage(
+                crate::t!(
+                    "callgraph mcp [--auto-update] [--allow <dir>]... (MCP server on stdio; --auto-update: update itself at start, at most once a day; --allow: let the tools read this extra folder outside the project root, repeatable, or set CALLGRAPH_MCP_ALLOW; default: strict)",
+                    "callgraph mcp [--auto-update] [--allow <mappa>]... (MCP-szerver stdio-n; --auto-update: indításkor frissíti magát, naponta legfeljebb egyszer; --allow: az eszközök a projekt-gyökéren kívüli ezen mappát is olvashatják, ismételhető, vagy a CALLGRAPH_MCP_ALLOW környezeti változó; alapból szigorú)"
+                )
+                .into(),
+            )
+        };
+        let (mut auto_update, mut allow) = (false, Vec::new());
+        let mut rest = args.iter();
+        while let Some(arg) = rest.next() {
+            if arg == crate::mcp::AUTO_UPDATE_FLAG {
+                auto_update = true;
+            } else if arg == "--allow" {
+                allow.push(rest.next().ok_or_else(usage)?.clone());
+            } else if let Some(dir) = arg.strip_prefix("--allow=") {
+                allow.push(dir.to_owned());
+            } else {
+                return Err(usage());
+            }
+        }
+        Ok(Self::Mcp { auto_update, allow })
+    }
+
     /// A program neve nélküli argumentumlistából állít elő parancsot.
     pub fn parse<I: IntoIterator<Item = String>>(args: I) -> Result<Self> {
         let args: Vec<String> = args.into_iter().collect();
@@ -251,19 +283,7 @@ impl CliArgs {
             return Ok(Self::Help);
         }
         if args.first().is_some_and(|a| a == "mcp") {
-            let auto_update = args
-                .get(1)
-                .is_some_and(|a| a == crate::mcp::AUTO_UPDATE_FLAG);
-            if args.len() > 1 + usize::from(auto_update) {
-                return Err(CallgraphError::Usage(
-                    crate::t!(
-                        "callgraph mcp [--auto-update] (MCP server on stdio; --auto-update: update itself at start, at most once a day)",
-                        "callgraph mcp [--auto-update] (MCP-szerver stdio-n; --auto-update: indításkor frissíti magát, naponta legfeljebb egyszer)"
-                    )
-                    .into(),
-                ));
-            }
-            return Ok(Self::Mcp { auto_update });
+            return Self::parse_mcp(&args[1..]);
         }
         if args.first().is_some_and(|a| a == "prune") {
             return Self::parse_prune(&args[1..]);
@@ -1138,12 +1158,33 @@ mod tests {
         ));
         assert_eq!(
             parse(&["mcp"]).unwrap(),
-            CliArgs::Mcp { auto_update: false }
+            CliArgs::Mcp {
+                auto_update: false,
+                allow: Vec::new()
+            }
         );
         assert_eq!(
             parse(&["mcp", "--auto-update"]).unwrap(),
-            CliArgs::Mcp { auto_update: true }
+            CliArgs::Mcp {
+                auto_update: true,
+                allow: Vec::new()
+            }
         );
+        assert_eq!(
+            parse(&[
+                "mcp",
+                "--allow",
+                "../android",
+                "--auto-update",
+                "--allow=/tmp/x"
+            ])
+            .unwrap(),
+            CliArgs::Mcp {
+                auto_update: true,
+                allow: vec!["../android".to_owned(), "/tmp/x".to_owned()]
+            }
+        );
+        assert!(parse(&["mcp", "--allow"]).is_err());
         assert!(parse(&["mcp", "x"]).is_err());
         assert!(parse(&["mcp", "--auto-update", "x"]).is_err());
         assert!(parse(&["mcp", "x", "--auto-update"]).is_err());

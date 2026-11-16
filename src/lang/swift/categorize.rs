@@ -34,6 +34,8 @@ pub(crate) struct FileSymbols {
     pub functions: HashSet<String>,
     /// A fájlban deklarált protokollok.
     pub protocols: HashSet<String>,
+    /// Típus (rövid név, extension-nél az alap típus) → a property-jei: név → típusnév (`vm` → `ChatViewModel`).
+    pub props: HashMap<String, HashMap<String, String>>,
 }
 
 /// A kategorizáló bemenete: a hívás és a fájl szimbólumai.
