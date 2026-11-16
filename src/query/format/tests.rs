@@ -103,6 +103,31 @@ fn summary_and_coverage_follow_the_language() {
 }
 
 #[test]
+fn summary_shows_the_folder_for_multi_file_output() {
+    let en = render(
+        Lang::En,
+        "summary",
+        &[
+            row("Chat/Shop.php", CLASS),
+            row("Chat/run.php", SCRIPT),
+            row("Admin/Shop.php", CLASS),
+        ],
+    );
+    // azonos mappájú sorok fejléc alatt, az egyedül álló sor teljes úttal
+    assert!(
+        en.starts_with("Chat/\n  Shop.php  class Shop  (1 method)\n  run.php  procedural ("),
+        "{en}"
+    );
+    assert!(
+        en.contains("\nAdmin/Shop.php  class Shop  (1 method)\n"),
+        "{en}"
+    );
+    // egy fájl: változatlan, csak a fájlnév
+    let one = render(Lang::En, "summary", &[row("Chat/Shop.php", CLASS)]);
+    assert_eq!(one, "Shop.php  class Shop  (1 method)\n");
+}
+
+#[test]
 fn procedural_outline_follows_the_language() {
     let (en, hu) = both("outline", &[row("src/run.php", SCRIPT)]);
     assert!(

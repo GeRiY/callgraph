@@ -145,14 +145,22 @@ pub(crate) fn is_test_path(path: &str) -> bool {
     let name = lower.rsplit('/').next().unwrap_or(&lower);
     lower.starts_with("tests/")
         || lower.starts_with("test/")
-        || ["/tests/", "/test/", "/__tests__/", "/spec/"]
-            .iter()
-            .any(|dir| lower.contains(dir))
+        || [
+            "/tests/",
+            "/test/",
+            "/__tests__/",
+            "/spec/",
+            "/androidtest/",
+        ]
+        .iter()
+        .any(|dir| lower.contains(dir))
         || name.contains(".spec.")
         || name.contains(".test.")
         || name.ends_with("test.php")
         || name.ends_with("_test.rs")
         || name.ends_with("tests.swift")
+        || name.ends_with("test.kt")
+        || name.ends_with("tests.kt")
         || (name.starts_with("test_") && name.ends_with(".py"))
         || name.ends_with("_test.py")
         || name == "conftest.py"

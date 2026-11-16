@@ -244,8 +244,20 @@ fn layers_flag_tags_and_groups_without_changing_the_rest() {
     .map(|h| grouped.find(h).unwrap_or_else(|| panic!("{h}: {grouped}")))
     .collect();
     assert!(order.windows(2).all(|w| w[0] < w[1]), "{grouped}");
-    // ugyanazok a fájl-sorok, csak csoportosítva
-    let mut a: Vec<&str> = summary.lines().collect();
+    // ugyanazok a fájl-sorok, csak csoportosítva (a sima summary mappánként csoportosít: a mappa-fejléc és a
+    // behúzás / a sor eleji mappa-út nélkül hasonlítunk)
+    let mut a: Vec<&str> = summary
+        .lines()
+        .filter(|l| !l.ends_with('/') && !l.starts_with("root: "))
+        .map(|l| {
+            let l = l.trim_start();
+            let name_end = l.find("  ").unwrap_or(l.len());
+            match l[..name_end].rfind('/') {
+                Some(slash) => &l[slash + 1..],
+                None => l,
+            }
+        })
+        .collect();
     let mut b: Vec<&str> = grouped.lines().filter(|l| !l.starts_with('[')).collect();
     a.sort_unstable();
     b.sort_unstable();

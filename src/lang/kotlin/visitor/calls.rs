@@ -257,8 +257,25 @@ impl KotlinVisitor<'_, '_> {
                 let (target, name) = navigation(node)?;
                 Some(format!("{}.{}", self.path_of(target)?, self.text(name)))
             }
-            _ => None,
+            // `repo.owner!!.save()`: a `!!` nem változtat az úton
+            _ => self
+                .non_null_inner(node)
+                .and_then(|inner| self.path_of(inner)),
         }
+    }
+
+    /// A `x!!` kifejezés belső kifejezése (a node szövege `!!`-ra végződik, és van nevesített gyereke).
+    fn non_null_inner<'t>(&self, node: Node<'t>) -> Option<Node<'t>> {
+        if IDENTS.contains(&node.kind())
+            || matches!(
+                node.kind(),
+                "string_literal" | "multiline_string_literal" | "line_comment" | "block_comment"
+            )
+            || !self.text(node).trim_end().ends_with("!!")
+        {
+            return None;
+        }
+        operands(node).into_iter().next()
     }
 
     /// A lánc bal szélső azonosítója, és hogy hívás(oka)n át értük-e el.
@@ -274,7 +291,10 @@ impl KotlinVisitor<'_, '_> {
                 Some(callee) => (self.root_of(callee).0, true),
                 None => (None, true),
             },
-            _ => (None, false),
+            _ => match self.non_null_inner(node) {
+                Some(inner) => self.root_of(inner),
+                None => (None, false),
+            },
         }
     }
 

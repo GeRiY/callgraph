@@ -15,7 +15,7 @@ struct Site {
     family: String,
 }
 
-/// A fájl nyelvcsaládja a kiterjesztésből: a JS / TS / Vue / HTML együtt, a PHP külön, más a saját kiterjesztése.
+/// A fájl nyelvcsaládja a kiterjesztésből: a JS / TS / Vue / HTML együtt, a `kt` / `kts` együtt, a PHP külön, más a saját kiterjesztése.
 fn family(file: &str) -> String {
     let ext = file
         .rsplit_once('.')
@@ -25,6 +25,7 @@ fn family(file: &str) -> String {
         "js" | "jsx" | "mjs" | "cjs" | "ts" | "tsx" | "mts" | "cts" | "vue" | "html" | "htm" => {
             "js".to_owned()
         }
+        "kt" | "kts" => "kt".to_owned(),
         _ => ext,
     }
 }

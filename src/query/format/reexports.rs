@@ -32,7 +32,7 @@ pub(super) fn find(source: &str, syntax: Syntax, filter: &str) -> Vec<ReExport> 
         Syntax::Rust => &*RUST_START,
         Syntax::Js => &*JS_START,
         Syntax::Php => &*PHP_START,
-        Syntax::Swift => return Vec::new(),
+        Syntax::Swift | Syntax::Kotlin => return Vec::new(),
     };
     let mut scanner = LineScanner::new(syntax);
     let mut out = Vec::new();

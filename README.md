@@ -98,6 +98,7 @@ Per-language guides with examples: [PHP](https://callgraph.eu/php/) · [Rust](ht
 | JavaScript / TypeScript | `.js` `.mjs` `.cjs` `.jsx` `.ts` `.tsx` | modules, functions, classes, imports with alias resolution (`jsconfig` / `tsconfig`) |
 | Vue | `.vue` | props, emits, `setup`, template components and event handlers, `computed`, `watch`, lifecycle hooks, Options API |
 | Swift / SwiftUI | `.swift` | classes, structs, enums, protocols, actors, extensions; `View` types as components; `func` / `init` / computed properties (`body`); property wrappers (`@State`, `@Binding`, `@Published`, …); SwiftUI views and modifiers as their own call categories |
+| Kotlin / Android | `.kt` `.kts` | classes, objects, interfaces, data / sealed / enum classes, companions, extension functions; `@Composable` functions as components; Compose views and modifiers, coroutines / Flow and Android APIs as their own call categories; Hilt / Dagger `inject` and `provide` edges, Compose Navigation `nav` edges, `ViewModel` factories, method references (`::`) as `(ref)` calls; `*.gradle.kts` build scripts marked |
 | Python | `.py` `.pyi` | classes (bases, decorators), functions / methods (`async`, `@staticmethod`, `@classmethod`, `@property`) with signatures, constants, `__all__`, docstrings, imports, calls (`native_python`, `internal_helper`, `static_call`, …), Django / Flask / FastAPI detection |
 | Go | `.go` | packages, structs (fields as properties, embedded types), interfaces, type aliases, functions and methods with receivers and signatures (several return values, generics), `const` / `var`, imports (alias, blank, dot), calls (`native_go`, `internal_helper`, …), `go` / `defer`, exported (capitalised) = public; `vendor` / `testdata` skipped, `_test.go` ranked as tests |
 | CSS / SCSS | `.css` `.scss` | rule blocks and at-rules (`@media`, `@layer`, Tailwind v4 `@theme` / `@utility` / `@source` …), mixins, functions, variables, `@use` / `@import` |
@@ -486,6 +487,7 @@ files ─► FileWalker ─► LanguageRegistry ─► Language::analyze ─► 
          (.gitignore,    (by extension)     (mago · oxc · raffia ·   (one shared
           vendor, …)                         pulldown-cmark · syn ·    schema)
                                              tree-sitter-swift ·
+                                             tree-sitter-kotlin-ng ·
                                              tree-sitter-python ·
                                              tree-sitter-go)
 ```
@@ -494,13 +496,13 @@ files ─► FileWalker ─► LanguageRegistry ─► Language::analyze ─► 
   query layer (`src/query/`) never needs to know which language a file was.
 - Parsers: [mago](https://github.com/carthage-software/mago) (PHP), [oxc](https://github.com/oxc-project/oxc)
   (JS / TS / Vue), [raffia](https://github.com/g-plane/raffia) (CSS / SCSS),
-  [pulldown-cmark](https://github.com/pulldown-cmark/pulldown-cmark) (Markdown), [syn](https://github.com/dtolnay/syn) (Rust), [tree-sitter-swift](https://github.com/alex-pinkus/tree-sitter-swift) (Swift), [tree-sitter-python](https://github.com/tree-sitter/tree-sitter-python) (Python), [tree-sitter-go](https://github.com/tree-sitter/tree-sitter-go) (Go).
+  [pulldown-cmark](https://github.com/pulldown-cmark/pulldown-cmark) (Markdown), [syn](https://github.com/dtolnay/syn) (Rust), [tree-sitter-swift](https://github.com/alex-pinkus/tree-sitter-swift) (Swift), [tree-sitter-kotlin-ng](https://github.com/tree-sitter-grammars/tree-sitter-kotlin) (Kotlin), [tree-sitter-python](https://github.com/tree-sitter/tree-sitter-python) (Python), [tree-sitter-go](https://github.com/tree-sitter/tree-sitter-go) (Go).
 - Results are cached per file in JSONL (keyed by mtime); "who calls this?" uses an incremental project index (mtime + size) under
   `.callgraph/`.
 
 Design and coding rules: [`ARCHITECTURE.md`](ARCHITECTURE.md) · query layer: [`docs/QUERY.md`](docs/QUERY.md) ·
 per-language mapping: [`docs/LANG-JS.md`](docs/LANG-JS.md), [`docs/LANG-CSS.md`](docs/LANG-CSS.md),
-[`docs/LANG-DOC.md`](docs/LANG-DOC.md), [`docs/LANG-RUST.md`](docs/LANG-RUST.md), [`docs/LANG-SWIFT.md`](docs/LANG-SWIFT.md), [`docs/LANG-PYTHON.md`](docs/LANG-PYTHON.md), [`docs/LANG-GO.md`](docs/LANG-GO.md) (the detailed docs are currently in Hungarian).
+[`docs/LANG-DOC.md`](docs/LANG-DOC.md), [`docs/LANG-RUST.md`](docs/LANG-RUST.md), [`docs/LANG-SWIFT.md`](docs/LANG-SWIFT.md), [`docs/LANG-KOTLIN.md`](docs/LANG-KOTLIN.md), [`docs/LANG-PYTHON.md`](docs/LANG-PYTHON.md), [`docs/LANG-GO.md`](docs/LANG-GO.md) (the detailed docs are currently in Hungarian).
 
 ## Development
 

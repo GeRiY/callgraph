@@ -10,6 +10,7 @@ pub(super) enum Syntax {
     Js,
     Rust,
     Swift,
+    Kotlin,
 }
 
 impl Syntax {
@@ -24,20 +25,21 @@ impl Syntax {
             "js" | "jsx" | "mjs" | "cjs" | "ts" | "tsx" | "mts" | "cts" | "vue" => Some(Self::Js),
             "rs" => Some(Self::Rust),
             "swift" => Some(Self::Swift),
+            "kt" | "kts" => Some(Self::Kotlin),
             _ => None,
         }
     }
 
-    /// Rustban és Swiftben a `/* */` egymásba ágyazható.
+    /// Rustban, Swiftben és Kotlinban a `/* */` egymásba ágyazható.
     fn nested_blocks(self) -> bool {
-        matches!(self, Self::Rust | Self::Swift)
+        matches!(self, Self::Rust | Self::Swift | Self::Kotlin)
     }
 
     /// Attribútum / dekorátor kezdősora (`#[…]`, `@Foo`).
     fn is_attribute_start(self, trimmed: &str) -> bool {
         match self {
             Self::Rust | Self::Php => trimmed.starts_with("#["),
-            Self::Js | Self::Swift => trimmed.starts_with('@'),
+            Self::Js | Self::Swift | Self::Kotlin => trimmed.starts_with('@'),
         }
     }
 
@@ -242,6 +244,16 @@ impl LineScanner {
                     triple: true,
                     hashes: 0,
                     escapes: true,
+                    multiline: true,
+                };
+                i + 3
+            }
+            // Kotlin nyers string: `"""…"""`, escape nélkül, több soros
+            (Syntax::Kotlin, b'"') if bytes[i..].starts_with(b"\"\"\"") => {
+                self.state = State::Delimited {
+                    triple: true,
+                    hashes: 0,
+                    escapes: false,
                     multiline: true,
                 };
                 i + 3
