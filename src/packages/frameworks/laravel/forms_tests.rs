@@ -683,6 +683,27 @@ fn a_transform_decides_the_sent_keys() {
     );
 }
 
+/// A láncolt `form.transform(..).post(..)` (Inertia-doksi) ugyanúgy űrlap-küldés, mint a két utasításos alak.
+#[test]
+fn a_chained_transform_post_is_a_form_submit() {
+    let text = "const form = useForm({ name: '' });\nconst save = () => {\n  form.transform((d) => ({ ...d, extra: 1 })).post('/x');\n};\n";
+    let mut post = call(
+        "method_call",
+        "post",
+        None,
+        "external_call",
+        line_of(text, ".post"),
+    );
+    post.on = Some("<expr>".into());
+    post.caller = Some("save".into());
+    let calls = vec![use_form(text, "const form"), post];
+    let sites = extract("p.vue", text, &calls);
+    assert_eq!(sites.len(), 1);
+    assert_eq!(sites[0].fields, strings(&["name", "extra"]));
+    assert_eq!(sites[0].verb, "POST");
+    assert_eq!(sites[0].arg, "'/x'");
+}
+
 /// A preset űrlap-szerződése a transformot is figyelembe veszi: nincs hamis „szabály nélkül küldött” mező.
 #[test]
 fn the_preset_contract_follows_the_transform() {

@@ -182,9 +182,15 @@ pub(super) fn extract(rel: &str, text: &str, calls: &[Call]) -> Vec<Site> {
         {
             continue;
         }
-        let Some((var, method)) = call.target.rsplit_once('.') else {
-            continue;
+        let (var, method) = match call.target.rsplit_once('.') {
+            Some((var, method)) => (var.to_owned(), method),
+            // láncolt küldés: `form.transform(..).post(..)` — a hívás célja csak `post`
+            None => match chained_var(text, call.line, &decls) {
+                Some(var) => (var, call.target.as_str()),
+                None => continue,
+            },
         };
+        let var = var.as_str();
         let verb = match method {
             "post" => "POST",
             "put" => "PUT",
@@ -225,6 +231,26 @@ pub(super) fn extract(rel: &str, text: &str, calls: &[Call]) -> Vec<Site> {
         });
     }
     sites
+}
+
+/// Láncolt küldés (`form.transform(..).post(..)`) űrlap-változója: a küldő sor (és a három előtte álló) utolsó
+/// `<változó>.transform(` előfordulása, ha a változó `useForm` deklaráció.
+fn chained_var(text: &str, line: u32, decls: &[(u32, String, Vec<String>)]) -> Option<String> {
+    static TRANSFORM: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"([A-Za-z_$][\w$]*)\s*\.\s*transform\s*\(").expect("valid regex")
+    });
+    let end = usize::try_from(line).ok()?;
+    let window: Vec<&str> = text
+        .lines()
+        .skip(end.saturating_sub(4))
+        .take(end.min(4))
+        .collect();
+    let window = window.join("\n");
+    TRANSFORM
+        .captures_iter(&window)
+        .map(|found| found[1].to_owned())
+        .filter(|var| decls.iter().any(|decl| decl.1 == *var))
+        .last()
 }
 
 /// Egy objektum-literál felső szintű kulcsai: `{ name: '', 'e-mail': '', password }`; ha az argumentum nem

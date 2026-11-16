@@ -11,6 +11,22 @@ use crate::model::FileGraph;
 struct Site {
     owner: Option<String>,
     caller: String,
+    /// A hívó fájl nyelvcsaládja (`family`): csak azonos családú definíciót hívhat.
+    family: String,
+}
+
+/// A fájl nyelvcsaládja a kiterjesztésből: a JS / TS / Vue / HTML együtt, a PHP külön, más a saját kiterjesztése.
+fn family(file: &str) -> String {
+    let ext = file
+        .rsplit_once('.')
+        .map_or("", |(_, ext)| ext)
+        .to_lowercase();
+    match ext.as_str() {
+        "js" | "jsx" | "mjs" | "cjs" | "ts" | "tsx" | "mts" | "cts" | "vue" | "html" | "htm" => {
+            "js".to_owned()
+        }
+        _ => ext,
+    }
 }
 
 /// A projekt hívásai a hívott név (kisbetűvel) szerint.
@@ -63,6 +79,7 @@ impl CallerCounts {
                 by_name.entry(name.to_owned()).or_default().push(Site {
                     owner: owner.map(|o| short_name(o).to_owned()),
                     caller,
+                    family: family(&graph.file),
                 });
             }
         }
@@ -71,7 +88,9 @@ impl CallerCounts {
 
     /// A `container` típus `name` metódusának (vagy a `name` függvénynek) hívói. A JS objektum-literál metódusa
     /// (`api.refund`) a pont előtti részt tekinti típusnak.
-    pub(crate) fn of(&self, container: Option<&str>, name: &str) -> Callers {
+    /// Csak azonos nyelvcsaládú hívó számít: a Vue `setLocale()`-ját nem hívja a PHP `setLocale`-hívás.
+    pub(crate) fn of(&self, container: Option<&str>, name: &str, file: &str) -> Callers {
+        let own_family = family(file);
         let name = name.to_lowercase();
         let (inner_owner, bare) = split_member(&name);
         let owner = inner_owner
@@ -82,10 +101,11 @@ impl CallerCounts {
         };
         let mut seen: Vec<&str> = Vec::new();
         for site in sites {
-            let fits = match (&site.owner, &owner) {
-                (None, _) | (_, None) => true,
-                (Some(called), Some(own)) => called == own || !self.types.contains(called),
-            };
+            let fits = site.family == own_family
+                && match (&site.owner, &owner) {
+                    (None, _) | (_, None) => true,
+                    (Some(called), Some(own)) => called == own || !self.types.contains(called),
+                };
             if fits && !seen.contains(&site.caller.as_str()) {
                 seen.push(&site.caller);
             }

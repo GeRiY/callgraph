@@ -287,7 +287,18 @@ impl Parser<'_> {
         let names: String = mods
             .iter()
             .filter(|s| matches!(s.name.as_str(), "name" | "as"))
-            .filter_map(|s| first_literal(s))
+            .filter_map(|s| {
+                // az interpolált név (`"{$code}.x"`) is név: a ziggy nézet dinamikus mintaként kezeli
+                s.args.first().and_then(|&range| {
+                    let raw = self.slice(range).trim();
+                    unquote(raw).or_else(|| {
+                        raw.strip_prefix('"')
+                            .and_then(|r| r.strip_suffix('"'))
+                            .filter(|inner| inner.contains('$') && !inner.contains('"'))
+                            .map(str::to_owned)
+                    })
+                })
+            })
             .collect();
         let prefixes: Vec<String> = mods
             .iter()

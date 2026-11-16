@@ -321,7 +321,9 @@ impl<'a> Matcher<'a> {
                 line: m.line,
                 end: m.end_line.unwrap_or(m.line),
                 callable: !crate::query::format::parens(m).is_empty(),
-                callers: self.callers.of(m.container.as_deref(), &m.name),
+                callers: self
+                    .callers
+                    .of(m.container.as_deref(), &m.name, &graph.file),
             };
             self.name_hits(&m.name, m.container.as_deref(), symbol, hits);
         }

@@ -979,3 +979,21 @@ fn page_term_gives_a_page_reason_at_the_render_site() {
     matcher.page_hits(board_rel, &inertia, &mut hits);
     assert_eq!(hits.len(), count, "{hits:?}");
 }
+
+/// A hívószám csak azonos nyelvcsaládból számít: a Vue `setLocale()`-ját nem „hívja” a PHP `setLocale`.
+#[test]
+fn caller_counts_stay_within_the_language_family() {
+    let vue = graph("resources/js/Pages/Home.vue");
+    let mut vue_caller = graph("resources/js/Pages/Menu.vue");
+    vue_caller.calls.push(call("Menu", "pick", 4, "setLocale"));
+    let mut php = graph("app/Http/Middleware/SetLocale.php");
+    php.calls.push(call("SetLocale", "handle", 9, "setLocale"));
+    php.calls
+        .push(call("AppServiceProvider", "boot", 7, "setLocale"));
+    let counts = CallerCounts::build([&vue, &vue_caller, &php]);
+    let js = counts.of(Some("Home"), "setLocale", "resources/js/Pages/Home.vue");
+    assert_eq!(js.count, 1, "{js:?}");
+    assert_eq!(js.sample, ["Menu::pick"]);
+    let on_php = counts.of(None, "setLocale", "app/Services/Locale.php");
+    assert_eq!(on_php.count, 2, "{on_php:?}");
+}

@@ -246,8 +246,22 @@ impl Laravel {
                 if let Some(text) = files.read(path) {
                     route_files.push((rel, text, graph));
                 }
-            } else if references {
-                self.collect_references(&rel, path, graph, files);
+            } else {
+                // route-fájlon kívüli segéd (`LocalizedRoutes::register`): a ciklusban, interpolált névvel
+                // felvett route-ok nem látszanak a táblában, csak a dinamikus név gyanúja marad
+                if rel.ends_with(".php")
+                    && registers_routes(graph)
+                    && let Some(text) = files.read(path)
+                {
+                    self.dynamic_names.extend(
+                        dynamic_name_lines(&text)
+                            .into_iter()
+                            .map(|line| (rel.clone(), line)),
+                    );
+                }
+                if references {
+                    self.collect_references(&rel, path, graph, files);
+                }
             }
         }
         // út szerinti sorrend: a teljes projekt-bejárás és a célzott beolvasás ugyanazt a táblát (és a controller
@@ -397,6 +411,14 @@ impl Laravel {
         Some(text.to_owned())
     }
 
+    /// A név által illesztett dinamikus nevű route (`{$code}.{$name}`) mintája, ha van ilyen a táblában.
+    pub(crate) fn dynamic_pattern(&self, name: &str) -> Option<&str> {
+        self.by_name
+            .keys()
+            .map(String::as_str)
+            .find(|pattern| matches_dynamic(pattern, name))
+    }
+
     /// A tábla route-jai (a `scan` után).
     #[cfg(test)]
     pub(crate) fn routes(&self) -> &[Route] {
@@ -432,6 +454,15 @@ impl Laravel {
                 describe(self.by_submit(route, call, siblings), inertia)
             ),
             // dinamikus nevű route-ok mellett csak gyanú
+            None if route_name(call).is_some_and(|name| self.dynamic_pattern(name).is_some()) => {
+                format!(
+                    " {}",
+                    lang.pick(
+                        "? dynamic route, not verifiable",
+                        "? dinamikus route, nem ellenőrizhető"
+                    )
+                )
+            }
             None if !self.dynamic_names.is_empty() => format!(
                 " {}",
                 lang.pick("? no static route", "? nincs statikus route")
@@ -631,10 +662,42 @@ impl Laravel {
     }
 }
 
+/// Hív-e a fájl `Route::` homlokzatot (route-regisztráló segéd lehet).
+fn registers_routes(graph: &FileGraph) -> bool {
+    graph.calls.iter().any(|call| {
+        call.target.starts_with("Route::")
+            || call.resolved.as_deref().is_some_and(|resolved| {
+                resolved.starts_with("Illuminate\\Support\\Facades\\Route::")
+            })
+    })
+}
+
+/// Illeszkedik-e a név a dinamikus route-névmintára (`{$code}.{$name}` / `$a.x`: a változók `.+`-ként)?
+pub(super) fn matches_dynamic(pattern: &str, name: &str) -> bool {
+    static VAR: std::sync::LazyLock<regex::Regex> =
+        std::sync::LazyLock::new(|| regex::Regex::new(r"\{\$[^}]*\}|\$\w+").expect("valid regex"));
+    if !VAR.is_match(pattern) {
+        return false;
+    }
+    let mut re = String::from("^");
+    let mut last = 0;
+    for found in VAR.find_iter(pattern) {
+        re.push_str(&regex::escape(&pattern[last..found.start()]));
+        re.push_str(".+");
+        last = found.end();
+    }
+    re.push_str(&regex::escape(&pattern[last..]));
+    re.push('$');
+    regex::Regex::new(&re).is_ok_and(|re| re.is_match(name))
+}
+
 /// A route-fájl dinamikus nevű route-jainak sorai (`->name($name)`, `->name($prefix . 'x')`), kommentek nélkül.
 fn dynamic_name_lines(text: &str) -> Vec<u32> {
-    static DYNAMIC: std::sync::LazyLock<regex::Regex> =
-        std::sync::LazyLock::new(|| regex::Regex::new(r"->\s*name\(\s*\$").expect("valid regex"));
+    // `->name($n)`, `->name("{$code}.x")`, `->name('x.' . $n)`
+    static DYNAMIC: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+        regex::Regex::new(r#"->\s*name\(\s*(?:\$|"[^")]*\$|'[^')]*'\s*\.\s*\$)"#)
+            .expect("valid regex")
+    });
     routes::strip_comments(text)
         .lines()
         .enumerate()

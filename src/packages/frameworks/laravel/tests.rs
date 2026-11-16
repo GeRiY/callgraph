@@ -781,6 +781,77 @@ fn notifiable_routes_guards_and_dynamic_names_are_not_false_alarms() {
     );
 }
 
+/// Ciklusban, interpolált névvel felvett (lokalizált) route-ok: a névre illeszkedő `route('en.home')` nem
+/// „ismeretlen”, hanem „dinamikus, nem ellenőrizhető”; a route-fájlon kívüli segédnél a `?` gyanú és a hely.
+#[test]
+fn looped_interpolated_route_names_are_dynamic_not_unknown() {
+    let looped = "<?php\nRoute::get('/', [HomeController::class, 'index'])->name('home');\nforeach (['en', 'de'] as $code) {\n    Route::get(\"/{$code}/x\", $h)->name(\"{$code}.x\");\n}\n";
+    let vue = graph(
+        "/p/resources/js/Pages/Foo.vue",
+        Some("resources/js/Pages/Foo.vue"),
+        &[],
+        vec![js_route("en.x", 3), js_route("zz", 4)],
+    );
+    let routes = graph("/p/routes/web.php", None, &[], Vec::new());
+    let (web_path, vue_path) = (
+        root().join("routes/web.php"),
+        root().join("resources/js/Pages/Foo.vue"),
+    );
+    let scope = vec!["resources/js/Pages/Foo.vue".to_owned()];
+    let mut laravel = Laravel::new(&root());
+    laravel.scan(
+        [(web_path.as_path(), &routes), (vue_path.as_path(), &vue)],
+        &MemFiles::new(&[("routes/web.php", looped)]),
+        true,
+    );
+    let lines = laravel.view_lines(&scope, Lang::En);
+    assert_eq!(
+        lines[0],
+        "? dynamic route name 'en.x', not verifiable  resources/js/Pages/Foo.vue L3"
+    );
+    assert!(
+        lines[1].starts_with("? unknown route name 'zz'"),
+        "{lines:?}"
+    );
+
+    // a segéd a route-fájlon kívül: csak a dinamikus név gyanúja és a helye
+    let helper = "<?php\nclass LocalizedRoutes {\n    public static function register(array $names) {\n        foreach ($names as $name) {\n            Route::get('/en/'.$name, $h)->name(\"en.{$name}\");\n        }\n    }\n}\n";
+    let helper_graph = graph(
+        "/p/app/Support/LocalizedRoutes.php",
+        None,
+        &[],
+        vec![call(
+            "static_call",
+            "Route::get",
+            Some("Illuminate\\Support\\Facades\\Route::get"),
+            "framework_use",
+            5,
+        )],
+    );
+    let helper_path = root().join("app/Support/LocalizedRoutes.php");
+    let mut laravel = Laravel::new(&root());
+    laravel.scan(
+        [
+            (web_path.as_path(), &routes),
+            (helper_path.as_path(), &helper_graph),
+            (vue_path.as_path(), &vue),
+        ],
+        &MemFiles::new(&[
+            (
+                "routes/web.php",
+                "<?php\nRoute::get('/', $h)->name('home');\n",
+            ),
+            ("app/Support/LocalizedRoutes.php", helper),
+        ]),
+        true,
+    );
+    let lines = laravel.view_lines(&scope, Lang::En);
+    assert_eq!(
+        lines[2],
+        "? dynamic route names at app/Support/LocalizedRoutes.php L5: the names above may be defined there"
+    );
+}
+
 #[test]
 fn the_ziggy_view_flags_unknown_names_and_counts_the_rest() {
     let web = "<?php\nRoute::get('/', [HomeController::class, 'index'])->name('home');\nRoute::get('/about', [HomeController::class, 'about'])->name('about');\n";

@@ -247,6 +247,49 @@ fn candidates(project: &VueProject<'_>, dirs: &[&str]) -> BTreeMap<String, Rc<St
     out
 }
 
+/// Alias mögötti komponensek: fájlnév-törzs → (import-út, a fájl szövege).
+type AliasComponents = BTreeMap<String, (String, Rc<String>)>;
+
+/// Az alias mögötti (külön UI-csomag) komponensek: `stem → (import-út, szöveg)`. Az oldalak által már importált
+/// komponensek is ide kerülnek (akkor is, ha a mappájuk nem komponens-mappa), utána az alias-mappák `components`
+/// fájljai; a második érték az oldalak importjainak fájlnév-törzsei.
+fn alias_candidates(project: &VueProject<'_>) -> (AliasComponents, BTreeSet<String>) {
+    let mut out = BTreeMap::new();
+    let mut used = BTreeSet::new();
+    let stem_of = |path: &str| {
+        path.rsplit('/')
+            .next()
+            .and_then(|f| f.strip_suffix(".vue"))
+            .map(str::to_owned)
+    };
+    for source in project.sample_vue_imports() {
+        let Some(stem) = stem_of(&source) else {
+            continue;
+        };
+        used.insert(stem.clone());
+        for (prefix, dir) in project.aliases() {
+            if let Some(rest) = source
+                .strip_prefix(prefix.as_str())
+                .and_then(|r| r.strip_prefix('/'))
+                && let Some(text) = project.text(&dir.join(rest))
+            {
+                out.entry(stem.clone()).or_insert((source.clone(), text));
+            }
+        }
+    }
+    for (path, file) in project.alias_components(MAX_FILES * 3) {
+        let Some(stem) = stem_of(&path) else {
+            continue;
+        };
+        if !out.contains_key(&stem)
+            && let Some(text) = project.text(&file)
+        {
+            out.insert(stem, (path, text));
+        }
+    }
+    (out, used)
+}
+
 /// Honnan van a választás.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Source {
@@ -348,8 +391,19 @@ pub fn discover(
             && pick.as_ref().is_some_and(|p| p.source == Source::Config)
     });
     let mut texts = BTreeMap::new();
+    let mut aliased: BTreeMap<String, String> = BTreeMap::new();
+    let mut imported: BTreeSet<String> = BTreeSet::new();
     if picks.iter().any(Option::is_none) || configured {
         texts = candidates(project, &COMPONENT_DIRS);
+        // külön UI-csomag (`@ui/…` alias): a helyi komponens-mappák nyernek, az alias-mögöttiek kiegészítik
+        let (found, used) = alias_candidates(project);
+        for (stem, (path, text)) in found {
+            if let std::collections::btree_map::Entry::Vacant(slot) = texts.entry(stem.clone()) {
+                slot.insert(text);
+                aliased.insert(stem, path);
+            }
+        }
+        imported = used;
     }
     for (pick, (_, role, _)) in picks.iter_mut().zip(roles.iter()) {
         if pick.is_some() {
@@ -358,9 +412,13 @@ pub fn discover(
         let best = texts
             .iter()
             .filter(|(stem, text)| classify(stem, text) == Some(*role))
-            .min_by_key(|(stem, _)| rank(stem, *role));
+            // az oldalak által már importált komponens előbbre való
+            .min_by_key(|(stem, _)| (u8::from(!imported.contains(*stem)), rank(stem, *role)));
         if let Some((stem, text)) = best
-            && let Some(path) = vue::component_path(project, stem)
+            && let Some(path) = aliased
+                .get(stem)
+                .cloned()
+                .or_else(|| vue::component_path(project, stem))
         {
             *pick = Some(Pick {
                 name: stem.clone(),

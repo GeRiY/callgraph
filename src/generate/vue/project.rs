@@ -6,6 +6,9 @@ use std::cell::{OnceCell, RefCell};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use std::sync::LazyLock;
+
+use regex::Regex;
 
 use super::edit::indent_unit;
 use crate::generate::edit::split_lines;
@@ -15,6 +18,16 @@ use crate::generate::fs::{FileSystem, MemoWalk};
 const SAMPLE: usize = 30;
 /// A komponens-keresés gyökerei (az `@/` alias célja).
 const ROOTS: [&str; 2] = ["resources/js", "src"];
+
+/// Az alias-beállítások fájljai (a `tsconfig` `paths` / a Vite `resolve.alias`).
+const ALIAS_FILES: [&str; 6] = [
+    "tsconfig.json",
+    "tsconfig.app.json",
+    "jsconfig.json",
+    "vite.config.ts",
+    "vite.config.js",
+    "vite.config.mjs",
+];
 
 /// A projekt kódstílusa.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -32,6 +45,62 @@ pub struct VueProject<'a> {
     texts: RefCell<HashMap<PathBuf, Option<Rc<String>>>>,
     sample_roots: OnceCell<Vec<PathBuf>>,
     sample: OnceCell<Vec<PathBuf>>,
+    aliases: OnceCell<Vec<(String, PathBuf)>>,
+}
+
+/// A beállítás-szövegből `(alias-előtag, a gyökérhez relatív cél)` párok: `"@ui/*": ["ui/src/*"]` (tsconfig, a
+/// `baseUrl`-lel), `'@ui': path.resolve(__dirname, 'ui/src')` / `{ find: '@ui', replacement: '…' }` (Vite). Az
+/// egyszerű `@` (a `resources/js` / `src`) kimarad. Csak literál értékek; más: kimarad.
+fn parse_aliases(file: &str, text: &str) -> Vec<(String, String)> {
+    static TS_PATH: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r#""([^"*]+?)/\*"\s*:\s*\[\s*"([^"]*?)/?\*""#).expect("valid regex")
+    });
+    static BASE_URL: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r#""baseUrl"\s*:\s*"([^"]+)""#).expect("valid regex"));
+    static VITE_KV: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r#"['"](@[\w./-]*)['"]\s*:\s*[^}
+]*?['"]([^'"]+)['"]"#,
+        )
+        .expect("valid regex")
+    });
+    static VITE_FIND: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r#"find:\s*['"]([^'"]+)['"][^}]*?replacement:\s*[^}
+]*?['"]([^'"]+)['"]"#,
+        )
+        .expect("valid regex")
+    });
+    let clean = |path: &str| {
+        path.trim_start_matches("./")
+            .trim_start_matches('/')
+            .trim_end_matches('/')
+            .to_owned()
+    };
+    let mut out: Vec<(String, String)> = Vec::new();
+    if file.ends_with(".json") {
+        let base = BASE_URL
+            .captures(text)
+            .map(|c| clean(&c[1]))
+            .filter(|b| !b.is_empty() && b != ".");
+        for found in TS_PATH.captures_iter(text) {
+            let target = clean(&found[2]);
+            let target = match &base {
+                Some(base) => format!("{base}/{target}"),
+                None => target,
+            };
+            out.push((found[1].to_owned(), target));
+        }
+    } else {
+        for found in VITE_KV
+            .captures_iter(text)
+            .chain(VITE_FIND.captures_iter(text))
+        {
+            out.push((found[1].to_owned(), clean(&found[2])));
+        }
+    }
+    out.retain(|(prefix, target)| prefix != "@" && !target.is_empty());
+    out
 }
 
 fn skipped_dir(name: &str) -> bool {
@@ -114,7 +183,72 @@ impl<'a> VueProject<'a> {
             texts: RefCell::default(),
             sample_roots: OnceCell::new(),
             sample: OnceCell::new(),
+            aliases: OnceCell::new(),
         }
+    }
+
+    /// Az import-aliasok `(előtag, létező mappa)`: a `tsconfig` `paths` és a Vite `resolve.alias` literáljaiból.
+    pub fn aliases(&self) -> &[(String, PathBuf)] {
+        self.aliases.get_or_init(|| {
+            let mut out: Vec<(String, PathBuf)> = Vec::new();
+            for name in ALIAS_FILES {
+                let Ok(text) = self.fs.read(&self.root.join(name)) else {
+                    continue;
+                };
+                for (prefix, target) in parse_aliases(name, &text) {
+                    let dir = self.root.join(target);
+                    if !out.iter().any(|(have, _)| *have == prefix) && self.fs.list(&dir).is_ok() {
+                        out.push((prefix, dir));
+                    }
+                }
+            }
+            out
+        })
+    }
+
+    /// A mintafájlok `.vue` importjainak forrásai (ahogy írva vannak), egyszer-egyszer.
+    pub fn sample_vue_imports(&self) -> Vec<String> {
+        static IMPORT: LazyLock<Regex> = LazyLock::new(|| {
+            Regex::new(r#"import\s+[\w$]+\s+from\s+['"]([^'"]+\.vue)['"]"#).expect("valid regex")
+        });
+        let mut out: Vec<String> = Vec::new();
+        for file in self.sample_files() {
+            let Some(text) = self.text(file) else {
+                continue;
+            };
+            for found in IMPORT.captures_iter(&text) {
+                let source = found[1].to_owned();
+                if !out.contains(&source) {
+                    out.push(source);
+                }
+            }
+        }
+        out
+    }
+
+    /// Az alias-mappák komponensei `(import-út az alias-szal, fájl)`: a `components` almappa (ha van, különben a
+    /// mappa) `.vue` fájljai, aliasonként legfeljebb `limit` darab.
+    pub fn alias_components(&self, limit: usize) -> Vec<(String, PathBuf)> {
+        let mut out = Vec::new();
+        for (prefix, dir) in self.aliases() {
+            let components = dir.join("components");
+            let base = if self.fs.list(&components).is_ok() {
+                components
+            } else {
+                dir.clone()
+            };
+            for file in self.walk(&base).iter().take(limit) {
+                let Ok(rel) = file.strip_prefix(dir) else {
+                    continue;
+                };
+                let rel: Vec<String> = rel
+                    .components()
+                    .map(|c| c.as_os_str().to_string_lossy().into_owned())
+                    .collect();
+                out.push((format!("{prefix}/{}", rel.join("/")), file));
+            }
+        }
+        out
     }
 
     /// A mappa `.vue` fájljainak memoizált, lusta bejárása.

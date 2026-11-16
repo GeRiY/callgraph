@@ -22,25 +22,39 @@ impl Laravel {
             .collect();
         unknown.sort_by(|a, b| (&a.file, a.line, &a.name).cmp(&(&b.file, b.line, &b.name)));
         unknown.dedup_by(|a, b| (&a.file, a.line, &a.name) == (&b.file, b.line, &b.name));
+        // a dinamikus nevű route mintájára illeszkedő név nem „ismeretlen”, csak nem ellenőrizhető
+        let (dynamic, unknown): (Vec<_>, Vec<_>) = unknown
+            .into_iter()
+            .partition(|r| self.dynamic_pattern(&r.name).is_some());
         // dinamikus nevű route-ok mellett az „ismeretlen” csak gyanú (`?`), és egy sor megmondja, hol vannak
         let mark = if self.dynamic_names.is_empty() {
             "⚠"
         } else {
             "?"
         };
-        let mut lines: Vec<String> = unknown
+        let mut lines: Vec<String> = dynamic
             .iter()
             .map(|r| match lang {
                 Lang::En => format!(
-                    "{mark} unknown route name '{}'  {} L{}",
+                    "? dynamic route name '{}', not verifiable  {} L{}",
                     r.name, r.file, r.line
                 ),
                 Lang::Hu => format!(
-                    "{mark} ismeretlen route-név '{}'  {} L{}",
+                    "? dinamikus route-név '{}', nem ellenőrizhető  {} L{}",
                     r.name, r.file, r.line
                 ),
             })
             .collect();
+        lines.extend(unknown.iter().map(|r| match lang {
+            Lang::En => format!(
+                "{mark} unknown route name '{}'  {} L{}",
+                r.name, r.file, r.line
+            ),
+            Lang::Hu => format!(
+                "{mark} ismeretlen route-név '{}'  {} L{}",
+                r.name, r.file, r.line
+            ),
+        }));
         if let Some((file, line)) = self.dynamic_names.first().filter(|_| !unknown.is_empty()) {
             let more = self.dynamic_names.len() - 1;
             let more = if more > 0 {

@@ -128,6 +128,25 @@ impl CallerIndex {
         if let Some(invokers) = self.callbacks.get(&edge_key(edge)) {
             out.extend(invokers.iter().cloned());
         }
+        // Vue-komponens: a következő szint a fájlt (a komponenst) a template-ben használók — a komponens-
+        // használat éle a feloldott fájlútra kulcsol, a hívó kulcsa viszont `Komponens::template`;
+        // az út minden utótagját megpróbáljuk (abszolút és projekt-relatív alak is illeszkedjen)
+        if edge.row.file.ends_with(".vue") {
+            let mut rest = edge
+                .row
+                .file
+                .trim_start_matches("./")
+                .trim_start_matches('/');
+            loop {
+                if let Some(list) = self.reverse.get(rest) {
+                    out.extend(list.iter().cloned());
+                }
+                match rest.split_once('/') {
+                    Some((_, tail)) => rest = tail,
+                    None => break,
+                }
+            }
+        }
         let Some(caller_type) = edge.caller_type.as_deref() else {
             return out;
         };

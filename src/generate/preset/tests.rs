@@ -1056,3 +1056,43 @@ fn gen_toml_parser_reads_sections_comments_and_booleans() {
         super::ui::Config::default()
     );
 }
+
+/// A form-komponensek külön UI-csomagban vannak (`@ui` → `ui/src` a `tsconfig` `paths`-ból): az oldalak által már
+/// importált és az alias-mappa komponensei is felismerődnek, az import az alias-szal marad.
+#[test]
+fn components_in_an_aliased_ui_package_are_found() {
+    let fs = bare_project();
+    fs.put(
+        "tsconfig.json",
+        r#"{"compilerOptions":{"paths":{"@ui/*":["ui/src/*"],"@/*":["resources/js/*"]}}}"#,
+    );
+    fs.put(
+        "ui/src/components/atoms/BaseInput/BaseInput.vue",
+        BASE_INPUT,
+    );
+    fs.put(
+        "ui/src/components/atoms/BaseButton/BaseButton.vue",
+        ACTION_BUTTON,
+    );
+    fs.put(
+        "ui/src/components/molecules/FormField/FormField.vue",
+        FIELD_LABEL,
+    );
+    fs.put(
+        "resources/js/Pages/Home.vue",
+        "<script setup>\nimport BaseInput from '@ui/components/atoms/BaseInput/BaseInput.vue';\n</script>\n<template><BaseInput /></template>\n",
+    );
+    let clock = FixedClock(Cell::new(T0));
+    let out = run(&fs, &clock, CREATE, false).unwrap();
+    let create = fs.get("resources/js/Pages/Fees/Create.vue").unwrap();
+    assert!(
+        create.contains("import BaseInput from '@ui/components/atoms/BaseInput/BaseInput.vue';"),
+        "{create}"
+    );
+    assert!(
+        create.contains("import BaseButton from '@ui/components/atoms/BaseButton/BaseButton.vue';"),
+        "{create}"
+    );
+    assert!(out.contains("input=BaseInput"), "{out}");
+    assert!(out.contains("button=BaseButton"), "{out}");
+}
