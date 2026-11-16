@@ -3,12 +3,15 @@
 mod args;
 mod command;
 pub mod commands;
+mod generate_args;
 mod next_args;
 mod profile_args;
+mod rename_args;
 pub mod signatures;
 mod stats_args;
 pub mod strict;
 mod telemetry_args;
+mod uses_args;
 
 pub use args::{CliArgs, HookAction, NO_GITIGNORE_FLAG, NoteAction, take_no_gitignore};
 pub use command::Command;
@@ -108,6 +111,20 @@ pub fn build_command(args: CliArgs) -> Result<Box<dyn Command>> {
             project,
             crate::skill::SkillHome::from_env(),
         ))),
+        CliArgs::Uses {
+            package,
+            calls,
+            project,
+        } => Ok(Box::new(commands::UsesCommand::new(
+            package,
+            calls,
+            project,
+            crate::skill::SkillHome::from_env(),
+        ))),
+        CliArgs::Deps { project } => Ok(Box::new(commands::DepsCommand::new(
+            project,
+            crate::skill::SkillHome::from_env(),
+        ))),
         CliArgs::Hook { action, settings } => Ok(Box::new(commands::HookCommand::new(
             action,
             settings,
@@ -127,6 +144,21 @@ pub fn build_command(args: CliArgs) -> Result<Box<dyn Command>> {
             action,
             crate::skill::SkillHome::from_env(),
         ))),
+        CliArgs::Generate { request, project } => Ok(Box::new(commands::GenerateCommand::new(
+            request,
+            project,
+            crate::skill::SkillHome::from_env(),
+        ))),
+        CliArgs::Rename { request, project } => Ok(Box::new(commands::RenameCommand::new(
+            request,
+            project,
+            crate::skill::SkillHome::from_env(),
+        ))),
+        CliArgs::Undo { file, project } => Ok(Box::new(commands::UndoCommand::new(
+            file,
+            project,
+            crate::skill::SkillHome::from_env(),
+        ))),
         CliArgs::Version => Ok(Box::new(commands::VersionCommand)),
         CliArgs::Help => Ok(Box::new(commands::HelpCommand)),
         CliArgs::Stats { days, events } => Ok(Box::new(
@@ -137,9 +169,11 @@ pub fn build_command(args: CliArgs) -> Result<Box<dyn Command>> {
             project,
             full,
             with_vendor,
+            packages,
         } => Ok(Box::new(
             commands::ProfileCommand::new(project, full, crate::skill::SkillHome::from_env())
-                .with_vendor(with_vendor),
+                .with_vendor(with_vendor)
+                .with_packages(packages),
         )),
         CliArgs::Mcp { auto_update } => Ok(Box::new(commands::McpCommand::new(
             crate::skill::SkillHome::from_env(),

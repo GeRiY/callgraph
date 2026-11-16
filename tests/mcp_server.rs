@@ -131,6 +131,7 @@ fn initialize_list_and_call_outline() {
             "next",
             "notes",
             "outline",
+            "package_usage",
             "project_profile",
             "projects",
             "search"
@@ -472,6 +473,131 @@ fn project_profile_and_the_layer_parameter() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// A `package_usage` eszköz: a CLI `uses` kimenete (összesítés, `calls: true`), az ismeretlen név egy sor, nem hiba.
+#[test]
+fn package_usage_matches_the_cli_uses() {
+    let id = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let dir = std::env::temp_dir().join(format!("callgraph-mcp-uses-{}-{id}", std::process::id()));
+    let files = [
+        (
+            "composer.json",
+            r#"{"require": {"guzzlehttp/guzzle": "^7.9"}, "autoload": {"psr-4": {"App\\": "app/"}}}"#,
+        ),
+        (
+            "composer.lock",
+            r#"{"packages": [{"name": "guzzlehttp/guzzle", "version": "7.9.2", "autoload": {"psr-4": {"GuzzleHttp\\": "src/"}}}]}"#,
+        ),
+        (
+            "app/Services/Shipping.php",
+            "<?php\nnamespace App\\Services;\n\nuse GuzzleHttp\\Client;\n\nclass Shipping\n{\n    public function client(): Client\n    {\n        return new Client();\n    }\n}\n",
+        ),
+    ];
+    for (path, body) in files {
+        let path = dir.join(path);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, body).unwrap();
+    }
+    let dir = dir.canonicalize().unwrap();
+    let mut s = Session::start_in(&dir);
+    s.send(
+        json!({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
+        "protocolVersion": "2025-06-18", "capabilities": {},
+        "clientInfo": {"name": "test", "version": "0"}}}),
+    );
+    s.response(1);
+    s.send(json!({"jsonrpc": "2.0", "method": "notifications/initialized"}));
+
+    let summary = s.call(2, "package_usage", json!({"package": "guzzle"}));
+    assert_ne!(summary["isError"], json!(true), "{summary}");
+    assert_eq!(
+        text(&summary),
+        "guzzlehttp/guzzle 7.9.2 · 1 call · 1 file\n  new Client  1  app/Services/Shipping.php\n"
+    );
+    let calls = s.call(
+        3,
+        "package_usage",
+        json!({"package": "guzzle", "calls": true}),
+    );
+    let cli = Command::new(env!("CARGO_BIN_EXE_callgraph"))
+        .args(["uses", "guzzle", "--calls", "--project"])
+        .arg(&dir)
+        .env("CALLGRAPH_LANG", "en")
+        .env("CALLGRAPH_REGISTRY", "/nonexistent/projects.json")
+        .output()
+        .unwrap();
+    assert_eq!(text(&calls), String::from_utf8_lossy(&cli.stdout));
+    assert!(text(&calls).contains("\n  L10 new Client\n"), "{calls}");
+    let unknown = s.call(4, "package_usage", json!({"package": "stripe"}));
+    assert_ne!(unknown["isError"], json!(true), "{unknown}");
+    assert!(
+        text(&unknown).starts_with("unknown package: stripe"),
+        "{unknown}"
+    );
+    drop(s);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A `project_profile` `deps: true`: a profil helyett a CLI `deps` kimenete (soronként egy találat).
+#[test]
+fn project_profile_deps_matches_the_cli_deps() {
+    let id = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let dir = std::env::temp_dir().join(format!("callgraph-mcp-deps-{}-{id}", std::process::id()));
+    let files = [
+        (
+            "composer.json",
+            r#"{"require": {"guzzlehttp/guzzle": "^7.9", "stripe/stripe-php": "^15.0"}, "autoload": {"psr-4": {"App\\": "app/"}}}"#,
+        ),
+        (
+            "composer.lock",
+            r#"{"packages": [
+                {"name": "guzzlehttp/guzzle", "version": "7.9.2", "autoload": {"psr-4": {"GuzzleHttp\\": "src/"}}},
+                {"name": "stripe/stripe-php", "version": "15.1.0", "autoload": {"psr-4": {"Stripe\\": "lib/"}}}
+            ]}"#,
+        ),
+        (
+            "app/Services/Shipping.php",
+            "<?php\nnamespace App\\Services;\n\nuse GuzzleHttp\\Client;\n\nclass Shipping\n{\n    public function client(): Client\n    {\n        return new Client();\n    }\n}\n",
+        ),
+    ];
+    for (path, body) in files {
+        let path = dir.join(path);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, body).unwrap();
+    }
+    let dir = dir.canonicalize().unwrap();
+    let mut s = Session::start_in(&dir);
+    s.send(
+        json!({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
+        "protocolVersion": "2025-06-18", "capabilities": {},
+        "clientInfo": {"name": "test", "version": "0"}}}),
+    );
+    s.response(1);
+    s.send(json!({"jsonrpc": "2.0", "method": "notifications/initialized"}));
+
+    let deps = s.call(2, "project_profile", json!({"deps": true}));
+    assert_ne!(deps["isError"], json!(true), "{deps}");
+    assert_eq!(
+        text(&deps),
+        "unused?   stripe/stripe-php  no reference in code\n"
+    );
+    let cli = Command::new(env!("CARGO_BIN_EXE_callgraph"))
+        .args(["deps", "--project"])
+        .arg(&dir)
+        .env("CALLGRAPH_LANG", "en")
+        .env("CALLGRAPH_REGISTRY", "/nonexistent/projects.json")
+        .output()
+        .unwrap();
+    assert_eq!(text(&deps), String::from_utf8_lossy(&cli.stdout));
+    drop(s);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 /// A helyi statisztika `locate`-találata: `locate`, utána `outline` a lista első fájljára → a `callgraph stats`
 /// (ugyanazzal a `CALLGRAPH_STATS_DIR`-rel) „1 of 1” első-találatot mutat. Út a napi fájlba nem kerül.
 #[test]
@@ -552,4 +678,104 @@ fn locate_hit_rank_is_recorded_in_the_local_stats() {
         );
     }
     let _ = std::fs::remove_dir_all(&base);
+}
+
+/// A `generate` eszköz alapból nincs a listán (a lista változatlan, lásd fent); `CALLGRAPH_GENERATE=1`-gyel megjelenik,
+/// íróként annotált, és működik: `dry` kódot ad, `write` új fájlt hoz létre és egy sort ad vissza.
+#[test]
+fn generate_tool_appears_only_when_enabled() {
+    let id = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let dir = std::env::temp_dir().join(format!("callgraph-mcp-gen-{}-{id}", std::process::id()));
+    std::fs::create_dir_all(dir.join("app")).unwrap();
+    std::fs::write(
+        dir.join("composer.json"),
+        r#"{"autoload":{"psr-4":{"App\\":"app/"}}}"#,
+    )
+    .unwrap();
+    let dir = dir.canonicalize().unwrap();
+    let initialize = json!({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
+        "protocolVersion": "2025-06-18", "capabilities": {},
+        "clientInfo": {"name": "test", "version": "0"}}});
+    let list = |s: &mut Session| -> Vec<Value> {
+        s.send(initialize.clone());
+        s.response(1);
+        s.send(json!({"jsonrpc": "2.0", "method": "notifications/initialized"}));
+        s.send(json!({"jsonrpc": "2.0", "id": 2, "method": "tools/list"}));
+        s.response(2)["result"]["tools"].as_array().unwrap().clone()
+    };
+
+    // alapból: nincs `generate` (a meglévő tizenkét eszköz marad)
+    let mut off = Session::start_in(&dir);
+    let tools = list(&mut off);
+    assert_eq!(tools.len(), 12);
+    assert!(
+        tools
+            .iter()
+            .all(|t| t["name"] != "generate" && t["name"] != "rename")
+    );
+    drop(off);
+
+    let mut on = Session::start_with(&dir, &[("CALLGRAPH_GENERATE", std::ffi::OsStr::new("1"))]);
+    let tools = list(&mut on);
+    assert_eq!(tools.len(), 14);
+    let rename = tools.iter().find(|t| t["name"] == "rename").unwrap();
+    assert_eq!(
+        rename["annotations"]["readOnlyHint"],
+        json!(false),
+        "{rename}"
+    );
+    assert!(
+        rename["description"].as_str().unwrap().chars().count() <= 200,
+        "{rename}"
+    );
+    let generate = tools.iter().find(|t| t["name"] == "generate").unwrap();
+    let a = &generate["annotations"];
+    assert_eq!(
+        (
+            &a["readOnlyHint"],
+            &a["destructiveHint"],
+            &a["idempotentHint"],
+            &a["openWorldHint"]
+        ),
+        (&json!(false), &json!(false), &json!(false), &json!(false)),
+        "{generate}"
+    );
+    assert!(
+        generate["description"].as_str().unwrap().chars().count() <= 250,
+        "{generate}"
+    );
+
+    let dry = on.call(
+        3,
+        "generate",
+        json!({"expr": "c:A > +x():void", "dry": true}),
+    );
+    assert_ne!(dry["isError"], json!(true), "{dry}");
+    assert!(text(&dry).contains("class A\n{"), "{dry}");
+    let written = on.call(
+        4,
+        "generate",
+        json!({"expr": "c:Pay > +run():int", "write": "app/Pay.php"}),
+    );
+    assert_ne!(written["isError"], json!(true), "{written}");
+    assert!(
+        text(&written).starts_with("wrote app/Pay.php ("),
+        "{written}"
+    );
+    assert!(
+        std::fs::read_to_string(dir.join("app/Pay.php"))
+            .unwrap()
+            .contains("namespace App;")
+    );
+    let again = on.call(
+        5,
+        "generate",
+        json!({"expr": "c:Pay", "write": "app/Pay.php"}),
+    );
+    assert_eq!(again["isError"], json!(true), "{again}");
+    assert!(text(&again).contains("already exists"), "{again}");
+    let _ = std::fs::remove_dir_all(&dir);
 }

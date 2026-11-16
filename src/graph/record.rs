@@ -60,8 +60,9 @@ impl FileFacts {
     /// típus-hierarchia (névtér, konténerek, metódusok, hívások), a `--grep` outline (ugyanezek + a vezérlési ágak; a
     /// `--grep` szűrő a property-ket, konstansokat és kommenteket úgyis eldobja), a `--strings` (string-literálok), a
     /// `--const` (konstans-definíciók és `const_fetch` hívások), a `locate` (a property-k is: definícióként
-    /// kereshetők, a doc-juk nélkül), és a hívás-sorok. Kimarad: kommentek, írások, importok, SFC, a
-    /// hívás-argumentumok, a property- és metódus-doc, a metódus-törzs. Ha e lekérdezések egy itt kiürített
+    /// kereshetők, a doc-juk nélkül), a `uses` (az importok: a hívás nélküli, csak típus-hivatkozás), és a
+    /// hívás-sorok. Kimarad: kommentek, írások, SFC, a hívás-argumentumok, a property- és metódus-doc, a
+    /// metódus-törzs. Ha e lekérdezések egy itt kiürített
     /// mezőt kezdenének olvasni, a gráf–bejárás összevető teszt (`tests/project_graph.rs`) eltérést jelez.
     pub(crate) fn slim(&self) -> Self {
         let source = &self.graph;
@@ -70,7 +71,7 @@ impl FileFacts {
             module: source.module.clone(),
             framework: source.framework.clone(),
             namespace: source.namespace.clone(),
-            imports: crate::model::Imports::default(),
+            imports: source.imports.clone(),
             containers: source.containers.clone(),
             properties: source
                 .properties

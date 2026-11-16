@@ -89,6 +89,7 @@ impl<'s> Walker<'s> {
                 TypeRef {
                     name: class.name.clone()?,
                     category: "internal_helper",
+                    from: None,
                 }
             }
             Expression::StaticMemberExpression(inner)
@@ -110,6 +111,7 @@ impl<'s> Walker<'s> {
         if let Some((ty, method)) = self.receiver(callee) {
             r.resolved = Some(format!("{}::{method}", ty.name));
             r.category = ty.category;
+            r.from = ty.from;
         }
         r
     }
@@ -133,19 +135,19 @@ impl<'s> Walker<'s> {
             .chain(rest.iter().map(String::as_str))
             .collect::<Vec<_>>()
             .join(".");
-        let (resolved, category) = if rest.is_empty() && self.scope.names.contains(&root) {
-            (None, "internal_helper")
+        let (resolved, category, from) = if rest.is_empty() && self.scope.names.contains(&root) {
+            (None, "internal_helper", None)
         } else if let Some(b) = self.scope.bindings.get(&root) {
             let resolved = if rest.is_empty() {
                 b.resolved.clone()
             } else {
                 format!("{}.{}", b.resolved, rest.join("."))
             };
-            (Some(resolved), "component_use")
+            (Some(resolved), "component_use", b.from.clone())
         } else if self.scope.local_fns.contains(&root) || self.scope.names.contains(&root) {
-            (None, "internal_helper")
+            (None, "internal_helper", None)
         } else {
-            (None, "component_use")
+            (None, "component_use", None)
         };
         Some(Callee {
             on: (!rest.is_empty()).then(|| root.clone()),
@@ -153,6 +155,7 @@ impl<'s> Walker<'s> {
             resolved,
             category,
             kind: "component",
+            from,
         })
     }
 
@@ -181,6 +184,7 @@ impl<'s> Walker<'s> {
         let args = (!args.is_empty()).then(|| args.iter().take(4).map(|a| self.src(a)).collect());
         self.calls.push(Call {
             handler: None,
+            from: r.from,
             container: Some(self.container.clone()),
             caller: Some(self.caller.clone()),
             line: self.ctx.lines.line_of(start as usize),
@@ -198,6 +202,7 @@ impl<'s> Walker<'s> {
     fn record_dynamic(&mut self, start: u32, expr: &str) {
         self.calls.push(Call {
             handler: None,
+            from: None,
             container: Some(self.container.clone()),
             caller: Some(self.caller.clone()),
             line: self.ctx.lines.line_of(start as usize),
@@ -255,7 +260,7 @@ impl<'s> Walker<'s> {
         };
         match &d.id {
             BindingPattern::BindingIdentifier(id) => {
-                self.set(id.name.as_str(), rv, cat);
+                self.set(id.name.as_str(), rv, cat, r.from.clone());
             }
             BindingPattern::ObjectPattern(o) => {
                 for p in &o.properties {
@@ -266,7 +271,7 @@ impl<'s> Walker<'s> {
                     };
                     if let (Some(k), Some(v)) = (k, v) {
                         let cat = if k == "t" { "i18n_helper" } else { r.category };
-                        self.set(&v, format!("{rv}.{k}"), cat);
+                        self.set(&v, format!("{rv}.{k}"), cat, r.from.clone());
                     }
                 }
             }
@@ -274,10 +279,15 @@ impl<'s> Walker<'s> {
         }
     }
 
-    fn set(&mut self, name: &str, resolved: String, category: &'static str) {
-        self.scope
-            .bindings
-            .insert(name.to_string(), Binding { resolved, category });
+    fn set(&mut self, name: &str, resolved: String, category: &'static str, from: Option<String>) {
+        self.scope.bindings.insert(
+            name.to_string(),
+            Binding {
+                resolved,
+                category,
+                from,
+            },
+        );
     }
 }
 
@@ -438,6 +448,7 @@ impl<'a> Visit<'a> for Walker<'_> {
         let (container, caller) = (self.container.clone(), self.caller.clone());
         self.calls.push(Call {
             handler: None,
+            from: None,
             container: Some(container),
             caller: Some(caller),
             line: self.ctx.lines.line_of(it.span.start as usize),

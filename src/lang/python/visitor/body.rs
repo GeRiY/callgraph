@@ -56,6 +56,7 @@ impl PythonVisitor<'_, '_> {
                 category: DYNAMIC_CALL.to_string(),
                 args: None,
                 handler: None,
+                from: None,
             });
         }
         let Some(callee) = self.callee(expr) else {
@@ -101,6 +102,7 @@ impl PythonVisitor<'_, '_> {
             category: category.to_string(),
             args: self.args(node),
             handler: None,
+            from: None,
         });
     }
 

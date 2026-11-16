@@ -149,6 +149,30 @@ impl Command for ShowCommand {
             // a kimenet változatlan
             crate::notes::annotate(&mut rows, engine.root());
         }
+        if !self.body
+            && matches!(self.format.as_str(), "outline" | "json" | "jsonl")
+            && self.lines.is_none()
+            && self.strings.is_none()
+            && self.const_filter.is_none()
+        {
+            // csomagok: az outline külső hívásai a csomag rövid címkéjével, a json `package` mezővel; manifest
+            // nélkül a kimenet változatlan (a csomagtérkép a `.callgraph/packages.bin`-ből, bélyeg szerint)
+            crate::packages::annotate(&mut rows, engine.root());
+        }
+        if !self.body
+            && matches!(
+                self.format.as_str(),
+                "outline" | "json" | "jsonl" | "inertia" | "ziggy" | "forms" | "models"
+            )
+            && self.lines.is_none()
+            && self.strings.is_none()
+            && self.const_filter.is_none()
+        {
+            // framework-kötések (Inertia, Laravel): a render-hívás page-fájlja, a page-fájl `rendered by:` sora, a
+            // `inertia` nézet, a JS `route('név')` link, a controller `route:` sora és a `ziggy` nézet; framework
+            // nélkül a kimenet változatlan
+            crate::packages::annotate_frameworks(&mut rows, engine.root(), &self.format);
+        }
         let text = match self.render(&rows) {
             Ok(value) => value,
             Err(error) => return Self::report(_err, error),

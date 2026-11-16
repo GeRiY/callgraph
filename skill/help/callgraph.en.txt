@@ -88,11 +88,20 @@ Supported files: PHP, JS, TS, Vue, Rust, Swift, Python (.py, .pyi), Go (.go) + C
   bash ~/.claude/skills/callgraph/callgraph.sh --version                       version, platform and the binary's path
 
 Project profile (architecture, layers and patterns from folder / file names, checked against the graph):
-  bash ~/.claude/skills/callgraph/callgraph.sh profile [--project alias] [--full] [--with-vendor]
-                                                ~15 lines: architecture, layers with folders and file counts, patterns,
+  bash ~/.claude/skills/callgraph/callgraph.sh profile [--project alias] [--full] [--with-vendor] [--packages]
+                                                ~15 lines: architecture, notable packages with their locked versions
+                                                (stack:), layers with folders and file counts, patterns,
                                                 call direction between layers, unknown folders; --full: per folder;
                                                 embedded third-party code and build output are skipped (--with-vendor:
-                                                counted too); a role in both PHP and JS: controller (php) / controller (js)
+                                                counted too); a role in both PHP and JS: controller (php) / controller (js);
+                                                --packages: every direct composer / npm dependency (installed, declared)
+  bash ~/.claude/skills/callgraph/callgraph.sh uses <package> [--calls] [--project alias]   where the code uses a dependency (guzzle, @vueuse/core): per API symbol the count, first file, +N; (type) = import without a call; --calls: every call line per file
+  bash ~/.claude/skills/callgraph/callgraph.sh deps [--project alias]   probably unused / missing / dev-only composer / npm dependencies (one line each; .callgraphignore: deps-ignore <name>)
+  Laravel / Inertia project views (run on the project root, e.g. `. --format ziggy`; outlines also get the short links):
+    --format ziggy     unknown route('x') names (JS / Vue / PHP), never-loaded route files; outline: route::x → POST /x · Ctrl@m
+    --format forms     useForm fields vs the action's FormRequest / validate rules; outline: form: … · N fields ✓ / ⚠ …
+    --format models    models: table, columns from the migrations, relations; fillable / cast not a column, table created twice
+    --format inertia   pages: render sites, props the page does not declare, pages never rendered
   bash ~/.claude/skills/callgraph/callgraph.sh <dir> --layer service           only the files of that layer (name,name...;
                                                 one ecosystem: controller:php, controller:js, …:swift, …:rust)
   bash ~/.claude/skills/callgraph/callgraph.sh <dir> --layers                  summary grouped by layer, [role] on FILE lines
@@ -160,6 +169,45 @@ Update (from GitHub Releases; projects.json, lang, errors.jsonl, feedback.jsonl,
   Anonymous daily count: once a day, on first use, the version, platform and three yes/no flags go to
   check.callgraph.eu (no ID, no IP stored). Off: CALLGRAPH_COUNT=0 or DO_NOT_TRACK=1 (also with CALLGRAPH_UPDATE_CHECK=0);
   DO_NOT_TRACK=1 also stops the opt-in telemetry.
+
+Code generator (writes files; the MCP `generate` tool is off unless the server runs with --generate or CALLGRAPH_GENERATE=1):
+  bash ~/.claude/skills/callgraph/callgraph.sh gen '<expr>' [--dry] [--write <file> | --into <file>[::Class] [--after <method>] | --replace <file>(:L<a>-L<b> | ::<method>) [--expect <sha256-prefix>]] [--project alias]
+    Prints one line (what was written, the backup, `unresolved: Foo` for names it could not import); code only with --dry
+    (the default without a target). Never overwrites a file (--write refuses an existing one); every change to an existing
+    file is backed up first to .callgraph/backups/<path>.<UTC yyyymmddThhmmss>.bak (newest 10 per file); the whole new file
+    is parsed before writing, on a syntax error nothing is written. Namespace from composer.json psr-4, imports from the project.
+    Expression: c:Name class, i: interface, t: trait, e:Name:string(A=a,B=b) enum, s: struct; c! final, c~ abstract, c% readonly;
+      <Base> extends, [A,B] implements; > child, + sibling (a new line too), ^ up, *n repeat ($ = counter), ( ) group, {body} raw code
+      members: + public, - private, # protected, then ~ abstract, ! final, :: static:  +charge(Order $o, int ...$xs):Receipt{ ... }
+      ctor(-Client $http, -int $n=3) promoted, $prop:Type=1, K=1; no body: // TODO (void) / throw LogicException (typed) /
+      yield from [] (Generator, iterable, iter<T>); ns:App\X, use:Foo\Bar,Baz\Qux as Q
+      types: int float bool str bytes void mixed list<T> map<K,V> opt<T> or ?T iter<T> A|B, or native PHP names (list/map -> array + docblock)
+    Examples:
+      gen 'c!:PaymentGateway<BaseGateway>[Chargeable] > ctor(-Client $http, -int $retries=3) + +charge(Order $order):Receipt + -sign(array $p):string' --write app/Services/PaymentGateway.php
+      gen '+refund(Order $o):void{ $this->http->post($o->id); }' --into app/Services/PaymentGateway.php::PaymentGateway --after charge
+    Vue (TS or JS like the project): vue:Name>(script>…)+(template>…)+(style>…), comp:useX>… composable;
+      script: props(title:str,size?:int=3) emits(save:int,close) ref:n:T=v computed:n:T{…} fn:n(p:T):R{…} form(a,b) use:@/Components/X
+        use:{useX}@/composables/useX (named; bare path = auto: named if the file has only `export function useX`)
+        type:Flag{flag:str,on?:bool} (interface; inline list<{a:str}>) raw{ const {a} = useX() } const:{a,b}=useX()
+      template: Emmet div.card#id[attr=v @click=f :key=x.id]{text} {{ expr }} *3; components auto-imported; style: .a{decl;decl}
+      gen 'script>ref:loading:bool=false+fn:reset(){ form.reset() }' --into resources/js/Pages/Auth/Register.vue
+    JS / TS module (by file extension: .ts types, .js JSDoc): mod:util>type:Opts{sep?:str}+fn:join(p:list<str>):str{…}+const:MAX:int=10+-fn:helper(){…}
+      exported by default; -fn private; !fn / !class export default; type:Id=str|int alias; class:Svc<Base>[Iface]>$n:int=0+ctor(-repo:Repo)+ +run():void{…}
+      members: + public - private # protected, then :: static ~ abstract % readonly; --into x.ts[::Class [--after m]]  --replace x.ts::fn | x.ts::Class::method
+    HTML (.html/.htm; or an `html:` head): gen 'html:Title[lang=hu]>(head>meta:description=Hi+link:style.css+script:app.js)+(body>header>nav>a[href=/]{Home}^^main>form[action=/x method=post]>input[type=email name=e required]+button{Send})' --write index.html
+      full document (doctype, charset, viewport, title); head shortcuts meta:name=v meta:og:title=v link:style.css link:icon=/f.ico script:app.js script:module=m.js base:/app/;
+      any tag/attr (boolean, data-*, aria-*), table>thead>tr>th*3, svg[viewBox=…]>path[d=…]; style{ .a{color:red} } script{ … } comment{ text } (CSS / JS validated); bare elements + --write x.html = body
+      --into x.html [--after L12 | ::#id | ::.class | ::tag] (default: end of <body>)  --replace x.html:L5-L9 | x.html::#id; duplicate id = warning
+    Laravel feature: gen 'laravel:Fee[auth]>create(name:str,amount:int,paid?:bool)+edit+index'  (request, controller,
+      routes, Inertia pages; checks form ↔ rules and the model's columns; one undo reverts all files)
+      field types: str (max:255) text (long text, no max) int float bool date datetime email; name? = optional;
+      without Ziggy (tightenco/ziggy / ziggy-js) the pages use plain URLs instead of route('…')
+    --expect <prefix>: only with --replace; sha256 of the replaced lines (not the whole file); a mismatch prints the current one
+  bash ~/.claude/skills/callgraph/callgraph.sh rename route|class|method <old> <new> [--dry] [--strings] [--keep-table]
+    route names ('profile.*' = whole group, resource routes via ->names()), PHP classes (file move, use, ::class, types),
+    PHP methods (resolved calls, overrides, route actions) across PHP / Blade / JS / Vue; dynamic references are only
+    listed; one line per file; one undo reverts the whole rename
+  bash ~/.claude/skills/callgraph/callgraph.sh undo [<file>]    restore the newest backup (of the file, or of the last changed one / group); itself undoable
 
 Output limit: above 400 lines the directory outline switches to summary, the single-file one to a method index;
 

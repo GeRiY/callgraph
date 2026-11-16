@@ -81,6 +81,12 @@ pub struct Call {
     /// JS template: puszta függvénynév-eseménykezelő.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub handler: Option<bool>,
+    /// JS / TS / Vue: a nem helyi import forrás-specifikátora (`axios`, `@vueuse/core`, `lodash/debounce`), amelyből
+    /// a hívott név jön — a csomag-feloldás (`crate::packages`) nyers minősítője. A relatív és az alias-os
+    /// (jsconfig / tsconfig `paths`) import, és a többi nyelv: `None`. A `--format json` JS-hívásaiba nem kerül
+    /// (ott a feloldott `package` áll).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from: Option<String>,
 }
 
 impl Call {
@@ -117,6 +123,7 @@ mod tests {
             category: category.into(),
             args: None,
             handler: None,
+            from: None,
         }
     }
 

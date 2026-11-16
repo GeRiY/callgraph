@@ -1,6 +1,5 @@
 //! `json` (a callgraph `jq -s '.'` paritása) és `jsonl` (soronként egy FileGraph) formázók.
 
-use crate::model::FileGraph;
 use crate::query::QueryResult;
 
 use super::Formatter;
@@ -11,7 +10,10 @@ pub(super) struct OrderedGraph<'a> {
     framework: &'a Option<String>,
     namespace: &'a Option<String>,
     imports: &'a crate::model::Imports,
-    containers: &'a [crate::model::Container],
+    /// A fájl hívásaiban hivatkozott csomagok verziója egyszer (név → verzió); a hívásokon csak a név áll, hogy
+    /// a verzió ne ismétlődjön hívásonként. Üres: nem kerül a kimenetbe.
+    packages: std::collections::BTreeMap<String, String>,
+    containers: Containers<'a>,
     properties: &'a [crate::model::Property],
     constants: &'a [crate::model::Constant],
     methods: &'a [crate::model::Method],
@@ -38,7 +40,10 @@ impl serde::Serialize for OrderedGraph<'_> {
         m.serialize_entry("framework", self.framework)?;
         m.serialize_entry("namespace", self.namespace)?;
         m.serialize_entry("imports", self.imports)?;
-        m.serialize_entry("containers", self.containers)?;
+        if !self.packages.is_empty() {
+            m.serialize_entry("packages", &self.packages)?;
+        }
+        m.serialize_entry("containers", &self.containers)?;
         m.serialize_entry("properties", self.properties)?;
         m.serialize_entry("constants", self.constants)?;
         m.serialize_entry("methods", self.methods)?;
@@ -66,12 +71,83 @@ impl serde::Serialize for OrderedGraph<'_> {
     }
 }
 
-/// A hívások mezősorrendje nyelvfüggő: a JS-motor `category`-t a `resolved` elé teszi.
+/// A konténerek: Laravel-modellel (az Eloquent-összefoglaló futott és van modell a fájlban) a modell osztályán a
+/// `model` mező (`table`, `columns`, `fillable`, `casts`, `relations`, `issues`); különben a régi alak.
+#[derive(serde::Serialize)]
+#[serde(untagged)]
+enum Containers<'a> {
+    Plain(&'a [crate::model::Container]),
+    Models(Vec<ContainerJson<'a>>),
+}
+
+#[derive(serde::Serialize)]
+struct ContainerJson<'a> {
+    #[serde(flatten)]
+    container: &'a crate::model::Container,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    model: Option<serde_json::Value>,
+}
+
+impl<'a> Containers<'a> {
+    fn of(row: &'a QueryResult) -> Self {
+        let graph = &row.graph;
+        let Some(laravel) = row.laravel.as_ref() else {
+            return Self::Plain(&graph.containers);
+        };
+        let items: Vec<ContainerJson<'a>> = graph
+            .containers
+            .iter()
+            .map(|container| ContainerJson {
+                container,
+                model: laravel.model_json(graph.namespace.as_deref(), &container.name),
+            })
+            .collect();
+        if items.iter().any(|item| item.model.is_some()) {
+            Self::Models(items)
+        } else {
+            Self::Plain(&graph.containers)
+        }
+    }
+}
+
+/// A hívások mezősorrendje nyelvfüggő: a JS-motor `category`-t a `resolved` elé teszi. Csomagtérképpel (a
+/// projektnek van manifestje) a hívás végén a csomag: `package` (teljes név; a verzió a fájl `packages` táblájában);
+/// Inertia-kötésekkel a render-hívásnál a page-fájl: `inertia_page` (és ha nem létezik, `inertia_page_missing`).
 #[derive(serde::Serialize)]
 #[serde(untagged)]
 enum Calls<'a> {
     Php(&'a [crate::model::Call]),
+    PhpPackages(Vec<PhpCall<'a>>),
     Js(Vec<JsCall<'a>>),
+}
+
+/// PHP- (nem JS-) sorrend: a `Call` saját mezői, utána a csomag, ha a cél egy csomagé.
+#[derive(serde::Serialize)]
+struct PhpCall<'a> {
+    #[serde(flatten)]
+    call: &'a crate::model::Call,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    package: Option<String>,
+    /// Inertia render-hívásnál a page-fájl a gyökérhez relatívan (`resources/js/Pages/Board.vue`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    inertia_page: Option<String>,
+    /// Csak ha a page-fájl nem létezik: `true`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    inertia_page_missing: Option<bool>,
+}
+
+impl<'a> PhpCall<'a> {
+    fn new(row: &QueryResult, call: &'a crate::model::Call) -> Self {
+        let package = row.package_of(call).map(|found| found.name);
+        let page = row.inertia_page(call);
+        let inertia_page_missing = page.as_ref().filter(|page| !page.exists).map(|_| true);
+        Self {
+            call,
+            package,
+            inertia_page: page.map(|page| page.rel),
+            inertia_page_missing,
+        }
+    }
 }
 
 #[derive(serde::Serialize)]
@@ -96,12 +172,75 @@ fn js_comment<S: serde::Serializer>(c: &&crate::model::Comment, ser: S) -> Resul
     m.end()
 }
 
-struct JsCall<'a>(&'a crate::model::Call);
+struct JsCall<'a> {
+    call: &'a crate::model::Call,
+    package: Option<crate::packages::Attribution>,
+    /// Laravel-kötésekkel a Ziggy `route('név')` hívásnál a route.
+    route: Option<RouteJson>,
+    /// Laravel + Inertia kötésekkel a `useForm` küldésnél az űrlap-szerződés.
+    form: Option<FormJson>,
+}
+
+/// A `form` mező: az űrlap mezői, a szabály-kulcsok, az eltérések és a controller-akció.
+#[derive(serde::Serialize)]
+struct FormJson {
+    fields: Vec<String>,
+    rules: Vec<String>,
+    unvalidated: Vec<String>,
+    missing_required: Vec<String>,
+    action: String,
+}
+
+impl FormJson {
+    /// A hívás űrlapja a Laravel-kötésekből; kötések nélkül vagy nem ellenőrzött küldésnél `None`.
+    fn of(row: &QueryResult, call: &crate::model::Call) -> Option<Self> {
+        let form = row.laravel.as_ref()?.form_of(&row.graph.file, call)?;
+        Some(Self {
+            fields: form.fields.clone(),
+            rules: form.rules.clone(),
+            unvalidated: form.unvalidated.clone(),
+            missing_required: form.missing_required.clone(),
+            action: form.action(),
+        })
+    }
+}
+
+/// A `route` mező: a megtalált route (`name`, `verb`, `uri`, `action`), vagy `{"missing": true}`, ha a név nem létezik.
+#[derive(serde::Serialize)]
+#[serde(untagged)]
+enum RouteJson {
+    Found {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        name: Option<String>,
+        verb: String,
+        uri: String,
+        action: String,
+    },
+    Missing {
+        missing: bool,
+    },
+}
+
+impl RouteJson {
+    /// A hívás route-ja a Laravel-kötésekből; kötések nélkül, nem route-hívásnál vagy üres route-táblánál `None`.
+    fn of(row: &QueryResult, call: &crate::model::Call) -> Option<Self> {
+        let laravel = row.laravel.as_ref()?;
+        Some(match laravel.lookup(call)? {
+            Some(route) => Self::Found {
+                name: route.name.clone(),
+                verb: route.verb.clone(),
+                uri: route.uri.clone(),
+                action: route.action.full(),
+            },
+            None => Self::Missing { missing: true },
+        })
+    }
+}
 
 impl serde::Serialize for JsCall<'_> {
     fn serialize<S: serde::Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
         use serde::ser::SerializeMap;
-        let c = self.0;
+        let c = self.call;
         let mut m = ser.serialize_map(None)?;
         m.serialize_entry("container", &c.container)?;
         m.serialize_entry("caller", &c.caller)?;
@@ -124,23 +263,65 @@ impl serde::Serialize for JsCall<'_> {
         if let Some(v) = &c.handler {
             m.serialize_entry("handler", v)?;
         }
+        // ha a `resolved` már a csomag nevével kezdődik (`vue::computed`), a `package` csak ismétlés lenne
+        let repeated = |name: &str| {
+            c.resolved.as_deref().is_some_and(|r| {
+                r.strip_prefix(name)
+                    .is_some_and(|rest| rest.starts_with("::"))
+            })
+        };
+        if let Some(package) = self.package.as_ref().filter(|p| !repeated(&p.name)) {
+            m.serialize_entry("package", &package.name)?;
+        }
+        if let Some(route) = &self.route {
+            m.serialize_entry("route", route)?;
+        }
+        if let Some(form) = &self.form {
+            m.serialize_entry("form", form)?;
+        }
         m.end()
     }
 }
 
-pub(super) fn ordered_graph(graph: &FileGraph) -> OrderedGraph<'_> {
+pub(super) fn ordered_graph(row: &QueryResult) -> OrderedGraph<'_> {
+    let graph = &row.graph;
     OrderedGraph {
         file: &graph.file,
         module: &graph.module,
         framework: &graph.framework,
         namespace: &graph.namespace,
         imports: &graph.imports,
-        containers: &graph.containers,
+        packages: graph
+            .calls
+            .iter()
+            .filter_map(|call| row.package_of(call))
+            .filter_map(|found| Some((found.name, found.version?)))
+            .collect(),
+        containers: Containers::of(row),
         properties: &graph.properties,
         constants: &graph.constants,
         methods: &graph.methods,
         calls: if graph.module.is_some() {
-            Calls::Js(graph.calls.iter().map(JsCall).collect())
+            Calls::Js(
+                graph
+                    .calls
+                    .iter()
+                    .map(|call| JsCall {
+                        call,
+                        package: row.package_of(call),
+                        route: RouteJson::of(row, call),
+                        form: FormJson::of(row, call),
+                    })
+                    .collect(),
+            )
+        } else if row.packages.is_some() || row.inertia.is_some() {
+            Calls::PhpPackages(
+                graph
+                    .calls
+                    .iter()
+                    .map(|call| PhpCall::new(row, call))
+                    .collect(),
+            )
         } else {
             Calls::Php(&graph.calls)
         },
@@ -162,7 +343,7 @@ pub struct Json;
 
 impl Formatter for Json {
     fn format(&self, rows: &[QueryResult], _lang: crate::i18n::Lang) -> String {
-        let graphs: Vec<_> = rows.iter().map(|r| ordered_graph(&r.graph)).collect();
+        let graphs: Vec<_> = rows.iter().map(ordered_graph).collect();
         let mut text = serde_json::to_string_pretty(&graphs).unwrap_or_default();
         text.push('\n');
         text
@@ -174,7 +355,7 @@ pub struct Jsonl;
 impl Formatter for Jsonl {
     fn format(&self, rows: &[QueryResult], _lang: crate::i18n::Lang) -> String {
         rows.iter()
-            .map(|r| serde_json::to_string(&ordered_graph(&r.graph)).unwrap_or_default() + "\n")
+            .map(|r| serde_json::to_string(&ordered_graph(r)).unwrap_or_default() + "\n")
             .collect()
     }
 }

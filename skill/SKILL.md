@@ -156,7 +156,9 @@ repository → service → controller), each group under a `[service]  3 calls` 
 | `json` / `jsonl` | raw graph (not limited); `jsonl` is callgraph's native output |
 
 **Framework views** (`--format …`): `routes`, `middleware`, `validation`, `jobs`, `events`, `providers`,
-`magic`, `di`, `views`. Run them on a directory (e.g. `bash $CG --project myapp routes --format routes`).
+`magic`, `di`, `views`. Run them on a directory (e.g. `bash $CG --project myapp routes --format routes`). Laravel +
+Inertia, on the project root: `ziggy` (unknown route names), `forms` (useForm ↔ validation rules), `models`
+(tables and columns from the migrations), `inertia` (pages, render sites, props).
 
 ## JS / TS / Vue
 
@@ -238,7 +240,7 @@ root: a registered alias (`project`, list: `projects`) or the server's working d
   `useForm.js::submit` (export), `route::orders.show`, `i18n::orders.title`, `vue::emit:save`, `Atoms/AtomButton.vue`.
 - `search` `{kind: strings | constants, pattern}`: where a string literal (error message, key) or a constant is.
 - `framework_view` `{view, path}`: `routes`, `middleware`, `validation`, `jobs`, `events`, `providers`, `magic`,
-  `di`, `views` of a directory.
+  `di`, `views` of a directory; Laravel + Inertia (project root): `ziggy`, `forms`, `models`, `inertia`.
 - `notes`: notes left on files / methods (`📝`, read-only). `guide`: this manual in full (CLI examples, languages).
 - `next` `{result_id, choice}`: when the server runs with `callgraph mcp --next`, some results end with
   `↪ r7 possible next: [1] … [2] …` (read-only navigation); run one by number (`choice: 1` or `[1, 3]`), only if it

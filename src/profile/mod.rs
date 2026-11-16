@@ -43,7 +43,7 @@ use crate::i18n::Lang;
 
 pub(crate) use build::{quick, with_graph};
 pub(crate) use classify::Classifier;
-pub(crate) use format::{Tip, render};
+pub(crate) use format::{Tip, render, render_startup};
 pub(crate) use scope::{LayerRun, LayerScope};
 pub(crate) use view::{Count, group_header, layered_summary, tag_file_lines};
 
@@ -66,5 +66,5 @@ pub(crate) fn startup_summary(root: &Path, lang: Lang) -> Option<String> {
     if profile.files == 0 {
         return None;
     }
-    Some(render(&profile, lang, false, Tip::Hide))
+    Some(render_startup(&profile, lang))
 }

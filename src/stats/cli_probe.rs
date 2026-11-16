@@ -171,11 +171,16 @@ pub(crate) fn classify(args: &[String], client: Option<&str>) -> Option<(Command
         "show" | "wrap" => CommandKind::Show,
         "locate" => CommandKind::Locate,
         "profile" => CommandKind::Profile,
+        "deps" => CommandKind::Deps,
+        "gen" => CommandKind::Generate,
+        "undo" => CommandKind::Undo,
+        "rename" => CommandKind::Rename,
         "refresh" => CommandKind::Refresh,
         "callers" => CommandKind::Callers,
         "note" => CommandKind::Notes,
         "project" => CommandKind::Projects,
         "next" => CommandKind::Next,
+        "uses" => CommandKind::PackageUsage,
         _ => CommandKind::Other,
     };
     Some((command, client))

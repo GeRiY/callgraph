@@ -88,11 +88,20 @@ Támogatott fájlok: PHP, JS, TS, Vue, Rust, Swift, Python (.py, .pyi), Go (.go)
   bash ~/.claude/skills/callgraph/callgraph.sh --version                       verzió, platform és a bináris helye
 
 Projekt-profil (architektúra, rétegek és minták a mappa- / fájlnevekből, a gráffal ellenőrizve):
-  bash ~/.claude/skills/callgraph/callgraph.sh profile [--project alias] [--full] [--with-vendor]
-                                                ~15 sor: architektúra, rétegek mappával és fájlszámmal, minták,
+  bash ~/.claude/skills/callgraph/callgraph.sh profile [--project alias] [--full] [--with-vendor] [--packages]
+                                                ~15 sor: architektúra, a kiemelt csomagok a lock verziójával (stack:),
+                                                rétegek mappával és fájlszámmal, minták,
                                                 a rétegek közti hívásirány, ismeretlen mappák; --full: mappánként;
                                                 a bemásolt külső kód és a build-kimenet kimarad (--with-vendor: az is
-                                                számít); PHP-ben és JS-ben is meglévő szerep: controller (php) / (js)
+                                                számít); PHP-ben és JS-ben is meglévő szerep: controller (php) / (js);
+                                                --packages: minden közvetlen composer / npm függőség (telepített, deklarált)
+  bash ~/.claude/skills/callgraph/callgraph.sh uses <csomag> [--calls] [--project alias]   hol használja a kód egy függőségét (guzzle, @vueuse/core): API-szimbólumonként a darabszám, az első fájl, +N; (típus) = import hívás nélkül; --calls: fájlonként minden hívás-sor
+  bash ~/.claude/skills/callgraph/callgraph.sh deps [--project alias]   valószínűleg fölösleges / hiányzó / csak dev composer / npm függőségek (soronként egy; .callgraphignore: deps-ignore <név>)
+  Laravel / Inertia projekt-nézetek (a projekt gyökerén, pl. `. --format ziggy`; az outline-ok is megkapják a rövid linkeket):
+    --format ziggy     ismeretlen route('x') nevek (JS / Vue / PHP), sehonnan be nem töltött route-fájlok; outline: route::x → POST /x · Ctrl@m
+    --format forms     a useForm mezői ↔ az akció FormRequest / validate szabályai; outline: form: … · N mező ✓ / ⚠ …
+    --format models    modellek: tábla, oszlopok a migrációkból, relációk; fillable / cast nem oszlop, kétszer létrehozott tábla
+    --format inertia   oldalak: render-helyek, az oldal által nem deklarált props-ok, sehol nem renderelt oldalak
   bash ~/.claude/skills/callgraph/callgraph.sh <mappa> --layer service         csak az adott réteg fájljai (név,név...;
                                                 egy ökoszisztéma: controller:php, controller:js, …:swift, …:rust)
   bash ~/.claude/skills/callgraph/callgraph.sh <mappa> --layers                summary rétegenként, [szerep] a FILE sorokon
@@ -163,6 +172,45 @@ Frissítés (a GitHub Releases-ből; a projects.json, a lang, az errors.jsonl, a
   Névtelen napi számlálás: naponta egyszer, az első használatkor a verzió, a platform és három igen/nem jelző megy a
   check.callgraph.eu-ra (azonosító és IP nélkül). Kikapcsolás: CALLGRAPH_COUNT=0 vagy DO_NOT_TRACK=1 (a CALLGRAPH_UPDATE_CHECK=0 is);
   a DO_NOT_TRACK=1 az opt-in telemetriát is leállítja.
+
+Kódgenerátor (fájlt ír; az MCP `generate` eszköz alapból ki van, a szervert --generate kapcsolóval vagy CALLGRAPH_GENERATE=1-gyel kell indítani):
+  bash ~/.claude/skills/callgraph/callgraph.sh gen '<kif>' [--dry] [--write <fájl> | --into <fájl>[::Osztály] [--after <metódus>] | --replace <fájl>(:L<a>-L<b> | ::<metódus>) [--expect <sha256-előtag>]] [--project alias]
+    Egy sort ír ki (mi íródott, a mentés, `unresolved: Foo` a nem importálható nevekre); kódot csak a --dry ír ki (cél nélkül
+    ez az alap). Fájlt soha nem ír felül (a --write létezőt elutasít); a meglévő fájl minden módosítása előtt mentés készül:
+    .callgraph/backups/<út>.<UTC yyyymmddThhmmss>.bak (fájlonként a legújabb 10); az új fájlt írás előtt teljesen
+    parse-oljuk, szintaktikai hibánál semmi nem íródik. A névtér a composer.json psr-4-ből, az importok a projektből jönnek.
+    Kifejezés: c:Név osztály, i: interfész, t: trait, e:Név:string(A=a,B=b) enum, s: struct; c! final, c~ abstract, c% readonly;
+      <Ős> extends, [A,B] implements; > gyerek, + testvér (az új sor is), ^ fel, *n ismétlés ($ = számláló), ( ) csoport, {törzs} nyers kód
+      tagok: + public, - private, # protected, majd ~ abstract, ! final, :: static:  +charge(Order $o, int ...$xs):Receipt{ ... }
+      ctor(-Client $http, -int $n=3) promoted, $prop:Típus=1, K=1; törzs nélkül: // TODO (void) / throw LogicException (típusos) /
+      yield from [] (Generator, iterable, iter<T>); ns:App\X, use:Foo\Bar,Baz\Qux as Q
+      típusok: int float bool str bytes void mixed list<T> map<K,V> opt<T> vagy ?T iter<T> A|B, vagy natív PHP-nevek (list/map -> array + docblock)
+    Példák:
+      gen 'c!:PaymentGateway<BaseGateway>[Chargeable] > ctor(-Client $http, -int $retries=3) + +charge(Order $order):Receipt + -sign(array $p):string' --write app/Services/PaymentGateway.php
+      gen '+refund(Order $o):void{ $this->http->post($o->id); }' --into app/Services/PaymentGateway.php::PaymentGateway --after charge
+    Vue (TS vagy JS a projekt szerint): vue:Név>(script>…)+(template>…)+(style>…), comp:useX>… composable;
+      script: props(title:str,size?:int=3) emits(save:int,close) ref:n:T=v computed:n:T{…} fn:n(p:T):R{…} form(a,b) use:@/Components/X
+        use:{useX}@/composables/useX (nevesített; sima út = auto: nevesített, ha a fájlban csak `export function useX` van)
+        type:Flag{flag:str,on?:bool} (interface; inline list<{a:str}>) raw{ const {a} = useX() } const:{a,b}=useX()
+      template: Emmet div.card#id[attr=v @click=f :key=x.id]{szöveg} {{ kifejezés }} *3; a komponens importja magától; style: .a{decl;decl}
+      gen 'script>ref:loading:bool=false+fn:reset(){ form.reset() }' --into resources/js/Pages/Auth/Register.vue
+    JS / TS modul (a fájl kiterjesztése szerint: .ts típusok, .js JSDoc): mod:util>type:Opts{sep?:str}+fn:join(p:list<str>):str{…}+const:MAX:int=10+-fn:helper(){…}
+      alapból exportált; -fn privát; !fn / !class export default; type:Id=str|int alias; class:Svc<Ős>[Iface]>$n:int=0+ctor(-repo:Repo)+ +run():void{…}
+      tagok: + public - private # protected, majd :: static ~ abstract % readonly; --into x.ts[::Osztály [--after tag]]  --replace x.ts::fn | x.ts::Osztály::metódus
+    HTML (.html/.htm, vagy `html:` fej): gen 'html:Cím[lang=hu]>(head>meta:description=Szia+link:style.css+script:app.js)+(body>header>nav>a[href=/]{Főoldal}^^main>form[action=/x method=post]>input[type=email name=e required]+button{Küld})' --write index.html
+      teljes dokumentum (doctype, charset, viewport, title); head-rövidítések meta:név=v meta:og:title=v link:style.css link:icon=/f.ico script:app.js script:module=m.js base:/app/;
+      bármely tag / attribútum (logikai, data-*, aria-*), table>thead>tr>th*3, svg[viewBox=…]>path[d=…]; style{ .a{color:red} } script{ … } comment{ szöveg } (CSS / JS ellenőrizve); csupasz elemek + --write x.html = body
+      --into x.html [--after L12 | ::#id | ::.class | ::tag] (alapból a <body> vége)  --replace x.html:L5-L9 | x.html::#id; duplikált id = figyelmeztetés
+    Laravel-funkció: gen 'laravel:Fee[auth]>create(name:str,amount:int,paid?:bool)+edit+index'  (request, controller,
+      route-ok, Inertia-oldalak; ellenőrzi az űrlap ↔ szabályok egyezését és a modell oszlopait; egy undo minden fájlt visszavon)
+      mezőtípusok: str (max:255) text (hosszú szöveg, max nélkül) int float bool date datetime email; név? = nem kötelező;
+      Ziggy (tightenco/ziggy / ziggy-js) nélkül az oldalak route('…') helyett sima URL-eket használnak
+    --expect <előtag>: csak a --replace-szel; a lecserélt sorok (nem a teljes fájl) sha256-ja; eltérésnél kiírja a jelenlegit
+  bash ~/.claude/skills/callgraph/callgraph.sh rename route|class|method <régi> <új> [--dry] [--strings] [--keep-table]
+    route-nevek ('profile.*' = az egész csoport, resource route-ok ->names()-szel), PHP-osztályok (fájl-áthelyezés, use,
+    ::class, típusok), PHP-metódusok (feloldott hívások, felülírások, route-akciók) PHP / Blade / JS / Vue fájlokban; a
+    dinamikus hivatkozást csak listázza; fájlonként egy sor; egy undo a teljes átnevezést visszavonja
+  bash ~/.claude/skills/callgraph/callgraph.sh undo [<fájl>]    a legutóbbi mentés visszaállítása (a fájlé, vagy a legutóbb módosítotté / csoporté); az undo is visszavonható
 
 Kimenet-korlát: 400 sor fölött a mappás outline summary-ra, az egyfájlos metódus-indexre vált;
 

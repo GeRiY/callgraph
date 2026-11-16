@@ -156,7 +156,9 @@ réteg elöl (a hívásirányban a legmélyebb: model → repository → service
 | `json` / `jsonl` | nyers gráf (nem korlátos); a `jsonl` az callgraph natív kimenete |
 
 **Framework-nézetek** (`--format …`): `routes`, `middleware`, `validation`, `jobs`, `events`, `providers`,
-`magic`, `di`, `views`. Mappára futtasd (pl. `bash $CG --project myapp routes --format routes`).
+`magic`, `di`, `views`. Mappára futtasd (pl. `bash $CG --project myapp routes --format routes`). Laravel +
+Inertia, a projekt gyökerén: `ziggy` (ismeretlen route-nevek), `forms` (useForm ↔ validációs szabályok), `models`
+(táblák és oszlopok a migrációkból), `inertia` (oldalak, render-helyek, props).
 
 ## JS / TS / Vue
 
@@ -240,7 +242,7 @@ relatívak: regisztrált alias (`project`, lista: `projects`) vagy a szerver mun
   kulcsok: `useForm.js::submit` (export), `route::orders.show`, `i18n::orders.title`, `vue::emit:save`, `Atoms/AtomButton.vue`.
 - `search` `{kind: strings | constants, pattern}`: hol van egy string-literál (hibaüzenet, kulcs) vagy konstans.
 - `framework_view` `{view, path}`: egy mappa `routes`, `middleware`, `validation`, `jobs`, `events`, `providers`,
-  `magic`, `di`, `views` nézete.
+  `magic`, `di`, `views` nézete; Laravel + Inertia (projekt gyökere): `ziggy`, `forms`, `models`, `inertia`.
 - `notes`: fájlokhoz / metódusokhoz írt jegyzetek (`📝`, csak olvas). `guide`: ez az útmutató teljes terjedelmében
   (CLI-példák, nyelvek).
 - `next` `{result_id, choice}`: ha a szerver `callgraph mcp --next`-tel fut, egyes eredmények végén

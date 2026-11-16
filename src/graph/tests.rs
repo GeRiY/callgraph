@@ -633,3 +633,36 @@ fn restored_mtime_with_same_size_still_changes_stamp() {
     assert_ne!(before, after);
     let _ = fs::remove_dir_all(dir);
 }
+
+/// Az előző formátum-verzió (a `Call::from` előtti, 5-ös) tárolója nem olvasódik: a gráf csendben újraépül.
+#[test]
+fn a_store_of_the_previous_format_version_is_not_read() {
+    let dir = TempDir::new();
+    let path = dir.store().join("index.bin");
+    let entry = codec::ManifestEntry {
+        path: "a.php".to_owned(),
+        mtime: 1,
+        size: 2,
+        ctime: 3,
+        offset: 0,
+        len: 0,
+    };
+    codec::write_manifest(&path, std::slice::from_ref(&entry)).unwrap();
+    assert_eq!(codec::read_manifest(&path), Some(vec![entry]));
+    // ugyanaz a fájl, csak a fejléc verziója a régi
+    let old = codec::Header {
+        version: codec::FORMAT_VERSION - 1,
+        ..codec::Header::current(codec::MANIFEST)
+    };
+    let header = rmp_serde::to_vec_named(&old).unwrap();
+    let mut bytes = fs::read(&path).unwrap();
+    // `CGB1` + [u32 hossz][fejléc] + a többi keret
+    let header_len = u32::from_le_bytes(bytes[4..8].try_into().unwrap()) as usize;
+    let body = bytes.split_off(8 + header_len);
+    let mut stale = b"CGB1".to_vec();
+    stale.extend_from_slice(&u32::try_from(header.len()).unwrap().to_le_bytes());
+    stale.extend_from_slice(&header);
+    stale.extend_from_slice(&body);
+    fs::write(&path, stale).unwrap();
+    assert_eq!(codec::read_manifest(&path), None);
+}

@@ -109,6 +109,19 @@ fn classifies_cli_runs_and_skips_servers_and_background_children() {
         Some((CommandKind::Notes, Client::Cli))
     );
     assert_eq!(
+        cli(&["deps", "--project", "/x"]),
+        Some((CommandKind::Deps, Client::Cli))
+    );
+    assert_eq!(
+        cli(&["gen", "c:Foo", "--dry"]),
+        Some((CommandKind::Generate, Client::Cli))
+    );
+    assert_eq!(cli(&["undo"]), Some((CommandKind::Undo, Client::Cli)));
+    assert_eq!(
+        cli(&["rename", "route", "a.b", "c.d", "--dry"]),
+        Some((CommandKind::Rename, Client::Cli))
+    );
+    assert_eq!(
         cli(&["src/Order.php"]),
         Some((CommandKind::Other, Client::Cli))
     );

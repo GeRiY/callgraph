@@ -6,6 +6,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
+use super::params::{GenerateParams, RenameParams};
 use super::request::ShowQuery;
 use super::runner::QueryRunner;
 use crate::skill::SkillHome;
@@ -43,10 +44,20 @@ impl QueryRunner for HintRunner {
         self.inner.projects().map(|text| self.append(text))
     }
 
-    fn profile(&self, project: Option<&str>, full: bool) -> Result<String, String> {
+    fn profile(&self, project: Option<&str>, full: bool, packages: bool) -> Result<String, String> {
         self.inner
-            .profile(project, full)
+            .profile(project, full, packages)
             .map(|text| self.append(text))
+    }
+
+    fn uses(&self, project: Option<&str>, package: &str, calls: bool) -> Result<String, String> {
+        self.inner
+            .uses(project, package, calls)
+            .map(|text| self.append(text))
+    }
+
+    fn deps(&self, project: Option<&str>) -> Result<String, String> {
+        self.inner.deps(project).map(|text| self.append(text))
     }
 
     fn startup_note(&self) -> String {
@@ -57,6 +68,14 @@ impl QueryRunner for HintRunner {
         self.inner
             .next(project, id, choices)
             .map(|text| self.append(text))
+    }
+
+    fn generate(&self, params: &GenerateParams) -> Result<String, String> {
+        self.inner.generate(params)
+    }
+
+    fn rename(&self, params: &RenameParams) -> Result<String, String> {
+        self.inner.rename(params)
     }
 }
 

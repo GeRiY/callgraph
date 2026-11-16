@@ -18,6 +18,8 @@ pub struct ImportBinding {
     pub component: bool,
     /// Az `imports` térkép értéke: `<display>` / `::*` / `::<importált>`.
     pub import_value: String,
+    /// A forrás-specifikátor, ha nem helyi (se nem relatív, se nem alias-os): a hívások `Call::from`-ja.
+    pub package: Option<String>,
 }
 
 /// A fájl top-level importjai kötésekké feloldva, forrásbeli sorrendben.
@@ -66,6 +68,7 @@ pub fn import_bindings(
                 category: categorize(source, cat_name, resolved.local),
                 component: resolved.display.ends_with(".vue"),
                 import_value: format!("{}{suffix}", resolved.display),
+                package: (!resolved.local).then(|| source.to_owned()),
                 local,
             });
         }

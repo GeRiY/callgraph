@@ -4,6 +4,7 @@
 use std::path::PathBuf;
 
 use super::guard::ProjectRoot;
+use super::params::{GenerateParams, RenameParams};
 use super::request::ShowQuery;
 use crate::cli::{CliArgs, build_command};
 use crate::skill::{ProjectRegistry, SkillHome};
@@ -14,9 +15,29 @@ pub(crate) trait QueryRunner: Send + Sync {
     fn run(&self, query: &ShowQuery) -> Result<String, String>;
     /// A regisztrált projektek: `alias<TAB>gyökér` soronként.
     fn projects(&self) -> Result<String, String>;
-    /// A projekt-profil (`callgraph profile`) szövege; `project`: alias (`None` = a munkakönyvtár).
-    fn profile(&self, project: Option<&str>, full: bool) -> Result<String, String> {
-        let _ = (project, full);
+    /// A projekt-profil (`callgraph profile`) szövege; `project`: alias (`None` = a munkakönyvtár); `packages`: a
+    /// közvetlen függőségek listája is (`--packages`).
+    fn profile(&self, project: Option<&str>, full: bool, packages: bool) -> Result<String, String> {
+        let _ = (project, full, packages);
+        Err(crate::t!(
+            "project_profile is not available",
+            "a project_profile nem érhető el"
+        )
+        .into())
+    }
+    /// Egy függőség használata (`callgraph uses`); `calls`: fájlonként minden hívás-sor (`--calls`).
+    fn uses(&self, project: Option<&str>, package: &str, calls: bool) -> Result<String, String> {
+        let _ = (project, package, calls);
+        Err(crate::t!(
+            "package_usage is not available",
+            "a package_usage nem érhető el"
+        )
+        .into())
+    }
+    /// A függőség-vizsgálat (`callgraph deps`): fölösleges, hiányzó és csak dev függőségek (`project_profile`
+    /// `deps: true`).
+    fn deps(&self, project: Option<&str>) -> Result<String, String> {
+        let _ = project;
         Err(crate::t!(
             "project_profile is not available",
             "a project_profile nem érhető el"
@@ -31,6 +52,16 @@ pub(crate) trait QueryRunner: Send + Sync {
     fn next(&self, project: Option<&str>, id: &str, choices: &[usize]) -> Result<String, String> {
         let _ = (project, choices);
         Err(unknown_result(id))
+    }
+    /// Kód generálása (`generate` eszköz, opt-in, `crate::generate`): a CLI `gen` parancsának kimenete.
+    fn generate(&self, params: &GenerateParams) -> Result<String, String> {
+        let _ = params;
+        Err(crate::t!("generate is not available", "a generate nem érhető el").into())
+    }
+    /// Biztonságos átnevezés (`rename` eszköz, opt-in, `crate::rename`): a CLI `rename` parancsának kimenete.
+    fn rename(&self, params: &RenameParams) -> Result<String, String> {
+        let _ = params;
+        Err(crate::t!("rename is not available", "a rename nem érhető el").into())
     }
 }
 
@@ -113,7 +144,7 @@ impl QueryRunner for ShowRunner {
         Self::execute(args, &root)
     }
 
-    fn profile(&self, project: Option<&str>, full: bool) -> Result<String, String> {
+    fn profile(&self, project: Option<&str>, full: bool, packages: bool) -> Result<String, String> {
         let root = self.root(project)?;
         let mut args = vec![
             "profile".to_owned(),
@@ -122,6 +153,33 @@ impl QueryRunner for ShowRunner {
         ];
         if full {
             args.push("--full".into());
+        }
+        if packages {
+            args.push("--packages".into());
+        }
+        Self::execute(args, &root)
+    }
+
+    fn deps(&self, project: Option<&str>) -> Result<String, String> {
+        let root = self.root(project)?;
+        let args = vec![
+            "deps".to_owned(),
+            "--project".to_owned(),
+            root.root().display().to_string(),
+        ];
+        Self::execute(args, &root)
+    }
+
+    fn uses(&self, project: Option<&str>, package: &str, calls: bool) -> Result<String, String> {
+        let root = self.root(project)?;
+        let mut args = vec![
+            "uses".to_owned(),
+            package.to_owned(),
+            "--project".to_owned(),
+            root.root().display().to_string(),
+        ];
+        if calls {
+            args.push("--calls".into());
         }
         Self::execute(args, &root)
     }
@@ -135,6 +193,22 @@ impl QueryRunner for ShowRunner {
             return Err(String::from_utf8_lossy(&err).trim_end().to_owned());
         }
         Ok(String::from_utf8_lossy(&out).into_owned())
+    }
+
+    fn generate(&self, params: &GenerateParams) -> Result<String, String> {
+        let root = self.root(params.project.as_deref())?;
+        let mut args = params.to_args();
+        args.push("--project".to_owned());
+        args.push(root.root().display().to_string());
+        Self::execute_plain(args)
+    }
+
+    fn rename(&self, params: &RenameParams) -> Result<String, String> {
+        let root = self.root(params.project.as_deref())?;
+        let mut args = params.to_args();
+        args.push("--project".to_owned());
+        args.push(root.root().display().to_string());
+        Self::execute_plain(args)
     }
 
     fn startup_note(&self) -> String {

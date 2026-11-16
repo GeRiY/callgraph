@@ -155,6 +155,7 @@ mod tests {
             category: category.into(),
             args: None,
             handler: None,
+            from: None,
         }
     }
 

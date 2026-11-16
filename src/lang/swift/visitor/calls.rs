@@ -69,6 +69,7 @@ impl SwiftVisitor<'_, '_> {
             category: category.to_string(),
             args: self.args(node),
             handler: None,
+            from: None,
         });
     }
 

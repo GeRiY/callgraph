@@ -21,6 +21,8 @@
 
 [![M8ven Score](https://m8ven.ai/badge/mcp/geriy-callgraph-96dgjx?v=dd506132eff002dd067b90a1092601d3)](https://m8ven.ai/mcp/geriy-callgraph-96dgjx?s=readme) [![M8ven Live](https://m8ven.ai/badge/mcp/geriy-callgraph-96dgjx?variant=verified)](https://m8ven.ai/mcp/geriy-callgraph-96dgjx?s=readme)
 
+[![callgraph MCP server](https://mcprush.com/badge/callgraph-mcp/card.svg)](https://mcprush.com/to/callgraph-mcp?ref=badge)
+
 </div>
 
 <p align="center">

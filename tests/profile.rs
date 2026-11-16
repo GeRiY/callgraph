@@ -127,8 +127,11 @@ fn line_with<'a>(text: &'a str, start: &str) -> &'a str {
 fn profile_recognises_a_laravel_project() {
     let project = laravel();
     let out = project.run(&["profile"]);
+    // a headline után a kiemelt csomagok sora (lock nélkül a deklarált tartomány, jelölve)
     assert!(
-        out.starts_with("profile: laravel (layered MVC) · confidence: high\nlayers (files):\n"),
+        out.starts_with(
+            "profile: laravel (layered MVC) · confidence: high\nstack:   laravel/framework ^11 (range)\nlayers (files):\n"
+        ),
         "{out}"
     );
     let controller = line_with(&out, "  controller ");
@@ -380,6 +383,55 @@ fn profile_recognises_a_vue_project() {
     let stores = project.run(&["show", "src", "--layer", "store", "--full"]);
     assert!(stores.contains("user.ts"), "{stores}");
     assert!(!stores.contains("Home.vue"), "{stores}");
+}
+
+/// A stack-sor a lock pontos verziójával, és a `--packages` lista csomag-gyökerenként (prod, utána dev).
+#[test]
+fn profile_stack_line_and_packages_list_from_the_locks() {
+    let project = Project::new(&[
+        (
+            "composer.json",
+            "{\"require\": {\"php\": \"^8.2\", \"laravel/framework\": \"^11.0\"}, \"require-dev\": {\"phpunit/phpunit\": \"^10.5\"}}\n",
+        ),
+        (
+            "composer.lock",
+            "{\"packages\": [{\"name\": \"laravel/framework\", \"version\": \"v11.31.0\"}, {\"name\": \"symfony/console\", \"version\": \"v7.1.0\"}], \"packages-dev\": [{\"name\": \"phpunit/phpunit\", \"version\": \"10.5.1\"}]}\n",
+        ),
+        (
+            "frontend/package.json",
+            "{\"dependencies\": {\"vue\": \"^3.4.0\"}, \"devDependencies\": {\"vite\": \"^5.0.0\"}}\n",
+        ),
+        (
+            "frontend/yarn.lock",
+            "# yarn lockfile v1\n\nvue@^3.4.0:\n  version \"3.4.21\"\n\nvite@^5.0.0:\n  version \"5.1.4\"\n",
+        ),
+        ("app/Http/Controllers/Controller.php", CONTROLLER),
+        ("app/Models/User.php", MODEL),
+    ]);
+    let out = project.run(&["profile"]);
+    assert_eq!(
+        line_with(&out, "stack:"),
+        "stack:   laravel/framework 11.31.0 · phpunit/phpunit 10.5.1 · vue 3.4.21 · vite 5.1.4   (composer.lock, yarn.lock)",
+        "{out}"
+    );
+    assert!(!out.contains("packages ["), "{out}");
+
+    let listed = project.run(&["profile", "--packages"]);
+    let at = listed
+        .find("packages [php] . · composer.lock\n")
+        .unwrap_or_else(|| panic!("{listed}"));
+    assert!(
+        listed[at..].starts_with(
+            "packages [php] . · composer.lock\n  laravel/framework  11.31.0 (^11.0)\n  phpunit/phpunit    10.5.1 (^10.5)  [dev]\npackages [node] frontend · yarn.lock\n  vue   3.4.21 (^3.4.0)\n  vite  5.1.4 (^5.0.0)  [dev]\n"
+        ),
+        "{listed}"
+    );
+    assert!(!listed.contains("symfony/console"), "{listed}");
+    let hu = project.run_in(&["profile", "--packages"], "hu");
+    assert!(
+        hu.contains("csomagok [node] frontend · yarn.lock\n"),
+        "{hu}"
+    );
 }
 
 #[test]

@@ -32,3 +32,5 @@
 /skill/lang
 /skill/update-check.json
 __pycache__/
+# belső mérési követelmények (privát)
+/.measure/

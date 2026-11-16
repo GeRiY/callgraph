@@ -191,3 +191,258 @@ fn output_limit_notices_follow_the_language() {
     );
     assert!(summary(Lang::En).ends_with("\n\nS") && summary(Lang::Hu).ends_with("\n\nS"));
 }
+
+const PAY: &str = "<?php\nnamespace App;\n\nuse GuzzleHttp\\Client;\nuse Illuminate\\Support\\Facades\\Http;\n\nclass Pay\n{\n    public function charge(): void\n    {\n        $client = new Client();\n        $client->request('GET', '/');\n        Http::get('/x');\n        strlen('x');\n    }\n}\n";
+
+/// Csomagtérkép a `/p` gyökérre: guzzle és laravel (lockkal), saját `App\` névtér.
+fn pay_packages() -> std::sync::Arc<crate::packages::Packages> {
+    use crate::packages::{Ecosystem, EcosystemPackages, Package, Packages, ProjectPackages};
+    let package = |name: &str, version: &str, namespace: &str| Package {
+        name: name.to_owned(),
+        ecosystem: Ecosystem::Php,
+        declared: Some("*".to_owned()),
+        installed: Some(version.to_owned()),
+        dev: false,
+        namespaces: vec![namespace.to_owned()],
+        auto_discovered: false,
+        plugin: false,
+    };
+    let part = EcosystemPackages {
+        root: "/p".into(),
+        ecosystem: Ecosystem::Php,
+        name: None,
+        packages: vec![
+            package("guzzlehttp/guzzle", "7.9.2", "GuzzleHttp\\"),
+            package("laravel/framework", "11.31.0", "Illuminate\\"),
+        ],
+        installed_only: Vec::new(),
+        own_namespaces: vec!["App\\".to_owned()],
+        lock: Some("composer.lock".to_owned()),
+    };
+    std::sync::Arc::new(Packages::from_map(ProjectPackages {
+        root: "/p".into(),
+        parts: vec![part],
+    }))
+}
+
+#[test]
+fn outline_labels_package_calls_but_not_the_framework_itself() {
+    let plain = row("/p/app/Pay.php", PAY);
+    let mut labelled = row("/p/app/Pay.php", PAY);
+    labelled.packages = Some(pay_packages());
+    let before = render(Lang::En, "outline", std::slice::from_ref(&plain));
+    let after = render(Lang::En, "outline", std::slice::from_ref(&labelled));
+    assert!(!before.contains("guzzle: "), "{before}");
+    assert!(
+        after
+            .lines()
+            .any(|line| line.contains("guzzle: ") && line.contains("GuzzleHttp\\Client::request")),
+        "{after}"
+    );
+    // a `framework_use` sor már mondja, hogy framework: a `laravel:` címke elmarad
+    assert!(!after.contains("laravel: "), "{after}");
+    // a címkén kívül a kimenet ugyanaz (nincs új sor, fejléc)
+    assert_eq!(
+        before.lines().count() + 1,
+        after.lines().count(),
+        "{before}\n{after}"
+    );
+}
+
+#[test]
+fn outline_without_a_matching_package_is_unchanged() {
+    use crate::packages::{Ecosystem, EcosystemPackages, Packages, ProjectPackages};
+    let plain = row("/p/app/Pay.php", PAY);
+    let mut other = row("/p/app/Pay.php", PAY);
+    // csak egy Node-rész: a PHP-hívások egyike sem kap csomagot
+    other.packages = Some(std::sync::Arc::new(Packages::from_map(ProjectPackages {
+        root: "/p".into(),
+        parts: vec![EcosystemPackages {
+            root: "/p".into(),
+            ecosystem: Ecosystem::Node,
+            name: None,
+            packages: Vec::new(),
+            installed_only: Vec::new(),
+            own_namespaces: Vec::new(),
+            lock: None,
+        }],
+    })));
+    for format in ["outline", "json"] {
+        assert_eq!(
+            render(Lang::En, format, std::slice::from_ref(&plain)),
+            render(Lang::En, format, std::slice::from_ref(&other)),
+            "{format}"
+        );
+    }
+}
+
+#[test]
+fn json_calls_carry_the_full_package_name_and_version() {
+    let mut labelled = row("/p/app/Pay.php", PAY);
+    labelled.packages = Some(pay_packages());
+    let text = render(Lang::En, "json", std::slice::from_ref(&labelled));
+    let json: serde_json::Value = serde_json::from_str(&text).unwrap();
+    let calls = json[0]["calls"].as_array().unwrap();
+    let package_of = |resolved: &str| {
+        let call = calls
+            .iter()
+            .find(|call| call["resolved"] == resolved)
+            .unwrap_or_else(|| panic!("{resolved}: {text}"));
+        // a verzió nem ismétlődik hívásonként: a fájl `packages` táblájában van, egyszer
+        assert!(call.get("package_version").is_none(), "{call}");
+        let name = call["package"].clone();
+        let version = json[0]["packages"][name.as_str().unwrap_or_default()].clone();
+        (name, version)
+    };
+    assert_eq!(
+        package_of("GuzzleHttp\\Client::request"),
+        (
+            serde_json::json!("guzzlehttp/guzzle"),
+            serde_json::json!("7.9.2")
+        )
+    );
+    assert_eq!(
+        package_of("Illuminate\\Support\\Facades\\Http::get"),
+        (
+            serde_json::json!("laravel/framework"),
+            serde_json::json!("11.31.0")
+        )
+    );
+    // a saját kód és a natív függvény: nincs `package` kulcs
+    let strlen = calls
+        .iter()
+        .find(|call| call["target"] == "strlen")
+        .unwrap();
+    assert!(strlen.get("package").is_none(), "{strlen}");
+    // csomagtérkép nélkül egy hívásnak sincs `package` kulcsa
+    let plain = render(Lang::En, "json", &[row("/p/app/Pay.php", PAY)]);
+    assert!(!plain.contains("\"package\""), "{plain}");
+}
+
+const BOARD: &str = "<?php\nnamespace App\\Http\\Controllers;\n\nuse Inertia\\Inertia;\n\nclass BoardController\n{\n    public function show()\n    {\n        return Inertia::render('Board', ['title' => 'x']);\n    }\n\n    public function gone()\n    {\n        return inertia('Gone');\n    }\n}\n";
+
+/// Inertia-kötések a `/p` gyökérre: `resources/js/Pages`, a `Board.vue` létezik, két render-hely.
+fn board_inertia() -> std::sync::Arc<crate::packages::Inertia> {
+    std::sync::Arc::new(crate::packages::Inertia::fixture(
+        std::path::Path::new("/p"),
+        "resources/js/Pages",
+        &["resources/js/Pages/Board.vue"],
+        &[
+            (
+                "app/Http/Controllers/BoardController.php",
+                "BoardController",
+                "show",
+                10,
+                "Board",
+            ),
+            (
+                "app/Http/Controllers/BoardEditor.php",
+                "BoardEditor",
+                "edit",
+                31,
+                "Board",
+            ),
+        ],
+    ))
+}
+
+#[test]
+fn outline_links_inertia_render_calls_to_their_page_file() {
+    let plain = row("/p/app/Http/Controllers/BoardController.php", BOARD);
+    let mut linked = row("/p/app/Http/Controllers/BoardController.php", BOARD);
+    linked.inertia = Some(board_inertia());
+    let before = render(Lang::En, "outline", std::slice::from_ref(&plain));
+    let (after, hu) = both("outline", std::slice::from_ref(&linked));
+    assert!(!before.contains(" → "), "{before}");
+    assert!(
+        after
+            .lines()
+            .any(|line| line.contains("Inertia\\Inertia::render → Pages/Board.vue")),
+        "{after}"
+    );
+    assert!(
+        after
+            .lines()
+            .any(|line| line.contains("inertia → Pages/Gone.vue (missing)")),
+        "{after}"
+    );
+    assert!(hu.contains("inertia → Pages/Gone.vue (hiányzik)"), "{hu}");
+    // csak a hívás-sorok kapnak nyilat: a sorok száma ugyanaz, a PHP-fájlnak nincs `rendered by:` sora
+    assert_eq!(before.lines().count(), after.lines().count(), "{after}");
+    assert!(!after.contains("rendered by:"), "{after}");
+}
+
+#[test]
+fn json_render_calls_carry_the_inertia_page() {
+    let mut linked = row("/p/app/Http/Controllers/BoardController.php", BOARD);
+    linked.inertia = Some(board_inertia());
+    let text = render(Lang::En, "json", std::slice::from_ref(&linked));
+    let json: serde_json::Value = serde_json::from_str(&text).unwrap();
+    let calls = json[0]["calls"].as_array().unwrap();
+    let render_call = calls
+        .iter()
+        .find(|call| call["resolved"] == "Inertia\\Inertia::render")
+        .unwrap_or_else(|| panic!("{text}"));
+    assert_eq!(
+        render_call["inertia_page"],
+        serde_json::json!("resources/js/Pages/Board.vue")
+    );
+    assert!(
+        render_call.get("inertia_page_missing").is_none(),
+        "{render_call}"
+    );
+    let helper = calls
+        .iter()
+        .find(|call| call["target"] == "inertia")
+        .unwrap_or_else(|| panic!("{text}"));
+    assert_eq!(
+        helper["inertia_page"],
+        serde_json::json!("resources/js/Pages/Gone.vue")
+    );
+    assert_eq!(helper["inertia_page_missing"], serde_json::json!(true));
+    assert_eq!(text.matches("\"inertia_page\"").count(), 2, "{text}");
+}
+
+#[test]
+fn outline_and_json_without_inertia_are_unchanged() {
+    // egy Inertia-projekt render-hívás nélküli fájlja: a kötésekkel is a régi kimenet
+    let plain = row("/p/app/Pay.php", PAY);
+    let mut linked = row("/p/app/Pay.php", PAY);
+    linked.inertia = Some(board_inertia());
+    for format in ["outline", "json"] {
+        assert_eq!(
+            render(Lang::En, format, std::slice::from_ref(&plain)),
+            render(Lang::En, format, std::slice::from_ref(&linked)),
+            "{format}"
+        );
+    }
+}
+
+#[test]
+fn page_outline_has_one_rendered_by_line() {
+    let language = LanguageRegistry::with_defaults();
+    let path = "/p/resources/js/Pages/Board.vue";
+    let vue = language.for_path(std::path::Path::new(path)).unwrap();
+    let text = "<script setup>\ndefineProps({ title: String })\n</script>\n<template><h1>{{ title }}</h1></template>\n";
+    let graph = vue
+        .analyze(&SourceFile::new(path, text.as_bytes().to_vec(), None))
+        .unwrap()
+        .graph;
+    let plain = QueryResult::new(graph.clone(), None);
+    let mut linked = QueryResult::new(graph, None);
+    linked.inertia = Some(board_inertia());
+    let before = render(Lang::En, "outline", std::slice::from_ref(&plain));
+    let (after, hu) = both("outline", std::slice::from_ref(&linked));
+    assert_eq!(before.lines().count() + 1, after.lines().count(), "{after}");
+    let mut lines = after.lines();
+    assert!(lines.next().unwrap().starts_with("FILE  "), "{after}");
+    assert_eq!(
+        lines.next(),
+        Some("rendered by: BoardController::show L10 (+1)"),
+        "{after}"
+    );
+    assert!(
+        hu.contains("renderelő: BoardController::show L10 (+1)"),
+        "{hu}"
+    );
+}

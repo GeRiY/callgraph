@@ -1,4 +1,4 @@
-# Build + teszt a main- és develop-pushoknál és PR-en; `v*` tagnél a négy platform binárisaiból skill-csomag és GitHub Release.
+# Build + teszt a develop-pushnál és a develop / main felé nyitott PR-en; `v*` tagnél a négy platform binárisaiból skill-csomag és GitHub Release.
 # develop-pushnál ugyanezek a csomagok a gördülő `dev` előzetes kiadásba kerülnek (a `dev` tag az épített commitra
 # mozdul; `callgraph.sh update --dev`), a binárisok verziója `X.Y.Z-dev.<sha7>` (CALLGRAPH_BUILD_VERSION).
 # A `dev` tag pusholása nem indít új futást: a tag-szűrő `v*`, és a GITHUB_TOKEN-nel küldött push amúgy sem indít workflow-t.
@@ -6,11 +6,13 @@ name: build
 
 on:
   push:
-    branches: [main, develop]
+    # a main csak kiadáskor változik, és azt a `v*` tag-futás építi: main-pushra nincs külön (dupla) build
+    branches: [develop]
     tags: ["v*"]
     # csak dokumentáció változott → nincs build (a tag-pusholásra a paths-ignore nem vonatkozik)
     paths-ignore: ["**/*.md", "docs/**", ".github/ISSUE_TEMPLATE/**", "LICENSE"]
   pull_request:
+    branches: [develop, main]
     paths-ignore: ["**/*.md", "docs/**", ".github/ISSUE_TEMPLATE/**", "LICENSE"]
 
 # egymás utáni pusholásnál a régi futás leáll; a release-t készítő tag-futás soha

@@ -20,7 +20,7 @@ ugyanaz a tömör kimenet, amit a `callgraph show` kiír (ez a token-hatékony r
 | `method_body` | `path`, `method` (egy név stringként vagy névtömb), `project?`, `doc?`, `raw?`, `full?` | a metódus(ok) forrása sorszámozva, tömören (docblock és üres sorok nélkül, a törzsbeli megjegyzések maradnak; a kihagyott docblockot a fejléc jelzi); `doc: true`: docblockkal, `raw: true`: szűretlenül | `show <út>::m --body [--doc\|--raw]` |
 | `find_callers` | `pattern`, `path?`, `project?`, `depth?` (1–5), `guess?`, `full?` | ki hívja; `depth` > 1: hatáselemzés | `show <út> --grep <minta> --depth N [--guess]` |
 | `search` | `kind` (`strings`\|`constants`), `pattern`, `path?`, `project?`, `full?` | string-literál / konstans helye | `show <út> --strings` / `--const` |
-| `framework_view` | `view` (`routes`\|`middleware`\|`validation`\|`jobs`\|`events`\|`providers`\|`magic`\|`di`\|`views`), `path`, `project?`, `full?` | framework-nézet | `show <út> --format <nézet>` |
+| `framework_view` | `view` (`routes`\|`middleware`\|`validation`\|`jobs`\|`events`\|`providers`\|`magic`\|`di`\|`views`\|`inertia`), `path`, `project?`, `full?` | framework-nézet | `show <út> --format <nézet>` |
 | `notes` (pilot) | `pattern?` (regex a szövegre / horgonyra; üres = mind), `path?`, `project?` | a fájlokhoz / metódusokhoz írt jegyzetek: `út[::metódus]  idő  📝 szöveg`, `[orphaned]`, ha a metódus már nincs | `show <út> --notes <minta>` |
 | `projects` | — | a regisztrált aliasok és gyökereik | `projects.sh list` |
 | `guide` | — | a teljes skill-útmutató (`SKILL.md` törzse, frontmatter nélkül) a beállított nyelven | `skill/SKILL.md` |
@@ -201,6 +201,15 @@ A Claude Desktop nem a projektmappában indít: add meg a `project` aliast (lás
   }
 }
 ```
+
+## `generate` (opt-in, ír)
+
+Az egyetlen író eszköz: egy rövid, Emmet-szerű kifejezésből PHP-kódot generál, és maga írja a fájlt (a kód
+visszaadása a kimeneti token-nyereséget elvinné). **Alapból nincs a listán**: `callgraph mcp --generate` vagy
+`CALLGRAPH_GENERATE=1`. Paraméterek: `expr`, `dry`, `write` (új fájl), `into` (`fájl` / `fájl::Osztály`) + `after`,
+`replace` (`fájl::metódus` / `fájl:L42-L87`) + `expect`, `project`. Létező fájlt nem ír felül; módosítás előtt
+mentés készül a `.callgraph/backups/` alá, az új szöveget írás előtt a PHP-parser ellenőrzi. A válasz egy sor.
+A nyelvtan: `callgraph --help` (a „Code generator” rész) és a `src/generate/mod.rs` doksija.
 
 ## Kipróbálás kézzel
 

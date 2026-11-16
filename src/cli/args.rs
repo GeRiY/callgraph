@@ -7,10 +7,13 @@ use crate::error::{CallgraphError, Result};
 use crate::lang::LanguageRegistry;
 use crate::query::format::BodyMode;
 
+use super::generate_args::{parse_gen, parse_undo};
 use super::next_args::parse_next;
 use super::profile_args::{LayerArgs, parse_profile};
+use super::rename_args::parse_rename;
 use super::stats_args::parse_stats;
 use super::telemetry_args::{TelemetryAction, parse_telemetry};
+use super::uses_args::{parse_deps, parse_uses};
 
 fn usage() -> &'static str {
     crate::t!(
@@ -159,12 +162,13 @@ pub enum CliArgs {
         /// A réteg-kapcsolók (`--layer`, `--layers`, `--by-layer`; `profile_args.rs`).
         layers: LayerArgs,
     },
-    /// `profile [--project <alias|mappa>] [--full] [--with-vendor]`: a projekt-profil (architektúra, rétegek,
-    /// minták); `with_vendor`: a beágyazott külső kód is számít.
+    /// `profile [--project <alias|mappa>] [--full] [--with-vendor] [--packages]`: a projekt-profil (architektúra,
+    /// rétegek, minták); `with_vendor`: a beágyazott külső kód is számít; `packages`: a közvetlen függőségek listája.
     Profile {
         project: Option<String>,
         full: bool,
         with_vendor: bool,
+        packages: bool,
     },
     /// `note add|list|rm` (PILOT); `project`: alias vagy gyökér-út.
     Note {
@@ -185,6 +189,15 @@ pub enum CliArgs {
         all: bool,
         project: Option<String>,
     },
+    /// `uses <csomag> [--calls]`: hol és hogyan használja a projekt egy függőségét; `calls`: fájlonként minden
+    /// hívás-sor; `project`: alias vagy gyökér-út.
+    Uses {
+        package: String,
+        calls: bool,
+        project: Option<String>,
+    },
+    /// `deps`: fölösleges, hiányzó és csak dev függőségek; `project`: alias vagy gyökér-út.
+    Deps { project: Option<String> },
     /// `hook post-edit|install|uninstall|status`; `settings`: a Claude Code `settings.json` helye (alapból
     /// `~/.claude/settings.json`).
     Hook {
@@ -198,6 +211,21 @@ pub enum CliArgs {
     Next {
         id: String,
         choices: Vec<usize>,
+        project: Option<String>,
+    },
+    /// `gen '<kifejezés>' [--dry|--write|--into|--replace …]`: kód-generálás rövid kifejezésből (`crate::generate`).
+    Generate {
+        request: crate::generate::GenRequest,
+        project: Option<String>,
+    },
+    /// `rename <route|class|method> <régi> <új> [--dry] [--strings] [--keep-table]`: biztonságos átnevezés (`crate::rename`).
+    Rename {
+        request: crate::rename::RenameRequest,
+        project: Option<String>,
+    },
+    /// `undo [<fájl>]`: a legutóbbi generátor-módosítás visszavonása a `.callgraph/backups/` mappából.
+    Undo {
+        file: Option<String>,
         project: Option<String>,
     },
     /// `telemetry on|off|status|preview`: a helyi statisztika opt-in beküldése (`crate::stats::telemetry`).
@@ -255,6 +283,12 @@ impl CliArgs {
         if args.first().is_some_and(|a| a == "locate") {
             return Self::parse_locate(&args[1..]);
         }
+        if args.first().is_some_and(|a| a == "uses") {
+            return parse_uses(&args[1..]);
+        }
+        if args.first().is_some_and(|a| a == "deps") {
+            return parse_deps(&args[1..]);
+        }
         if args.first().is_some_and(|a| a == "hook") {
             return Self::parse_hook(&args[1..]);
         }
@@ -266,6 +300,15 @@ impl CliArgs {
         }
         if args.first().is_some_and(|a| a == "next") {
             return parse_next(&args[1..]);
+        }
+        if args.first().is_some_and(|a| a == "gen") {
+            return parse_gen(&args[1..]);
+        }
+        if args.first().is_some_and(|a| a == "rename") {
+            return parse_rename(&args[1..]);
+        }
+        if args.first().is_some_and(|a| a == "undo") {
+            return parse_undo(&args[1..]);
         }
         if args.first().is_some_and(|a| a == "telemetry") {
             return parse_telemetry(&args[1..]);

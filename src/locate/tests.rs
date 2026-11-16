@@ -139,6 +139,7 @@ fn call(container: &str, caller: &str, line: u32, target: &str) -> Call {
         category: "external_call".into(),
         args: None,
         handler: None,
+        from: None,
     }
 }
 
@@ -823,4 +824,157 @@ fn a_rare_property_is_an_exact_match() {
     ];
     let ranked = rank(files, super::rank::is_test_path);
     assert_eq!(ranked[0].path, "app/Models/Invoice.php", "{ranked:?}");
+}
+
+/// A `guzzle` kifejezés a `GuzzleHttp\Client`-et hívó fájlban „pkg guzzle” indoklást ad (név-részlet súllyal); ahol
+/// a kifejezés már erősebben illik (a fájl neve), ott nem.
+#[test]
+fn package_term_gives_a_uses_package_reason_in_the_calling_file() {
+    use crate::packages::{Ecosystem, EcosystemPackages, Package, Packages, ProjectPackages};
+    let guzzle = Package {
+        name: "guzzlehttp/guzzle".into(),
+        ecosystem: Ecosystem::Php,
+        declared: Some("^7.9".into()),
+        installed: Some("7.9.2".into()),
+        dev: false,
+        namespaces: vec!["GuzzleHttp\\".into()],
+        auto_discovered: false,
+        plugin: false,
+    };
+    let packages = Packages::from_map(ProjectPackages {
+        root: "/p".into(),
+        parts: vec![EcosystemPackages {
+            root: "/p".into(),
+            ecosystem: Ecosystem::Php,
+            name: None,
+            packages: vec![guzzle],
+            installed_only: Vec::new(),
+            own_namespaces: vec!["App\\".into()],
+            lock: Some("composer.lock".into()),
+        }],
+    });
+    let mut pay = graph("app/Services/Pay.php");
+    let mut request = call("Pay", "charge", 42, "request");
+    request.kind = "method_call".into();
+    request.resolved = Some("GuzzleHttp\\Client::request".into());
+    pay.calls.push(request);
+    let terms = Term::parse_all(&["guzzle"]);
+    let callers = CallerCounts::build([&pay]);
+    let matcher = Matcher::new(&terms, &callers).with_packages(Some(&packages));
+    let path = std::path::Path::new("/p/app/Services/Pay.php");
+    let mut hits = matcher.file_hits("app/Services/Pay.php", &pay, true);
+    assert!(hits.is_empty(), "{hits:?}");
+    matcher.package_hits(path, &pay, &mut hits);
+    assert_eq!(hits.len(), 1, "{hits:?}");
+    assert_eq!(hits[0].kind, Kind::NamePart);
+    let reasons = group(&hits);
+    let text = super::reasons::describe(&reasons[0], &terms);
+    assert!(text.starts_with("pkg guzzle  L42  ← \"guzzle\""), "{text}");
+    // a csomagtérkép nélküli matcher nem ad ilyen egyezést
+    let mut none = Vec::new();
+    Matcher::new(&terms, &callers).package_hits(path, &pay, &mut none);
+    assert!(none.is_empty());
+    // erősebb egyezés (a fájl neve `Guzzle.php`) mellett nincs külön csomag-indoklás
+    let mut named = graph("app/Guzzle.php");
+    named.calls = pay.calls.clone();
+    let mut hits = matcher.file_hits("app/Guzzle.php", &named, true);
+    let before = hits.len();
+    assert!(before > 0, "{hits:?}");
+    matcher.package_hits(std::path::Path::new("/p/app/Guzzle.php"), &named, &mut hits);
+    assert_eq!(hits.len(), before, "{hits:?}");
+}
+
+/// A page-név kifejezés (`Board`, `Users/Index`): a render-hely fájljában a page-név string-egyezése helyett
+/// „page ← Osztály::metódus” indoklás (ugyanannyi egyezés, ugyanaz a súly), a page-fájl a fájlnév-egyezést kapja.
+#[test]
+fn page_term_gives_a_page_reason_at_the_render_site() {
+    let inertia = crate::packages::Inertia::fixture(
+        std::path::Path::new("/p"),
+        "resources/js/Pages",
+        &[
+            "resources/js/Pages/Board.vue",
+            "resources/js/Pages/Users/Index.vue",
+        ],
+        &[
+            (
+                "app/Http/Controllers/BoardController.php",
+                "BoardController",
+                "show",
+                23,
+                "Board",
+            ),
+            (
+                "app/Http/Controllers/UserController.php",
+                "UserController",
+                "index",
+                12,
+                "Users/Index",
+            ),
+        ],
+    );
+    let mut controller = graph("app/Http/Controllers/BoardController.php");
+    controller.strings.push(StringLit {
+        container: Some("BoardController".into()),
+        caller: Some("show".into()),
+        line: 23,
+        end_line: None,
+        value: "Board".into(),
+    });
+    let terms = Term::parse_all(&["Board", "Users/Index"]);
+    let callers = CallerCounts::build([&controller]);
+    let matcher = Matcher::new(&terms, &callers);
+    let rel = "app/Http/Controllers/BoardController.php";
+    let mut hits = matcher.file_hits(rel, &controller, true);
+    let before: Vec<(usize, Kind)> = hits.iter().map(|hit| (hit.term, hit.kind)).collect();
+    matcher.page_hits(rel, &inertia, &mut hits);
+    let after: Vec<(usize, Kind)> = hits.iter().map(|hit| (hit.term, hit.kind)).collect();
+    assert_eq!(before, after, "{hits:?}");
+    let plain = matcher.file_hits(rel, &controller, true);
+    assert_eq!(score(&hits), score(&plain));
+    let page = hits
+        .iter()
+        .find(|hit| matches!(hit.symbol, Symbol::Page { .. }))
+        .unwrap_or_else(|| panic!("{hits:?}"));
+    let reasons = group(std::slice::from_ref(page));
+    let text = super::reasons::describe(&reasons[0], &terms);
+    assert!(
+        text.starts_with("page ← BoardController::show  L23  ← \"Board\""),
+        "{text}"
+    );
+    // a render-hely string-egyezése nélkül (szűkített tényekben sincs) új, string-súlyú egyezés
+    let mut hits = Vec::new();
+    matcher.page_hits(
+        "app/Http/Controllers/UserController.php",
+        &inertia,
+        &mut hits,
+    );
+    assert_eq!(hits.len(), 1, "{hits:?}");
+    assert_eq!((hits[0].term, hits[0].kind), (1, Kind::StringLit));
+    // a page-fájl: `Users/Index` → fájlnév-egyezés (a `Board.vue`-é már a meglévő fájlnév-egyezés)
+    let page_rel = "resources/js/Pages/Users/Index.vue";
+    let page_graph = graph(page_rel);
+    let mut hits = matcher.file_hits(page_rel, &page_graph, true);
+    assert!(
+        !hits
+            .iter()
+            .any(|hit| hit.term == 1 && hit.kind == Kind::FileName),
+        "{hits:?}"
+    );
+    matcher.page_hits(page_rel, &inertia, &mut hits);
+    assert!(
+        hits.iter()
+            .any(|hit| hit.term == 1 && hit.kind == Kind::FileName),
+        "{hits:?}"
+    );
+    let board_rel = "resources/js/Pages/Board.vue";
+    let board = graph(board_rel);
+    let mut hits = matcher.file_hits(board_rel, &board, true);
+    let count = hits.len();
+    assert!(
+        hits.iter()
+            .any(|hit| hit.term == 0 && hit.kind == Kind::FileName),
+        "{hits:?}"
+    );
+    matcher.page_hits(board_rel, &inertia, &mut hits);
+    assert_eq!(hits.len(), count, "{hits:?}");
 }

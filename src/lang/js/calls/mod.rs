@@ -46,6 +46,7 @@ impl JsPass for CallsPass {
                 Binding {
                     resolved: b.resolved,
                     category: b.category,
+                    from: b.package,
                 },
             );
         }

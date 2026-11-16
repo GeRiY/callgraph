@@ -2,8 +2,10 @@
 
 mod analyze;
 mod callers;
+mod deps;
 mod error;
 mod feedback;
+mod generate;
 mod help;
 mod hook;
 mod lang;
@@ -15,12 +17,14 @@ mod profile;
 mod project;
 mod prune;
 mod refresh;
+mod rename;
 mod self_update;
 mod show;
 mod skill_sync;
 mod stats;
 mod telemetry;
 mod usage_check;
+mod uses;
 mod version;
 mod wrap;
 
@@ -31,8 +35,10 @@ use crate::skill::{ProjectRegistry, SkillHome};
 
 pub use analyze::AnalyzeCommand;
 pub use callers::CallersCommand;
+pub use deps::DepsCommand;
 pub use error::ErrorCommand;
 pub use feedback::FeedbackCommand;
+pub use generate::{GenerateCommand, UndoCommand};
 pub use help::HelpCommand;
 pub use hook::HookCommand;
 pub use lang::LangCommand;
@@ -44,12 +50,14 @@ pub use profile::ProfileCommand;
 pub use project::ProjectCommand;
 pub use prune::PruneCommand;
 pub use refresh::RefreshCommand;
+pub use rename::RenameCommand;
 pub use self_update::SelfUpdateCommand;
 pub use show::ShowCommand;
 pub use skill_sync::SkillSyncCommand;
 pub use stats::StatsCommand;
 pub use telemetry::TelemetryCommand;
 pub use usage_check::UsageCheckCommand;
+pub use uses::UsesCommand;
 pub use version::VersionCommand;
 pub use wrap::WrapCommand;
 

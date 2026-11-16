@@ -29,7 +29,7 @@ ASSET_RE = re.compile(
 )
 VIA = ("cli", "mcp")
 KINDS = ("update", "install")
-LATEST_TTL = 600  # seconds the cached latest tag is fresh
+LATEST_TTL = 300  # seconds the cached latest tag is fresh
 LATEST_MAX_AGE = 86400  # an older cached tag is not served (503 → the client falls back to GitHub)
 
 SCHEMA = """
@@ -58,7 +58,7 @@ def fetch_latest_tag(opener=None) -> str | None:
     """The tag GitHub's releases/latest redirects to (read from the Location, without following it)."""
     opener = opener or urllib.request.build_opener(_NoRedirect)
     try:
-        opener.open(urllib.request.Request(REPO + "/releases/latest", method="HEAD"), timeout=10)
+        opener.open(urllib.request.Request(REPO + "/releases/latest", method="HEAD"), timeout=5)
     except urllib.error.HTTPError as e:
         location = e.headers.get("Location", "") if 300 <= e.code < 400 else ""
         tag = location.rsplit("/releases/tag/", 1)[-1] if "/releases/tag/" in location else ""
@@ -82,7 +82,9 @@ def _refresh_latest(fetch) -> None:
 
 
 def latest_tag(fetch=None, now: float | None = None) -> str | None:
-    """The cached latest tag; refreshed in the background when stale, never one older than LATEST_MAX_AGE."""
+    """The cached latest tag. A stale one is refreshed BEFORE answering (right after a release the old tag would
+    otherwise send the client to GitHub directly, uncounted); if GitHub does not answer, the stale tag is served —
+    never one older than LATEST_MAX_AGE. Requests arriving during a refresh get the cached tag."""
     fetch = fetch or fetch_latest_tag
     now = time.time() if now is None else now
     with _latest_lock:
@@ -91,13 +93,10 @@ def latest_tag(fetch=None, now: float | None = None) -> str | None:
         if start:
             _latest["refreshing"] = True
     if start:
-        if tag is None:
-            _refresh_latest(fetch)  # nothing cached yet: wait for the first lookup once
-            with _latest_lock:
-                tag, at = _latest["tag"], _latest["at"]
-            now = time.time()
-        else:
-            threading.Thread(target=_refresh_latest, args=(fetch,), daemon=True).start()
+        _refresh_latest(fetch)
+        with _latest_lock:
+            tag, at = _latest["tag"], _latest["at"]
+        now = time.time() if tag and at > now else now
     if tag is None or now - at > LATEST_MAX_AGE:
         return None
     return tag

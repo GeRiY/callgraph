@@ -1,5 +1,5 @@
 //! MCP-szerver mód (`callgraph mcp`): Model Context Protocol stdio-n, a hivatalos Rust SDK-val (`rmcp`).
-//! Csak olvas; hálózatot csak a frissítés használ (`autoupdate`: napi háttér-ellenőrzés, opt-in `--auto-update`),
+//! Alapból csak olvas (az egyetlen író eszköz, a `generate`, opt-in: `--generate` / `CALLGRAPH_GENERATE=1`); hálózatot csak a frissítés használ (`autoupdate`: napi háttér-ellenőrzés, opt-in `--auto-update`),
 //! a skill-mappán belül. A lekérdezéseket a meglévő `show` parancs futtatja, így a kimenet és a
 //! kimeneti korlát azonos a CLI-ével. Részletek: `docs/MCP.md`.
 
