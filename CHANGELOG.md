@@ -15,7 +15,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   (`→ POST /users · Controller@method`, unknown names are flagged); `__()` / `@lang` take part in the i18n check; and
   a "rendered by" line lists the `view('…')` calls in controllers.
 - **MCP `undo` tool:** restores the last change made by `generate` or `rename` — one file when a file is given,
-  otherwise the whole last group of changes. Like `generate` and `rename`, it only exists when the server runs with
+  otherwise the whole last group of changes. The history is multi-step: each call steps one change further back
+  (before, two undos in a row toggled the last change). Like `generate` and `rename`, it only exists when the server runs with
   `--generate` / `CALLGRAPH_GENERATE=1`, and it is marked `readOnlyHint: false`.
 - **`gen --dry` shows where the code would go:** with `--into` / `--replace`, the dry run first prints the placement,
   e.g. `→ app/Pay.php::Pay after charge (L41)` or `→ f.vue: script L12-14`.
@@ -140,7 +141,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   (also on Windows).
 - **Laravel routes registered in a loop:** a route with an interpolated name (`->name("{$code}.x")`) makes
   `route('en.x')` "dynamic, not verifiable" instead of unknown, and a helper outside `routes/` that registers such
-  routes is pointed out.
+  routes is pointed out. The same applies to groups with a computed prefix or name
+  (`Route::prefix($code)->name($code.'.')->group(…)`, config-driven loops) in `--format ziggy`.
+- **Typed one-line `defineEmits` is read:** `defineEmits<{ login: []; save: [id: number] }>()` on one line now
+  produces the emits list (`--format api`).
+- **No false calls from template-literal text in Vue attributes:** text inside a template literal of a bound
+  attribute (`` :title="`… név (pl. …)`" ``) is no longer read as a call (accented letters were the trigger).
+- **`--format forms` keeps forms submitted to a computed URL:** `form.post(path.value)` is listed, and its route is
+  marked unknown/dynamic.
+- **`--grep useX --depth N` skips destructured values:** uses of a value destructured from `useX()` are no longer
+  listed as calls of `useX`.
+- **`callgraph.sh rename` works:** the wrapper script now forwards it (the help already advertised it).
+- **`gen --at L<n>` outside the class body is rejected upfront:** e.g. on the `{` line; the message gives the body's
+  line range.
+- **`gen … --into file.vue::#id` / `::.class` reads template markup:** the expression is parsed as markup by default.
+- **`gen --into … --upsert --expect …` is accepted:** the expectation is checked when the member already exists.
+- **The `laravel:` preset follows the project and the migration:** it writes `<script setup lang="ts">` with typed
+  props in a TypeScript project even without existing `.vue` files, and reads the migration column type: `text`
+  columns get no `max:255`, `string('x', 100)` gets `max:100`.
 - **`locate` caller counts stay within the language family:** a Vue function no longer counts the PHP callers of a
   same-named method.
 - **Swift: an `Extensions` folder is own code:** a folder named `Extensions` with Swift files was treated as vendor.

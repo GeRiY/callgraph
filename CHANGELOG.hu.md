@@ -16,7 +16,8 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   (`→ POST /users · Controller@method`, ismeretlen név jelölve); a `__()` / `@lang` részt vesz az i18n-ellenőrzésben;
   a „rendered by” sor pedig a controllerek `view('…')` hívásait mutatja.
 - **MCP `undo` eszköz:** visszaállítja a `generate` vagy a `rename` utolsó változtatását — fájl megadásakor azt az
-  egy fájlt, egyébként az utolsó változtatáscsoport egészét. A `generate`-hez és a `rename`-hez hasonlóan csak akkor
+  egy fájlt, egyébként az utolsó változtatáscsoport egészét. Az előzmény többlépéses: minden hívás egy változtatással
+  tovább lép vissza (korábban két egymás utáni undo az utolsó változtatást ide-oda kapcsolgatta). A `generate`-hez és a `rename`-hez hasonlóan csak akkor
   létezik, ha a szerver `--generate` / `CALLGRAPH_GENERATE=1` móddal fut, és `readOnlyHint: false` jelölést kap.
 - **A `gen --dry` megmutatja, hová kerülne a kód:** `--into` / `--replace` mellett a próbafutás először kiírja az
   elhelyezést, pl. `→ app/Pay.php::Pay after charge (L41)` vagy `→ f.vue: script L12-14`.
@@ -151,7 +152,25 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   (Windowson is).
 - **Ciklusban regisztrált Laravel-útvonalak:** az interpolált nevű útvonal (`->name("{$code}.x")`) miatt a
   `route('en.x')` „dinamikus, nem ellenőrizhető" lesz ismeretlen helyett, a `routes/` mappán kívüli, ilyen útvonalakat
-  regisztráló segédfüggvényre pedig a program felhívja a figyelmet.
+  regisztráló segédfüggvényre pedig a program felhívja a figyelmet. Ugyanez igaz a számított prefixű vagy nevű
+  csoportokra (`Route::prefix($code)->name($code.'.')->group(…)`, konfigból vezérelt ciklusok) a `--format ziggy`
+  kimenetben.
+- **Az egysoros, típusos `defineEmits` is olvasható:** a `defineEmits<{ login: []; save: [id: number] }>()` egy
+  sorban is megadja az emit-listát (`--format api`).
+- **Nincs téves hívás a Vue-attribútumok template literaljából:** a kötött attribútum template literaljában lévő
+  szöveg (`` :title="`… név (pl. …)`" ``) már nem számít hívásnak (az ékezetes betűk váltották ki).
+- **A `--format forms` megtartja a számított URL-re küldött űrlapot:** a `form.post(path.value)` szerepel a
+  listán, az útvonala pedig ismeretlen/dinamikus jelölést kap.
+- **A `--grep useX --depth N` kihagyja a destrukturált értékeket:** a `useX()`-ből destrukturált érték használatai
+  már nem szerepelnek a `useX` hívásaiként.
+- **A `callgraph.sh rename` működik:** a wrapper szkript már továbbítja (a súgó eddig is hirdette).
+- **A `gen --at L<n>` az osztálytörzsön kívül azonnal hibát ad:** pl. a `{` során; az üzenet megadja a törzs
+  sortartományát.
+- **A `gen … --into fájl.vue::#id` / `::.class` sablon-markupként olvas:** a kifejezést alapból markupként elemzi.
+- **A `gen --into … --upsert --expect …` elfogadott:** az elvárást akkor ellenőrzi, ha a tag már létezik.
+- **A `laravel:` preset követi a projektet és a migrációt:** TypeScript-projektben `<script setup lang="ts">`
+  fejlécet és típusos propokat ír akkor is, ha még nincs `.vue` fájl, és olvassa a migráció oszloptípusát: a
+  `text` oszlop nem kap `max:255`-öt, a `string('x', 100)` pedig `max:100`-at.
 - **A `locate` hívószámai a nyelvcsaládon belül maradnak:** egy Vue-függvény már nem számolja az azonos nevű PHP-metódus
   hívóit.
 - **Swift: az `Extensions` mappa saját kód:** a Swift-fájlokat tartalmazó `Extensions` mappát korábban vendorként
