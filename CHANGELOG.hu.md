@@ -6,6 +6,14 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ## [Unreleased]
 
+### Javítás
+
+- **A csoportból betöltött Laravel route-fájlok megkapják a csoport előtagjait:** a `->group(base_path('routes/admin.php'))`,
+  `->group(__DIR__.'/admin.php')`, a csoporton belüli `require`, illetve a `bootstrap/app.php` `then:` closure-jében lévő
+  csoport által betöltött fájl mostantól örökli a csoport URI-előtagját és route-név előtagját. A meglévő láncolt
+  neveket (pl. `admin.reports.show`) a `--format ziggy` már nem jelzi ismeretlennek (téves riasztás), a `rename route`
+  pedig ugyanígy ellenőrzi a neveket.
+
 ## [1.0.0] — 2026-11-16
 
 ### Új

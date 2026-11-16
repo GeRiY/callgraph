@@ -5,6 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+### Fixed
+
+- **Laravel route files loaded from a group keep the group's prefixes:** a file loaded with `->group(base_path('routes/admin.php'))`,
+  `->group(__DIR__.'/admin.php')`, a `require` inside a group, or a group in the `then:` closure of `bootstrap/app.php`
+  now inherits the group's URI prefix and route-name prefix. Existing chained names like `admin.reports.show` are no
+  longer reported as unknown by `--format ziggy` (false alarms), and `rename route` checks names the same way.
+
 ## [1.0.0] — 2026-11-16
 
 ### Added
