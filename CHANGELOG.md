@@ -5,6 +5,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+## [1.0.1] — 2026-11-16
+
+### Fixed
+
+- **Laravel route files loaded from a group keep the group's prefixes:** a file loaded with `->group(base_path('routes/admin.php'))`,
+  `->group(__DIR__.'/admin.php')`, a `require` inside a group, or a group in the `then:` closure of `bootstrap/app.php`
+  now inherits the group's URI prefix and route-name prefix. Existing chained names like `admin.reports.show` are no
+  longer reported as unknown by `--format ziggy` (false alarms), and `rename route` checks names the same way.
+- **Unnamed routes in a named Laravel group get the group's name:** a route without its own `->name()` inside a named
+  group now gets the group's combined name, like Laravel does (`Route::prefix('x')->name('a')->group(fn () =>
+  Route::name('.b')->group(fn () => Route::get('/', ...)))` gives `a.b`), so `route('a.b')` is no longer reported as
+  unknown by `--format ziggy`. A route file that is `require`d but left out of the scan (typically a gitignored,
+  local-only file, e.g. `if (app()->isLocal()) require __DIR__.'/local.php';`) is read from disk and its routes count.
+
 ## [1.0.0] — 2026-11-16
 
 ### Added
@@ -688,7 +702,8 @@ First release.
 - Built-in update: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Prebuilt packages for macOS (arm64, x86_64), Linux (x86_64, ARM64, static musl) and Windows.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v1.0.0...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v1.0.1...develop
+[1.0.1]: https://github.com/GeRiY/callgraph/releases/tag/v1.0.1
 [1.0.0]: https://github.com/GeRiY/callgraph/releases/tag/v1.0.0
 [0.9.5]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.5
 [0.9.4]: https://github.com/GeRiY/callgraph/releases/tag/v0.9.4

@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use super::super::files::ProjectFiles;
 use super::super::inertia::Inertia;
 use super::routes::Action;
-use super::{Laravel, NAME};
+use super::{Laravel, NAME, route_names};
 use crate::i18n::Lang;
 use crate::model::{Call, FileGraph, Imports};
 use crate::packages::{Ecosystem, EcosystemPackages, Package, Packages, ProjectPackages};
@@ -196,6 +196,49 @@ fn a_chained_name_and_the_imported_controller_class_make_a_route() {
 }
 
 #[test]
+fn arrow_function_groups_chain_dot_prefixed_names() {
+    let text = r#"<?php
+use App\Http\Controllers\ReportController;
+
+Route::name('a')->group(fn () => Route::prefix('x')->name('.b')->group(fn () =>
+    Route::get('/c', [ReportController::class, 'index'])->name('.c')));
+Route::name('shop')->prefix('shop')->group(fn () => [
+    Route::get('/', [ReportController::class, 'index'])->name('.home'),
+    Route::name('.orders')->prefix('orders')->group(function () {
+        Route::get('{order}', [ReportController::class, 'show'])->name('.show');
+    }),
+]);
+Route::prefix('x')->name('a')->group(function () {
+    Route::prefix('y')->name('.b')->group(function () {
+        Route::get('/', [ReportController::class, 'index']);
+    });
+});
+"#;
+    let laravel = table(
+        text,
+        &[(
+            "ReportController",
+            "App\\Http\\Controllers\\ReportController",
+        )],
+    );
+    assert_eq!(
+        rows(&laravel),
+        vec![
+            row("a.b.c", "GET", "/x/c", "ReportController@index"),
+            row("shop.home", "GET", "/shop", "ReportController@index"),
+            row(
+                "shop.orders.show",
+                "GET",
+                "/shop/orders/{order}",
+                "ReportController@show"
+            ),
+            // saját `->name()` nélkül: a csoport összefűzött neve (Geri hibajegye)
+            row("a.b", "GET", "/x/y", "ReportController@index"),
+        ]
+    );
+}
+
+#[test]
 fn nested_groups_compose_prefix_name_and_controller() {
     let text = r#"<?php
 use App\Http\Controllers\Admin\UserController;
@@ -233,8 +276,13 @@ Route::get('/', function () { return Inertia::render('Welcome', ['a' => 1]); })-
                 "/admin/users/{user}",
                 "UserController@show"
             ),
-            // név nélküli route a névvel rendelkező csoportban: nincs neve
-            row("", "POST", "/admin/users", "UserController@store"),
+            // saját név nélküli route a nevesített csoportban: a csoport nevét kapja (Laravel `RouteGroup::merge`)
+            row(
+                "admin.users.",
+                "POST",
+                "/admin/users",
+                "UserController@store"
+            ),
             row("admin.dash", "GET", "/admin/dashboard", "closure"),
             row("welcome", "GET", "/", "page Welcome"),
         ]
@@ -542,6 +590,92 @@ fn only_loaded_route_files_count() {
             "routes: 2 named, 0 referenced from JS".to_owned(),
         ]
     );
+}
+
+/// Egy csoport által betöltött route-fájl (`->group(base_path(..))`, `->group(__DIR__.'/x.php')`, `require` egy
+/// csoportban, a `bootstrap/app.php` `then:` closure-je) a csoport uri- és név-előtagját örökli; a fájl a legfelső
+/// szinten nem számít (különben hamis „ismeretlen route-név” jönne az összefűzött nevekre).
+#[test]
+fn route_files_loaded_from_a_group_inherit_its_prefixes() {
+    let bootstrap = "<?php\nreturn Application::configure()->withRouting(web: __DIR__.'/../routes/web.php', then: function () {\n    Route::middleware('web')->prefix('admin')->name('admin')->group(base_path('routes/admin.php'));\n});\n";
+    let web = "<?php\nRoute::get('/', fn () => 1)->name('home');\nRoute::name('shop.')->prefix('shop')->group(__DIR__.'/shop.php');\nRoute::name('acct.')->group(function () {\n    require __DIR__.'/account.php';\n});\n";
+    let admin = "<?php\nRoute::name('.reports')->prefix('reports')->group(fn () =>\n    Route::get('{r}', fn () => 1)->name('.show'));\n";
+    let shop = "<?php\nRoute::get('/', fn () => 1)->name('index');\n";
+    let account = "<?php\nRoute::get('/me', fn () => 1)->name('me');\n";
+    let files = MemFiles::new(&[
+        ("bootstrap/app.php", bootstrap),
+        ("routes/web.php", web),
+        ("routes/admin.php", admin),
+        ("routes/shop.php", shop),
+        ("routes/account.php", account),
+    ]);
+    let graphs: Vec<(PathBuf, FileGraph)> = ["account", "admin", "shop", "web"]
+        .iter()
+        .map(|name| {
+            let rel = format!("routes/{name}.php");
+            (
+                root().join(&rel),
+                graph(&format!("/p/{rel}"), None, &[], Vec::new()),
+            )
+        })
+        .collect();
+    let mut laravel = Laravel::new(&root());
+    laravel.scan(
+        graphs.iter().map(|(path, graph)| (path.as_path(), graph)),
+        &files,
+        false,
+    );
+    let mut found: Vec<(String, String)> = laravel
+        .routes()
+        .iter()
+        .map(|r| (r.name.clone().unwrap_or_default(), r.uri.clone()))
+        .collect();
+    found.sort();
+    let pair = |n: &str, u: &str| (n.to_owned(), u.to_owned());
+    assert_eq!(
+        found,
+        vec![
+            pair("acct.me", "/me"),
+            pair("admin.reports.show", "/admin/reports/{r}"),
+            pair("home", "/"),
+            pair("shop.index", "/shop"),
+        ]
+    );
+    // a `rename route` névlistája is ugyanígy fűz
+    let mut names = route_names(&[
+        ("routes/web.php".to_owned(), web.to_owned()),
+        ("routes/shop.php".to_owned(), shop.to_owned()),
+        ("routes/account.php".to_owned(), account.to_owned()),
+    ]);
+    names.sort();
+    assert_eq!(names, vec!["acct.me", "home", "shop.index"]);
+}
+
+/// A feltételesen `require`-olt, a bejárásból kimaradt (pl. `.gitignore`-olt, csak helyben létező) route-fájl
+/// route-jai is számítanak: a lemezről olvassuk.
+#[test]
+fn a_conditionally_required_file_outside_the_scan_still_counts() {
+    let bootstrap =
+        "<?php\nreturn Application::configure()->withRouting(web: __DIR__.'/../routes/web.php');\n";
+    let web = "<?php\nRoute::get('/', fn () => 1)->name('home');\nif (app()->isLocal() && file_exists(__DIR__.'/local.php')) require __DIR__.'/local.php';\n";
+    let local = "<?php\nRoute::get('/debug', fn () => 1)->name('debug');\n";
+    let files = MemFiles::new(&[
+        ("bootstrap/app.php", bootstrap),
+        ("routes/web.php", web),
+        ("routes/local.php", local),
+    ]);
+    // a gráfok között csak a web.php van (a local.php a bejárásból kimaradt)
+    let web_graph = graph("/p/routes/web.php", None, &[], Vec::new());
+    let path = root().join("routes/web.php");
+    let mut laravel = Laravel::new(&root());
+    laravel.scan([(path.as_path(), &web_graph)], &files, false);
+    let mut names: Vec<_> = laravel
+        .routes()
+        .iter()
+        .filter_map(|r| r.name.clone())
+        .collect();
+    names.sort();
+    assert_eq!(names, vec!["debug".to_owned(), "home".to_owned()]);
 }
 
 /// A `routes/api.php` route-jai `/api` előtagot kapnak (vagy a `bootstrap/app.php` `apiPrefix:`-ét).
