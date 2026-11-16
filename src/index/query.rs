@@ -39,6 +39,8 @@ struct Edge {
     guessable: bool,
     /// Swift closure-bekötés (`socket.onFrame = { … }`): a bekötés sora és a closure utolsó sora.
     wire: Option<(u32, u32)>,
+    /// Az index írta át a célt (Swift fogadó-lánc, Rust `T: A + B`, Kotlin útvonal): a hívás saját `target`-je más.
+    rewritten: bool,
 }
 
 /// A teljes projektből épített, memóriabeli fordított hívó-index.
@@ -61,6 +63,7 @@ impl CallerIndex {
         let hierarchy = TypeHierarchy::from_graphs(records.iter().map(|(_, graph)| *graph));
         let properties = property_types(&records);
         let rust_traits = rust_trait_methods(&records);
+        let kotlin_routes = kotlin_routes(&records);
         let mut edges = Vec::new();
         for (path, graph) in records {
             let namespace = graph.namespace.as_deref().unwrap_or("");
@@ -75,6 +78,12 @@ impl CallerIndex {
                         let uncertain = call.resolved.as_deref().is_some_and(is_uncertain);
                         (uncertain && path.ends_with(".rs"))
                             .then(|| multi_target(&rust_traits, call.on.as_deref()?, &call.target))
+                            .flatten()
+                    })
+                    .or_else(|| {
+                        // Kotlin: másik fájlban deklarált `composable(..)` útvonal (az `on` = `route:<arg>`)
+                        (call.resolved.is_none() && path.ends_with(".kt"))
+                            .then(|| route_target(&kotlin_routes, call.on.as_deref()?))
                             .flatten()
                     });
                 let target = chained
@@ -113,6 +122,7 @@ impl CallerIndex {
                     guessable: chained.is_none()
                         && ((call.resolved.is_none() && call.category == "external_call")
                             || uncertain),
+                    rewritten: chained.is_some(),
                     wire: (call.kind == "wire")
                         .then_some((call.line, call.end_line.unwrap_or(call.line))),
                 });
@@ -237,6 +247,26 @@ impl CallerIndex {
         }
         out.sort_by(|a, b| (&a.file, a.line).cmp(&(&b.file, b.line)));
         out
+    }
+
+    /// A mintára illeszkedő, az index által átírt célú hívások (Swift fogadó-lánc, Rust `T: A + B`, Kotlin útvonal):
+    /// a fájl-szintű keresés ezeket nem látja, mert a hívás saját célja más. 1. szintű sorok; hibás minta: üres.
+    pub(crate) fn rewritten(&self, pattern: &str) -> Vec<CallerRow> {
+        let Ok(matcher) = RegexBuilder::new(&crate::query::filter::namespace_pattern(pattern))
+            .case_insensitive(true)
+            .build()
+        else {
+            return Vec::new();
+        };
+        self.edges
+            .iter()
+            .filter(|edge| edge.rewritten && matcher.is_match(&edge.row.target))
+            .map(|edge| {
+                let mut row = edge.row.clone();
+                row.level = 1;
+                row
+            })
+            .collect()
     }
 
     /// A `név` metódusra csak név szerint illeszkedő hívások: feloldatlan, fogadó-típus nélküli (`open`), nem
@@ -584,6 +614,54 @@ fn chain_type(hint: &str) -> Option<String> {
             .chars()
             .all(|c| c.is_alphanumeric() || c == '_' || c == '.');
     valid.then(|| token.to_owned())
+}
+
+/// A projekt Kotlin navigációs útvonalai: (útvonal vagy típusnév, képernyő) a `composable(..)` nav-élekből.
+fn kotlin_routes(records: &[(&str, &FileGraph)]) -> Vec<(String, String)> {
+    let mut out: Vec<(String, String)> = Vec::new();
+    for (path, graph) in records {
+        if !path.ends_with(".kt") {
+            continue;
+        }
+        for call in graph
+            .calls
+            .iter()
+            .filter(|c| c.kind == "nav" && c.on.is_none())
+        {
+            if let Some(route) = call.args.as_ref().and_then(|a| a.first()) {
+                let pair = (route.clone(), call.target.clone());
+                if !out.contains(&pair) {
+                    out.push(pair);
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Az útvonal literál-előtagja a `{…}` / `$…` / `?…` előtt, záró `/` nélkül.
+fn route_prefix(route: &str) -> &str {
+    let end = route.find(['{', '$', '?']).unwrap_or(route.len());
+    route[..end].trim_end_matches('/')
+}
+
+/// A `route:<arg>` jelölésű `navigate(..)` hívás képernyője: az egyező literál-előtagú, vagy a paraméteres
+/// útvonal (`detail/{id}`) alatti útvonal; több találatnál a leghosszabb előtag. Típusbiztos útvonalnál a típusnév.
+fn route_target(routes: &[(String, String)], on: &str) -> Option<String> {
+    let wanted = route_prefix(on.strip_prefix("route:")?);
+    if wanted.is_empty() {
+        return None;
+    }
+    routes
+        .iter()
+        .filter(|(route, _)| {
+            let prefix = route_prefix(route);
+            !prefix.is_empty()
+                && (prefix == wanted
+                    || (route.contains('{') && wanted.starts_with(&format!("{prefix}/"))))
+        })
+        .max_by_key(|(route, _)| route_prefix(route).len())
+        .map(|(_, screen)| screen.clone())
 }
 
 /// A projekt Rust trait-jei: trait neve → a deklarált metódusok nevei.

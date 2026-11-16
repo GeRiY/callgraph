@@ -95,7 +95,10 @@ impl FileFacts {
                 .calls
                 .iter()
                 .map(|call| crate::model::Call {
-                    args: None,
+                    // a Kotlin navigációs él útvonala (`args[0]`) kell a hívó-indexnek (`route_target`)
+                    args: (call.kind == "nav" && source.file.ends_with(".kt"))
+                        .then(|| call.args.clone())
+                        .flatten(),
                     ..call.clone()
                 })
                 .collect(),

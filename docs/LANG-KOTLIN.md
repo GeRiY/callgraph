@@ -56,6 +56,11 @@ ismeri.
   (nem tényleges hívás; a kimenet `(ref)`-fel jelöli az outline / grep / callers nézetben).
 - **Interfész ↔ implementáció**: az interfész-metódus hívói az implementációnál, és fordítva is megjelennek (`via`).
 
+## Navigáció
+A `navigate("detail/$id")` / `navigate(Detail(1))` hívás `nav` élet kap a `composable("detail/{id}") { DetailScreen() }`
+képernyőre akkor is, ha a NavHost másik fájlban van: a projekt-index a leghosszabb literál-előtag (típusbiztos
+útvonalnál a típusnév) alapján párosít.
+
 ## Projekt-profil (rétegek)
 A `profile` Kotlin / Android projektben a mappa-, név- és kódjelek alapján rétegez: `view` (Activity / Fragment /
 `@Composable`, `ui/`, `screens/`), `viewmodel` (`ViewModel` leszármazott, `@HiltViewModel`, `viewmodel/`),
@@ -64,8 +69,6 @@ A `profile` Kotlin / Android projektben a mappa-, név- és kódjelek alapján r
 rétegekből áll. `build.gradle(.kts)` / `settings.gradle.kts` a projekt-gyökér jele.
 
 ## Ismert korlátok
-- A `navigate(..)` ↔ `composable(..)` párosítás csak ugyanabban a fájlban működik; fájlok közötti útvonal-párosítás
-  nincs (a `composable` oldal így is `nav` élet ad a képernyőre).
 - Nincs típus-feloldás és fájlok közötti szimbólum-tábla: a kategória a fájlbeli nevekből és az ismert listákból
   (`known.rs`) dől el; a lambda-fogadók (`it`, `this` a `let` / `apply` / `with` törzsében) típusa nem ismert, ezek
   hívása `external_call` / puszta név marad.

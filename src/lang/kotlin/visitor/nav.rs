@@ -113,6 +113,53 @@ pub(super) fn destination<'t>(
     (!screens.is_empty()).then_some((route, screens))
 }
 
+/// Típusbiztos `composable<Detail> { DetailScreen() }`: a tree-sitter a zárójel nélküli generikus hívást
+/// összehasonlításként olvassa (`(composable < Detail) > { … }`); ezt az alakot ismeri fel, mint a `destination`.
+pub(super) fn generic_destination<'t>(
+    parsed: &ParsedKotlin<'_>,
+    node: Node<'t>,
+) -> Option<(String, Vec<(Node<'t>, String)>)> {
+    if node.kind() != "binary_expression" {
+        return None;
+    }
+    let parts: Vec<Node<'t>> = named_children(node)
+        .into_iter()
+        .filter(|c| !is_comment(*c))
+        .collect();
+    let [left, right] = parts.as_slice() else {
+        return None;
+    };
+    if left.kind() != "binary_expression" || right.kind() != "lambda_literal" {
+        return None;
+    }
+    let inner: Vec<Node<'t>> = named_children(*left);
+    let [callee, ty] = inner.as_slice() else {
+        return None;
+    };
+    if !IDENTS.contains(&callee.kind())
+        || !IDENTS.contains(&ty.kind())
+        || !DESTINATIONS.contains(&parsed.text(*callee))
+    {
+        return None;
+    }
+    let between_inner = parsed
+        .text(*left)
+        .trim_start()
+        .strip_prefix(parsed.text(*callee))?
+        .trim_start();
+    let after_left = parsed
+        .text(node)
+        .trim_start()
+        .strip_prefix(parsed.text(*left))?
+        .trim_start();
+    if !between_inner.starts_with('<') || !after_left.starts_with('>') {
+        return None;
+    }
+    let mut screens = Vec::new();
+    collect_screens(parsed, *right, &mut screens);
+    (!screens.is_empty()).then(|| (parsed.text(*ty).to_string(), screens))
+}
+
 /// A `navigate(..)` célja: a string-literál (`"detail/$id"`) vagy a típusbiztos útvonal neve (`Detail(id)`, `Detail`).
 pub(super) fn navigate_target(parsed: &ParsedKotlin<'_>, call: Node<'_>) -> Option<String> {
     let arg = *value_args(call).first()?;

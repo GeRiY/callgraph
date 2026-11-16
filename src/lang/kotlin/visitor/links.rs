@@ -146,6 +146,21 @@ impl KotlinVisitor<'_, '_> {
             return;
         };
         let Some((route, screen)) = match_route(&self.symbols.routes, &target) else {
+            // másik fájlban deklarált útvonal: az index párosítja (`on` = `route:<argumentum>`)
+            b.call(Call {
+                container: scope.container.clone(),
+                caller: Some(scope.caller.clone()),
+                line: line(call),
+                end_line: None,
+                kind: "nav".to_string(),
+                target: target.clone(),
+                resolved: None,
+                on: Some(format!("route:{target}")),
+                category: "component_use".to_string(),
+                args: Some(vec![target]),
+                handler: None,
+                from: None,
+            });
             return;
         };
         b.call(Call {

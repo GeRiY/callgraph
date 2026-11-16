@@ -276,3 +276,32 @@ class TodoRepoImpl : TodoRepo {
         ]
     );
 }
+
+#[test]
+fn navigate_resolves_the_route_declared_in_another_file() {
+    let host = graph_of(
+        "/p/AppNavHost.kt",
+        "@Composable\nfun AppNavHost(nav: NavHostController) {\n    NavHost(nav, startDestination = \"list\") {\n        composable(\"list\") { ListScreen() }\n        composable(\"detail/{id}\") { DetailScreen() }\n        composable<Settings> { SettingsScreen() }\n    }\n}\n",
+    );
+    let list = graph_of(
+        "/p/ListScreen.kt",
+        "@Composable\nfun ListScreen(nav: NavHostController) {\n    val id = 1\n    nav.navigate(\"detail/$id\")\n    nav.navigate(Settings)\n}\n",
+    );
+    let detail = graph_of("/p/DetailScreen.kt", "@Composable\nfun DetailScreen() {}\n");
+    assert_eq!(
+        call(&list, "detail/$id").on.as_deref(),
+        Some("route:detail/$id")
+    );
+    let index = CallerIndex::build([
+        ("/p/AppNavHost.kt", &host),
+        ("/p/ListScreen.kt", &list),
+        ("/p/DetailScreen.kt", &detail),
+    ]);
+    let rows = index.callers("DetailScreen", 1).unwrap();
+    assert!(rows.iter().any(|r| r.caller == "ListScreen"), "{rows:?}");
+    let typed = index.callers("SettingsScreen", 1).unwrap();
+    assert!(typed.iter().any(|r| r.caller == "ListScreen"), "{typed:?}");
+    let rewritten = index.rewritten("DetailScreen");
+    assert_eq!(rewritten.len(), 1, "{rewritten:?}");
+    assert_eq!(rewritten[0].caller, "ListScreen");
+}

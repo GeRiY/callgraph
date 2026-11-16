@@ -72,7 +72,9 @@ impl QueryEngine {
                         source.remember(&caller.file, snippets);
                     }
                 }
-                let wired = graph.caller_index().wire_invokers(&direct_rows(rows));
+                let direct = direct_rows(rows);
+                let mut wired = graph.caller_index().wire_invokers(&direct);
+                wired.extend(rewritten_rows(graph.caller_index(), pattern, &direct));
                 for caller in &wired {
                     if let Some(snippets) = graph.snippets(&caller.file) {
                         source.remember(&caller.file, snippets);
@@ -108,7 +110,9 @@ impl QueryEngine {
                     let all = self.all_graphs(scope)?;
                     let index =
                         CallerIndex::build(all.iter().map(|(path, graph)| (path.as_str(), graph)));
-                    let wired = index.wire_invokers(&direct_rows(rows));
+                    let direct = direct_rows(rows);
+                    let mut wired = index.wire_invokers(&direct);
+                    wired.extend(rewritten_rows(&index, pattern, &direct));
                     base = with_wired(base, &wired, &all, &source, lang, &marks);
                     (index.name_only_callers(name), all)
                 }
@@ -214,6 +218,22 @@ impl QueryEngine {
     }
 }
 
+/// Az index által átírt célú (fájlok közötti lánc / trait / útvonal) hívók, amelyek a grep-sorok között még nincsenek.
+fn rewritten_rows(index: &CallerIndex, pattern: &str, direct: &[CallerRow]) -> Vec<CallerRow> {
+    index
+        .rewritten(pattern)
+        .into_iter()
+        .filter(|row| {
+            !direct.iter().any(|d| {
+                d.file == row.file
+                    && d.container == row.container
+                    && d.caller == row.caller
+                    && d.line == row.line
+            })
+        })
+        .collect()
+}
+
 /// A bekötött closure-t meghívó metódusok szakasza (`== via stored closure`), a záró tipp (`---` + `💡`) elé
 /// szúrva; bekötés nélkül a kimenet változatlan.
 fn with_wired(
@@ -228,8 +248,8 @@ fn with_wired(
         return base;
     }
     let mut add = String::from(t!(
-        "== called through a stored closure\n",
-        "== tárolt closure-on át hívva\n"
+        "== called through a stored closure or resolved across files\n",
+        "== tárolt closure-on át vagy fájlok között feloldva\n"
     ));
     for caller in wired {
         let range = ranges

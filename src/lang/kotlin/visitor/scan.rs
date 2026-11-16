@@ -145,6 +145,15 @@ fn collect(parsed: &ParsedKotlin<'_>, node: Node<'_>, class: Option<&str>, out: 
                 }
                 collect(parsed, child, class, out);
             }
+            "binary_expression" => {
+                if let Some((route, screens)) = nav::generic_destination(parsed, child) {
+                    for (node, name) in screens {
+                        out.screen_nodes.insert(node.id(), route.clone());
+                        out.routes.push((route.clone(), name));
+                    }
+                }
+                collect(parsed, child, class, out);
+            }
             _ => collect(parsed, child, class, out),
         }
     }

@@ -112,8 +112,8 @@ attribútumú tag törzse.
   (`.environment(…)`, `@Environment`), `nav` (`navigationDestination`, `sheet`, `NavigationLink`) és `query`
   (`@Query` a nézetben, `modelContext` hívások: SwiftData) látszik.
 - **Bekötött closure hívója:** `find_callers ChatConnection::handle` az 1. szinten is mutatja a tárolt closure-t
-  meghívó metódust (`onFrame?(f)`), `via RealtimeSocket::onFrame` jelöléssel, külön „tárolt closure-on át hívva”
-  szakaszban. Bekötés nélkül a kimenet nem változik.
+  meghívó metódust (`onFrame?(f)`), `via RealtimeSocket::onFrame` jelöléssel, külön „tárolt closure-on át vagy fájlok
+  között feloldva” szakaszban (ugyanitt a fájlokon átívelő `self.store.session.user.load()` hívó is). Bekötés nélkül a kimenet nem változik.
 - **Fájlok közötti lánc:** `self.store.session.user.load()` akkor is a `User::load` hívója, ha a `Store`, `Session` és
   `User` külön fájlban van: a property-típusokon át követi (`@Published var session: Session?` → `Session`).
   Tömb, szótár és generikus típus (`[User]`) megállítja a láncot (ismeretlen marad).
