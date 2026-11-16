@@ -5,6 +5,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+### Fixed
+
+- **Short `::method` selector works in a multi-selector call:** `callgraph.sh src/Sample.php::alpha ::beta --body`
+  now shows both bodies; `::beta` reuses the file of the previous selector. Before, it answered "Not found: <root>/".
+  A `::method` with no file before it gives a clear usage error, and the help lists the form.
+
 ## [1.0.1] — 2026-11-16
 
 ### Fixed

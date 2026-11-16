@@ -6,6 +6,12 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ## [Unreleased]
 
+### Javítás
+
+- **A rövid `::method` kijelölő működik többkijelölős hívásban:** a `callgraph.sh src/Sample.php::alpha ::beta --body`
+  mostantól mindkét törzset mutatja; a `::beta` az előző kijelölő fájlját használja újra. Korábban „Not found: <root>/"
+  választ adott. A fájl nélküli, elöl álló `::method` érthető használati hibát ad, a súgó pedig felsorolja ezt az alakot.
+
 ## [1.0.1] — 2026-11-16
 
 ### Javítás
