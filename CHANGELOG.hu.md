@@ -6,6 +6,23 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ## [Unreleased]
 
+### Új
+
+- **MCP `undo` eszköz:** visszaállítja a `generate` vagy a `rename` utolsó változtatását — fájl megadásakor azt az
+  egy fájlt, egyébként az utolsó változtatáscsoport egészét. A `generate`-hez és a `rename`-hez hasonlóan csak akkor
+  létezik, ha a szerver `--generate` / `CALLGRAPH_GENERATE=1` móddal fut, és `readOnlyHint: false` jelölést kap.
+
+### Változás
+
+- **A Laravel űrlapellenőrzés követi a `form.transform(...)`-ot:** a `--format forms`, a `form:` sorok és a `laravel:`
+  generátor űrlap ↔ szabály ellenőrzése mostantól azokat a kulcsokat vizsgálja, amelyeket a transform visszaad;
+  `...data` szórás esetén az űrlapmezőket és a hozzáadott kulcsokat.
+
+### Javítás
+
+- **A `laravel:` preset írás előtt szintaxist ellenőriz a generált `.ts`, `.js` és `.html` fájlokon is:** korábban
+  csak a PHP- és Vue-fájlokat ellenőrizte.
+
 ## [1.0.2] — 2026-11-16
 
 ### Változás

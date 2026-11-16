@@ -5,6 +5,23 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+### Added
+
+- **MCP `undo` tool:** restores the last change made by `generate` or `rename` — one file when a file is given,
+  otherwise the whole last group of changes. Like `generate` and `rename`, it only exists when the server runs with
+  `--generate` / `CALLGRAPH_GENERATE=1`, and it is marked `readOnlyHint: false`.
+
+### Changed
+
+- **The Laravel form check follows `form.transform(...)`:** `--format forms`, the `form:` lines and the form ↔ rules
+  check of the `laravel:` generator now check the keys the transform returns; with a `...data` spread, the form
+  fields plus the added keys.
+
+### Fixed
+
+- **The `laravel:` preset syntax-checks generated `.ts`, `.js` and `.html` files before writing:** before, only PHP
+  and Vue files were checked.
+
 ## [1.0.2] — 2026-11-16
 
 ### Changed
