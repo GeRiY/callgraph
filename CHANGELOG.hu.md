@@ -6,6 +6,13 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ## [Unreleased]
 
+### Változás
+
+- **A `gyökér:` sor mutatja a git ágat:** a többfájlos kimenetek (és a `locate`) tetején álló gyökérsor mostantól a
+  projektgyökér ágával végződik, pl. `gyökér: /x/app (ág: feature/z)`; detached HEAD esetén `detached <sha7>` áll
+  benne, git nélkül pedig nem változik. Az agent azonnal látja, ha nem abban a checkoutban néz körül, ahol az ágat
+  váltották (másik klónra vagy worktree-re mutató `--project` alias, más mappában indított MCP-szerver).
+
 ### Javítás
 
 - **A rövid `::method` kijelölő működik többkijelölős hívásban:** a `callgraph.sh src/Sample.php::alpha ::beta --body`

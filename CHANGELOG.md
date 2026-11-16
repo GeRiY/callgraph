@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+### Changed
+
+- **The `root:` line shows the git branch:** the `root:` line at the top of multi-file outputs (and `locate`) now ends
+  with the branch of the project root, e.g. `root: /x/app (branch: feature/z)`; on a detached HEAD it shows
+  `detached <sha7>`, and without git it is unchanged. An agent sees at once when it looks at another checkout than the
+  one where the branch was switched (a `--project` alias pointing to another clone or worktree, an MCP server started
+  in another folder).
+
 ### Fixed
 
 - **Short `::method` selector works in a multi-selector call:** `callgraph.sh src/Sample.php::alpha ::beta --body`
