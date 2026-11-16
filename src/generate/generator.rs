@@ -23,15 +23,18 @@ use crate::model::{Container, FileGraph};
 /// Hová menjen a generált kód.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Target {
-    /// Csak kiírás (`--dry`, a kód a kimenet).
+    /// Nincs célfájl: a generált kód a kimenet (a `--dry` is ide tartozik).
     Preview,
     /// Új fájl (létezőt nem ír felül).
     Write { file: String },
-    /// Tagok beszúrása egy osztályba.
+    /// Tagok beszúrása egy osztályba (vagy egy Vue-sablon elemébe: `class` = `template#id`).
     Into {
         file: String,
         class: Option<String>,
-        after: Option<String>,
+        /// Hová az osztályon belül.
+        place: Place,
+        /// `--upsert`: a már létező tagot lecseréli (egy csupasz taggal).
+        upsert: bool,
     },
     /// Egy tartomány / metódus cseréje.
     Replace {
@@ -39,6 +42,40 @@ pub enum Target {
         at: ReplaceAt,
         expect: Option<String>,
     },
+}
+
+/// Hová szúr be az `--into` az osztályon belül.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub enum Place {
+    /// Az osztály végére (alapértelmezés).
+    #[default]
+    End,
+    /// `--after <metódus>`: ennek a metódusnak a végére.
+    After(String),
+    /// `--before <metódus>`: ennek a metódusnak (a docblockjának) az elé.
+    Before(String),
+    /// `--at L<n>`: az n. (1-alapú) sor elé (a célosztály törzsében).
+    Line(usize),
+}
+
+impl Place {
+    /// A CLI három, egymást kizáró kapcsolójából (`--after`, `--before`, `--at`) a hely.
+    pub fn of(after: Option<String>, before: Option<String>, at: Option<usize>) -> Self {
+        match (after, before, at) {
+            (Some(m), _, _) => Self::After(m),
+            (None, Some(m), _) => Self::Before(m),
+            (None, None, Some(n)) => Self::Line(n),
+            (None, None, None) => Self::End,
+        }
+    }
+
+    /// Az `--after` neve (a Vue / HTML célok csak ezt ismerik: `L<n>`, tagnév vagy elem); a többi hely ott nem számít.
+    pub fn after_name(&self) -> Option<&str> {
+        match self {
+            Self::After(m) => Some(m.as_str()),
+            _ => None,
+        }
+    }
 }
 
 /// Mit cseréljen a `Target::Replace`.
@@ -50,49 +87,47 @@ pub enum ReplaceAt {
     Method { class: Option<String>, name: String },
 }
 
-/// A célzás és a kimenet kiegészítő kapcsolói (alapértelmezésben mind kikapcsolt).
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Opts {
-    /// `--diff`: a `--replace` előnézete a régi / új különbség (a `dry` ilyenkor is be van kapcsolva).
-    pub diff: bool,
-    /// `--upsert`: az `--into` a már létező tagot lecseréli (egy csupasz taggal).
-    pub upsert: bool,
-    /// `--before <metódus>`: az `--into` ennek a metódusnak (a docblockjának) az elé szúr.
-    pub before: Option<String>,
-    /// `--at L<n>`: az `--into` az n. sor elé szúr (a célosztály törzsében).
-    pub at: Option<usize>,
+/// Mi történjen a kimenettel: kiírás a fájlba, vagy előnézet.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum Mode {
+    /// Kiírás (mentéssel, ellenőrzés után).
+    #[default]
+    Write,
+    /// `--dry`: semmi nem íródik, a kimenet a generált kód.
+    Dry,
+    /// `--diff`: mint a `Dry`, de a `--replace` a régi / új különbséget mutatja.
+    Diff,
+}
+
+impl Mode {
+    /// Előnézet-e (semmi nem íródik): a `Diff` is az.
+    pub fn dry(self) -> bool {
+        !matches!(self, Self::Write)
+    }
+
+    /// A `--replace` előnézete a különbség legyen-e.
+    pub fn diff(self) -> bool {
+        self == Self::Diff
+    }
+
+    /// A CLI `--dry` / `--diff` kapcsolóiból (a `--diff` erősebb).
+    pub fn of(dry: bool, diff: bool) -> Self {
+        if diff {
+            Self::Diff
+        } else if dry {
+            Self::Dry
+        } else {
+            Self::Write
+        }
+    }
 }
 
 /// Egy generálási kérés.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GenRequest {
     pub expr: String,
-    /// Csak kiírás: semmi nem íródik, a kimenet a generált kód.
-    pub dry: bool,
+    pub mode: Mode,
     pub target: Target,
-    pub opts: Opts,
-}
-
-/// Hová szúr be az `--into` az osztályon belül.
-#[derive(Debug, Clone, Copy)]
-enum Anchor<'a> {
-    /// Az osztály végére.
-    End,
-    After(&'a str),
-    Before(&'a str),
-    /// Az n. (1-alapú) sor elé.
-    Line(usize),
-}
-
-impl<'a> Anchor<'a> {
-    fn of(after: Option<&'a str>, opts: &'a Opts) -> Self {
-        match (after, opts.before.as_deref(), opts.at) {
-            (Some(m), _, _) => Self::After(m),
-            (None, Some(m), _) => Self::Before(m),
-            (None, None, Some(n)) => Self::Line(n),
-            (None, None, None) => Self::End,
-        }
-    }
 }
 
 /// A parancs kimenete: az egy-egy soros jelentés (`--dry`-nál a kód) és a feloldatlan nevek.
@@ -163,18 +198,23 @@ impl<'a, E: Emitter> Generator<'a, E> {
         let program = parser::parse(&request.expr)?;
         match &request.target {
             Target::Preview => self.preview(&program),
-            Target::Write { file } => self.write(&program, file, request.dry),
-            Target::Into { file, class, after } => {
-                let anchor = Anchor::of(after.as_deref(), &request.opts);
-                self.insert_members(&program, file, class.as_deref(), anchor, request)
-            }
-            Target::Replace { file, at, expect } => self.replace(
+            Target::Write { file } => self.write(&program, file, request.mode),
+            Target::Into {
+                file,
+                class,
+                place,
+                upsert,
+            } => self.insert_members(
                 &program,
                 file,
-                at,
-                expect.as_deref(),
-                (request.dry, request.opts.diff),
+                class.as_deref(),
+                place,
+                *upsert,
+                request.mode,
             ),
+            Target::Replace { file, at, expect } => {
+                self.replace(&program, file, at, expect.as_deref(), request.mode)
+            }
         }
     }
 
@@ -326,7 +366,7 @@ impl<'a, E: Emitter> Generator<'a, E> {
         })
     }
 
-    fn write(&self, program: &Program, file: &str, dry: bool) -> GenResult<Output> {
+    fn write(&self, program: &Program, file: &str, mode: Mode) -> GenResult<Output> {
         if program.decls.is_empty() {
             return Err(GenError::new(
                 crate::t!(
@@ -340,7 +380,7 @@ impl<'a, E: Emitter> Generator<'a, E> {
         self.check_extension(&rel)?;
         let (text, unresolved) = self.render_file(program, Some(&rel))?;
         self.validate(&rel, &text)?;
-        if dry {
+        if mode.dry() {
             return Ok(Output {
                 lines: text.lines().map(str::to_owned).collect(),
                 unresolved,
@@ -396,10 +436,10 @@ impl<'a, E: Emitter> Generator<'a, E> {
         program: &Program,
         file: &str,
         class: Option<&str>,
-        anchor: Anchor<'_>,
-        request: &GenRequest,
+        place: &Place,
+        upsert: bool,
+        mode: Mode,
     ) -> GenResult<Output> {
-        let dry = request.dry;
         let rel = self.rel(file)?;
         self.check_extension(&rel)?;
         let members = self.member_source(program)?;
@@ -409,8 +449,8 @@ impl<'a, E: Emitter> Generator<'a, E> {
             graph,
         } = self.load(&rel)?;
         let container = pick_container(&graph, class, &rel)?;
-        if let Some(at) = upsert_target(request, program, &graph, container) {
-            return self.replace(program, file, &at, None, (request.dry, request.opts.diff));
+        if let Some(at) = upsert_target(upsert, program, &graph, container) {
+            return self.replace(program, file, &at, None, mode);
         }
         let kind = TypeKind::from_graph(&container.kind);
         let block: Vec<String> = self.emitter.members(kind, members).collect();
@@ -425,17 +465,17 @@ impl<'a, E: Emitter> Generator<'a, E> {
             &psr4,
             &scan,
         );
-        let first = match anchor {
-            Anchor::After(method) => {
+        let first = match place {
+            Place::After(method) => {
                 let (_, end) = find_method(&graph, container, method)?;
                 insert_after_line(&mut lines, end, &block)
             }
-            Anchor::Before(method) => {
+            Place::Before(method) => {
                 let (start, _) = find_method(&graph, container, method)?;
                 let start = extend_over_docs(&lines, start);
                 insert_before_line(&mut lines, start, &block)
             }
-            Anchor::Line(n) => {
+            &Place::Line(n) => {
                 if n <= container.line as usize || n > container.end_line as usize {
                     return Err(GenError::new(crate::tf!(
                         "--at L{} is outside the body of {} (L{}-L{})",
@@ -448,7 +488,7 @@ impl<'a, E: Emitter> Generator<'a, E> {
                 }
                 insert_before_line(&mut lines, n, &block)
             }
-            Anchor::End => {
+            Place::End => {
                 if container.line >= container.end_line {
                     return Err(GenError::new(crate::tf!(
                         "{} is declared on one line; reformat it so its `{{` and `}}` are on separate lines",
@@ -465,19 +505,19 @@ impl<'a, E: Emitter> Generator<'a, E> {
         self.validate(&rel, &text)?;
         let start = first + added + 1;
         let end = start + block.len().saturating_sub(1);
-        let place = match anchor {
-            Anchor::After(method) => format!("{}::{} after {method}", rel, container.name),
-            Anchor::Before(method) => format!("{}::{} before {method}", rel, container.name),
-            Anchor::Line(n) => format!("{}::{} at L{n}", rel, container.name),
-            Anchor::End => format!("{}::{}", rel, container.name),
+        let label = match place {
+            Place::After(method) => format!("{}::{} after {method}", rel, container.name),
+            Place::Before(method) => format!("{}::{} before {method}", rel, container.name),
+            &Place::Line(n) => format!("{}::{} at L{n}", rel, container.name),
+            Place::End => format!("{}::{}", rel, container.name),
         };
-        if dry {
+        if mode.dry() {
             return Ok(Output {
-                lines: report::with_header(report::insert_header(&place, start), block),
+                lines: report::with_header(report::insert_header(&label, start), block),
                 unresolved,
             });
         }
-        let summary = report::inserted_members(members.len(), &place, start, end);
+        let summary = report::inserted_members(members.len(), &label, start, end);
         let line = InsertInto { rel, text, summary }.execute(self.env)?;
         Ok(Output {
             lines: vec![line],
@@ -491,7 +531,7 @@ impl<'a, E: Emitter> Generator<'a, E> {
         file: &str,
         at: &ReplaceAt,
         expect: Option<&str>,
-        (dry, diff): (bool, bool),
+        mode: Mode,
     ) -> GenResult<Output> {
         let rel = self.rel(file)?;
         self.check_extension(&rel)?;
@@ -561,10 +601,10 @@ impl<'a, E: Emitter> Generator<'a, E> {
         let new_from = from + added;
         let new_to = new_from + block.len().saturating_sub(1);
         let label = label.unwrap_or_default();
-        if dry {
+        if mode.dry() {
             let header = report::replace_header(&rel, (from, to), (new_from, new_to), label);
             return Ok(Output {
-                lines: report::replace_preview(header, &old, block, diff),
+                lines: report::replace_preview(header, &old, block, mode.diff()),
                 unresolved,
             });
         }
@@ -622,12 +662,12 @@ pub(super) fn pick_container<'g>(
 
 /// `--upsert`: ha egyetlen csupasz tagot kell beszúrni, és a konténernek már van ilyen nevű metódusa, a csere célja.
 fn upsert_target(
-    request: &GenRequest,
+    upsert: bool,
     program: &Program,
     graph: &FileGraph,
     container: &Container,
 ) -> Option<ReplaceAt> {
-    if !request.opts.upsert || !program.decls.is_empty() {
+    if !upsert || !program.decls.is_empty() {
         return None;
     }
     let [member] = program.loose.as_slice() else {

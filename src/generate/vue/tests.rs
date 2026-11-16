@@ -5,22 +5,16 @@ use std::path::Path;
 
 use super::{VueGenerator, wants_vue};
 use crate::generate::fs::Env;
-use crate::generate::generator::{GenRequest, Opts, Output, ReplaceAt, Target};
+use crate::generate::generator::{GenRequest, Mode, Output, Place, ReplaceAt, Target};
 use crate::generate::testing::{FixedClock, MemFs, ROOT};
 
 const T0: u64 = 1_700_000_000;
 
 fn go(fs: &MemFs, expr: &str, dry: bool, target: Target) -> Result<Output, String> {
-    go_with(fs, expr, dry, target, Opts::default())
+    go_with(fs, expr, Mode::of(dry, false), target)
 }
 
-fn go_with(
-    fs: &MemFs,
-    expr: &str,
-    dry: bool,
-    target: Target,
-    opts: Opts,
-) -> Result<Output, String> {
+fn go_with(fs: &MemFs, expr: &str, mode: Mode, target: Target) -> Result<Output, String> {
     let clock = FixedClock(Cell::new(T0));
     let env = Env {
         root: Path::new(ROOT),
@@ -29,9 +23,8 @@ fn go_with(
     };
     let request = GenRequest {
         expr: expr.to_owned(),
-        dry,
+        mode,
         target,
-        opts,
     };
     VueGenerator::new(env)
         .run(&request)
@@ -48,8 +41,14 @@ fn into(file: &str, after: Option<&str>) -> Target {
     Target::Into {
         file: file.to_owned(),
         class: None,
-        after: after.map(str::to_owned),
+        place: place_after(after),
+        upsert: false,
     }
+}
+
+/// A `--after` neve (vagy semmi) `Place`-ként.
+fn place_after(name: Option<&str>) -> Place {
+    name.map_or(Place::End, |m| Place::After(m.to_owned()))
 }
 
 fn text(out: &Output) -> String {
@@ -516,7 +515,8 @@ fn into_template_element_by_id_appends_as_its_last_child() {
     let target = |class: &str| Target::Into {
         file: "src/A.vue".to_owned(),
         class: Some(class.to_owned()),
-        after: None,
+        place: Place::End,
+        upsert: false,
     };
     go(&fs, "template>li{b}", false, target("template#list")).unwrap();
     let file = fs.get("src/A.vue").unwrap();
@@ -538,30 +538,21 @@ fn into_template_element_by_id_appends_as_its_last_child() {
 #[test]
 fn upsert_and_diff_work_on_class_members() {
     let fs = MemFs::with(&[("src/svc.ts", SERVICE_TS)]);
-    let upsert = Opts {
+    let upsert = Target::Into {
+        file: "src/svc.ts".to_owned(),
+        class: Some("Svc".to_owned()),
+        place: Place::End,
         upsert: true,
-        ..Opts::default()
     };
-    let out = go_with(
-        &fs,
-        "+run():void{ this.n = 5 }",
-        false,
-        into_class("src/svc.ts", "Svc", None),
-        upsert,
-    )
-    .unwrap();
+    let out = go_with(&fs, "+run():void{ this.n = 5 }", Mode::Write, upsert).unwrap();
     assert!(out.lines[0].starts_with("replaced src/svc.ts"), "{out:?}");
     assert!(fs.get("src/svc.ts").unwrap().contains("this.n = 5"));
 
     let fs = MemFs::with(&[("src/svc.ts", SERVICE_TS)]);
-    let diff = Opts {
-        diff: true,
-        ..Opts::default()
-    };
     let out = go_with(
         &fs,
         "+run():void{ this.n = 5 }",
-        true,
+        Mode::Diff,
         Target::Replace {
             file: "src/svc.ts".to_owned(),
             at: ReplaceAt::Method {
@@ -570,7 +561,6 @@ fn upsert_and_diff_work_on_class_members() {
             },
             expect: None,
         },
-        diff,
     )
     .unwrap();
     assert!(
@@ -876,9 +866,8 @@ fn bad_targets_and_mixed_kinds_are_explained() {
 fn only_vue_js_ts_targets_and_heads_are_routed_here() {
     let req = |expr: &str, target: Target| GenRequest {
         expr: expr.to_owned(),
-        dry: false,
+        mode: Mode::Write,
         target,
-        opts: Default::default(),
     };
     assert!(!wants_vue(&req("c:A", write("app/A.php"))));
     assert!(!wants_vue(&req("c:A", Target::Preview)));
@@ -1195,7 +1184,8 @@ fn into_class(file: &str, class: &str, after: Option<&str>) -> Target {
     Target::Into {
         file: file.to_owned(),
         class: Some(class.to_owned()),
-        after: after.map(str::to_owned),
+        place: place_after(after),
+        upsert: false,
     }
 }
 
@@ -1614,9 +1604,8 @@ fn module_errors_and_routing() {
 
     let req = |expr: &str, target: Target| GenRequest {
         expr: expr.to_owned(),
-        dry: false,
+        mode: Mode::Write,
         target,
-        opts: Default::default(),
     };
     assert!(wants_vue(&req("mod:x>fn:a", Target::Preview)));
     assert!(wants_vue(&req("class:A>+x():int", Target::Preview)));

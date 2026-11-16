@@ -13,7 +13,7 @@ use super::html_scan::{
 use super::template::opens_element;
 use crate::generate::command::{EditCommand, ReplaceRange, WriteNew};
 use crate::generate::error::{GenError, GenResult};
-use crate::generate::generator::{GenRequest, Output, ReplaceAt, Target};
+use crate::generate::generator::{GenRequest, Mode, Output, ReplaceAt, Target};
 use crate::generate::report;
 
 /// `.html` / `.htm` fájl-e.
@@ -36,7 +36,7 @@ pub fn wants_html(request: &GenRequest) -> bool {
 }
 
 /// Hová kerül a blokk.
-enum Place {
+enum Slot {
     /// A `line` (0-alapú) sor elé.
     At { line: usize, indent: usize },
     /// A `line` sort a `col` oszlopnál kettévágva (a záró tag nem a sor elején áll).
@@ -93,21 +93,19 @@ impl VueGenerator<'_> {
         let program = parse(&request.expr)?;
         match &request.target {
             Target::Preview => self.html_preview(&program),
-            Target::Write { file } => self.html_write(program, file, request.dry),
-            Target::Into { file, class, after } => self.html_into(
+            Target::Write { file } => self.html_write(program, file, request.mode),
+            Target::Into {
+                file, class, place, ..
+            } => self.html_into(
                 program,
                 file,
                 class.as_deref(),
-                after.as_deref(),
-                request.dry,
+                place.after_name(),
+                request.mode,
             ),
-            Target::Replace { file, at, expect } => self.html_replace(
-                program,
-                file,
-                at,
-                expect.as_deref(),
-                (request.dry, request.opts.diff),
-            ),
+            Target::Replace { file, at, expect } => {
+                self.html_replace(program, file, at, expect.as_deref(), request.mode)
+            }
         }
     }
 
@@ -121,7 +119,7 @@ impl VueGenerator<'_> {
         Ok(with_warnings(block, &text, &text))
     }
 
-    fn html_write(&self, program: HtmlProgram, file: &str, dry: bool) -> GenResult<Output> {
+    fn html_write(&self, program: HtmlProgram, file: &str, mode: Mode) -> GenResult<Output> {
         let rel = self.rel(file)?;
         let doc = match program {
             HtmlProgram::Document(doc) => *doc,
@@ -133,7 +131,7 @@ impl VueGenerator<'_> {
         let mut text = block.join("\n");
         text.push('\n');
         self.validate(&rel, &text)?;
-        if dry {
+        if mode.dry() {
             return Ok(with_warnings(block, &text, &text));
         }
         let line = WriteNew {
@@ -150,7 +148,7 @@ impl VueGenerator<'_> {
         file: &str,
         target: Option<&str>,
         after: Option<&str>,
-        dry: bool,
+        mode: Mode,
     ) -> GenResult<Output> {
         let HtmlProgram::Fragment(nodes) = program else {
             return Err(document_needs_write());
@@ -164,12 +162,12 @@ impl VueGenerator<'_> {
         let spans = spans_of(&rel, &text)?;
         let place = placement(&doc, &text, &spans, (target, after), unit)?;
         let (start, block) = match place {
-            Place::At { line, indent } => {
+            Slot::At { line, indent } => {
                 let block = indent_block(&generated, indent);
                 doc.insert(line, block.clone());
                 (line, block)
             }
-            Place::Split {
+            Slot::Split {
                 line,
                 col,
                 indent,
@@ -191,7 +189,7 @@ impl VueGenerator<'_> {
             }
         };
         doc.mark("html", start, block.len());
-        let mut out = self.commit_insert(rel, &doc, eol, block, Vec::new(), dry)?;
+        let mut out = self.commit_insert(rel, &doc, eol, block, Vec::new(), mode)?;
         out.lines
             .extend(duplicate_ids(&doc.text(), &generated.join("\n")));
         Ok(out)
@@ -203,7 +201,7 @@ impl VueGenerator<'_> {
         file: &str,
         at: &ReplaceAt,
         expect: Option<&str>,
-        (dry, diff): (bool, bool),
+        mode: Mode,
     ) -> GenResult<Output> {
         let HtmlProgram::Fragment(nodes) = program else {
             return Err(document_needs_write());
@@ -239,10 +237,10 @@ impl VueGenerator<'_> {
         self.validate(&rel, &new_text)?;
         let new = (from + 1, from + block.len());
         let label = label.unwrap_or_default();
-        if dry {
+        if mode.dry() {
             let header = report::replace_header(&rel, (from + 1, to), new, &label);
             return Ok(with_warnings(
-                report::replace_preview(header, &old, block, diff),
+                report::replace_preview(header, &old, block, mode.diff()),
                 &doc.text(),
                 &fresh,
             ));
@@ -265,7 +263,7 @@ fn placement(
     spans: &[Span],
     (target, after): (Option<&str>, Option<&str>),
     unit: usize,
-) -> GenResult<Place> {
+) -> GenResult<Slot> {
     if let Some(a) = after {
         let n = parse_line_ref(a).filter(|n| *n <= doc.lines.len());
         let Some(n) = n else {
@@ -277,7 +275,7 @@ fn placement(
         };
         let line = &doc.lines[n - 1];
         let indent = indent_of(line) + if opens_element(line) { unit } else { 0 };
-        return Ok(Place::At { line: n, indent });
+        return Ok(Slot::At { line: n, indent });
     }
     if let Some(t) = target {
         let sel = selector_of(t)?;
@@ -295,7 +293,7 @@ fn placement(
         .find_map(|n| spans.iter().find(|s| s.name == *n && s.close.is_some()));
     match container {
         Some(span) => into_element(doc, text, span, unit),
-        None => Ok(Place::At {
+        None => Ok(Slot::At {
             line: last_nonblank(&doc.lines, 0, doc.lines.len()).map_or(0, |l| l + 1),
             indent: 0,
         }),
@@ -303,7 +301,7 @@ fn placement(
 }
 
 /// Az elem utolsó gyerekének helye (a záró tag elé); a behúzás a meglévő első gyerek behúzása.
-fn into_element(doc: &Doc, text: &str, span: &Span, unit: usize) -> GenResult<Place> {
+fn into_element(doc: &Doc, text: &str, span: &Span, unit: usize) -> GenResult<Slot> {
     let Some((close_at, _)) = span.close else {
         return Err(GenError::new(crate::tf!(
             "`<{}>` has no closing tag: nothing can be appended inside it",
@@ -321,12 +319,12 @@ fn into_element(doc: &Doc, text: &str, span: &Span, unit: usize) -> GenResult<Pl
         .find(|&k| !doc.lines[k].trim().is_empty())
         .map_or(open_indent + unit, |k| indent_of(&doc.lines[k]));
     if before.trim().is_empty() {
-        Ok(Place::At {
+        Ok(Slot::At {
             line: close_line,
             indent,
         })
     } else {
-        Ok(Place::Split {
+        Ok(Slot::Split {
             line: close_line,
             col,
             indent,

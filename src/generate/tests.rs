@@ -8,7 +8,7 @@ use std::path::Path;
 use super::ast::TypeKind;
 use super::backup::Backups;
 use super::fs::{DirEntry, Env, FileSystem, stamp, walk_php};
-use super::generator::{GenRequest, Generator, Opts, Output, ReplaceAt, Target};
+use super::generator::{GenRequest, Generator, Mode, Output, Place, ReplaceAt, Target};
 use super::php::PhpEmitter;
 use super::project::Psr4;
 use super::testing::{FixedClock, MemFs, ROOT};
@@ -28,10 +28,14 @@ fn env<'a>(fs: &'a MemFs, clock: &'a FixedClock) -> Env<'a> {
 fn request(expr: &str, dry: bool, target: Target) -> GenRequest {
     GenRequest {
         expr: expr.to_owned(),
-        dry,
+        mode: Mode::of(dry, false),
         target,
-        opts: Default::default(),
     }
+}
+
+/// A `--after` neve (vagy semmi) `Place`-ként.
+fn place_after(name: Option<&str>) -> Place {
+    name.map_or(Place::End, |m| Place::After(m.to_owned()))
 }
 
 fn run(fs: &MemFs, clock: &FixedClock, req: &GenRequest) -> Result<Output, String> {
@@ -530,7 +534,8 @@ fn into_inserts_after_a_method_and_merges_imports() {
             Target::Into {
                 file: "app/Services/Pay.php".into(),
                 class: Some("Pay".into()),
-                after: Some("charge".into()),
+                place: Place::After("charge".into()),
+                upsert: false,
             },
         ),
     )
@@ -563,7 +568,8 @@ fn into_appends_at_the_end_when_no_method_is_given() {
             Target::Into {
                 file: "app/Services/Pay.php".into(),
                 class: None,
-                after: None,
+                place: Place::End,
+                upsert: false,
             },
         ),
     )
@@ -588,7 +594,8 @@ fn into_an_empty_class_has_no_leading_blank_line() {
             Target::Into {
                 file: "app/E.php".into(),
                 class: None,
-                after: None,
+                place: Place::End,
+                upsert: false,
             },
         ),
     )
@@ -613,7 +620,8 @@ fn into_reports_missing_class_and_method() {
                 Target::Into {
                     file: "app/Services/Pay.php".into(),
                     class: class.map(str::to_owned),
-                    after: after.map(str::to_owned),
+                    place: place_after(after),
+                    upsert: false,
                 },
             ),
         )
@@ -627,17 +635,17 @@ fn into_reports_missing_class_and_method() {
     );
 }
 
-/// `--into` az `app/A.php` osztályába, `opts` kapcsolókkal.
-fn into_with(expr: &str, dry: bool, after: Option<&str>, opts: Opts) -> GenRequest {
+/// `--into` az `app/A.php` osztályába, a megadott hellyel és móddal.
+fn into_with(expr: &str, mode: Mode, place: Place, upsert: bool) -> GenRequest {
     GenRequest {
         expr: expr.to_owned(),
-        dry,
+        mode,
         target: Target::Into {
             file: "app/A.php".into(),
             class: None,
-            after: after.map(str::to_owned),
+            place,
+            upsert,
         },
-        opts,
     }
 }
 
@@ -645,14 +653,11 @@ fn into_with(expr: &str, dry: bool, after: Option<&str>, opts: Opts) -> GenReque
 fn into_before_a_method_goes_above_its_docblock() {
     let fs = MemFs::with(&[("app/A.php", DOCUMENTED)]);
     let clock = FixedClock(Cell::new(T0));
-    let opts = Opts {
-        before: Some("go".into()),
-        ..Opts::default()
-    };
+    let place = Place::Before("go".into());
     let dry = run(
         &fs,
         &clock,
-        &into_with("+mid():int{ return 5; }", true, None, opts.clone()),
+        &into_with("+mid():int{ return 5; }", Mode::Dry, place.clone(), false),
     )
     .unwrap();
     assert_eq!(dry.lines[0], "→ app/A.php::A before go (L5)");
@@ -660,7 +665,7 @@ fn into_before_a_method_goes_above_its_docblock() {
     let out = run(
         &fs,
         &clock,
-        &into_with("+mid():int{ return 5; }", false, None, opts),
+        &into_with("+mid():int{ return 5; }", Mode::Write, place, false),
     )
     .unwrap();
     assert!(out.lines[0].contains("A before go (L5-8)"), "{out:?}");
@@ -675,19 +680,21 @@ fn into_before_a_method_goes_above_its_docblock() {
 fn into_at_a_line_stays_inside_the_class_body() {
     let fs = MemFs::with(&[("app/A.php", DOCUMENTED)]);
     let clock = FixedClock(Cell::new(T0));
-    let at = |n: usize| Opts {
-        at: Some(n),
-        ..Opts::default()
-    };
+    let at = Place::Line;
     let dry = run(
         &fs,
         &clock,
-        &into_with("+mid():int{ return 5; }", true, None, at(13)),
+        &into_with("+mid():int{ return 5; }", Mode::Dry, at(13), false),
     )
     .unwrap();
     assert_eq!(dry.lines[0], "→ app/A.php::A at L13 (L13)");
     for bad in [1, 3, 99] {
-        let err = run(&fs, &clock, &into_with("+mid():int", true, None, at(bad))).unwrap_err();
+        let err = run(
+            &fs,
+            &clock,
+            &into_with("+mid():int", Mode::Dry, at(bad), false),
+        )
+        .unwrap_err();
         assert!(err.contains("outside"), "{err}");
     }
     assert_eq!(fs.get("app/A.php").unwrap(), DOCUMENTED);
@@ -697,14 +704,10 @@ fn into_at_a_line_stays_inside_the_class_body() {
 fn upsert_replaces_an_existing_member_and_inserts_a_new_one() {
     let fs = MemFs::with(&[("app/A.php", DOCUMENTED)]);
     let clock = FixedClock(Cell::new(T0));
-    let upsert = Opts {
-        upsert: true,
-        ..Opts::default()
-    };
     let out = run(
         &fs,
         &clock,
-        &into_with("+keep():int{ return 9; }", false, None, upsert.clone()),
+        &into_with("+keep():int{ return 9; }", Mode::Write, Place::End, true),
     )
     .unwrap();
     assert!(
@@ -715,7 +718,7 @@ fn upsert_replaces_an_existing_member_and_inserts_a_new_one() {
     let out = run(
         &fs,
         &clock,
-        &into_with("+fresh():int{ return 7; }", false, None, upsert),
+        &into_with("+fresh():int{ return 7; }", Mode::Write, Place::End, true),
     )
     .unwrap();
     assert!(out.lines[0].starts_with("inserted 1 member(s)"), "{out:?}");
@@ -732,7 +735,7 @@ fn diff_shows_only_the_changed_lines_of_a_replace() {
     let clock = FixedClock(Cell::new(T0));
     let req = GenRequest {
         expr: "+keep():int{ return 9; }".to_owned(),
-        dry: true,
+        mode: Mode::Diff,
         target: Target::Replace {
             file: "app/A.php".into(),
             at: ReplaceAt::Method {
@@ -740,10 +743,6 @@ fn diff_shows_only_the_changed_lines_of_a_replace() {
                 name: "keep".into(),
             },
             expect: None,
-        },
-        opts: Opts {
-            diff: true,
-            ..Opts::default()
         },
     };
     let out = run(&fs, &clock, &req).unwrap();
@@ -916,7 +915,8 @@ fn a_syntax_error_writes_nothing() {
             Target::Into {
                 file: "app/Services/Pay.php".into(),
                 class: None,
-                after: None,
+                place: Place::End,
+                upsert: false,
             },
         ),
     )
@@ -939,7 +939,8 @@ fn crlf_files_keep_their_line_endings() {
             Target::Into {
                 file: "app/C.php".into(),
                 class: None,
-                after: None,
+                place: Place::End,
+                upsert: false,
             },
         ),
     )
@@ -1080,7 +1081,8 @@ fn protected_files_are_not_modified() {
             Target::Into {
                 file: "app/A.php".into(),
                 class: None,
-                after: None,
+                place: Place::End,
+                upsert: false,
             },
         ))
         .unwrap_err()
@@ -1244,7 +1246,8 @@ fn dry_into_and_replace_print_a_placement_header() {
     let into = Target::Into {
         file: "app/Services/Pay.php".into(),
         class: None,
-        after: Some("charge".into()),
+        place: Place::After("charge".into()),
+        upsert: false,
     };
     let clock = FixedClock(Cell::new(T0));
     let dry = run(
@@ -1332,7 +1335,8 @@ fn errors_carry_a_kind() {
             Target::Into {
                 file: "app/Missing.php".into(),
                 class: None,
-                after: None
+                place: Place::End,
+                upsert: false
             }
         ),
         Kind::NotFound
@@ -1343,7 +1347,8 @@ fn errors_carry_a_kind() {
             Target::Into {
                 file: "app/Services/Pay.php".into(),
                 class: None,
-                after: None
+                place: Place::End,
+                upsert: false
             }
         ),
         Kind::Syntax
@@ -1377,7 +1382,8 @@ fn several_unknown_names_share_one_project_walk() {
             Target::Into {
                 file: "app/Services/Pay.php".into(),
                 class: None,
-                after: None,
+                place: Place::End,
+                upsert: false,
             },
         ),
     )

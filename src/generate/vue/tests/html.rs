@@ -27,7 +27,8 @@ fn into_at(file: &str, class: &str) -> Target {
     Target::Into {
         file: file.to_owned(),
         class: Some(class.to_owned()),
-        after: None,
+        place: Place::End,
+        upsert: false,
     }
 }
 
@@ -315,9 +316,8 @@ fn unbalanced_existing_file_and_dispatch() {
 
     let req = |expr: &str, target: Target| GenRequest {
         expr: expr.to_owned(),
-        dry: false,
+        mode: Mode::Write,
         target,
-        opts: Default::default(),
     };
     assert!(wants_vue(&req("html:T>p", Target::Preview)));
     assert!(wants_vue(&req("p", write("a.htm"))));

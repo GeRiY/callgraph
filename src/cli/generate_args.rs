@@ -5,7 +5,7 @@
 //! `callgraph undo [<fájl>] [--project alias|mappa]`. Külön fájlban, hogy az `args.rs` csak egy-egy sorral bővüljön.
 
 use crate::error::{CallgraphError, Result};
-use crate::generate::{GenRequest, Opts, ReplaceAt, Target};
+use crate::generate::{GenRequest, Mode, Place, ReplaceAt, Target};
 
 use super::CliArgs;
 
@@ -170,7 +170,12 @@ pub(crate) fn parse_gen(args: &[String]) -> Result<CliArgs> {
             Some((file, class)) => (file.to_owned(), Some(class.to_owned())),
             None => (spec, None),
         };
-        Target::Into { file, class, after }
+        Target::Into {
+            file,
+            class,
+            place: Place::of(after, before, at),
+            upsert,
+        }
     } else if let Some(spec) = replace {
         let (file, at) = parse_replace(&spec)?;
         Target::Replace { file, at, expect }
@@ -181,14 +186,8 @@ pub(crate) fn parse_gen(args: &[String]) -> Result<CliArgs> {
         request: GenRequest {
             expr: expr.clone(),
             // a --diff csak előnézet: semmi nem íródik
-            dry: dry || diff,
+            mode: Mode::of(dry, diff),
             target,
-            opts: Opts {
-                diff,
-                upsert,
-                before,
-                at,
-            },
         },
         project,
     })
@@ -233,8 +232,8 @@ mod tests {
     fn gen_without_target_is_a_preview() {
         let r = request(&["c:A"]);
         assert_eq!(r.target, Target::Preview);
-        assert!(!r.dry);
-        assert!(request(&["c:A", "--dry"]).dry);
+        assert_eq!(r.mode, Mode::Write);
+        assert_eq!(request(&["c:A", "--dry"]).mode, Mode::Dry);
     }
 
     #[test]
@@ -250,7 +249,8 @@ mod tests {
             Target::Into {
                 file: "app/A.php".into(),
                 class: Some("A".into()),
-                after: Some("go".into())
+                place: Place::After("go".into()),
+                upsert: false
             }
         );
         assert_eq!(
@@ -285,19 +285,29 @@ mod tests {
     #[test]
     fn diff_before_at_and_upsert_parse() {
         let r = request(&["+x()", "--replace", "a.php::go", "--diff"]);
-        assert!(r.dry && r.opts.diff);
+        assert_eq!(r.mode, Mode::Diff);
         let r = request(&["+x()", "--into", "a.php::A", "--before", "go", "--upsert"]);
-        assert_eq!(r.opts.before.as_deref(), Some("go"));
-        assert!(r.opts.upsert && !r.opts.diff && !r.dry);
+        assert_eq!(r.mode, Mode::Write);
+        assert!(matches!(
+            r.target,
+            Target::Into { place: Place::Before(ref m), upsert: true, .. } if m == "go"
+        ));
         let r = request(&["+x()", "--into", "a.php", "--at", "L42"]);
-        assert_eq!(r.opts.at, Some(42));
+        assert!(matches!(
+            r.target,
+            Target::Into {
+                place: Place::Line(42),
+                ..
+            }
+        ));
         let r = request(&["+x()", "--into", "a.vue::template#list"]);
         assert_eq!(
             r.target,
             Target::Into {
                 file: "a.vue".into(),
                 class: Some("template#list".into()),
-                after: None
+                place: Place::End,
+                upsert: false
             }
         );
     }

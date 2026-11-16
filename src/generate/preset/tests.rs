@@ -5,7 +5,7 @@ use std::path::Path;
 
 use super::{PresetGenerator, spec};
 use crate::generate::fs::Env;
-use crate::generate::generator::{GenRequest, Generator, Target};
+use crate::generate::generator::{GenRequest, Generator, Mode, Place, Target};
 use crate::generate::php::PhpEmitter;
 use crate::generate::testing::{FixedClock, MemFs, ROOT};
 
@@ -97,9 +97,8 @@ fn project() -> MemFs {
 fn request(expr: &str, dry: bool) -> GenRequest {
     GenRequest {
         expr: expr.to_owned(),
-        dry,
+        mode: Mode::of(dry, false),
         target: Target::Preview,
-        opts: Default::default(),
     }
 }
 
@@ -639,13 +638,13 @@ fn a_later_single_edit_makes_undo_single_file_again() {
     let generator = Generator::new(env(&fs, &clock), PhpEmitter);
     let replace = GenRequest {
         expr: "+x():int{ return 1; }".to_owned(),
-        dry: false,
+        mode: Mode::Write,
         target: Target::Into {
             file: "app/Http/Controllers/FeeController.php".to_owned(),
             class: None,
-            after: None,
+            place: Place::End,
+            upsert: false,
         },
-        opts: Default::default(),
     };
     generator.run(&replace).unwrap();
     let out = generator.undo(None).unwrap().lines.join("\n");
@@ -697,11 +696,10 @@ fn a_preset_takes_no_file_target() {
     let clock = FixedClock(Cell::new(T0));
     let req = GenRequest {
         expr: CREATE.to_owned(),
-        dry: false,
+        mode: Mode::Write,
         target: Target::Write {
             file: "app/X.php".to_owned(),
         },
-        opts: Default::default(),
     };
     let err = PresetGenerator::new(env(&fs, &clock))
         .run(&req)

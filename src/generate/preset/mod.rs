@@ -95,7 +95,7 @@ impl<'a> PresetGenerator<'a> {
         ));
 
         let mut lines: Vec<String> = Vec::new();
-        if request.dry {
+        if request.mode.dry() {
             for file in &plan.files {
                 lines.push(format!("== {}", file.rel));
                 lines.extend(file.shown.iter().cloned());
@@ -115,7 +115,7 @@ impl<'a> PresetGenerator<'a> {
             lines.extend(plan.files.iter().map(|f| f.summary.clone()));
         }
         lines.extend(tail);
-        if !request.dry {
+        if !request.mode.dry() {
             lines.push(
                 crate::t!(
                     "undo: `callgraph undo` reverts all of these in one step",
