@@ -6,7 +6,7 @@
 //! # `.callgraph/gen.toml`
 //! ```toml
 //! [components]          # a heurisztika helyett: a komponens neve (Név.vue a projektben)
-//! input = "TextInput"   # label, input, error, button, layout
+//! input = "TextInput"   # field, label, input, textarea, checkbox, error, button, layout
 //! [i18n]
 //! enabled = false       # a fordítás kikapcsolása (true: bekapcsolás, ha a heurisztika nem találta meg)
 //! ```
@@ -122,37 +122,71 @@ impl Config {
 /// A komponens szerepe az űrlapon.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Role {
+    /// Címke + hiba + slot-os beviteli elem körüli burkoló (`FormField`).
+    Field,
     Label,
     Input,
+    Textarea,
+    Checkbox,
     Error,
     Button,
 }
+
+/// Az alapszerepek: ezek hiánya indítja a heurisztikát (a többi mellékesen kerül elő).
+fn is_core(role: Role) -> bool {
+    matches!(role, Role::Label | Role::Input | Role::Error | Role::Button)
+}
+
+/// Az ilyen nevű komponens nem űrlap-elem (állapot-blokk, oldal, sablon, modál, kártya).
+const NOT_FORM: [&str; 5] = ["state", "page", "template", "modal", "card"];
 
 fn is_ident(c: char) -> bool {
     c.is_alphanumeric() || matches!(c, '_' | '$')
 }
 
-/// A szó egész szóként szerepel-e a szövegben.
-fn contains_word(hay: &str, word: &str) -> bool {
-    hay.match_indices(word).any(|(i, _)| {
-        let before = hay.get(..i).and_then(|h| h.chars().next_back());
-        let after = hay.get(i + word.len()..).and_then(|h| h.chars().next());
-        !before.is_some_and(is_ident) && !after.is_some_and(is_ident)
+/// A fájl `<script>` blokkjainak szövege (a prop-deklarációk helye; `defineProps<{..}>` és a helyi interfész is).
+fn script_of(text: &str) -> String {
+    let mut out = String::new();
+    let mut rest = text;
+    while let Some(start) = rest.find("<script") {
+        let Some(open) = rest[start..].find('>') else {
+            break;
+        };
+        let body = &rest[start + open + 1..];
+        let end = body.find("</script>").unwrap_or(body.len());
+        out.push_str(&body[..end]);
+        out.push('\n');
+        rest = &body[end..];
+    }
+    out
+}
+
+/// Deklarált prop-e: a script-ben kulcsként / interfész-taggként / tömb-elemként szerepel (a `props.x` használat és
+/// az `update:x` eseménynév nem).
+fn has_prop(text: &str, name: &str) -> bool {
+    let script = script_of(text);
+    script.match_indices(name).any(|(i, _)| {
+        let before = script[..i].chars().next_back();
+        let rest = &script[i + name.len()..];
+        !before.is_some_and(|c| is_ident(c) || matches!(c, '.' | ':'))
+            && !rest.chars().next().is_some_and(is_ident)
+            && rest
+                .trim_start()
+                .starts_with(['?', ':', '\'', '"', ',', ']', '}'])
     })
 }
 
-/// A `defineProps(…)` / `props:` környéke (nincs ilyen: az egész szöveg).
-fn props_region(text: &str) -> &str {
-    let Some(at) = text.find("defineProps").or_else(|| text.find("props:")) else {
-        return text;
-    };
-    text.get(at..(at + 800).min(text.len()))
-        .or_else(|| text.get(at..))
-        .unwrap_or(text)
+/// Van-e névtelen (alapértelmezett) slotja a template-nek.
+fn has_slot(text: &str) -> bool {
+    text.match_indices("<slot").any(|(i, _)| {
+        let tag = text[i..].split('>').next().unwrap_or("");
+        !tag[5..].starts_with(is_ident) && !tag.contains("name=") && !tag.contains("name =")
+    })
 }
 
-fn has_prop(text: &str, name: &str) -> bool {
-    contains_word(props_region(text), name)
+/// A v-model-t fogadja-e (`modelValue` prop vagy `defineModel`).
+fn has_model(text: &str) -> bool {
+    has_prop(text, "modelValue") || text.contains("defineModel(") || text.contains("defineModel<")
 }
 
 /// Egy komponens szerepe a fájlnév és a props alapján (nem űrlap-elem: `None`).
@@ -171,14 +205,27 @@ fn classify(stem: &str, text: &str) -> Option<Role> {
         ];
         return (!other.iter().any(|&w| is(w))).then_some(Role::Button);
     }
+    let blocked = NOT_FORM.iter().any(|&w| is(w));
+    if blocked {
+        return None;
+    }
+    if is("field") && has_prop(text, "label") && error_prop_of(text).is_some() && has_slot(text) {
+        return Some(Role::Field);
+    }
     if is("error") || is("validation") {
-        return Some(Role::Error);
+        return error_prop_of(text).map(|_| Role::Error);
     }
     if is("label") {
-        return Some(Role::Label);
+        return (label_prop(text).is_some() || has_slot(text)).then_some(Role::Label);
     }
-    let other = ["checkbox", "radio", "select", "switch", "textarea", "file"];
-    if has_prop(text, "modelValue")
+    if is("textarea") {
+        return has_model(text).then_some(Role::Textarea);
+    }
+    if is("checkbox") {
+        return (has_model(text) || has_prop(text, "checked")).then_some(Role::Checkbox);
+    }
+    let other = ["radio", "select", "switch", "file"];
+    if has_model(text)
         && (is("input") || is("text") || text.contains("<input"))
         && !other.iter().any(|&w| is(w))
     {
@@ -190,8 +237,11 @@ fn classify(stem: &str, text: &str) -> Option<Role> {
 /// A találatok rangsora egy szerepen belül: a megszokott név, majd a jellemző szó, majd a névsor.
 fn rank(stem: &str, role: Role) -> (u8, String) {
     let default = match role {
+        Role::Field => "FormField",
         Role::Label => "InputLabel",
         Role::Input => "TextInput",
+        Role::Textarea => "Textarea",
+        Role::Checkbox => "Checkbox",
         Role::Error => "InputError",
         Role::Button => "PrimaryButton",
     };
@@ -219,13 +269,16 @@ fn label_prop(text: &str) -> Option<String> {
         .map(str::to_owned)
 }
 
-/// A hiba-komponens prop-ja (`message`, `error`, `errors`; alapérték `message`).
-fn error_prop(text: &str) -> String {
+/// A hiba-komponens prop-ja (`message`, `error`, `errors`), ha van ilyen.
+fn error_prop_of(text: &str) -> Option<&'static str> {
     ["message", "error", "errors"]
         .into_iter()
         .find(|p| has_prop(text, p))
-        .unwrap_or("message")
-        .to_owned()
+}
+
+/// A hiba-komponens prop-ja (alapérték `message`).
+fn error_prop(text: &str) -> String {
+    error_prop_of(text).unwrap_or("message").to_owned()
 }
 
 /// A mappák `.vue` fájljai `(név, szöveg)` párokban, névsorban (a szöveg a közös memóból).
@@ -344,7 +397,9 @@ pub struct Ui {
 
 fn to_comp(pick: Pick, texts: &BTreeMap<String, Rc<String>>, role: Role) -> Comp {
     let text = pick.text.or_else(|| texts.get(&pick.name).cloned());
+    let id = role == Role::Field && text.as_deref().is_some_and(|t| has_prop(t, "id"));
     let prop = match (role, text) {
+        (Role::Field, Some(text)) => Some(error_prop(&text)),
         (Role::Label, Some(text)) if pick.source != Source::Default => label_prop(&text),
         (Role::Label, _) => Some("value".to_owned()),
         (Role::Error, Some(text)) if pick.source != Source::Default => Some(error_prop(&text)),
@@ -355,6 +410,7 @@ fn to_comp(pick: Pick, texts: &BTreeMap<String, Rc<String>>, role: Role) -> Comp
         name: pick.name,
         path: pick.path,
         prop,
+        id,
     }
 }
 
@@ -367,15 +423,18 @@ pub fn discover(
     ziggy: bool,
 ) -> Ui {
     let mut bad: Vec<String> = Vec::new();
-    let roles = [
-        ("label", Role::Label, "InputLabel"),
-        ("input", Role::Input, "TextInput"),
-        ("error", Role::Error, "InputError"),
-        ("button", Role::Button, "PrimaryButton"),
+    let roles: [(&str, Role, &[&str]); 7] = [
+        ("field", Role::Field, &[]),
+        ("label", Role::Label, &["InputLabel"]),
+        ("input", Role::Input, &["TextInput"]),
+        ("textarea", Role::Textarea, &[]),
+        ("checkbox", Role::Checkbox, &[]),
+        ("error", Role::Error, &["InputError"]),
+        ("button", Role::Button, &["PrimaryButton"]),
     ];
     let mut picks: Vec<Option<Pick>> = roles
         .iter()
-        .map(|(key, _, default)| resolve(project, config, key, &[*default], &mut bad))
+        .map(|(key, _, defaults)| resolve(project, config, key, defaults, &mut bad))
         .collect();
     let mut layout = resolve(
         project,
@@ -393,7 +452,11 @@ pub fn discover(
     let mut texts = BTreeMap::new();
     let mut aliased: BTreeMap<String, String> = BTreeMap::new();
     let mut imported: BTreeSet<String> = BTreeSet::new();
-    if picks.iter().any(Option::is_none) || configured {
+    let core_missing = picks
+        .iter()
+        .zip(roles.iter())
+        .any(|(pick, (_, role, _))| pick.is_none() && is_core(*role));
+    if core_missing || configured {
         texts = candidates(project, &COMPONENT_DIRS);
         // külön UI-csomag (`@ui/…` alias): a helyi komponens-mappák nyernek, az alias-mögöttiek kiegészítik
         let (found, used) = alias_candidates(project);
@@ -493,7 +556,10 @@ pub fn discover(
         .into_iter()
         .zip(roles.iter())
         .map(|(pick, (_, role, _))| pick.map(|p| to_comp(p, &texts, *role)));
-    let (label, input, error, button) = (
+    let (field, label, input, textarea, checkbox, error, button) = (
+        comps.next().flatten(),
+        comps.next().flatten(),
+        comps.next().flatten(),
         comps.next().flatten(),
         comps.next().flatten(),
         comps.next().flatten(),
@@ -503,8 +569,11 @@ pub fn discover(
     Ui {
         parts: Parts {
             layout: layout.map(|p| (p.name, p.path)),
+            field,
             label,
             input,
+            textarea,
+            checkbox,
             error,
             button,
             ziggy,

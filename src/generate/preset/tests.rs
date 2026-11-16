@@ -1076,7 +1076,16 @@ fn components_in_an_aliased_ui_package_are_found() {
     );
     fs.put(
         "ui/src/components/molecules/FormField/FormField.vue",
-        FIELD_LABEL,
+        "<script setup lang=\"ts\">\ninterface Props { label: string; error?: string; id?: string }\ndefineProps<Props>();\n</script>\n<template><div><label :for=\"id\">{{ label }}</label><slot /><p>{{ error }}</p></div></template>\n",
+    );
+    fs.put(
+        "ui/src/components/atoms/BaseTextarea/BaseTextarea.vue",
+        "<script setup>\ndefineProps({ modelValue: String });\n</script>\n<template><textarea /></template>\n",
+    );
+    // hibaállapot-blokk: nincs `message` / `error` propja, nem lehet hiba-komponens
+    fs.put(
+        "ui/src/components/molecules/ErrorState/ErrorState.vue",
+        "<script setup>\ndefineProps({ title: String, description: String });\n</script>\n<template><div /></template>\n",
     );
     fs.put(
         "resources/js/Pages/Home.vue",
@@ -1095,4 +1104,14 @@ fn components_in_an_aliased_ui_package_are_found() {
     );
     assert!(out.contains("input=BaseInput"), "{out}");
     assert!(out.contains("button=BaseButton"), "{out}");
+    assert!(out.contains("field=FormField"), "{out}");
+    assert!(out.contains("textarea=BaseTextarea"), "{out}");
+    assert!(
+        !out.contains("ErrorState") && !create.contains("ErrorState"),
+        "{out}"
+    );
+    assert!(create.contains("<FormField"), "{create}");
+    assert!(create.contains(":error=\"form.errors.name\""), "{create}");
+    assert!(create.contains("<BaseTextarea"), "{create}");
+    assert!(!create.contains("<label for=\"name\""), "{create}");
 }

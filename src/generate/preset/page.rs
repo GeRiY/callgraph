@@ -49,14 +49,20 @@ pub struct Comp {
     pub path: String,
     /// Az a prop, amelyen a szöveget / a hibát kapja (címke: `value` / `label`, `None` = slot; hiba: `message`).
     pub prop: Option<String>,
+    /// Burkoló (`field`): van-e `id` propja (a mező azonosítóját kapja).
+    pub id: bool,
 }
 
 /// A projektben talált komponensek: `(név, import-út)`.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Parts {
     pub layout: Option<(String, String)>,
+    /// Címke + hiba + slot burkoló: ha van, ez váltja a külön címkét és hibát (`prop`: a hiba prop-ja).
+    pub field: Option<Comp>,
     pub label: Option<Comp>,
     pub input: Option<Comp>,
+    pub textarea: Option<Comp>,
+    pub checkbox: Option<Comp>,
     pub error: Option<Comp>,
     pub button: Option<Comp>,
     /// Fordít-e a projekt (`$t()`): a feliratok kulcsként íródnak, a kulcsokat a hívó jegyzetben sorolja fel.
@@ -255,12 +261,15 @@ impl Page<'_> {
             out.push(layout.clone());
         }
         if self.is_form() {
+            let any = |ty: FieldType| self.fields.iter().any(|f| f.ty == ty);
+            let non_bool = self.fields.iter().any(|f| f.ty != FieldType::Bool);
+            let wrapped = self.parts.field.is_some();
             let pairs = [
-                (&self.parts.error, true),
-                (
-                    &self.parts.label,
-                    self.fields.iter().any(|f| f.ty != FieldType::Bool),
-                ),
+                (&self.parts.field, non_bool),
+                (&self.parts.error, !wrapped || any(FieldType::Bool)),
+                (&self.parts.label, non_bool && !wrapped),
+                (&self.parts.textarea, any(FieldType::Text)),
+                (&self.parts.checkbox, any(FieldType::Bool)),
                 (&self.parts.button, true),
                 (
                     &self.parts.input,
@@ -483,41 +492,46 @@ impl Page<'_> {
             }
         };
         let block = el("div");
-        let block = match field.ty {
-            FieldType::Bool => block.kid(
-                el("label")
-                    .attr("class", "flex items-center gap-2 text-sm text-gray-700")
-                    .kid(
-                        el("input")
-                            .attr("id", name)
-                            .attr("type", "checkbox")
-                            .attr(
-                                "class",
-                                "rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500",
-                            )
-                            .attr("v-model", &model),
-                    )
-                    .kid(el("span").text(self.text_of(&format!("fields.{name}"), humanize(name)))),
-            ),
-            FieldType::Text => block.kid(self.label_el(field)).kid(mark(
-                el("textarea")
+        if field.ty == FieldType::Bool {
+            let check = match &self.parts.checkbox {
+                Some(comp) => el(&comp.name).attr("id", name),
+                None => el("input").attr("id", name).attr("type", "checkbox").attr(
+                    "class",
+                    "rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500",
+                ),
+            };
+            return block
+                .kid(
+                    el("label")
+                        .attr("class", "flex items-center gap-2 text-sm text-gray-700")
+                        .kid(check.attr("v-model", &model))
+                        .kid(
+                            el("span")
+                                .text(self.text_of(&format!("fields.{name}"), humanize(name))),
+                        ),
+                )
+                .kid(self.error_el(field));
+        }
+        let control = match field.ty {
+            FieldType::Text => {
+                let (tag, class) = match &self.parts.textarea {
+                    Some(comp) => (comp.name.as_str(), "mt-1 block w-full"),
+                    None => ("textarea", INPUT_CLASS),
+                };
+                el(tag)
                     .attr("id", name)
                     .attr("rows", "4")
-                    .attr("class", INPUT_CLASS)
-                    .attr("v-model", &model),
-            )),
+                    .attr("class", class)
+                    .attr("v-model", &model)
+            }
             FieldType::Int | FieldType::Float => {
                 let mut input = el("input").attr("id", name).attr("type", "number");
                 if field.ty == FieldType::Float {
                     input = input.attr("step", "any");
                 }
-                block.kid(self.label_el(field)).kid(mark(
-                    input
-                        .attr("class", INPUT_CLASS)
-                        .attr("v-model", &model),
-                ))
+                input.attr("class", INPUT_CLASS).attr("v-model", &model)
             }
-            FieldType::Str | FieldType::Email | FieldType::Date | FieldType::DateTime => {
+            _ => {
                 let kind = match field.ty {
                     FieldType::Email => "email",
                     FieldType::Date => "date",
@@ -528,16 +542,30 @@ impl Page<'_> {
                     Some(comp) => (comp.name.as_str(), "mt-1 block w-full"),
                     None => ("input", INPUT_CLASS),
                 };
-                block.kid(self.label_el(field)).kid(mark(
-                    el(tag)
-                        .attr("id", name)
-                        .attr("type", kind)
-                        .attr("class", class)
-                        .attr("v-model", &model),
-                ))
+                el(tag)
+                    .attr("id", name)
+                    .attr("type", kind)
+                    .attr("class", class)
+                    .attr("v-model", &model)
             }
         };
-        block.kid(self.error_el(field))
+        let control = mark(control);
+        // burkoló komponens: egy elem viszi a címkét és a hibát, a beviteli elem a slotjába kerül
+        if let Some(wrapper) = &self.parts.field {
+            let prop = wrapper.prop.as_deref().unwrap_or("error");
+            let key = format!("fields.{name}");
+            let mut outer = self.bind(el(&wrapper.name), "label", &key, humanize(name));
+            if wrapper.id {
+                outer = outer.attr("id", name);
+            }
+            return outer
+                .attr(&format!(":{prop}"), format!("form.errors.{name}"))
+                .kid(control);
+        }
+        block
+            .kid(self.label_el(field))
+            .kid(control)
+            .kid(self.error_el(field))
     }
 
     fn form_body(&self) -> Element {
