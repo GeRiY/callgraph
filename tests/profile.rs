@@ -248,11 +248,12 @@ fn layers_flag_tags_and_groups_without_changing_the_rest() {
     // behúzás / a sor eleji mappa-út nélkül hasonlítunk)
     let mut a: Vec<&str> = summary
         .lines()
-        .filter(|l| !l.ends_with('/') && !l.starts_with("root: "))
+        // a mappa-fejléc Windowson `\`-re végződik
+        .filter(|l| !l.ends_with(['/', '\\']) && !l.starts_with("root: "))
         .map(|l| {
             let l = l.trim_start();
             let name_end = l.find("  ").unwrap_or(l.len());
-            match l[..name_end].rfind('/') {
+            match l[..name_end].rfind(['/', '\\']) {
                 Some(slash) => &l[slash + 1..],
                 None => l,
             }
