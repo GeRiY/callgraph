@@ -102,11 +102,78 @@ pub(crate) fn route_name(call: &Call) -> Option<&str> {
 /// resource-ok generált neveivel); a `rename route` ezzel ellenőrzi, hogy a régi név létezik és az új szabad.
 pub(crate) fn route_names(files: &[(String, String)]) -> Vec<String> {
     let imports = crate::model::Imports::default();
-    files
+    let sources: Vec<(&str, &str, &crate::model::Imports)> = files
         .iter()
-        .flat_map(|(rel, text)| routes::parse_file(rel, text, &imports))
+        .map(|(rel, text)| (rel.as_str(), text.as_str(), &imports))
+        .collect();
+    resolve_routes(&sources, Vec::new())
+        .into_iter()
+        .flat_map(|parsed| parsed.routes)
         .filter_map(|route| route.name)
         .collect()
+}
+
+/// Egy route-fájl beolvasott route-jai.
+struct ParsedFile {
+    rel: String,
+    routes: Vec<Route>,
+    /// A legfelső szinten (üres környezettel) olvasva; `false`: egy csoport töltötte be, a csoport környezetével.
+    top: bool,
+}
+
+/// A route-fájlok (`(rel, szöveg, use-ok)`) route-jai: amit egy csoport tölt be (`->group(base_path('routes/x.php'))`,
+/// `require __DIR__.'/x.php'` egy csoportban; `entry`: a `bootstrap/app.php` / provider-ek ilyen csoportjai), az a
+/// csoport uri-előtagjával, név-előtagjával és controllerével, a többi a legfelső szinten.
+fn resolve_routes(
+    files: &[(&str, &str, &crate::model::Imports)],
+    entry: Vec<routes::Include>,
+) -> Vec<ParsedFile> {
+    let top = routes::Ctx::default();
+    let defaults: Vec<(Vec<Route>, Vec<routes::Include>)> = files
+        .iter()
+        .map(|(rel, text, imports)| routes::parse_file_in(rel, text, imports, &top))
+        .collect();
+    // a csoportból betöltött fájlok: ezeket csak a csoport környezetével olvassuk (a legfelső szint hamis neveket adna)
+    let targets: std::collections::BTreeSet<String> = entry
+        .iter()
+        .chain(defaults.iter().flat_map(|(_, includes)| includes))
+        .map(|include| include.file.clone())
+        .collect();
+    let mut out = Vec::new();
+    let mut queue: std::collections::VecDeque<routes::Include> = entry.into();
+    for ((rel, ..), (routes, includes)) in files.iter().zip(defaults) {
+        if targets.contains(*rel) {
+            continue;
+        }
+        out.push(ParsedFile {
+            rel: (*rel).to_owned(),
+            routes,
+            top: true,
+        });
+        queue.extend(includes);
+    }
+    let mut seen = std::collections::BTreeSet::new();
+    let mut budget = 256usize;
+    while let Some(include) = queue.pop_front() {
+        budget = budget.saturating_sub(1);
+        if budget == 0 {
+            break;
+        }
+        if !seen.insert((include.file.clone(), include.ctx.clone())) {
+            continue;
+        }
+        let Some((rel, text, imports)) = files.iter().find(|(rel, ..)| *rel == include.file) else {
+            continue;
+        };
+        let (routes, more) = routes::parse_file_in(rel, text, imports, &include.ctx);
+        out.push(ParsedFile {
+            rel: (*rel).to_owned(),
+            routes,
+            top: false,
+        });
+        queue.extend(more);
+    }
+    out
 }
 
 /// PHP-oldali route-hivatkozás hívott neve: `route(..)`, `to_route(..)`, `redirect()->route(..)`,
@@ -188,15 +255,24 @@ impl Laravel {
         route_files.sort_by(|a, b| a.0.cmp(&b.0));
         let loaded = self.loaded_route_files(&route_files, files);
         let prefix = self.api_prefix(files);
+        let mut sources: Vec<(&str, &str, &crate::model::Imports)> = Vec::new();
         for (rel, text, graph) in &route_files {
             if loaded.as_ref().is_some_and(|loaded| !loaded.contains(rel)) {
                 self.unloaded.push(rel.clone());
                 continue;
             }
-            let mut parsed = routes::parse_file(rel, text, &graph.imports);
-            // a `routes/api.php` route-jai elé a Laravel `/api`-t tesz (vagy a `bootstrap/app.php` `apiPrefix:`-át)
-            if rel == "routes/api.php" {
-                for route in &mut parsed {
+            sources.push((rel.as_str(), text.as_str(), &graph.imports));
+            self.dynamic_names.extend(
+                dynamic_name_lines(text)
+                    .into_iter()
+                    .map(|line| (rel.clone(), line)),
+            );
+        }
+        for mut parsed in resolve_routes(&sources, self.entry_includes(files)) {
+            // a `routes/api.php` route-jai elé a Laravel `/api`-t tesz (vagy a `bootstrap/app.php` `apiPrefix:`-át);
+            // ha egy csoport tölti be (régi `RouteServiceProvider`), az előtagot a csoport adja
+            if parsed.top && parsed.rel == "routes/api.php" {
+                for route in &mut parsed.routes {
                     route.uri = if route.uri == "/" {
                         format!("/{prefix}")
                     } else {
@@ -204,12 +280,7 @@ impl Laravel {
                     };
                 }
             }
-            self.routes.extend(parsed);
-            self.dynamic_names.extend(
-                dynamic_name_lines(text)
-                    .into_iter()
-                    .map(|line| (rel.clone(), line)),
-            );
+            self.routes.extend(parsed.routes);
         }
         self.rebuild_names();
     }
@@ -462,7 +533,7 @@ impl Laravel {
         // 1: a beemelő fájl mappájához relatív (`require __DIR__.'/auth.php'`); 2: `base_path('routes/x.php')`
         static REQUIRE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
             regex::Regex::new(
-                r#"(?:require|include)(?:_once)?\s*\(?\s*__DIR__\s*\.\s*['"]/([\w/.-]+\.php)|base_path\(\s*['"]routes/([\w/.-]+\.php)"#,
+                r#"(?:(?:require|include)(?:_once)?\s*\(?|group\(\s*)\s*__DIR__\s*\.\s*['"]/([\w/.-]+\.php)|base_path\(\s*['"]routes/([\w/.-]+\.php)"#,
             )
             .expect("valid regex")
         });
@@ -510,6 +581,20 @@ impl Laravel {
             }
         }
         Some(loaded)
+    }
+
+    /// A belépési pontok (`bootstrap/app.php`, `app/Providers/*`) csoportjai, amelyek egy route-fájlt töltenek be
+    /// (`Route::prefix('admin')->name('admin.')->group(base_path('routes/admin.php'))`, a `then:` closure-ben is).
+    fn entry_includes(&self, files: &dyn ProjectFiles) -> Vec<routes::Include> {
+        let imports = crate::model::Imports::default();
+        let mut paths = vec![self.root.join("bootstrap/app.php")];
+        paths.extend(files.files_under(&self.root.join("app/Providers")));
+        let top = routes::Ctx::default();
+        paths
+            .iter()
+            .filter_map(|path| Some((self.relative_path(path)?, files.read(path)?)))
+            .flat_map(|(rel, text)| routes::parse_file_in(&rel, &text, &imports, &top).1)
+            .collect()
     }
 
     /// Az API-route-ok előtagja: a `bootstrap/app.php` `apiPrefix: 'x'`-e, különben a Laravel alapértéke, `api`.

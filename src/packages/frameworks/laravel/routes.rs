@@ -77,11 +77,28 @@ pub(crate) fn short_class(class: &str) -> &str {
 }
 
 /// A csoportokból örökölt környezet.
-#[derive(Debug, Clone, Default)]
-struct Ctx {
+#[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord)]
+pub(super) struct Ctx {
     prefix: String,
     name: String,
     controller: Option<String>,
+}
+
+impl Ctx {
+    /// Üres-e (nincs örökölt előtag, név-előtag, controller).
+    pub(super) fn is_empty(&self) -> bool {
+        self.prefix.is_empty() && self.name.is_empty() && self.controller.is_none()
+    }
+}
+
+/// Egy másik route-fájl, amelyet egy csoport tölt be (`->group(base_path('routes/x.php'))`,
+/// `->group(__DIR__.'/x.php')`, vagy `require __DIR__.'/x.php'` egy csoport törzsében): a route-jait a csoport
+/// környezetével (uri-előtag, név-előtag, controller) kell beolvasni.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct Include {
+    /// A fájl a gyökérhez relatívan (`routes/admin.php`).
+    pub file: String,
+    pub ctx: Ctx,
 }
 
 /// Egy lánc szegmense: a (kisbetűs) metódusnév és az argumentumok bájt-tartományai a megtisztított szövegben.
@@ -98,7 +115,19 @@ struct Chain {
 
 /// Egy route-fájl route-jai. `rel`: a fájl a gyökérhez relatívan; `imports`: a fájl `use`-ai (a controller-osztályok
 /// teljes nevéhez).
+/// Egy route-fájl route-jai a legfelső szinten (a csoportokból betöltött fájlok nélkül).
 pub(super) fn parse_file(rel: &str, text: &str, imports: &Imports) -> Vec<Route> {
+    parse_file_in(rel, text, imports, &Ctx::default()).0
+}
+
+/// Egy route-fájl route-jai a `ctx` környezetben (a fájlt egy csoport töltötte be; a legfelső szint: üres), és a
+/// csoportokból betöltött további fájlok (a csoportjuk környezetével).
+pub(super) fn parse_file_in(
+    rel: &str,
+    text: &str,
+    imports: &Imports,
+    ctx: &Ctx,
+) -> (Vec<Route>, Vec<Include>) {
     let clean = strip_comments(text);
     let mut starts = vec![0usize];
     starts.extend(clean.match_indices('\n').map(|(i, _)| i + 1));
@@ -108,9 +137,10 @@ pub(super) fn parse_file(rel: &str, text: &str, imports: &Imports) -> Vec<Route>
         imports,
         rel,
         out: Vec::new(),
+        includes: Vec::new(),
     };
-    parser.block(0, clean.len(), &Ctx::default(), 0);
-    parser.out
+    parser.block(0, clean.len(), ctx, 0);
+    (parser.out, parser.includes)
 }
 
 struct Parser<'a> {
@@ -119,6 +149,7 @@ struct Parser<'a> {
     imports: &'a Imports,
     rel: &'a str,
     out: Vec<Route>,
+    includes: Vec<Include>,
 }
 
 impl Parser<'_> {
@@ -147,13 +178,39 @@ impl Parser<'_> {
             return;
         }
         let mut at = from;
+        // a láncok közötti szöveg (a láncok belsejét a csoportjuk saját `block`-ja nézi): `require` egy csoportban
+        let mut gap = from;
         while let Some(found) = next_route(self.text, at, to) {
             if let Some(chain) = self.chain(found, to) {
+                self.requires(gap, found, ctx);
                 at = chain.end;
+                gap = at;
                 self.apply(&chain, ctx, depth);
             } else {
                 at = found + "Route::".len();
             }
+        }
+        self.requires(gap, to, ctx);
+    }
+
+    /// A `from..to` szöveg `require __DIR__.'/x.php'` / `require base_path('routes/x.php')` sorai, ha egy csoport
+    /// törzsében vannak (a legfelső szintű `require`-t a betöltött fájlok listája kezeli).
+    fn requires(&mut self, from: usize, to: usize, ctx: &Ctx) {
+        if ctx.is_empty() || from >= to {
+            return;
+        }
+        let Some(text) = self.text.get(from..to) else {
+            return;
+        };
+        let found: Vec<String> = require_re()
+            .captures_iter(text)
+            .filter_map(|caps| file_ref(self.rel, &caps[1]))
+            .collect();
+        for file in found {
+            self.includes.push(Include {
+                file,
+                ctx: ctx.clone(),
+            });
         }
     }
 
@@ -265,6 +322,13 @@ impl Parser<'_> {
         if term.args.len() >= 2 {
             let attributes = self.slice(term.args[0]).to_owned();
             self.attributes(&attributes, &mut ctx);
+        }
+        // `->group(base_path('routes/admin.php'))` / `->group(__DIR__.'/admin.php')`: a fájl a csoport környezetével
+        if let Some(file) = file_ref(self.rel, self.slice((from, to))) {
+            if !ctx.is_empty() {
+                self.includes.push(Include { file, ctx });
+            }
+            return;
         }
         self.block(from, to, &ctx, depth + 1);
     }
@@ -551,6 +615,47 @@ fn page_re() -> &'static Regex {
 fn word_re() -> &'static Regex {
     static RE: LazyLock<Regex> =
         LazyLock::new(|| Regex::new(r#"['"](\w+)['"]"#).expect("érvényes regex"));
+    &RE
+}
+
+/// Egy fájl-hivatkozás: `base_path('routes/x.php')` (a gyökérhez relatív) vagy `__DIR__.'/x.php'` (a hivatkozó
+/// `rel` fájl mappájához relatív), normalizálva (`..` / `.` nélkül); más: `None`.
+pub(super) fn file_ref(rel: &str, text: &str) -> Option<String> {
+    static RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r#"^(?:base_path\(\s*['"]/?([\w/.-]+\.php)['"]\s*\)|__DIR__\s*\.\s*['"]/?([\w/.-]+\.php)['"])$"#,
+        )
+        .expect("érvényes regex")
+    });
+    let caps = RE.captures(text.trim())?;
+    let joined = match (caps.get(1), caps.get(2)) {
+        (Some(rooted), _) => rooted.as_str().to_owned(),
+        (None, Some(relative)) => {
+            let dir = rel.rsplit_once('/').map_or("", |(dir, _)| dir);
+            format!("{dir}/{}", relative.as_str())
+        }
+        (None, None) => return None,
+    };
+    let mut parts: Vec<&str> = Vec::new();
+    for part in joined.split('/') {
+        match part {
+            "" | "." => {}
+            ".." => {
+                parts.pop()?;
+            }
+            other => parts.push(other),
+        }
+    }
+    Some(parts.join("/"))
+}
+
+fn require_re() -> &'static Regex {
+    static RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r#"\b(?:require|include)(?:_once)?\s*\(?\s*(base_path\(\s*['"][\w/.-]+\.php['"]\s*\)|__DIR__\s*\.\s*['"][\w/.-]+\.php['"])"#,
+        )
+        .expect("érvényes regex")
+    });
     &RE
 }
 
