@@ -166,11 +166,9 @@ impl CallerIndex {
         // használat éle a feloldott fájlútra kulcsol, a hívó kulcsa viszont `Komponens::template`;
         // az út minden utótagját megpróbáljuk (abszolút és projekt-relatív alak is illeszkedjen)
         if edge.row.file.ends_with(".vue") {
-            let mut rest = edge
-                .row
-                .file
-                .trim_start_matches("./")
-                .trim_start_matches('/');
+            // Windowson a fájlút `\`-es, a komponens-használat kulcsa `/`-es: egységesítjük
+            let file = edge.row.file.replace('\\', "/");
+            let mut rest = file.trim_start_matches("./").trim_start_matches('/');
             loop {
                 if let Some(list) = self.reverse.get(rest) {
                     out.extend(list.iter().cloned());
