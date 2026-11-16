@@ -57,11 +57,32 @@ pub(crate) struct Form {
 impl Form {
     /// `Teljes\Névtér\FooController@store` (a json-hoz).
     pub(crate) fn action(&self) -> String {
+        if self.is_dynamic() {
+            return String::new();
+        }
         format!("{}@{}", self.class, self.method)
     }
 
     fn mismatched(&self) -> bool {
         !self.unvalidated.is_empty() || !self.missing_required.is_empty()
+    }
+
+    /// Számított cél (`form.post(path.value)`): nincs route, így nincs összevetés sem.
+    fn is_dynamic(&self) -> bool {
+        self.class.is_empty()
+    }
+
+    /// A dinamikus űrlap sora: `POST ? route unknown (dynamic URL) · 4 fields`.
+    fn dynamic_parts(&self, lang: Lang) -> Vec<String> {
+        vec![
+            self.verb.clone(),
+            lang.pick(
+                "? route unknown (dynamic URL)",
+                "? route ismeretlen (dinamikus URL)",
+            )
+            .to_owned(),
+            format!("{} {}", self.fields.len(), lang.pick("fields", "mező")),
+        ]
     }
 
     /// A kimenet tagjai a cél után: a figyelmeztetések (`prefix` + szöveg), nincs szabálynál a jelzés, tisztánál
@@ -100,6 +121,9 @@ impl Form {
 
     /// Az outline sora a küldő függvény alatt: `form: POST /register · RegisteredUserController@store · 4 fields ✓`.
     fn line_text(&self, lang: Lang) -> String {
+        if self.is_dynamic() {
+            return format!("form: {}", self.dynamic_parts(lang).join(" · "));
+        }
         let mut parts = vec![format!("{} {}", self.verb, self.uri), self.short_action()];
         parts.extend(self.findings(lang, "⚠ "));
         format!("form: {}", parts.join(" · "))
@@ -108,6 +132,23 @@ impl Form {
     fn short_action(&self) -> String {
         format!("{}@{}", short_class(&self.class), self.method)
     }
+}
+
+/// A küldés célja számított-e (nem `route('név')` és nem `'/uri'` literál): ilyenkor a route nem ismert.
+fn is_dynamic_target(arg: &str) -> bool {
+    let arg = arg.trim();
+    if arg.is_empty() {
+        return false;
+    }
+    if let Some(inner) = arg
+        .strip_prefix("route(")
+        .and_then(|rest| rest.strip_suffix(')'))
+    {
+        return split_top(inner, ",")
+            .first()
+            .is_none_or(|name| literal(name).is_none());
+    }
+    literal(arg).is_none()
 }
 
 /// Legfeljebb `MAX_NAMES` név, a többi `, +N`.
@@ -523,6 +564,25 @@ impl Laravel {
         let mut forms = Vec::new();
         for site in sites {
             let Some(route) = self.form_route(&site.arg, site.verb) else {
+                // számított cél (`form.post(path.value)`): az űrlap megmarad, route nélkül
+                if is_dynamic_target(&site.arg) {
+                    forms.push(Form {
+                        file: site.file,
+                        line: site.line,
+                        target: site.target,
+                        caller: site.caller,
+                        container: site.container,
+                        verb: site.verb.to_owned(),
+                        uri: String::new(),
+                        class: String::new(),
+                        method: String::new(),
+                        fields: site.fields,
+                        rules: Vec::new(),
+                        validated: false,
+                        unvalidated: Vec::new(),
+                        missing_required: Vec::new(),
+                    });
+                }
                 continue;
             };
             let Action::Controller { class, method } = &route.action else {
@@ -738,13 +798,24 @@ impl Laravel {
             .iter()
             .filter(|form| form.mismatched() || !form.validated)
             .map(|form| {
+                if form.is_dynamic() {
+                    return format!(
+                        "? {} L{} → {}",
+                        form.file,
+                        form.line,
+                        form.dynamic_parts(lang).join(" · ")
+                    );
+                }
                 let mut parts = vec![format!("{} {}", form.verb, form.uri), form.short_action()];
                 parts.extend(form.findings(lang, ""));
                 format!("⚠ {} L{} → {}", form.file, form.line, parts.join(" · "))
             })
             .collect();
         let issues = forms.iter().filter(|form| form.mismatched()).count();
-        let bare = forms.iter().filter(|form| !form.validated).count();
+        let bare = forms
+            .iter()
+            .filter(|form| !form.validated && !form.is_dynamic())
+            .count();
         lines.push(match lang {
             Lang::En => format!(
                 "forms: {} checked, {issues} with issues, {bare} without validation",

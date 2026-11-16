@@ -143,7 +143,10 @@ const FILES: &[(&str, &str)] = &[
 fn page_outline_has_the_view_sections_and_resolved_uses() {
     let project = Project::new();
     for graph in [true, false] {
-        let out = project.run(&["show", "resources/views/admin/users/index.blade.php"], graph);
+        let out = project.run(
+            &["show", "resources/views/admin/users/index.blade.php"],
+            graph,
+        );
         for want in [
             "view admin.users.index extends layouts.app",
             "section:content  L5-15",
@@ -162,12 +165,18 @@ fn page_outline_has_the_view_sections_and_resolved_uses() {
 fn route_calls_link_to_the_route_table_and_unknown_names_are_flagged() {
     let project = Project::new();
     for graph in [true, false] {
-        let out = project.run(&["show", "resources/views/admin/users/index.blade.php"], graph);
+        let out = project.run(
+            &["show", "resources/views/admin/users/index.blade.php"],
+            graph,
+        );
         assert!(
             out.contains("route::users.store → POST /users · UserController@store"),
             "{graph}: {out}"
         );
-        assert!(out.contains("route::users.nope ⚠ no route"), "{graph}: {out}");
+        assert!(
+            out.contains("route::users.nope ⚠ no route"),
+            "{graph}: {out}"
+        );
     }
     let ziggy = project.run(&["show", ".", "--format", "ziggy"], true);
     assert!(
@@ -175,14 +184,20 @@ fn route_calls_link_to_the_route_table_and_unknown_names_are_flagged() {
             && ziggy.contains("resources/views/admin/users/index.blade.php L10"),
         "{ziggy}"
     );
-    assert!(!ziggy.contains("unknown route name 'users.store'"), "{ziggy}");
+    assert!(
+        !ziggy.contains("unknown route name 'users.store'"),
+        "{ziggy}"
+    );
 }
 
 #[test]
 fn rendered_by_and_used_by_lines() {
     let project = Project::new();
     for graph in [true, false] {
-        let page = project.run(&["show", "resources/views/admin/users/index.blade.php"], graph);
+        let page = project.run(
+            &["show", "resources/views/admin/users/index.blade.php"],
+            graph,
+        );
         assert!(
             page.contains("rendered by: UserController::index L8"),
             "{graph}: {page}"
@@ -192,8 +207,14 @@ fn rendered_by_and_used_by_lines() {
             layout.contains("used by: admin.users.index L1 @extends"),
             "{graph}: {layout}"
         );
-        let alert = project.run(&["show", "resources/views/components/alert.blade.php"], graph);
-        assert!(alert.contains("used by: admin.users.index L7 <x-…>"), "{graph}: {alert}");
+        let alert = project.run(
+            &["show", "resources/views/components/alert.blade.php"],
+            graph,
+        );
+        assert!(
+            alert.contains("used by: admin.users.index L7 <x-…>"),
+            "{graph}: {alert}"
+        );
         assert!(alert.contains("$type = 'info'"), "{graph}: {alert}");
     }
 }
@@ -208,7 +229,10 @@ fn grep_finds_the_views_extending_a_layout() {
 #[test]
 fn translation_keys_of_the_templates_are_checked_against_the_lang_files() {
     let project = Project::new();
-    let out = project.run(&["show", "resources/views/admin/users/index.blade.php"], true);
+    let out = project.run(
+        &["show", "resources/views/admin/users/index.blade.php"],
+        true,
+    );
     assert!(out.contains("i18n::auth.failed"), "{out}");
     assert!(out.contains("i18n::auth.missing"), "{out}");
 }

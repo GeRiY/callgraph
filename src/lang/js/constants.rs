@@ -14,7 +14,7 @@ use crate::model::Constant;
 static CALL_SIGNATURE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r#"\(\s*\w+\s*:\s*['"]([\w:.-]+)['"]"#).unwrap());
 static NAMED_TUPLE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r#"(?m)^\s*['"]?([\w:.-]+)['"]?\s*:\s*\["#).unwrap());
+    LazyLock::new(|| Regex::new(r#"(?m)(?:^|[{;,])\s*['"]?([\w:.-]+)['"]?\s*:\s*\["#).unwrap());
 static UPPER_SNAKE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[A-Z][A-Z0-9_]+$").unwrap());
 
 /// A `const` / `enum` / `defineEmits` / Options `emits:` gyűjtője.
@@ -242,4 +242,17 @@ fn push(
         caller: None,
         doc: None,
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::type_emit_names;
+
+    #[test]
+    fn typed_emits_single_line_tuple_form() {
+        let n = type_emit_names("<{ login: []; save: [id: number] }>");
+        assert_eq!(n.into_iter().collect::<Vec<_>>(), ["login", "save"]);
+        let n = type_emit_names("<{ 'a:b': [], c: [x: string], }>");
+        assert_eq!(n.into_iter().collect::<Vec<_>>(), ["a:b", "c"]);
+    }
 }

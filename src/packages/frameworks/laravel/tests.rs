@@ -311,6 +311,32 @@ Route::group(['prefix' => 'api/v1', 'as' => 'api.', 'controller' => \App\Http\Co
 }
 
 #[test]
+fn closure_groups_with_computed_prefix_and_name_keep_a_dynamic_pattern() {
+    let text = r#"<?php
+foreach (config('app.locales') as $code) {
+    Route::prefix($code)->name($code . '.')->group(function () {
+        Route::put('/', 'update')->name('update');
+    });
+}
+Route::group(['prefix' => config('x.admin'), 'as' => 'admin.' . $suffix], function () {
+    Route::get('users', 'index')->name('users');
+});
+Route::prefix('admin')->name('admin.')->group(function () {
+    Route::get('home', 'index')->name('home');
+});
+"#;
+    let laravel = table(text, &[]);
+    let got = rows(&laravel);
+    assert_eq!(got[0].0, "{$?}.update", "{got:?}");
+    assert_eq!(got[0].2, "/{$?}", "{got:?}");
+    assert_eq!(got[1].0, "admin.{$?}users", "{got:?}");
+    assert_eq!(got[1].2, "/{$?}/users", "{got:?}");
+    assert_eq!(got[2].0, "admin.home", "{got:?}");
+    assert_eq!(got[2].2, "/admin/home", "{got:?}");
+    assert!(super::matches_dynamic(&got[0].0, "en.update"));
+}
+
+#[test]
 fn resources_expand_and_honor_only_except_and_prefixes() {
     let text = r#"<?php
 Route::resource('photos', PhotoController::class)->only(['index', 'show']);

@@ -22,18 +22,59 @@ fn pattern() -> &'static Regex {
     })
 }
 
-fn word_or_dot(b: u8) -> bool {
-    b.is_ascii_alphanumeric() || matches!(b, b'_' | b'$' | b'.')
+/// A string-literálok és a sablon-literálok statikus részeinek bájt-tartományai (a `${…}` kód kívül marad).
+fn literal_ranges(exp: &str) -> Vec<(usize, usize)> {
+    let chars: Vec<(usize, char)> = exp.char_indices().collect();
+    let pos = |i: usize| chars.get(i).map_or(exp.len(), |c| c.0);
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < chars.len() {
+        let c = chars[i].1;
+        if c == '\'' || c == '"' {
+            let (_, next) = quoted(&chars, i + 1, c);
+            out.push((pos(i), pos(next)));
+            i = next;
+        } else if c == '`' {
+            let mut seg = pos(i);
+            let mut j = i + 1;
+            while j < chars.len() {
+                match chars[j].1 {
+                    '\\' => j += 2,
+                    '`' => {
+                        j += 1;
+                        break;
+                    }
+                    '$' if chars.get(j + 1).is_some_and(|n| n.1 == '{') => {
+                        out.push((seg, pos(j)));
+                        j = skip_braces(&chars, j + 1);
+                        seg = pos(j);
+                    }
+                    _ => j += 1,
+                }
+            }
+            out.push((seg, pos(j)));
+            i = j;
+        } else {
+            i += 1;
+        }
+    }
+    out
 }
 
 /// `(?<![\w$.])ident(.ident)*\s*\(\s*(['"`]…['"`])?` összes találata.
 pub fn expr_calls(exp: &str) -> Vec<ExprCall> {
     let mut out = Vec::new();
     let mut from = 0;
+    let literals = literal_ranges(exp);
     while let Some(m) = pattern().captures_at(exp, from) {
         let whole = m.get(0).expect("teljes találat");
         let start = whole.start();
-        if start > 0 && word_or_dot(exp.as_bytes()[start - 1]) {
+        let prev_word = exp[..start]
+            .chars()
+            .next_back()
+            .is_some_and(|c| c.is_alphanumeric() || matches!(c, '_' | '$' | '.'));
+        let in_literal = literals.iter().any(|&(a, b)| start >= a && start < b);
+        if start > 0 && (prev_word || in_literal) {
             from = start + exp[start..].chars().next().map_or(1, char::len_utf8);
             continue;
         }
@@ -183,6 +224,16 @@ mod tests {
         assert_eq!(names, ["foo.bar", "a.b", "x.y.z"]);
         assert_eq!(c[0].literal.as_deref(), Some("x"));
         assert_eq!(c[0].quoted.as_deref(), Some("'x'"));
+    }
+
+    #[test]
+    fn template_literal_text_is_not_a_call() {
+        let c = expr_calls("`Nincs ${q} – próbáld a nevével (pl. XJ).`");
+        assert!(c.is_empty());
+        let c = expr_calls("`a ${fmt(q)} b (x)` + \"vel(1)\" + go('z')");
+        let names: Vec<_> = c.iter().map(|c| c.name.as_str()).collect();
+        assert_eq!(names, ["fmt", "go"]);
+        assert!(expr_calls("nevével(1)").is_empty());
     }
 
     #[test]

@@ -300,10 +300,10 @@ impl CallerIndex {
         let mut result = Vec::new();
         // a saját példányon át hívott (`$this->m()`) él célja a hívó típusán is: `Ns\Osztály::m` (a `lookup`),
         // így a `Típus::metódus` minta — és a leszármazottakon át a `via` — az örökölt hívást is megtalálja
-        let direct = |edge: &Edge| {
-            matcher.is_match(&edge.row.target)
-                || own_target(edge).is_some_and(|o| matcher.is_match(o))
-        };
+        // a kicsomagolt használat (`usePageChrome().site.x`) nem a composable hívása: lásd `target_matches`
+        let is_match = |target: &str| super::uncertain::target_matches(&matcher, target);
+        let direct =
+            |edge: &Edge| is_match(&edge.row.target) || own_target(edge).is_some_and(is_match);
         // a `?::név` (feloldatlan fogadójú) cél a `Típus::név` mintára név szerint, bizonytalanként illeszkedik
         let mut front: Vec<Edge> = self
             .edges

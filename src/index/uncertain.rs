@@ -35,9 +35,28 @@ pub(crate) fn uncertain_match(regex: &Regex, target: &str) -> bool {
         || pattern_name(regex.as_str()).is_some_and(|wanted| wanted.eq_ignore_ascii_case(name))
 }
 
+/// Illeszkedik-e a minta a hívás-célra. A kicsomagolt használat (`const { site } = usePageChrome(); site.x()` → cél
+/// `usePageChrome().site.x`) a hívás eredményének tagját hívja, nem a `usePageChrome`-ot: ilyen célnál a minta csak
+/// a `().` utáni részre illik (maga a `usePageChrome()` hívás külön él).
+pub(crate) fn target_matches(regex: &Regex, target: &str) -> bool {
+    match target.split_once("().") {
+        Some((_, rest)) => regex.is_match(rest),
+        None => regex.is_match(target),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn destructured_use_does_not_match_the_composable() {
+        let re = regex("usePageChrome");
+        assert!(target_matches(&re, "chrome.ts::usePageChrome"));
+        assert!(!target_matches(&re, "chrome.ts::usePageChrome().site.x"));
+        assert!(target_matches(&regex("push"), "useRouter().push"));
+        assert!(!target_matches(&re, "other"));
+    }
 
     fn regex(pattern: &str) -> Regex {
         regex::RegexBuilder::new(pattern)

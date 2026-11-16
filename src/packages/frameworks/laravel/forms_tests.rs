@@ -413,8 +413,13 @@ class PasswordController {
             ],
         )],
     );
-    // a template-literal cél kimarad: két űrlap-küldés marad
-    assert_eq!(laravel.forms.len(), 2);
+    // a template-literal cél dinamikus: az űrlap megmarad, route nélkül (harmadikként)
+    assert_eq!(laravel.forms.len(), 3);
+    assert!(
+        laravel.forms[2].class.is_empty(),
+        "{:?}",
+        laravel.forms[2].uri
+    );
     let (users, password) = (&laravel.forms[0], &laravel.forms[1]);
     assert_eq!(
         (users.uri.as_str(), users.method.as_str()),
@@ -718,4 +723,32 @@ fn the_preset_contract_follows_the_transform() {
     assert_eq!(contract.fields, strings(&["name", "slug"]));
     assert!(contract.unvalidated.is_empty(), "{contract:?}");
     assert!(contract.missing.is_empty(), "{contract:?}");
+}
+
+#[test]
+fn a_computed_url_keeps_the_form_with_an_unknown_route() {
+    let text = "const form = useForm({ a: '' });\nconst s = () => form.post(path.value);\n";
+    let routes = "<?php\nRoute::post('/x', [FooController::class, 'store']);\n";
+    let vues = [(
+        "resources/js/Pages/A.vue",
+        text,
+        vec![
+            use_form(text, "const form"),
+            submit(text, "form.post(path.value)", "form.post"),
+        ],
+    )];
+    let laravel = project(routes, &[], &vues);
+    assert_eq!(
+        laravel.form_lines("resources/js/Pages/A.vue", Some("Page"), "submit", Lang::En),
+        vec!["form: POST · ? route unknown (dynamic URL) · 1 fields".to_owned()]
+    );
+    let view = laravel.form_view_lines(&["resources/js/Pages/A.vue".to_owned()], Lang::En);
+    assert!(
+        view[0].starts_with("? resources/js/Pages/A.vue L2"),
+        "{view:?}"
+    );
+    assert_eq!(
+        view[1],
+        "forms: 1 checked, 0 with issues, 0 without validation"
+    );
 }

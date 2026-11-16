@@ -37,7 +37,7 @@ impl CallFilter for RegexSpec {
         }
         let target = call.resolved.as_deref().unwrap_or(&call.target);
         // `?::név` (feloldatlan fogadó): a `Típus::név` minta név szerint illeszkedik rá
-        if self.0.is_match(target)
+        if crate::index::target_matches(&self.0, target)
             || crate::index::uncertain_match(&self.0, target)
             || self.1.as_ref().is_some_and(|via| via.via(target).is_some())
         {
@@ -179,6 +179,28 @@ mod tests {
             binary: false,
             parse_errors: Vec::new(),
         }
+    }
+
+    #[test]
+    fn destructured_use_of_a_composable_is_not_a_call_of_it() {
+        let chain = FilterChain::new(Some("usePageChrome"), None, None).unwrap();
+        let first = graph(vec![
+            call("composable_use", "func_call", "chrome.ts::usePageChrome"),
+            call(
+                "composable_use",
+                "method_call",
+                "chrome.ts::usePageChrome().site.x",
+            ),
+        ]);
+        let kept = chain.apply(&first).expect("the composable call matches");
+        assert_eq!(kept.calls.len(), 1);
+        assert_eq!(kept.calls[0].target, "chrome.ts::usePageChrome");
+        // egy másik fájl `site.x()` hívása (nincs köze a composable-höz) nem találat
+        let second = graph(vec![call("internal_helper", "method_call", "site.x")]);
+        assert!(chain.apply(&second).is_none());
+        // a kicsomagolt tag önmagában (a `usePageChrome().site.x` hívás a `site.x` mintára) viszont találat
+        let by_member = FilterChain::new(Some("site\\.x"), None, None).unwrap();
+        assert_eq!(by_member.apply(&first).map(|g| g.calls.len()), Some(1));
     }
 
     #[test]

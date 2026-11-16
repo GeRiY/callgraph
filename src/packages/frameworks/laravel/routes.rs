@@ -278,32 +278,25 @@ impl Parser<'_> {
             .filter(|(i, _)| *i != at)
             .map(|(_, segment)| segment)
             .collect();
-        let first_literal = |segment: &Segment| {
-            segment
-                .args
-                .first()
-                .and_then(|&range| unquote(self.slice(range)))
-        };
         let names: String = mods
             .iter()
             .filter(|s| matches!(s.name.as_str(), "name" | "as"))
             .filter_map(|s| {
-                // az interpolált név (`"{$code}.x"`) is név: a ziggy nézet dinamikus mintaként kezeli
-                s.args.first().and_then(|&range| {
-                    let raw = self.slice(range).trim();
-                    unquote(raw).or_else(|| {
-                        raw.strip_prefix('"')
-                            .and_then(|r| r.strip_suffix('"'))
-                            .filter(|inner| inner.contains('$') && !inner.contains('"'))
-                            .map(str::to_owned)
-                    })
-                })
+                // az interpolált / összefűzött név (`"{$code}.x"`, `$code . '.x'`) is név: a ziggy nézet
+                // dinamikus mintaként kezeli
+                s.args
+                    .first()
+                    .and_then(|&range| dynamic_text(self.slice(range), true))
             })
             .collect();
         let prefixes: Vec<String> = mods
             .iter()
             .filter(|s| s.name == "prefix")
-            .filter_map(|s| first_literal(s))
+            .filter_map(|s| {
+                s.args
+                    .first()
+                    .and_then(|&range| dynamic_text(self.slice(range), false))
+            })
             .collect();
         let controller = mods
             .iter()
@@ -360,12 +353,12 @@ impl Parser<'_> {
             let value = value.trim();
             match key.as_str() {
                 "prefix" => {
-                    if let Some(prefix) = unquote(value) {
+                    if let Some(prefix) = dynamic_text(value, false) {
                         ctx.prefix = join_uri([ctx.prefix.as_str(), prefix.as_str()]);
                     }
                 }
                 "as" => {
-                    if let Some(name) = unquote(value) {
+                    if let Some(name) = dynamic_text(value, true) {
                         ctx.name.push_str(&name);
                     }
                 }
@@ -692,6 +685,47 @@ fn unquote(arg: &str) -> Option<String> {
     let inner = t.strip_prefix(quote)?.strip_suffix(quote)?;
     let plain = !inner.contains(quote) && !(quote == '"' && inner.contains('$'));
     plain.then(|| inner.replace("\\\\", "\\"))
+}
+
+/// Egy név / előtag argumentum szövege dinamikus mintával: a literál értéke; `"{$code}.x"` / `"$code.x"` változatlanul;
+/// az összefűzés (`$code . '.x'`, `'x.' . config('a')`) literál darabokkal és `{$?}`-ként a nem literál darabokkal.
+/// `need_literal`: legalább egy literál darab kell (a puszta `$name` nem minta); különben a puszta dinamikus érték
+/// is `{$?}`.
+fn dynamic_text(raw: &str, need_literal: bool) -> Option<String> {
+    let raw = raw.trim();
+    if let Some(text) = unquote(raw) {
+        return Some(text);
+    }
+    if let Some(inner) = raw
+        .strip_prefix('"')
+        .and_then(|r| r.strip_suffix('"'))
+        .filter(|inner| inner.contains('$') && !inner.contains('"'))
+    {
+        return Some(inner.to_owned());
+    }
+    let parts = split_top(raw, ".");
+    let mut text = String::new();
+    let mut literal = false;
+    for part in &parts {
+        let part = part.trim();
+        if part.is_empty() {
+            return None;
+        }
+        if let Some(value) = unquote(part) {
+            text.push_str(&value);
+            literal = true;
+        } else if let Some(inner) = part
+            .strip_prefix('"')
+            .and_then(|r| r.strip_suffix('"'))
+            .filter(|inner| !inner.contains('"'))
+        {
+            text.push_str(inner);
+            literal = true;
+        } else {
+            text.push_str("{$?}");
+        }
+    }
+    (literal || !need_literal).then_some(text)
 }
 
 /// Az uri-darabok `/`-rel összefűzve, üres darabok nélkül; mindig `/`-rel kezdődik.

@@ -709,7 +709,7 @@ pub(super) fn matches_dynamic(pattern: &str, name: &str) -> bool {
 fn dynamic_name_lines(text: &str) -> Vec<u32> {
     // `->name($n)`, `->name("{$code}.x")`, `->name('x.' . $n)`
     static DYNAMIC: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
-        regex::Regex::new(r#"->\s*name\(\s*(?:\$|"[^")]*\$|'[^')]*'\s*\.\s*\$)"#)
+        regex::Regex::new(r#"->\s*name\(\s*(?:\$|[A-Za-z_\\][\w\\:]*\s*\(|"[^")]*\$|'[^')]*'\s*\.\s*(?:\$|[A-Za-z_\\][\w\\:]*\s*\())"#)
             .expect("valid regex")
     });
     routes::strip_comments(text)
