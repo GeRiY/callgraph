@@ -75,6 +75,16 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   megfelelő címsor nélküli `#anchor` `⚠ missing` jelölést kap.
 - **Zárolt verziók a `package.json` / `composer.json` vázlatában:** a függőségi kulcsok mellett látszik a zárolt
   verzió.
+- **Fordítási kulcsok a `--format i18n` móddal:** egy lang fájlnál megmutatja, mely kulcsok hiányoznak a többi
+  nyelvből és melyek nem használtak; egy kulcsnál (`lang/en.json::board.title`) hol használják és mi az értéke
+  nyelvenként; a forráskódnál pedig mely használt kulcsok nem léteznek (`⚠ missing in hu.json`). Lefedi a lang JSON- és
+  PHP-fájlokat, valamint a `$t` / `t` / `trans` / `__` / `@lang` / `Lang::get` használatokat. A dinamikus kulcsokat
+  (`` `x.${y}` ``, összefűzés) soha nem jelzi hiányzónak, a mondatszerű kulcsokat (a Laravel „strings as keys"
+  megoldása) pedig soha nem jelzi nem használtnak.
+- **Stíluslap-osztályok használata a `--format classes` móddal:** megmutatja, mely template-ek és komponensek
+  használnak egy osztályt, és kiad egy engedékeny listát a nem használtakról (a dinamikusan összeállított osztályokat
+  és a Tailwind utility-ket soha nem jelzi). A lang fájlok, a stíluslapok és a `$t(…)` hívások a vázlatban rövid
+  tippet is kapnak, az MCP `framework_view` eszköz pedig megkapta az `i18n` és `classes` értéket.
 
 ### Változás
 
@@ -130,7 +140,8 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   `home/…` alakú modulútvonalat kapott; most a fájl mappájához képest relatív.
 - **Rust: a crate saját moduljai saját kódnak számítanak:** a `mod x;` és az inline `mod` útvonalak már nem számítanak
   csomagnak.
-- **A `--grep <Komponens>.vue --depth N` minden szinten követi a template-használatot:** a 2. szinttől üres volt.
+- **A `--grep <Komponens>.vue --depth N` minden szinten követi a template-használatot:** a 2. szinttől üres volt
+  (Windowson is).
 - **Ciklusban regisztrált Laravel-útvonalak:** az interpolált nevű útvonal (`->name("{$code}.x")`) miatt a
   `route('en.x')` „dinamikus, nem ellenőrizhető" lesz ismeretlen helyett, a `routes/` mappán kívüli, ilyen útvonalakat
   regisztráló segédfüggvényre pedig a program felhívja a figyelmet.

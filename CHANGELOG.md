@@ -70,6 +70,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   matching heading, shows `⚠ missing`.
 - **Locked versions in `package.json` / `composer.json`:** the outline shows the locked version next to each
   dependency key.
+- **Translation keys with `--format i18n`:** for a lang file it shows which keys are missing in the other locales
+  and which are unused; for a key (`lang/en.json::board.title`) where it is used and its value per locale; for source
+  code which used keys do not exist (`⚠ missing in hu.json`). Covers lang JSON and PHP files and `$t` / `t` / `trans` /
+  `__` / `@lang` / `Lang::get` usages. Dynamic keys (`` `x.${y}` ``, concatenation) are never reported missing, and
+  sentence-style keys (Laravel's "strings as keys") are never reported unused.
+- **Stylesheet class usage with `--format classes`:** shows which templates and components use a class, and a lenient
+  list of unused classes (dynamic class building and Tailwind utilities are never reported). Lang files, stylesheets
+  and `$t(…)` calls also get a short hint in the outline, and the MCP `framework_view` tool got `i18n` and `classes`.
 
 ### Changed
 
@@ -121,7 +129,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 - **Module paths of JS/TS files outside a project:** a file with no `package.json`, `tsconfig` or `jsconfig` above it
   got module paths like `home/…`; the path is now relative to the file's folder.
 - **Rust: the crate's own modules are own code:** `mod x;` and inline `mod` paths no longer count as a package.
-- **`--grep <Component>.vue --depth N` follows template usage at every level:** it was empty from level 2.
+- **`--grep <Component>.vue --depth N` follows template usage at every level:** it was empty from level 2
+  (also on Windows).
 - **Laravel routes registered in a loop:** a route with an interpolated name (`->name("{$code}.x")`) makes
   `route('en.x')` "dynamic, not verifiable" instead of unknown, and a helper outside `routes/` that registers such
   routes is pointed out.
