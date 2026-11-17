@@ -19,6 +19,17 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   egy fájlt, egyébként az utolsó változtatáscsoport egészét. Az előzmény többlépéses: minden hívás egy változtatással
   tovább lép vissza (korábban két egymás utáni undo az utolsó változtatást ide-oda kapcsolgatta). A `generate`-hez és a `rename`-hez hasonlóan csak akkor
   létezik, ha a szerver `--generate` / `CALLGRAPH_GENERATE=1` móddal fut, és `readOnlyHint: false` jelölést kap.
+- **`rename term <régi> <új>`: egy teljes fogalom átnevezése minden írásmódjában:** a `rename term post article`
+  a PHP-, JS-, TS- és Vue-kódban mindenhol lecseréli a szót, ahol egész szóként szerepel, a kis- és nagybetűt és a
+  többes számot megtartva: `Post` / `post` / `posts`, `post_id`, `StorePostRequest`, `/posts/{post}`,
+  `admin.posts.index`, `Posts/Index.vue`. A `-s`, `-es` és `-ies` többes számot magától képzi, a szabálytalant
+  `person/people` alakban lehet megadni. Az útvonalukban a szót tartalmazó fájlok átkerülnek az új helyre, és ha a
+  migrációk a szóval hoznak létre táblát (pivot táblát is) vagy `*_id` oszlopot, egy új, visszafordítható migráció
+  nevezi át őket (`rename_post_to_article`); a meglévő migrációk érintetlenek. Kimarad: a csupa nagybetűs szó
+  (`POST`), a HTTP-igés hívás (`->post(`, `Route::post(`, `postJson(`), a `vendor` és a `node_modules`. Az
+  érték-helyzetű, idézőjeles szót, amely HTTP-ige is lehet (`'method' => 'post'`), csak jelzi, nem módosítja. A
+  `--dry` a teljes tervet mutatja (áthelyezett fájlok, fájlonkénti változások, jelzett sztringek, a migráció), és
+  egyetlen `undo` mindent visszavon, az új migrációt is. MCP-n a `rename` eszköz `term` fajtája.
 - **A `gen --dry` megmutatja, hová kerülne a kód:** `--into` / `--replace` mellett a próbafutás először kiírja az
   elhelyezést, pl. `→ app/Pay.php::Pay after charge (L41)` vagy `→ f.vue: script L12-14`.
 - **`gen --diff` és további elhelyezési lehetőségek:** a `--diff` a `--replace`-t rövid unified diffként mutatja,
@@ -107,6 +118,13 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   `Route::get($uri, X::class)` invokálható controllere (`X::__invoke`) `(ref)` jelölésű hivatkozás-él, a `use` és a
   névtér alapján feloldva. A `--grep X`, a `locate X` és a `--depth` mostantól az osztályt megnevező útvonalakat,
   konfigbejegyzéseket és bindingokat is megtalálja.
+- **PHP: a hívások a docblock-típusokon keresztül is feloldódnak:** a csak docblockban típusozott változó vagy
+  property mostantól a megfelelő metódusra vezet, így a hívói is megtalálhatók (korábban a `--grep 'Model::method'`
+  ilyenkor nem talált hívót). Olvasott címkék: az osztályon lévő `@mixin` (Laravel API resource-ok: a resource-ban
+  nem definiált `$this->m()` a modell `m` metódusára mutat, kivéve a resource saját segédmetódusait), az értékadás
+  vagy a `foreach` fölötti `@var` (az elemtípus is, pl. `Collection<Post>` vagy `Post[]`), a `@property` /
+  `@property-read`, a típus nélküli paraméter `@param`-ja, a `@return` és a `@method`. A kódban megadott típus
+  elsőbbséget élvez, és csak egyetlen, egyértelmű osztályt használ (a `?Post` / `Post|null` is annak számít).
 - **Teljes Laravel route-tábla a `--format routes` kimenetben:** Laravel-projektben minden útvonal egy sor: metódus,
   teljes URI, action, `name=`, `[middleware]` és `fájl:sor`; a csoportok prefixét, nevét és middleware-ét a beágyazott
   csoportok is öröklik. Ugyanez a tábla táplálja a `--format ziggy`, `inertia` és `forms` nézetet. A literál
@@ -119,6 +137,9 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   `event(new E)`) a listenerére (amelyet a `handle(E $e)`, az `Event::listen` vagy a `$listen` tömb alapján talál meg);
   a `Job::dispatch(…)` a job `handle` metódusára; a `->notify(new N)` az `N::toMail`-re; a `Model::observe(O::class)`
   / `#[ObservedBy]` pedig az observer metódusaira.
+- **A `--format inertia` jelzi a soha át nem adott propokat:** ha egy oldal olyan kötelező propot deklarál, amelyet
+  sem render-hely, sem `HandleInertiaRequests::share` kulcs nem ad át, `! never passed: x` sort kap. A tárolt gráf
+  egyszer, csendben újraépül.
 - **A PHP konfig- és lang fájlok vázlata kulcs-útvonalakat mutat:** a tömböt visszaadó `config/*.php` vagy
   `lang/*/*.php` fájl a kulcsait útvonalként, sorszámmal listázza (`pages.home.uri = '/'`).
 - **Rust CLI- és könyvtárprofil:** a `main.rs`, `lib.rs` vagy `bin` célt tartalmazó crate profilt kap a belépési
@@ -136,7 +157,11 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   nyelvenként; a forráskódnál pedig mely használt kulcsok nem léteznek (`⚠ missing in hu.json`). Lefedi a lang JSON- és
   PHP-fájlokat, valamint a `$t` / `t` / `trans` / `__` / `@lang` / `Lang::get` használatokat. A dinamikus kulcsokat
   (`` `x.${y}` ``, összefűzés) soha nem jelzi hiányzónak, a mondatszerű kulcsokat (a Laravel „strings as keys"
-  megoldása) pedig soha nem jelzi nem használtnak.
+  megoldása) pedig soha nem jelzi nem használtnak. A TS / JS szótármodulok (`export default { … }` a
+  `locales/en.ts`, `i18n/de.ts` fájlban) is nyelvfájlnak számítanak: rájuk is jelzi a hiányzó, nem használt és
+  ismeretlen kulcsokat, a vázlatuk pedig a kulcsfát mutatja. A projekt saját `t()` burkolójával (egy helyi modul,
+  amely a `vue-i18n`-re vagy az `i18next`-re épül és `t`-t exportál) a scriptekben lévő `t('a.b')` hívások is
+  kulcshasználatnak számítanak.
 - **Stíluslap-osztályok használata a `--format classes` móddal:** megmutatja, mely template-ek és komponensek
   használnak egy osztályt, és kiad egy engedékeny listát a nem használtakról (a dinamikusan összeállított osztályokat
   és a Tailwind utility-ket soha nem jelzi). A lang fájlok, a stíluslapok és a `$t(…)` hívások a vázlatban rövid

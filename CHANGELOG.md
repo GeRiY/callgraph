@@ -18,6 +18,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   otherwise the whole last group of changes. The history is multi-step: each call steps one change further back
   (before, two undos in a row toggled the last change). Like `generate` and `rename`, it only exists when the server runs with
   `--generate` / `CALLGRAPH_GENERATE=1`, and it is marked `readOnlyHint: false`.
+- **`rename term <old> <new>`: rename a whole concept in every spelling:** `rename term post article` changes the
+  word in PHP, JS, TS and Vue code wherever it appears as a whole word, keeping the case and plural: `Post` / `post` /
+  `posts`, `post_id`, `StorePostRequest`, `/posts/{post}`, `admin.posts.index`, `Posts/Index.vue`. Plurals with
+  `-s`, `-es` and `-ies` are formed automatically; an irregular one is given as `person/people`. Files whose path
+  contains the word are moved, and if the migrations create tables (also pivot tables) or `*_id` columns with the
+  word, a new reversible migration renames them (`rename_post_to_article`); existing migrations are not touched.
+  Skipped: all-caps words (`POST`), HTTP-verb calls (`->post(`, `Route::post(`, `postJson(`), `vendor` and
+  `node_modules`. A quoted word in value position that may be an HTTP verb (`'method' => 'post'`) is only flagged,
+  not changed. `--dry` shows the whole plan (files moved, changes per file, flagged strings, the migration), and one
+  `undo` reverts everything, including the new migration. Over MCP it is the `term` kind of the `rename` tool.
 - **`gen --dry` shows where the code would go:** with `--into` / `--replace`, the dry run first prints the placement,
   e.g. `→ app/Pay.php::Pay after charge (L41)` or `→ f.vue: script L12-14`.
 - **`gen --diff` and more placement options:** `--diff` shows a `--replace` as a short unified diff without writing
@@ -101,6 +111,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   controller in `Route::get($uri, X::class)` (`X::__invoke`) are reference edges marked `(ref)`, resolved through
   `use` and the namespace. `--grep X`, `locate X` and `--depth` now also find the routes, config entries and bindings
   that name the class.
+- **PHP: calls resolve through docblock types:** a variable or property typed only in a docblock now leads to the
+  right method, so its callers are found (before, `--grep 'Model::method'` could find no callers there). Read:
+  `@mixin` on a class (Laravel API resources: `$this->m()` that the resource does not define goes to the model's
+  `m`, except the resource's own helpers), `@var` above an assignment or a `foreach` (also element types such as
+  `Collection<Post>` or `Post[]`), `@property` / `@property-read`, `@param` of an untyped parameter, `@return` and
+  `@method`. Native type declarations win, and only a single unambiguous class is used (`?Post` / `Post|null` count).
 - **Full Laravel route table with `--format routes`:** on a Laravel project every route is one row with its method,
   full URI, action, `name=`, `[middleware]` and `file:line`, with the prefix, name and middleware of groups inherited
   through nesting. The same table feeds `--format ziggy`, `inertia` and `forms`. Routes generated in a loop from a
@@ -111,6 +127,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   goes to `scopeStocked`; an event dispatch (`E::dispatch(…)`, `event(new E)`) to its listener (found by
   `handle(E $e)`, `Event::listen` or the `$listen` array); `Job::dispatch(…)` to the job's `handle`;
   `->notify(new N)` to `N::toMail`; and `Model::observe(O::class)` / `#[ObservedBy]` to the observer's methods.
+- **`--format inertia` flags props that are never passed:** a page that declares a required prop which no render
+  site and no `HandleInertiaRequests::share` key provides gets a `! never passed: x` line. The stored graph is rebuilt
+  once, quietly.
 - **PHP config and lang files outline as key paths:** a `config/*.php` or `lang/*/*.php` file that returns an array
   shows its keys as paths with their line numbers (`pages.home.uri = '/'`).
 - **Rust CLI and library profile:** a crate with `main.rs`, `lib.rs` or `bin` targets gets a profile with its entry
@@ -126,7 +145,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   and which are unused; for a key (`lang/en.json::board.title`) where it is used and its value per locale; for source
   code which used keys do not exist (`⚠ missing in hu.json`). Covers lang JSON and PHP files and `$t` / `t` / `trans` /
   `__` / `@lang` / `Lang::get` usages. Dynamic keys (`` `x.${y}` ``, concatenation) are never reported missing, and
-  sentence-style keys (Laravel's "strings as keys") are never reported unused.
+  sentence-style keys (Laravel's "strings as keys") are never reported unused. TS / JS dictionary modules
+  (`export default { … }` in `locales/en.ts`, `i18n/de.ts`) are language files too: missing, unused and unknown keys
+  are reported for them, and their outline shows the key tree. With a project's own `t()` wrapper (a local module
+  over `vue-i18n` or `i18next` that exports `t`), `t('a.b')` calls in scripts count as key uses.
 - **Stylesheet class usage with `--format classes`:** shows which templates and components use a class, and a lenient
   list of unused classes (dynamic class building and Tailwind utilities are never reported). Lang files, stylesheets
   and `$t(…)` calls also get a short hint in the outline, and the MCP `framework_view` tool got `i18n` and `classes`.
