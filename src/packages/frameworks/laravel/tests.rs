@@ -1071,9 +1071,9 @@ Route::middleware(['auth', 'verified'])->prefix('cards')->name('cards.')->contro
 
 #[test]
 fn a_config_driven_loop_expands_into_named_routes_with_pages() {
-    let routes = "<?php\nforeach (config('site.pages') as $name => $page) {\n    Route::get($page['uri'], $page['action'])->name($name);\n}\n";
+    let routes = "<?php\nforeach (config('catalogue.pages') as $name => $page) {\n    Route::get($page['uri'], $page['action'])->name($name);\n}\n";
     let config = "<?php\nuse App\\Http\\Controllers\\HomeController;\nreturn ['pages' => ['home' => ['uri' => '/', 'component' => 'Home', 'action' => HomeController::class], 'about' => ['uri' => '/about', 'action' => HomeController::class]]];\n";
-    let files = MemFiles::new(&[("routes/web.php", routes), ("config/site.php", config)]);
+    let files = MemFiles::new(&[("routes/web.php", routes), ("config/catalogue.php", config)]);
     let web = graph("/p/routes/web.php", None, &[], Vec::new());
     let path = root().join("routes/web.php");
     let mut laravel = Laravel::new(&root());

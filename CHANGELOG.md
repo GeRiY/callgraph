@@ -101,6 +101,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   controller in `Route::get($uri, X::class)` (`X::__invoke`) are reference edges marked `(ref)`, resolved through
   `use` and the namespace. `--grep X`, `locate X` and `--depth` now also find the routes, config entries and bindings
   that name the class.
+- **Full Laravel route table with `--format routes`:** on a Laravel project every route is one row with its method,
+  full URI, action, `name=`, `[middleware]` and `file:line`, with the prefix, name and middleware of groups inherited
+  through nesting. The same table feeds `--format ziggy`, `inertia` and `forms`. Routes generated in a loop from a
+  literal config array (`foreach (config('catalogue.pages') as $name => $page) Route::get($page['uri'], …)->name($name)`)
+  are expanded into real rows. The stored route data is rebuilt once, quietly.
+- **Laravel wiring the framework makes:** calls that only exist through Laravel now link to their target, so the
+  callers of the target list them: an Eloquent local scope call (`Product::query()->stocked()`, `Product::stocked()`)
+  goes to `scopeStocked`; an event dispatch (`E::dispatch(…)`, `event(new E)`) to its listener (found by
+  `handle(E $e)`, `Event::listen` or the `$listen` array); `Job::dispatch(…)` to the job's `handle`;
+  `->notify(new N)` to `N::toMail`; and `Model::observe(O::class)` / `#[ObservedBy]` to the observer's methods.
+- **PHP config and lang files outline as key paths:** a `config/*.php` or `lang/*/*.php` file that returns an array
+  shows its keys as paths with their line numbers (`pages.home.uri = '/'`).
 - **Rust CLI and library profile:** a crate with `main.rs`, `lib.rs` or `bin` targets gets a profile with its entry
   points, `src/<module>` folders as module layers, and workspace members listed. `tests`, `benches`, `examples` and
   fixture or golden-sample folders no longer make the project look like a web, Vue or SwiftUI project.
@@ -139,6 +151,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   `X::dispatch` and `Event::listen` are listed. The middleware label is no longer glued to its target, and validation
   only counts strings that are real rule lists. References are not calls in these views, so
   `belongsTo(Event::class)` is not listed as an event dispatch.
+- **Laravel views show the wiring:** `--format events` lists `wired` lines (dispatch site → listener) and `observer`
+  lines; `jobs` lists the `queued` classes (`ShouldQueue`) and `wired` lines for jobs and notifications, and no longer
+  lists event dispatches; `middleware` shows which routes use each middleware; `providers` counts registration calls
+  only inside service provider classes, so a model's `boot` or a query's `bind` (e.g. in tests) is not listed.
 - **Full translation keys in the i18n view:** `--format i18n` shows whole keys with the shared prefix written once
   (`a.b.{c, d}`) instead of cut-off keys, and it is faster in projects without translation files.
 - **CSS/SCSS `var()` shows the property:** a `var(--brand)` call is listed as `var(--brand)` and is found by `--grep`
@@ -226,10 +242,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 - **Rust: the crate's own modules are own code:** `mod x;` and inline `mod` paths no longer count as a package.
 - **`--grep <Component>.vue --depth N` follows template usage at every level:** it was empty from level 2
   (also on Windows).
+- **Laravel routes in controller groups appear in `--format routes`:** routes inside
+  `Route::prefix(…)->name(…)->middleware(…)->controller(X::class)->group(…)` (also with an arrow function and nested
+  groups) are listed, and a string action such as `'index'` becomes `X@index`.
 - **Laravel routes registered in a loop:** a route with an interpolated name (`->name("{$code}.x")`) makes
   `route('en.x')` "dynamic, not verifiable" instead of unknown, and a helper outside `routes/` that registers such
   routes is pointed out. The same applies to groups with a computed prefix or name
-  (`Route::prefix($code)->name($code.'.')->group(…)`, config-driven loops) in `--format ziggy`.
+  (`Route::prefix($code)->name($code.'.')->group(…)`, config-driven loops) in `--format ziggy`. A loop over a literal
+  config array is no longer dynamic: `ziggy` knows the names of its routes, and `inertia` knows their pages (a page
+  component named in the config that does not exist is flagged).
 - **Typed one-line `defineEmits` is read:** `defineEmits<{ login: []; save: [id: number] }>()` on one line now
   produces the emits list (`--format api`).
 - **No false calls from template-literal text in Vue attributes:** text inside a template literal of a bound

@@ -27,6 +27,6 @@ listener: …`), `jobs` the `queued` classes and their dispatchers.
 `--format routes` on a Laravel project is the full route table (one source for `ziggy`, `inertia`, `forms`): verb, full
 URI, handler, `name=`, `[middleware]`, `file:line`; a controller group's string actions (`->controller(X::class)->group(..)`
 → `'index'`), prefix, name and middleware are inherited through nesting, and routes generated from a literal config
-array (`foreach (config('site.pages') as $name => $page) Route::get($page['uri'], $page['action'])->name($name)`) are
+array (`foreach (config('catalogue.pages') as $name => $page) Route::get($page['uri'], $page['action'])->name($name)`) are
 expanded (a `component` key marks the Inertia page as rendered). A `config/*.php` or `lang/*/*.php` file (`return [ … ]`)
 outlines as key paths (`pages.home.uri = '/'`).

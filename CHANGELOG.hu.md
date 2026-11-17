@@ -107,6 +107,20 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   `Route::get($uri, X::class)` invokálható controllere (`X::__invoke`) `(ref)` jelölésű hivatkozás-él, a `use` és a
   névtér alapján feloldva. A `--grep X`, a `locate X` és a `--depth` mostantól az osztályt megnevező útvonalakat,
   konfigbejegyzéseket és bindingokat is megtalálja.
+- **Teljes Laravel route-tábla a `--format routes` kimenetben:** Laravel-projektben minden útvonal egy sor: metódus,
+  teljes URI, action, `name=`, `[middleware]` és `fájl:sor`; a csoportok prefixét, nevét és middleware-ét a beágyazott
+  csoportok is öröklik. Ugyanez a tábla táplálja a `--format ziggy`, `inertia` és `forms` nézetet. A literál
+  konfigtömbből ciklusban generált útvonalak (`foreach (config('catalogue.pages') as $name => $page)
+  Route::get($page['uri'], …)->name($name)`) valódi sorokká bomlanak ki. A tárolt route-adat egyszer, csendben
+  újraépül.
+- **A framework által végzett Laravel-drótozás:** azok a hívások, amelyek csak a Laravelen keresztül léteznek,
+  mostantól a céljukra mutatnak, így a cél hívólistája is mutatja őket: az Eloquent local scope hívása
+  (`Product::query()->stocked()`, `Product::stocked()`) a `scopeStocked`-ra; az esemény kiváltása (`E::dispatch(…)`,
+  `event(new E)`) a listenerére (amelyet a `handle(E $e)`, az `Event::listen` vagy a `$listen` tömb alapján talál meg);
+  a `Job::dispatch(…)` a job `handle` metódusára; a `->notify(new N)` az `N::toMail`-re; a `Model::observe(O::class)`
+  / `#[ObservedBy]` pedig az observer metódusaira.
+- **A PHP konfig- és lang fájlok vázlata kulcs-útvonalakat mutat:** a tömböt visszaadó `config/*.php` vagy
+  `lang/*/*.php` fájl a kulcsait útvonalként, sorszámmal listázza (`pages.home.uri = '/'`).
 - **Rust CLI- és könyvtárprofil:** a `main.rs`, `lib.rs` vagy `bin` célt tartalmazó crate profilt kap a belépési
   pontjaival, a `src/<modul>` mappákkal mint modulrétegekkel és a felsorolt workspace-tagokkal. A `tests`, `benches`,
   `examples` és a fixture- vagy golden-minta mappák már nem teszik a projektet webes, Vue- vagy SwiftUI-projektnek
@@ -148,6 +162,11 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   eseményként, az `X::dispatch` és az `Event::listen` viszont szerepel. A middleware címkéje már nem tapad a céljához,
   a validáció pedig csak a valódi szabálylistának számító stringeket veszi figyelembe. Ezekben a nézetekben a
   hivatkozás nem hívás, így a `belongsTo(Event::class)` nem jelenik meg esemény-dispatchként.
+- **A Laravel-nézetek mutatják a drótozást:** a `--format events` `wired` sorokat (kiváltás helye → listener) és
+  `observer` sorokat listáz; a `jobs` a `queued` osztályokat (`ShouldQueue`) és a jobok és notificationök `wired`
+  sorait mutatja, az esemény-kiváltásokat pedig már nem; a `middleware` megmutatja, mely útvonalak használják az egyes
+  middleware-eket; a `providers` csak a service provider osztályokon belüli regisztráló hívásokat számolja, így egy
+  modell `boot`-ja vagy egy lekérdezés `bind`-ja (pl. tesztekben) nem jelenik meg.
 - **Teljes fordítási kulcsok az i18n-nézetben:** a `--format i18n` levágott kulcsok helyett a teljes kulcsokat
   mutatja, a közös előtagot egyszer kiírva (`a.b.{c, d}`), és gyorsabb a fordítási fájl nélküli projektekben.
 - **A CSS/SCSS `var()` megmutatja a property-t:** a `var(--brand)` hívás `var(--brand)` alakban szerepel, és a
@@ -241,11 +260,15 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   csomagnak.
 - **A `--grep <Komponens>.vue --depth N` minden szinten követi a template-használatot:** a 2. szinttől üres volt
   (Windowson is).
+- **A controller-csoportok Laravel-útvonalai megjelennek a `--format routes` kimenetben:** a
+  `Route::prefix(…)->name(…)->middleware(…)->controller(X::class)->group(…)` csoporton belüli útvonalak (arrow
+  function-nel és beágyazott csoportokkal is) szerepelnek, a string action, pl. az `'index'`, pedig `X@index` lesz.
 - **Ciklusban regisztrált Laravel-útvonalak:** az interpolált nevű útvonal (`->name("{$code}.x")`) miatt a
   `route('en.x')` „dinamikus, nem ellenőrizhető" lesz ismeretlen helyett, a `routes/` mappán kívüli, ilyen útvonalakat
   regisztráló segédfüggvényre pedig a program felhívja a figyelmet. Ugyanez igaz a számított prefixű vagy nevű
   csoportokra (`Route::prefix($code)->name($code.'.')->group(…)`, konfigból vezérelt ciklusok) a `--format ziggy`
-  kimenetben.
+  kimenetben. A literál konfigtömbön futó ciklus már nem dinamikus: a `ziggy` ismeri az útvonalai nevét, az `inertia`
+  pedig az oldalait (a konfigban megnevezett, de nem létező oldalkomponenst jelzi).
 - **Az egysoros, típusos `defineEmits` is olvasható:** a `defineEmits<{ login: []; save: [id: number] }>()` egy
   sorban is megadja az emit-listát (`--format api`).
 - **Nincs téves hívás a Vue-attribútumok template literaljából:** a kötött attribútum template literaljában lévő
