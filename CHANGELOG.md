@@ -69,6 +69,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   tests, `Some` / `Ok` / `Err` / `Box::new` / `Default::default` no longer clutter the call list, and calls of a local
   closure are marked dynamic. Callers of a trait method and of its implementations see each other in both directions
   (`via`).
+- **JS/TS: functions passed as values are callers:** a function handed over as a call or `new` argument, an array
+  element or an object property value (also shorthand), e.g. the handler in a route table `guarded(api.listX)`, is a
+  reference edge marked `(ref)`. It shows in callers lists, counts for `--depth` / impact, and the function no longer
+  looks like it has no callers. This covers functions of the same file, local imports, object-literal methods and
+  members of a namespace import (`import * as api`); package functions are not counted.
+- **PHP: `X::class` references:** `X::class`, a callable pair `[X::class, 'method']` (`X::method`) and an invokable
+  controller in `Route::get($uri, X::class)` (`X::__invoke`) are reference edges marked `(ref)`, resolved through
+  `use` and the namespace. `--grep X`, `locate X` and `--depth` now also find the routes, config entries and bindings
+  that name the class.
 - **Rust CLI and library profile:** a crate with `main.rs`, `lib.rs` or `bin` targets gets a profile with its entry
   points, `src/<module>` folders as module layers, and workspace members listed. `tests`, `benches`, `examples` and
   fixture or golden-sample folders no longer make the project look like a web, Vue or SwiftUI project.
@@ -99,7 +108,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 - **Less noise in the framework views:** `--format events`, `middleware`, `validation`, `jobs`, `providers` and `di`
   match their patterns only at the right place, so e.g. `config` or `response` no longer show up as events, while
   `X::dispatch` and `Event::listen` are listed. The middleware label is no longer glued to its target, and validation
-  only counts strings that are real rule lists.
+  only counts strings that are real rule lists. References are not calls in these views, so
+  `belongsTo(Event::class)` is not listed as an event dispatch.
 - **Full translation keys in the i18n view:** `--format i18n` shows whole keys with the shared prefix written once
   (`a.b.{c, d}`) instead of cut-off keys, and it is faster in projects without translation files.
 - **CSS/SCSS `var()` shows the property:** a `var(--brand)` call is listed as `var(--brand)` and is found by `--grep`
@@ -157,6 +167,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 - **Literal `import('…')` is a use:** a dynamic `import('./x')` or `import('pkg')` with a fixed string in JS, TS or
   Vue now links to the file or package, so `deps` no longer reports such packages as unused and the importing
   component lists the files it loads.
+- **Vue: methods on `computed(…).value` are not Vue API calls:** with `const x = computed(…)` or `ref(…)`, a call such
+  as `x.value.filter(…)` is a plain call on the data, no longer reported as a Vue API call.
 - **`--grep` shows the matching line of a chained call:** for a call chain spread over several lines, the shown
   source line is the line of the match, not the first line of the chain.
 - **An unknown `--option` is an error:** a mistyped option of an analysis now stops with the usage text instead of

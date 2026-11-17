@@ -73,6 +73,16 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   `#[cfg(test)]` modulok tesztként vannak jelölve, a `Some` / `Ok` / `Err` / `Box::new` / `Default::default` már nem
   zsúfolja a híváslistát, a helyi closure hívása pedig dinamikusnak van jelölve. A trait-metódus és a megvalósításai
   hívói mindkét irányban látják egymást (`via`).
+- **JS/TS: az értékként átadott függvények hívónak számítanak:** a hívás- vagy `new`-argumentumként, tömbelemként
+  vagy objektum-property értékeként (rövidített alakban is) átadott függvény, pl. egy route-tábla handlere
+  `guarded(api.listX)`-ben, `(ref)` jelölésű hivatkozás-él. Megjelenik a hívólistákban, számít a `--depth` /
+  hatáselemzésben, és a függvény már nem tűnik hívó nélkülinek. Ez a fájl saját függvényeire, a helyi importokra, az
+  objektum-literálok metódusaira és a névtér-import (`import * as api`) tagjaira vonatkozik; a csomagok függvényeire
+  nem.
+- **PHP: `X::class` hivatkozások:** az `X::class`, a `[X::class, 'method']` hívható pár (`X::method`) és a
+  `Route::get($uri, X::class)` invokálható controllere (`X::__invoke`) `(ref)` jelölésű hivatkozás-él, a `use` és a
+  névtér alapján feloldva. A `--grep X`, a `locate X` és a `--depth` mostantól az osztályt megnevező útvonalakat,
+  konfigbejegyzéseket és bindingokat is megtalálja.
 - **Rust CLI- és könyvtárprofil:** a `main.rs`, `lib.rs` vagy `bin` célt tartalmazó crate profilt kap a belépési
   pontjaival, a `src/<modul>` mappákkal mint modulrétegekkel és a felsorolt workspace-tagokkal. A `tests`, `benches`,
   `examples` és a fixture- vagy golden-minta mappák már nem teszik a projektet webes, Vue- vagy SwiftUI-projektnek
@@ -106,7 +116,8 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 - **Kevesebb zaj a framework-nézetekben:** a `--format events`, `middleware`, `validation`, `jobs`, `providers` és
   `di` csak a megfelelő helyen illeszti a mintáit, így pl. a `config` vagy a `response` már nem jelenik meg
   eseményként, az `X::dispatch` és az `Event::listen` viszont szerepel. A middleware címkéje már nem tapad a céljához,
-  a validáció pedig csak a valódi szabálylistának számító stringeket veszi figyelembe.
+  a validáció pedig csak a valódi szabálylistának számító stringeket veszi figyelembe. Ezekben a nézetekben a
+  hivatkozás nem hívás, így a `belongsTo(Event::class)` nem jelenik meg esemény-dispatchként.
 - **Teljes fordítási kulcsok az i18n-nézetben:** a `--format i18n` levágott kulcsok helyett a teljes kulcsokat
   mutatja, a közös előtagot egyszer kiírva (`a.b.{c, d}`), és gyorsabb a fordítási fájl nélküli projektekben.
 - **A CSS/SCSS `var()` megmutatja a property-t:** a `var(--brand)` hívás `var(--brand)` alakban szerepel, és a
@@ -168,6 +179,8 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 - **A literális `import('…')` használatnak számít:** a fix stringgel írt dinamikus `import('./x')` vagy
   `import('pkg')` JS-ben, TS-ben és Vue-ban mostantól a fájlra vagy a csomagra mutat, így a `deps` már nem jelzi az
   ilyen csomagokat nem használtnak, az importáló komponens pedig felsorolja a betöltött fájlokat.
+- **Vue: a `computed(…).value` metódusai nem Vue API-hívások:** `const x = computed(…)` vagy `ref(…)` esetén az
+  `x.value.filter(…)`-hez hasonló hívás az adaton végzett egyszerű hívás, már nem Vue API-hívásként jelenik meg.
 - **A `--grep` a láncolt hívás illeszkedő sorát mutatja:** a több sorra tördelt hívásláncnál a megjelenített
   forrássor az illeszkedés sora, nem a lánc első sora.
 - **Az ismeretlen `--kapcsoló` hibát ad:** az elemzés elgépelt kapcsolója mostantól a használati szöveggel áll le,
