@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+@theme {
+  --color-parchment: #f6f0e2;
+  --color-binding: #3a2a1d;
+  --color-accent-500: #a4452c;
+  --font-serif: "Georgia", serif;
+  --text-body: 1.05rem;
+}
+
+@utility shelf-wrap {
+  max-width: 64rem;
+  margin-inline: auto;
+  padding-inline: 1rem;
+}
+
+body {
+  background: var(--color-parchment);
+  color: var(--color-binding);
+  font-family: var(--font-serif);
+  font-size: var(--text-body);
+}
+
+.spine-label {
+  transform: rotate(-2deg);
+  color: var(--color-accent-500);
+}

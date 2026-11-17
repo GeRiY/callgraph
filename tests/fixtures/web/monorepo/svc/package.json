@@ -1,0 +1,7 @@
+{
+    "name": "garden-planner-svc",
+    "private": true,
+    "devDependencies": {
+        "typescript": "^5.6.0"
+    }
+}

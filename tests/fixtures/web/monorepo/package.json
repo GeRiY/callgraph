@@ -1,0 +1,5 @@
+{
+    "name": "garden-planner",
+    "private": true,
+    "workspaces": ["ui", "svc"]
+}
