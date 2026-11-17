@@ -105,7 +105,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   and `$t(…)` calls also get a short hint in the outline, and the MCP `framework_view` tool got `i18n` and `classes`.
 - **MCP `guide` tool with a `topic`:** the optional `topic` parameter (e.g. `{topic: "php"}`) returns one detail file
   of the skill instead of the core manual, so clients that only use MCP can read them too. Topics: `php`, `blade`,
-  `js`, `vue`, `css`, `rust`, `swift`, `kotlin`, `python`, `go`, `gen`, `mcp`, `reference`.
+  `js`, `jsx`, `vue`, `css`, `rust`, `swift`, `kotlin`, `python`, `go`, `gen`, `mcp`, `reference`.
 
 ### Changed
 
@@ -115,9 +115,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   package; before, each importing package saw its own relative key. Single-package projects keep their keys. The
   stored graph is rebuilt once, quietly.
 - **Shorter skill, details per language:** the agent skill is now a short English core `SKILL.md` (about 13 KB
-  instead of 30 KB, roughly 3 500 instead of 7 800 tokens) plus detail files in `ref/` (php, blade, js, vue, css,
-  rust, swift, kotlin, python, go, gen, mcp, reference) that the agent reads only for the languages of the project.
-  Kotlin and Blade are covered in the skill for the first time. `self-update` installs the new layout.
+  instead of 30 KB, roughly 3 500 instead of 7 800 tokens) plus detail files in `ref/` (php, blade, js, jsx, vue,
+  css, rust, swift, kotlin, python, go, gen, mcp, reference) that the agent reads only for the languages of the
+  project. Kotlin, Blade and React (`ref/jsx.md`: components, hooks, current limits) are covered in the skill for the
+  first time. `self-update` installs the new layout.
 - **Less noise in the framework views:** `--format events`, `middleware`, `validation`, `jobs`, `providers` and `di`
   match their patterns only at the right place, so e.g. `config` or `response` no longer show up as events, while
   `X::dispatch` and `Event::listen` are listed. The middleware label is no longer glued to its target, and validation
@@ -168,8 +169,23 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 - **Markdown links merged:** the outline lists the same link target once, with `×N`.
 - **No repeated tip over MCP:** the closing 💡 tip line is no longer added to every MCP answer (the CLI keeps it).
   The skill now also recommends callgraph for the structure of md, json, css, scss and html files.
+- **Compact Vue outline:** props are listed once (a `defineProps<X>` interface that repeats the component's props is
+  no longer a separate block), emits and models take one line each (`emits (N): a, b, …`, `models (N): name: Type`),
+  a prop default longer than the line is cut with `…`, and `component_use` paths with a shared folder are written
+  once (`dir/{atoms/A, organisms/B}.vue`). The outline of a large component is much shorter.
+- **A large single-file outline is compacted before the method index:** above the output limit, the outline is first
+  shown in a compact form (no comments, constants and properties wrapped, call lists capped at 8 with `… +N`, every
+  member kept); the method index comes only if even that does not fit. `--full` shows the whole outline.
+- **Grouped callers in the one-line `--grep` view:** when a `--grep` output is over the limit and falls back to one
+  line per call, each file is a single header line with its callers under it (`Cont::caller  L12, L40 │ code`); a
+  target that is the same for every row is shown once at the top (`← target`).
+- **Shorter `--depth` output:** from level 2, test and story callers collapse into one line
+  (`tests/stories: N callers in M files`) when there are other callers too, and the whole output is cut at the output
+  limit with a `⚠` line on how to narrow it. `--full` lists everything.
 - **Multi-file `--format summary` shows the folder:** rows of the same folder are grouped under a `folder/` header
-  line; a lone file shows its relative path.
+  line; a lone file shows its relative path. Above the output limit, a summary shows per-folder totals instead
+  (`dir/  N files · C containers · M methods`, small folders list their files), so a large project fits in a much
+  shorter answer; `--full` shows every file.
 - **Swift project profile:** folders such as Features, Core, Shared, Networking, UI and Persistence get layers; an
   `@Observable` / `ObservableObject` class is a store candidate, `View` conformers are views, and `Codable` /
   `Identifiable` types are models. More Swift and Foundation built-ins are categorized (`pow`, `defer`, math

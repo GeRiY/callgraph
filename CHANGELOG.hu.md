@@ -114,7 +114,7 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   tippet is kapnak, az MCP `framework_view` eszköz pedig megkapta az `i18n` és `classes` értéket.
 - **MCP `guide` eszköz `topic` paraméterrel:** az opcionális `topic` (pl. `{topic: "php"}`) az alap-útmutató
   helyett a skill egy részletező fájlját adja vissza, így a csak MCP-t használó kliensek is elolvashatják. Témák:
-  `php`, `blade`, `js`, `vue`, `css`, `rust`, `swift`, `kotlin`, `python`, `go`, `gen`, `mcp`, `reference`.
+  `php`, `blade`, `js`, `jsx`, `vue`, `css`, `rust`, `swift`, `kotlin`, `python`, `go`, `gen`, `mcp`, `reference`.
 
 ### Változás
 
@@ -125,8 +125,9 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   kulcsát látta. Az egycsomagos projektek kulcsai nem változnak. A tárolt gráf egyszer, csendben újraépül.
 - **Rövidebb skill, nyelvenkénti részletek:** az agent skill mostantól egy rövid, angol nyelvű `SKILL.md` mag (kb.
   13 KB a korábbi 30 KB helyett, nagyjából 3 500 token 7 800 helyett), plusz a `ref/` mappa részletező fájljai (php,
-  blade, js, vue, css, rust, swift, kotlin, python, go, gen, mcp, reference), amelyeket az agent csak a projekt
-  nyelveihez olvas be. A Kotlin és a Blade először kap leírást a skillben. A `self-update` az új szerkezetet telepíti.
+  blade, js, jsx, vue, css, rust, swift, kotlin, python, go, gen, mcp, reference), amelyeket az agent csak a projekt
+  nyelveihez olvas be. A Kotlin, a Blade és a React (`ref/jsx.md`: komponensek, hookok, jelenlegi korlátok) először
+  kap leírást a skillben. A `self-update` az új szerkezetet telepíti.
 - **Kevesebb zaj a framework-nézetekben:** a `--format events`, `middleware`, `validation`, `jobs`, `providers` és
   `di` csak a megfelelő helyen illeszti a mintáit, így pl. a `config` vagy a `response` már nem jelenik meg
   eseményként, az `X::dispatch` és az `Event::listen` viszont szerepel. A middleware címkéje már nem tapad a céljához,
@@ -181,8 +182,24 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 - **Összevont Markdown-linkek:** a vázlat ugyanazt a link-célt egyszer listázza, `×N` jelöléssel.
 - **Nincs ismétlődő tipp MCP-n:** a záró 💡 tipp sor már nem kerül minden MCP-válaszba (a CLI megtartja). A skill
   mostantól az md, json, css, scss és html fájlok szerkezetére is a callgraphot ajánlja.
+- **Tömörebb Vue-vázlat:** a propok egyszer szerepelnek (a komponens propjait megismétlő `defineProps<X>` interfész
+  már nem külön blokk), az emitek és a modellek egy-egy sorban állnak (`emits (N): a, b, …`, `models (N): name: Type`),
+  a sornál hosszabb prop-alapérték `…`-tel le van vágva, a közös mappájú `component_use` útvonalak pedig egyszer
+  írják ki a mappát (`dir/{atoms/A, organisms/B}.vue`). Egy nagy komponens vázlata így jóval rövidebb.
+- **A nagy egyfájlos vázlat előbb tömörödik, csak utána jön a metódusindex:** a kimenet-korlát fölött a vázlat
+  először kompakt alakban jelenik meg (megjegyzések nélkül, a konstansok és propertyk tördelve, a híváslisták 8 elem
+  után `… +N`-nel rövidítve, minden tag megmarad); metódusindex csak akkor, ha ez sem fér bele. A `--full` a teljes
+  vázlatot adja.
+- **Csoportosított hívók az egysoros `--grep` nézetben:** ha a `--grep` kimenete a korlát fölött hívásonként egy
+  sorra vált, minden fájl egyetlen fejsor, alatta a hívói (`Cont::caller  L12, L40 │ kód`); a minden sorban azonos
+  cél egyszer, legfelül áll (`← cél`).
+- **Rövidebb `--depth` kimenet:** a 2. szinttől a teszt- és story-hívók egy sorba kerülnek
+  (`tesztek/story-k: N hívó M fájlban`), ha van más hívó is, a teljes kimenet pedig a kimenet-korlátnál le van vágva
+  egy `⚠` sorral, amely megmondja, hogyan szűkíts. A `--full` mindent felsorol.
 - **A többfájlos `--format summary` mutatja a mappát:** az azonos mappa sorai egy `mappa/` fejlécsor alatt
-  csoportosulnak; az egyedülálló fájl a relatív útvonalával jelenik meg.
+  csoportosulnak; az egyedülálló fájl a relatív útvonalával jelenik meg. A kimenet-korlát fölött a summary helyette
+  mappánkénti összesítést ad (`dir/  N fájl · C konténer · M metódus`, a kis mappák felsorolják a fájljaikat), így egy
+  nagy projekt is jóval rövidebb válaszba fér; a `--full` minden fájlt mutat.
 - **Swift projektprofil:** az olyan mappák, mint a Features, Core, Shared, Networking, UI és Persistence, rétegeket
   kapnak; az `@Observable` / `ObservableObject` osztály store-jelölt, a `View`-t megvalósítók nézetek, a `Codable` /
   `Identifiable` típusok modellek. Több Swift- és Foundation-beépített van kategorizálva (`pow`, `defer`,
