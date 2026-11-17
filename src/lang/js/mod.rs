@@ -18,6 +18,7 @@ mod scope;
 mod sfc;
 mod strings;
 mod template;
+mod vite_alias;
 
 pub use analysis::{JsAnalysis, JsPass, PassContext};
 pub use frontend::JsFrontend;

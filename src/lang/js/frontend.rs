@@ -35,7 +35,7 @@ impl JsFrontend {
         let frontend = Self::new();
         let resolver = frontend.resolver.clone();
         frontend
-            .with_pass(Box::new(ImportsPass::new(resolver)))
+            .with_pass(Box::new(ImportsPass::new(resolver.clone())))
             .with_pass(Box::new(ClassContainerPass))
             .with_pass(Box::new(super::container_doc::ContainerDocPass))
             .with_pass(Box::new(super::methods::MethodsPass))
@@ -44,7 +44,7 @@ impl JsFrontend {
             .with_pass(Box::new(super::strings::StringsPass))
             .with_pass(Box::new(super::comments::CommentsPass))
             .with_pass(Box::new(super::control_flow::ControlFlowPass))
-            .with_pass(Box::new(super::calls::CallsPass::default()))
+            .with_pass(Box::new(super::calls::CallsPass::new(resolver)))
     }
 
     /// Egy elemzési passz hozzáadása (DI).
@@ -168,11 +168,9 @@ impl Language for JsFrontend {
 }
 
 impl LanguageFrontend for JsFrontend {
-    /// Váz: a relatív specifikátor a `from` melletti útra oldódik; az alias-feloldás a következő lépésben jön.
+    /// A helyi (relatív, `paths`- vagy Vite-alias) import abszolút célfájlja: ugyanaz a feloldó, mint az indexé.
     fn resolve_module(&self, spec: &str, from: &Path) -> Option<PathBuf> {
-        spec.starts_with('.')
-            .then(|| from.parent().map(|p| p.join(spec)))
-            .flatten()
+        self.resolver.resolve_path(spec, from)
     }
 }
 

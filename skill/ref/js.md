@@ -11,7 +11,7 @@ union receivers stay unresolved (search those by name). A function passed as a v
 reference edge: it appears in callers lists and counts for `--depth`, marked `(ref)`. Searchable keys for `--grep`:
 
 ```bash
-bash $CG --project myapp resources/js --grep 'useForm.js::submit'     # <file>::<export>, with import resolution and the @/ alias
+bash $CG --project myapp resources/js --grep 'src/lib/useForm.js::submit'  # <project-root-relative file>::<export>, with tsconfig paths / Vite aliases
 bash $CG --project myapp resources/js --grep 'route::orders.show'     # route usage
 bash $CG --project myapp resources/js --grep 'i18n::orders.title'     # where a translation key is used
 bash $CG --project myapp resources/js --grep 'api.fetch'             # object-literal method (const api = { fetch() {} })

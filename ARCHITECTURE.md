@@ -71,7 +71,7 @@ Adatfolyam: `FileWalker` (a `registry.extensions()` szerint) → fájlok → `An
 | Szerep | Trait | Nyelvek | Specifikus metódus |
 |---|---|---|---|
 | `LanguageRole::Backend` | `LanguageBackend` | PHP (kész), később Python, Go | `detect_framework(dir)` |
-| `LanguageRole::Frontend` | `LanguageFrontend` | később CSS/SCSS, JS/TS/Vue | `resolve_module(spec, from)` |
+| `LanguageRole::Frontend` | `LanguageFrontend` | JS/TS/Vue (a `resolve_module` a valódi, projekt-gyökér-tudatos feloldó), CSS/SCSS | `resolve_module(spec, from)` |
 | `LanguageRole::Document` | `LanguageDocument` | később JSON, Markdown, YAML, TOML | `resolve_reference(reference, from)` |
 
 Mindhárom a közös `Language` traitre épül (`id`, `role`, `extensions`, `analyze`), és ugyanabba a `FileGraph` sémába

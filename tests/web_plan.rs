@@ -92,6 +92,11 @@ fn lines_starting<'a>(out: &'a str, prefix: &str) -> Vec<&'a str> {
     out.lines().filter(|l| l.starts_with(prefix)).collect()
 }
 
+/// A kimenet FILE-sora a platform elválasztóját használja (Windows-on `\`).
+fn sep(path: &str) -> String {
+    path.replace('/', std::path::MAIN_SEPARATOR_STR)
+}
+
 fn count_files(out: &str) -> usize {
     out.lines().filter(|l| l.starts_with("FILE  ")).count()
 }
@@ -196,7 +201,6 @@ fn h03_jobs_view_keeps_the_queued_class_and_skips_middleware_handle() {
 // H4 – H7: kulcsok és modul-feloldás (monorepo)
 
 #[test]
-#[ignore = "web-plan H4: one file gets two keys (importer-relative); enabled in phase 3"]
 fn h04_one_file_one_project_relative_key_across_packages() {
     let out = Fixture::monorepo().run(&[
         "show",
@@ -204,13 +208,18 @@ fn h04_one_file_one_project_relative_key_across_packages() {
         "--grep",
         "^ui/src/lib/seedsearch.ts::matchSeeds$",
     ]);
-    assert!(out.contains("FILE  ui/src/lib/useReminders.ts"), "{out}");
-    assert!(out.contains("FILE  svc/src/features/topMatch.ts"), "{out}");
+    assert!(
+        out.contains(&format!("FILE  {}", sep("ui/src/lib/useReminders.ts"))),
+        "{out}"
+    );
+    assert!(
+        out.contains(&format!("FILE  {}", sep("svc/src/features/topMatch.ts"))),
+        "{out}"
+    );
     assert_eq!(count_files(&out), 2, "{out}");
 }
 
 #[test]
-#[ignore = "web-plan H5: tsconfig references/extends and the Vite alias are not resolved; enabled in phase 3"]
 fn h05_deps_does_not_report_resolved_aliases_as_missing() {
     let out = Fixture::monorepo().run(&["deps"]);
     assert!(!out.contains("@common/calendar"), "{out}");
@@ -218,17 +227,25 @@ fn h05_deps_does_not_report_resolved_aliases_as_missing() {
 }
 
 #[test]
-#[ignore = "web-plan H5: client and server see common/calendar.ts under different keys; enabled in phase 3"]
 fn h05_alias_import_and_relative_import_share_one_key() {
     let out = Fixture::monorepo().run(&["show", ".", "--grep", "^common/calendar.ts::isSeason$"]);
-    assert!(out.contains("FILE  ui/src/lib/useReminders.ts"), "{out}");
-    assert!(out.contains("FILE  svc/src/rest.ts"), "{out}");
+    assert!(
+        out.contains(&format!("FILE  {}", sep("ui/src/lib/useReminders.ts"))),
+        "{out}"
+    );
+    assert!(
+        out.contains(&format!("FILE  {}", sep("svc/src/rest.ts"))),
+        "{out}"
+    );
 }
 
 #[test]
 fn h06_literal_dynamic_import_resolves_to_the_page() {
     let out = Fixture::monorepo().run(&["show", ".", "--grep", "views/OverviewView.vue"]);
-    assert!(out.contains("FILE  ui/src/router/index.ts"), "{out}");
+    assert!(
+        out.contains(&format!("FILE  {}", sep("ui/src/router/index.ts"))),
+        "{out}"
+    );
 }
 
 #[test]
@@ -238,7 +255,6 @@ fn h06_dynamic_import_of_a_package_counts_as_use() {
 }
 
 #[test]
-#[ignore = "web-plan H7: a package named in the vitest environment counts as unused; enabled in phase 3 (deps rules)"]
 fn h07_deps_knows_the_vitest_environment_package() {
     let out = Fixture::monorepo().run(&["deps"]);
     assert!(!out.contains("jsdom"), "{out}");
@@ -250,7 +266,10 @@ fn h07_deps_knows_the_vitest_environment_package() {
 #[test]
 fn h08_function_passed_as_value_is_a_ref_edge() {
     let out = Fixture::monorepo().run(&["show", ".", "--grep", "(^|::|\\.|->)streamSensor$"]);
-    assert!(out.contains("FILE  svc/src/endpoints/beds.ts"), "{out}");
+    assert!(
+        out.contains(&format!("FILE  {}", sep("svc/src/endpoints/beds.ts"))),
+        "{out}"
+    );
     assert!(out.contains("(ref)"), "{out}");
     let routes = Fixture::monorepo().run(&["show", "svc/src/endpoints/beds.ts"]);
     for handler in ["streamSensor", "listBeds", "findPlants"] {
@@ -265,8 +284,14 @@ fn h08_function_passed_as_value_is_a_ref_edge() {
 fn h09_class_constant_reference_is_found_by_grep_and_locate() {
     let fixture = Fixture::laravel();
     let out = fixture.run(&["show", ".", "--grep", "CatalogueController"]);
-    assert!(out.contains("FILE  config/library.php"), "{out}");
-    assert!(out.contains("FILE  routes/web.php"), "{out}");
+    assert!(
+        out.contains(&format!("FILE  {}", sep("config/library.php"))),
+        "{out}"
+    );
+    assert!(
+        out.contains(&format!("FILE  {}", sep("routes/web.php"))),
+        "{out}"
+    );
     let located = fixture.run(&["locate", "CatalogueController"]);
     assert!(located.contains("config/library.php"), "{located}");
 }
@@ -436,7 +461,10 @@ fn h21_unknown_flag_is_an_error_without_raw_output() {
 fn h22_single_file_outline_uses_a_relative_path() {
     let out = Fixture::laravel().run(&["show", "app/Models/Shelf.php"]);
     let first = out.lines().next().unwrap();
-    assert!(first.starts_with("FILE  app/Models/Shelf.php"), "{first}");
+    assert!(
+        first.starts_with(&format!("FILE  {}", sep("app/Models/Shelf.php"))),
+        "{first}"
+    );
 }
 
 #[test]

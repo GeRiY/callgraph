@@ -7,6 +7,8 @@ mod scan;
 mod tests_dynamic;
 mod walk;
 
+use std::sync::Arc;
+
 use oxc_ast::ast::{Program, PropertyKey};
 
 use super::analysis::{JsAnalysis, JsPass, PassContext};
@@ -28,7 +30,14 @@ pub(crate) fn key_name(k: &PropertyKey<'_>) -> Option<String> {
 /// A hívásokat gyűjtő passz (a template-hívások nem ide tartoznak).
 #[derive(Default)]
 pub struct CallsPass {
-    resolver: Resolver,
+    resolver: Arc<Resolver>,
+}
+
+impl CallsPass {
+    /// A frontenddel közös feloldóval (közös config- és mappa-gyorsítótár).
+    pub fn new(resolver: Arc<Resolver>) -> Self {
+        Self { resolver }
+    }
 }
 
 impl JsPass for CallsPass {
