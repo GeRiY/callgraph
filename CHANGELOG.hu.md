@@ -79,6 +79,15 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   hatáselemzésben, és a függvény már nem tűnik hívó nélkülinek. Ez a fájl saját függvényeire, a helyi importokra, az
   objektum-literálok metódusaira és a névtér-import (`import * as api`) tagjaira vonatkozik; a csomagok függvényeire
   nem.
+- **Több JS/TS import oldódik fájlra:** a tsconfig `extends` (string vagy tömb, láncolva is) és `references` mezőjét
+  követi, egy `paths`-bejegyzésnek több célja és a minta közepén `*` is lehet (a leghosszabb illeszkedő előtag nyer),
+  és beolvassa a `vite.config.*` / `vitest.config.*` `resolve.alias` beállítását (objektum vagy
+  `[{find, replacement}]`, `fileURLToPath(new URL(…))` vagy `path.resolve(__dirname, …)` alakban). Egy aliast csak
+  akkor használ, ha a célja létezik. Így az olyan importok, mint a `@shared/api` vagy a `@kit/…`, megtalálják a
+  hívóikat, és a `deps` már nem jelzi őket hiányzó csomagként. A kiterjesztés nélküli import a `.tsx`, `.jsx`, `.mts`,
+  `.cjs`, `.cts` fájlokat és az `index.vue` / `index.tsx` / `index.jsx` / `index.mjs` fájlt is megtalálja, TypeScript
+  projektben pedig a `./a.js` az `a.ts`-re oldódik. Az importfeloldás gyorsabb is: minden mappát egyszer listáz, nem
+  próbálgat végig minden lehetséges fájlt.
 - **PHP: `X::class` hivatkozások:** az `X::class`, a `[X::class, 'method']` hívható pár (`X::method`) és a
   `Route::get($uri, X::class)` invokálható controllere (`X::__invoke`) `(ref)` jelölésű hivatkozás-él, a `use` és a
   névtér alapján feloldva. A `--grep X`, a `locate X` és a `--depth` mostantól az osztályt megnevező útvonalakat,
@@ -109,6 +118,11 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ### Változás
 
+- **A JS/TS/Vue fájlkulcsok a projekt gyökeréhez relatívak:** a kulcs fájl-része (`ui/src/x.ts::fn`) a legközelebbi
+  `.git`-et vagy `.callgraph`-ot tartalmazó mappához viszonyít (ha nincs ilyen, a csomag / workspace legfelső
+  mappájához), minden platformon `/` elválasztóval. Monorepóban így egy fájlnak egy kulcsa van, a
+  `--grep 'ui/src/x.ts::fn'` minden csomagból megtalálja a hívókat; korábban minden importáló csomag a saját relatív
+  kulcsát látta. Az egycsomagos projektek kulcsai nem változnak. A tárolt gráf egyszer, csendben újraépül.
 - **Rövidebb skill, nyelvenkénti részletek:** az agent skill mostantól egy rövid, angol nyelvű `SKILL.md` mag (kb.
   13 KB a korábbi 30 KB helyett, nagyjából 3 500 token 7 800 helyett), plusz a `ref/` mappa részletező fájljai (php,
   blade, js, vue, css, rust, swift, kotlin, python, go, gen, mcp, reference), amelyeket az agent csak a projekt
@@ -179,6 +193,8 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 - **A literális `import('…')` használatnak számít:** a fix stringgel írt dinamikus `import('./x')` vagy
   `import('pkg')` JS-ben, TS-ben és Vue-ban mostantól a fájlra vagy a csomagra mutat, így a `deps` már nem jelzi az
   ilyen csomagokat nem használtnak, az importáló komponens pedig felsorolja a betöltött fájlokat.
+- **`deps`: a tesztkörnyezet-csomagok eszközök:** a `jsdom`, `happy-dom`, `jest-environment-*` és `@vitest/*`
+  csomagokat már nem jelzi nem használtnak.
 - **Vue: a `computed(…).value` metódusai nem Vue API-hívások:** `const x = computed(…)` vagy `ref(…)` esetén az
   `x.value.filter(…)`-hez hasonló hívás az adaton végzett egyszerű hívás, már nem Vue API-hívásként jelenik meg.
 - **A `--grep` a láncolt hívás illeszkedő sorát mutatja:** a több sorra tördelt hívásláncnál a megjelenített

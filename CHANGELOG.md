@@ -74,6 +74,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   reference edge marked `(ref)`. It shows in callers lists, counts for `--depth` / impact, and the function no longer
   looks like it has no callers. This covers functions of the same file, local imports, object-literal methods and
   members of a namespace import (`import * as api`); package functions are not counted.
+- **More JS/TS imports resolve to files:** tsconfig `extends` (a string or an array, also chained) and `references`
+  are followed, a `paths` entry may have several targets and a `*` in the middle (the longest matching prefix wins),
+  and `resolve.alias` in `vite.config.*` / `vitest.config.*` is read (an object or `[{find, replacement}]`, with
+  `fileURLToPath(new URL(…))` or `path.resolve(__dirname, …)`). An alias is used only if its target exists. So imports
+  like `@shared/api` or `@kit/…` find their callers and `deps` no longer reports them as missing packages. Imports
+  without an extension also find `.tsx`, `.jsx`, `.mts`, `.cjs`, `.cts` files and `index.vue` / `index.tsx` /
+  `index.jsx` / `index.mjs`, and `./a.js` in a TypeScript project resolves to `a.ts`. Import resolution is faster
+  too: each folder is listed once instead of checking every candidate file.
 - **PHP: `X::class` references:** `X::class`, a callable pair `[X::class, 'method']` (`X::method`) and an invokable
   controller in `Route::get($uri, X::class)` (`X::__invoke`) are reference edges marked `(ref)`, resolved through
   `use` and the namespace. `--grep X`, `locate X` and `--depth` now also find the routes, config entries and bindings
@@ -101,6 +109,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ### Changed
 
+- **JS/TS/Vue file keys are relative to the project root:** the file part of a key (`ui/src/x.ts::fn`) is relative to
+  the nearest folder with `.git` or `.callgraph` (without one, the topmost folder of the package / workspace), with `/`
+  on every platform. In a monorepo a file has one key, so `--grep 'ui/src/x.ts::fn'` finds its callers in every
+  package; before, each importing package saw its own relative key. Single-package projects keep their keys. The
+  stored graph is rebuilt once, quietly.
 - **Shorter skill, details per language:** the agent skill is now a short English core `SKILL.md` (about 13 KB
   instead of 30 KB, roughly 3 500 instead of 7 800 tokens) plus detail files in `ref/` (php, blade, js, vue, css,
   rust, swift, kotlin, python, go, gen, mcp, reference) that the agent reads only for the languages of the project.
@@ -167,6 +180,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 - **Literal `import('…')` is a use:** a dynamic `import('./x')` or `import('pkg')` with a fixed string in JS, TS or
   Vue now links to the file or package, so `deps` no longer reports such packages as unused and the importing
   component lists the files it loads.
+- **`deps`: test environment packages are tooling:** `jsdom`, `happy-dom`, `jest-environment-*` and `@vitest/*` are
+  no longer reported as unused.
 - **Vue: methods on `computed(…).value` are not Vue API calls:** with `const x = computed(…)` or `ref(…)`, a call such
   as `x.value.filter(…)` is a plain call on the data, no longer reported as a Vue API call.
 - **`--grep` shows the matching line of a chained call:** for a call chain spread over several lines, the shown
