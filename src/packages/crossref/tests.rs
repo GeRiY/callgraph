@@ -462,3 +462,54 @@ fn blade_translation_calls_count_as_usages() {
         [("auth.failed", 1), ("auth.throttle", 2), ("forms.email", 3)]
     );
 }
+
+#[test]
+fn ts_dictionary_modules_are_language_files() {
+    assert_eq!(
+        lang_target("ui/src/locales/en.ts"),
+        Some(("ui/src/locales".into(), "en".into()))
+    );
+    assert_eq!(
+        lang_target("src/i18n/de/index.ts"),
+        Some(("src/i18n".into(), "de".into()))
+    );
+    assert_eq!(lang_target("src/i18n/index.ts"), None);
+    assert_eq!(lang_target("src/locales/en.d.ts"), None);
+
+    let en = "export default {\n  bed: { locked: 'Locked', save: 'Save' },\n  old: 'Old',\n};\n";
+    let de = "export default {\n  bed: { locked: 'Gesperrt' },\n};\n";
+    let board = "<script setup>\nconst a = t('bed.locked');\nconst b = t('bed.nope');\n</script>\n";
+    let root = project(&[
+        ("src/locales/en.ts", en),
+        ("src/locales/de.ts", de),
+        ("src/Board.vue", board),
+    ]);
+    let need = Need {
+        i18n: I18nNeed::Full,
+        classes: false,
+        views: false,
+    };
+    let crossref = CrossRef::open(&root, need);
+    let view = crossref.i18n_view(
+        &[
+            scope("src/locales/en.ts", None),
+            scope("src/Board.vue", None),
+        ],
+        Lang::En,
+    );
+    assert_eq!(view[0], "i18n src/locales: de, en · 3 keys");
+    assert!(
+        view.iter()
+            .any(|line| line.replace('\\', "/").starts_with("src/locales/en.ts") && line.contains("missing in de 2")),
+        "{view:?}"
+    );
+    assert!(
+        view.iter()
+            .any(|line| line.contains("bed.nope") && line.contains("no key")),
+        "{view:?}"
+    );
+    let header = crossref.header("src/locales/en.ts", Lang::En).unwrap();
+    assert!(header.contains("keys (3):"), "{header}");
+    assert!(header.contains("bed (2): locked, save"), "{header}");
+    assert!(header.contains("old (1)"), "{header}");
+}

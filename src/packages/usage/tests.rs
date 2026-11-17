@@ -89,6 +89,7 @@ fn graph(file: &str) -> FileGraph {
         sfc: None,
         binary: false,
         parse_errors: Vec::new(),
+        facts: None,
     }
 }
 

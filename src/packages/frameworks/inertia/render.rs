@@ -5,7 +5,7 @@
 //! szöveget adja, így a props-kulcsok sem vágódnak le).
 
 use crate::core::srcscan::{self, Dialect};
-use crate::model::{Call, FileGraph};
+use crate::model::{Call, FileGraph, FrameworkFacts, RenderFact};
 
 /// A forrásbeli argumentum-keresés felső korlátja (bájt): egy lezáratlan hívás se járja be a fájl végéig.
 const MAX_SCAN: usize = 20_000;
@@ -119,6 +119,64 @@ pub(crate) fn sites_in(rel: &str, graph: &FileGraph, text: Option<&str>) -> Vec<
             })
         })
         .collect()
+}
+
+/// A render-hívások sorai, amelyeknek nincs literál page-nevű helye (`sites`: a hívások találatai): dinamikus render.
+pub(crate) fn dynamic_lines(graph: &FileGraph, sites: &[RenderSite]) -> Vec<u32> {
+    graph
+        .calls
+        .iter()
+        .filter(|call| RenderKind::of(call).is_some())
+        .filter(|call| !sites.iter().any(|site| site.line == call.line))
+        .map(|call| call.line)
+        .collect()
+}
+
+/// A render-hely tényként.
+pub(crate) fn fact_of_site(site: RenderSite) -> RenderFact {
+    RenderFact {
+        page: site.page,
+        prop_keys: site.props,
+        line: site.line,
+        container: site.container,
+        caller: site.caller,
+    }
+}
+
+/// A fájl tényei render-helyekként (a `rel` a gyökérhez relatív út).
+pub(crate) fn sites_of_facts(rel: &str, facts: &FrameworkFacts) -> Vec<RenderSite> {
+    facts
+        .render_sites
+        .iter()
+        .map(|fact| RenderSite {
+            file: rel.to_owned(),
+            container: fact.container.clone(),
+            caller: fact.caller.clone(),
+            line: fact.line,
+            page: fact.page.clone(),
+            props: fact.prop_keys.clone(),
+        })
+        .collect()
+}
+
+/// A PHP-fájl framework-tényei (R4): a render-helyek és a megosztott props az elemzéskor, a forrásból (`text` a
+/// teljes fájl). Nincs render-hívás és nincs `share` metódus: `None`.
+pub(crate) fn facts_of(graph: &FileGraph, text: &str) -> Option<FrameworkFacts> {
+    let renders = graph
+        .calls
+        .iter()
+        .any(|call| RenderKind::of(call).is_some());
+    let shared = super::shared::shared_in(graph, text);
+    if !renders && shared.is_none() {
+        return None;
+    }
+    let sites = sites_in("", graph, Some(text));
+    let facts = FrameworkFacts {
+        dynamic_lines: dynamic_lines(graph, &sites),
+        render_sites: sites.into_iter().map(fact_of_site).collect(),
+        shared,
+    };
+    (!facts.is_empty()).then_some(facts)
 }
 
 /// A hívás page-neve a tárolt `args`-ból (az outline / json nyila); nem render-hívásnál, argumentum nélkül vagy

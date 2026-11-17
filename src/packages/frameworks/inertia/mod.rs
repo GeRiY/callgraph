@@ -5,6 +5,7 @@
 
 mod pages;
 pub(super) mod render;
+mod shared;
 mod view;
 
 #[cfg(test)]
@@ -14,11 +15,11 @@ use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 
 use super::files::ProjectFiles;
-use crate::model::{Call, FileGraph};
+use crate::model::{Call, FileGraph, FrameworkFacts};
 use crate::packages::Packages;
 
 pub(crate) use pages::PageRoot;
-pub(crate) use render::RenderSite;
+pub(crate) use render::{RenderSite, facts_of};
 
 /// A framework neve a `FRAMEWORKS` regiszterben: ez kapcsolja be a stratégiát.
 pub(crate) const NAME: &str = "inertia";
@@ -47,6 +48,26 @@ pub(crate) struct Inertia {
     declared: HashMap<String, Vec<String>>,
     /// A dinamikus (nem literál page-nevű) render-helyek: (fájl, sor) — ilyenkor a „nem renderelt” lista nem biztos.
     dynamic: Vec<(String, u32)>,
+    /// Az oldalak kötelező props-ai (a `defineProps` nem opcionális, alapérték nélküli tagjai; csak a nem üres).
+    required: HashMap<String, Vec<String>>,
+    /// A `HandleInertiaRequests::share` kulcsai: minden oldalnak átadottak.
+    shared: SharedProps,
+}
+
+/// A megosztott props: a kulcsok és hogy a `share` végig statikusan olvasható volt-e.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SharedProps {
+    keys: Vec<String>,
+    complete: bool,
+}
+
+impl Default for SharedProps {
+    fn default() -> Self {
+        Self {
+            keys: Vec::new(),
+            complete: true,
+        }
+    }
 }
 
 impl Inertia {
@@ -81,45 +102,111 @@ impl Inertia {
             sites: Vec::new(),
             declared: HashMap::new(),
             dynamic: Vec::new(),
+            required: HashMap::new(),
+            shared: SharedProps::default(),
         }
     }
 
     /// A projekt render-helyei és az oldalak props-ai a projekt (kód)fájljaiból: a page-fájloknál a property-k (a
-    /// `defineProps` / `props:`), a PHP-fájloknál a render-hívások — az argumentumaik a forrásból (`files`), mert a
-    /// szűkített tényekben nincs argumentum.
+    /// `defineProps` / `props:`), a PHP-fájloknál a render-helyek — az elemzéskor kinyert tényekből (`FileGraph::facts`);
+    /// tény nélküli gráfnál (régi cache, kézzel épített gráf) az argumentumaik a forrásból (`files`), mert a szűkített
+    /// gráfban nincs hívás-argumentum. A `CALLGRAPH_FACTS_DIFF=1` mindkét utat futtatja, és az eltérést a stderr-re írja.
     pub(crate) fn scan<'g>(
         &mut self,
         graphs: impl IntoIterator<Item = (&'g Path, &'g FileGraph)>,
         files: &dyn ProjectFiles,
     ) {
+        let compare = std::env::var_os("CALLGRAPH_FACTS_DIFF").is_some();
         for (path, graph) in graphs {
             let Some(rel) = self.relative_path(path) else {
                 continue;
             };
             if self.pages.page_name(&rel).is_some() {
-                let props: Vec<String> = graph.properties.iter().map(|p| p.name.clone()).collect();
-                if !props.is_empty() {
-                    self.declared.insert(rel, props);
-                }
+                self.add_page(rel, graph);
                 continue;
             }
-            let renders = rel.ends_with(".php")
-                && graph
-                    .calls
-                    .iter()
-                    .any(|call| render::RenderKind::of(call).is_some());
-            if renders {
-                let text = files.read(path);
-                let found = render::sites_in(&rel, graph, text.as_deref());
-                for call in &graph.calls {
-                    let literal = found.iter().any(|site| site.line == call.line);
-                    if render::RenderKind::of(call).is_some() && !literal {
-                        self.dynamic.push((rel.clone(), call.line));
+            if !rel.ends_with(".php") {
+                continue;
+            }
+            match &graph.facts {
+                Some(facts) => {
+                    self.add_facts(&rel, facts);
+                    if compare {
+                        let text = files.read(path);
+                        report_diff(&rel, graph, facts, text.as_deref());
                     }
                 }
-                self.sites.extend(found);
+                None => {
+                    let renders = graph
+                        .calls
+                        .iter()
+                        .any(|call| render::RenderKind::of(call).is_some());
+                    let shares = graph
+                        .methods
+                        .iter()
+                        .any(|method| method.name.eq_ignore_ascii_case("share"));
+                    if renders || shares {
+                        let text = files.read(path);
+                        self.add_text(&rel, graph, text.as_deref());
+                    }
+                }
             }
         }
+    }
+
+    /// Egy page-fájl deklarált és kötelező props-ai.
+    fn add_page(&mut self, rel: String, graph: &FileGraph) {
+        let props: Vec<String> = graph.properties.iter().map(|p| p.name.clone()).collect();
+        if props.is_empty() {
+            return;
+        }
+        let required: Vec<String> = graph
+            .properties
+            .iter()
+            .filter(|p| p.js && p.readonly)
+            .map(|p| p.name.clone())
+            .collect();
+        if !required.is_empty() {
+            self.required.insert(rel.clone(), required);
+        }
+        self.declared.insert(rel, props);
+    }
+
+    /// Egy PHP-fájl tényei (az elemzés kinyerte: nincs forrásolvasás).
+    fn add_facts(&mut self, rel: &str, facts: &FrameworkFacts) {
+        self.sites.extend(render::sites_of_facts(rel, facts));
+        self.dynamic.extend(
+            facts
+                .dynamic_lines
+                .iter()
+                .map(|line| (rel.to_owned(), *line)),
+        );
+        if let Some(shared) = &facts.shared {
+            self.add_shared(&shared.keys, shared.complete);
+        }
+    }
+
+    /// Egy PHP-fájl render-helyei a forrásból (a régi, szöveg-olvasó út: tény nélküli gráfnál).
+    fn add_text(&mut self, rel: &str, graph: &FileGraph, text: Option<&str>) {
+        let found = render::sites_in(rel, graph, text);
+        self.dynamic.extend(
+            render::dynamic_lines(graph, &found)
+                .into_iter()
+                .map(|line| (rel.to_owned(), line)),
+        );
+        self.sites.extend(found);
+        if let Some(shared) = text.and_then(|text| shared::shared_in(graph, text)) {
+            self.add_shared(&shared.keys, shared.complete);
+        }
+    }
+
+    fn add_shared(&mut self, keys: &[String], complete: bool) {
+        for key in keys {
+            if !self.shared.keys.contains(key) {
+                self.shared.keys.push(key.clone());
+            }
+        }
+        self.shared.complete &= complete;
     }
 
     /// Teszt-összeállítás (más modulok egységtesztjeihez): a page-gyökér (`dir`, az alapértelmezett
@@ -243,5 +330,24 @@ impl Inertia {
             text.push_str(&format!(" (+{rest})"));
         }
         Some(text)
+    }
+}
+
+/// A tény-alapú és a szöveg-olvasó út összevetése (`CALLGRAPH_FACTS_DIFF=1`): eltérésnél egy sor a stderr-re.
+fn report_diff(rel: &str, graph: &FileGraph, facts: &FrameworkFacts, text: Option<&str>) {
+    let Some(text) = text else { return };
+    let other = text_facts(rel, graph, text);
+    if other != *facts {
+        eprintln!("facts diff: {rel}: {facts:?} != {other:?}");
+    }
+}
+
+/// A régi szöveg-olvasó út eredménye tényként (az A / B összevetéshez).
+pub(crate) fn text_facts(rel: &str, graph: &FileGraph, text: &str) -> FrameworkFacts {
+    let found = render::sites_in(rel, graph, Some(text));
+    FrameworkFacts {
+        dynamic_lines: render::dynamic_lines(graph, &found),
+        render_sites: found.into_iter().map(render::fact_of_site).collect(),
+        shared: shared::shared_in(graph, text),
     }
 }

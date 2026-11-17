@@ -13,7 +13,9 @@ reference edges marked `(ref)`: `--grep Foo` and `locate Foo` also find the rout
 **Framework views** (`--format …`): `routes`, `middleware`, `validation`, `jobs`, `events`, `providers`,
 `magic`, `di`, `views`. Run them on a directory (e.g. `bash $CG --project myapp routes --format routes`). Laravel +
 Inertia, on the project root: `ziggy` (unknown route names), `forms` (useForm ↔ validation rules), `models`
-(tables and columns from the migrations), `inertia` (pages, render sites, props). In any project, on a folder or a
+(tables and columns from the migrations), `inertia` (pages, render sites, props; `! props not declared: x` when a
+render site passes a prop the page's `defineProps` lacks, `! never passed: x` when the page declares a required prop
+that no render site and no `HandleInertiaRequests::share` key provides). In any project, on a folder or a
 file: `i18n` (translation keys missing per locale, unused keys, `$t('a.b')` / `__('x')` calls whose key does not
 exist; `lang/en.json::board.title` shows where one key is used) and `classes` (stylesheet classes and the templates
 using them, plus classes nothing uses). Lang files and stylesheets also get the summary line in their outline.

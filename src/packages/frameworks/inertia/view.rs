@@ -1,6 +1,7 @@
 //! Az `inertia` nézet sorai: oldalanként egy sor — `Pages/Board.vue  ← BoardController::show L23 · props: title,
 //! board`, a hibák ugyanazon a soron `!` jellel (a page-fájl hiányzik; a render-hely olyan props-ot ad át, amelyet
-//! az oldal `defineProps`-a nem deklarál — csak ha mindkét oldal statikusan ismert) —, a végén egy sor a PHP-ból
+//! az oldal `defineProps`-a nem deklarál; a kötelező prop, amelyet egyetlen render-hely és a `share` sem ad át —
+//! csak ha mindkét oldal statikusan ismert) —, a végén egy sor a PHP-ból
 //! soha nem renderelt oldalakkal (`unrendered: …`, legfeljebb 10).
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -72,7 +73,44 @@ impl Inertia {
                 });
             }
         }
+        if link.exists {
+            let never = self.never_passed(page, &link.rel);
+            if !never.is_empty() {
+                let list = never.join(", ");
+                line.push_str(&match lang {
+                    Lang::En => format!("  ! never passed: {list}"),
+                    Lang::Hu => format!("  ! sehol nem átadott: {list}"),
+                });
+            }
+        }
         Some(line)
+    }
+
+    /// Az oldal kötelező props-ai, amelyeket egyetlen render-hely sem ad át, és a `share` sem oszt meg (az Inertia
+    /// maga adja az `errors`-t). Csak ha az oldalnak van statikus render-helye, mindegyiknek ismert a props-a, és a
+    /// megosztott props végig olvasható volt — különben nem biztos, ezért üres.
+    fn never_passed(&self, page: &str, rel: &str) -> Vec<&str> {
+        let Some(required) = self.required.get(rel) else {
+            return Vec::new();
+        };
+        let mut passed: Vec<&str> = Vec::new();
+        let mut any = false;
+        for site in self.sites_of(page) {
+            let Some(props) = &site.props else {
+                return Vec::new();
+            };
+            any = true;
+            passed.extend(props.iter().map(String::as_str));
+        }
+        if !any || !self.shared.complete {
+            return Vec::new();
+        }
+        passed.extend(self.shared.keys.iter().map(String::as_str));
+        required
+            .iter()
+            .map(String::as_str)
+            .filter(|name| *name != "errors" && !passed.contains(name))
+            .collect()
     }
 
     /// A PHP-ból (render-hívással vagy `Route::inertia`-val) soha nem renderelt oldalak; mind renderelt: `None`.

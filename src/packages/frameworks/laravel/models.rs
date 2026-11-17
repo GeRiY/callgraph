@@ -524,7 +524,7 @@ impl Laravel {
         }
         models.sort_by(|a, b| a.class.cmp(&b.class));
         let SchemaTable { schema, duplicates } = self.schema_table(files);
-        self.models = Some(ModelData {
+        self.models.data = Some(ModelData {
             models,
             schema,
             duplicates,
@@ -569,7 +569,7 @@ impl Laravel {
 
     /// A modell az osztály teljes neve (`namespace` + `container`) szerint, és a séma.
     fn model_of(&self, namespace: Option<&str>, container: &str) -> Option<(&Model, &Schema)> {
-        let data = self.models.as_ref()?;
+        let data = self.models.data.as_ref()?;
         let full = match namespace.filter(|ns| !ns.is_empty()) {
             Some(ns) => format!("{}\\{container}", ns.trim_matches('\\')),
             None => container.to_owned(),
@@ -685,7 +685,7 @@ impl Laravel {
     /// A `models` nézet sorai a hatókörre (`scope`: a lekérdezett fájlok a gyökérhez relatívan): modellenként egy
     /// sor, utána a problémák (`⚠`) és az összegzés. Üres: nincs modell a hatókörben.
     pub(crate) fn model_view_lines(&self, scope: &[String], lang: Lang) -> Vec<String> {
-        let Some(data) = self.models.as_ref() else {
+        let Some(data) = self.models.data.as_ref() else {
             return Vec::new();
         };
         let mut shown: Vec<&Model> = data
@@ -770,6 +770,7 @@ impl Laravel {
     #[cfg(test)]
     pub(crate) fn models(&self) -> &[Model] {
         self.models
+            .data
             .as_ref()
             .map_or(&[], |data| data.models.as_slice())
     }

@@ -118,6 +118,8 @@ fn group(file: &str) -> String {
     if file.ends_with(".php") {
         let name = file.rsplit('/').next().unwrap_or(file);
         format!("php:{name}")
+    } else if is_script(file) {
+        "script".to_owned()
     } else {
         "json".to_owned()
     }
@@ -145,6 +147,12 @@ fn locale_like(text: &str) -> bool {
         })
 }
 
+/// TS / JS szótár-modul-e a fájl (kiterjesztés szerint).
+fn is_script(file: &str) -> bool {
+    file.rsplit_once('.')
+        .is_some_and(|(_, ext)| matches!(ext, "ts" | "js" | "mjs"))
+}
+
 fn is_lang_dir(name: &str) -> bool {
     LANG_DIRS.contains(&name)
 }
@@ -156,7 +164,7 @@ pub(super) fn lang_target(rel: &str) -> Option<(String, String)> {
     let (stem, ext) = file.rsplit_once('.')?;
     let last = dirs.last().copied();
     match ext {
-        "json" => {
+        "json" | "ts" | "js" | "mjs" => {
             if locale_like(stem) && last.is_some_and(is_lang_dir) {
                 return Some((dirs.join("/"), stem.to_owned()));
             }
@@ -175,6 +183,11 @@ pub(super) fn lang_target(rel: &str) -> Option<(String, String)> {
     }
 }
 
+/// TS / JS szótár-modul alakú nyelvfájl-e az út.
+pub(crate) fn is_script_path(rel: &str) -> bool {
+    is_script(rel) && lang_target(rel).is_some()
+}
+
 /// Nyelvfájl-alakú-e az út.
 pub(crate) fn is_lang_path(rel: &str) -> bool {
     lang_target(rel).is_some()
@@ -186,7 +199,9 @@ impl I18n {
         let Some((dir, locale)) = lang_target(rel) else {
             return;
         };
-        let leaves: Vec<Leaf> = if rel.ends_with(".json") {
+        let leaves: Vec<Leaf> = if is_script(rel) {
+            super::i18n_script::script_leaves(text)
+        } else if rel.ends_with(".json") {
             let Some(all) = crate::lang::json::leaves(text) else {
                 return;
             };
@@ -440,6 +455,62 @@ impl I18n {
                     .collect(),
             })
             .collect()
+    }
+}
+
+/// Egy felső szintű kulcs a szótár-modul kulcs-fájában: a név, a levelek száma és a közvetlen gyerekek nevei.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct TreeGroup {
+    pub(crate) name: String,
+    pub(crate) leaves: usize,
+    pub(crate) children: Vec<String>,
+}
+
+impl I18n {
+    /// A szótár-modul (TS / JS nyelvfájl) kulcs-fája: felső szint, darabszám, a következő szint nevei.
+    pub(crate) fn key_tree(&self, rel: &str) -> Vec<TreeGroup> {
+        let Some((index, locale)) = self.lang_file(rel) else {
+            return Vec::new();
+        };
+        let Some(mine) = self.sets[index].locales.get(locale) else {
+            return Vec::new();
+        };
+        let mut groups: Vec<TreeGroup> = Vec::new();
+        for (key, def) in &mine.keys {
+            if def.file != rel {
+                continue;
+            }
+            let mut parts = key.splitn(3, '.');
+            let top = parts.next().unwrap_or_default();
+            let child = parts.next();
+            if groups.last().is_none_or(|group| group.name != top) {
+                groups.push(TreeGroup {
+                    name: top.to_owned(),
+                    leaves: 0,
+                    children: Vec::new(),
+                });
+            }
+            let Some(group) = groups.last_mut() else {
+                continue;
+            };
+            group.leaves += 1;
+            if let Some(child) = child {
+                let branch = parts.next().is_some();
+                let label = if branch {
+                    format!("{child}.")
+                } else {
+                    child.to_owned()
+                };
+                let seen = group
+                    .children
+                    .last()
+                    .is_some_and(|last| last == &label || last.trim_end_matches('.') == child);
+                if !seen {
+                    group.children.push(label);
+                }
+            }
+        }
+        groups
     }
 }
 

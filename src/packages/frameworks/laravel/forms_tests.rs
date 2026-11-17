@@ -260,8 +260,8 @@ fn two_forms_in_one_file_keep_their_own_fields() {
 #[test]
 fn a_form_request_via_import_confirmed_and_explicit_reads_make_the_contract() {
     let laravel = register_project();
-    let form = &laravel.forms[0];
-    assert_eq!(laravel.forms.len(), 1);
+    let form = &laravel.forms.items[0];
+    assert_eq!(laravel.forms.items.len(), 1);
     assert_eq!(form.file, REGISTER_PAGE);
     assert_eq!(
         (form.verb.as_str(), form.uri.as_str()),
@@ -414,13 +414,13 @@ class PasswordController {
         )],
     );
     // a template-literal cél dinamikus: az űrlap megmarad, route nélkül (harmadikként)
-    assert_eq!(laravel.forms.len(), 3);
+    assert_eq!(laravel.forms.items.len(), 3);
     assert!(
-        laravel.forms[2].class.is_empty(),
+        laravel.forms.items[2].class.is_empty(),
         "{:?}",
-        laravel.forms[2].uri
+        laravel.forms.items[2].uri
     );
-    let (users, password) = (&laravel.forms[0], &laravel.forms[1]);
+    let (users, password) = (&laravel.forms.items[0], &laravel.forms.items[1]);
     assert_eq!(
         (users.uri.as_str(), users.method.as_str()),
         ("/users/{user}", "update")
@@ -458,7 +458,7 @@ class FooController {
             ],
         )],
     );
-    let form = &laravel.forms[0];
+    let form = &laravel.forms.items[0];
     assert!(!form.validated && form.unvalidated.is_empty() && form.missing_required.is_empty());
     assert_eq!(
         laravel.form_lines(
@@ -509,7 +509,7 @@ fn long_name_lists_are_capped_at_five() {
         missing_required: Vec::new(),
     };
     let mut laravel = Laravel::new(&root());
-    laravel.forms.push(form);
+    laravel.forms.items.push(form);
     assert_eq!(
         laravel.form_lines("resources/js/Pages/X.vue", Some("Page"), "submit", Lang::En),
         vec!["form: POST /x · FooController@store · ⚠ unvalidated: a, b, c, d, e, +2".to_owned()]

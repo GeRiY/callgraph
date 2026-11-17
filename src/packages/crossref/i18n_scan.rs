@@ -36,7 +36,7 @@ pub(crate) struct Found {
 fn call_re() -> &'static Regex {
     static RE: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(
-            r#"(@lang|\$tc|\$te|\$t|trans_choice|trans|__|Lang::(?:get|choice|has)|\btc|\bt)\s*\(\s*(['"`])?"#,
+            r#"(@lang|\$tc|\$te|\$t|trans_choice|trans|__|Lang::(?:get|choice|has)|\btranslate|\btc|\bt)\s*\(\s*(['"`])?"#,
         )
         .expect("érvényes regex")
     });
@@ -77,7 +77,7 @@ fn is_js(ext: &str) -> bool {
 /// A hívó név engedélyezett-e a fájltípusban (a PHP-ban nincs `t()` / `$t()`).
 fn allowed(function: &str, ext: &str) -> bool {
     match function {
-        "t" | "tc" | "$t" | "$tc" | "$te" => is_js(ext),
+        "t" | "tc" | "translate" | "$t" | "$tc" | "$te" => is_js(ext),
         "@lang" | "Lang::get" | "Lang::choice" | "Lang::has" | "trans_choice" => {
             matches!(ext, "php" | "html" | "htm")
         }
@@ -152,7 +152,7 @@ pub(super) fn scan(rel: &str, ext: &str, text: &str, found: &mut Found) {
             continue;
         }
         // a vue-i18n-szerű `t` / `$t` kulcsai szóköz nélküliek (a `__('Welcome back')` mondat-kulcs más)
-        if matches!(function, "t" | "tc" | "$t" | "$tc" | "$te")
+        if matches!(function, "t" | "tc" | "translate" | "$t" | "$tc" | "$te")
             && body.contains(char::is_whitespace)
         {
             continue;

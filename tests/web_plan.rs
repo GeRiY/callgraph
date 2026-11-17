@@ -292,7 +292,7 @@ fn h09_class_constant_reference_is_found_by_grep_and_locate() {
         "{out}"
     );
     let located = fixture.run(&["locate", "CatalogueController"]);
-    assert!(located.contains("config/library.php"), "{located}");
+    assert!(located.contains(&sep("config/library.php")), "{located}");
 }
 
 #[test]
@@ -314,30 +314,30 @@ fn h11_forms_view_keeps_a_multiline_chain_and_an_unknown_target() {
 }
 
 #[test]
-#[ignore = "web-plan H12: a TS dictionary module is not a language file; enabled in phase 6 (F6)"]
 fn h12_i18n_view_reads_ts_dictionary_modules() {
     let out = Fixture::monorepo().run(&["show", ".", "--format", "i18n"]);
     assert!(!out.contains("no translation files found"), "{out}");
     let head = out.lines().next().unwrap_or("");
     assert!(
-        head.starts_with("i18n lang:") && head.contains("en") && head.contains("de"),
+        head.starts_with("i18n ui/src/locales:") && head.contains("en") && head.contains("de"),
         "{out}"
     );
 }
 
 #[test]
-#[ignore = "web-plan H12: a script-side t() call is not an i18n:: key; enabled in phase 6 (F6)"]
 fn h12_script_t_call_is_an_i18n_key() {
     let out = Fixture::monorepo().run(&["show", "ui/src", "--grep", "i18n::bed.locked"]);
     assert!(
-        out.contains("FILE  ui/src/components/BedPlanner.vue"),
+        out.contains(&format!(
+            "FILE  {}",
+            sep("ui/src/components/BedPlanner.vue")
+        )),
         "{out}"
     );
     assert!(out.contains("statusLine"), "{out}");
 }
 
 #[test]
-#[ignore = "web-plan H12: the dictionary module outline shows no key tree; enabled in phase 6 (F6)"]
 fn h12_dictionary_outline_shows_the_key_tree() {
     let out = Fixture::monorepo().run(&["show", "ui/src/locales/en.ts"]);
     assert!(out.contains("locked") && out.contains("remove"), "{out}");
@@ -509,7 +509,8 @@ fn h26_routes_view_is_the_full_table_without_noise() {
     assert!(reports.contains("EnsureReaderCard"), "{reports}");
     assert!(rows.iter().any(|r| r.contains("name=start")), "{out}");
     assert!(
-        rows.iter().all(|r| r.contains("routes/web.php:")),
+        rows.iter()
+            .all(|r| r.contains("routes/web.php:") || r.contains(&sep("routes/web.php:"))),
         "a sorok fájl:sor helye hiányzik:\n{out}"
     );
 }

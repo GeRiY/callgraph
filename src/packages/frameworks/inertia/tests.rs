@@ -10,7 +10,7 @@ use super::pages::{self, PageRoot};
 use super::render::{self, RenderKind};
 use super::{Inertia, PageLink};
 use crate::i18n::Lang;
-use crate::model::{Call, FileGraph, Property};
+use crate::model::{Call, Container, FileGraph, Method, Property};
 use crate::packages::{Ecosystem, EcosystemPackages, Package, Packages, ProjectPackages};
 
 /// Memóriabeli fájlrendszer: a gyökérhez relatív út → szöveg.
@@ -98,6 +98,7 @@ fn graph(file: &str, calls: Vec<Call>) -> FileGraph {
         sfc: None,
         binary: false,
         parse_errors: Vec::new(),
+        facts: None,
     }
 }
 
@@ -504,4 +505,175 @@ fn the_strategy_needs_the_inertia_package_and_a_page_root() {
     // page-gyökér nélkül sincs stratégia
     let empty = MemFiles::new(&[]);
     assert!(Inertia::detect(&root(), &with_inertia, &empty).is_none());
+}
+
+/// Egy oldal, két kötelező prop-pal (`slug`, `title`) és egy opcionálissal.
+fn required_page(inertia: &mut Inertia) {
+    let page = "resources/js/Pages/Board.vue".to_owned();
+    inertia
+        .declared
+        .insert(page.clone(), s(&["slug", "title", "note"]));
+    inertia.required.insert(page, s(&["slug", "title"]));
+}
+
+#[test]
+fn view_lines_report_required_props_that_no_render_site_passes() {
+    let mut inertia = Inertia::fixture(
+        &root(),
+        "resources/js/Pages",
+        &["resources/js/Pages/Board.vue"],
+        &[
+            ("app/A.php", "A", "show", 3, "Board"),
+            ("app/B.php", "B", "edit", 5, "Board"),
+        ],
+    );
+    required_page(&mut inertia);
+    let scope = s(&["resources/js/Pages/Board.vue"]);
+    let lines = |inertia: &Inertia, lang| inertia.view_lines(&scope, lang);
+
+    // az egyik render-hely sem ad át `slug`-ot: a hiány a két render-hely uniójára számít
+    inertia.sites[0].props = Some(s(&["title"]));
+    inertia.sites[1].props = Some(s(&["note"]));
+    let out = lines(&inertia, Lang::En);
+    assert!(out[0].ends_with("  ! never passed: slug"), "{out:?}");
+    assert!(lines(&inertia, Lang::Hu)[0].ends_with("  ! sehol nem átadott: slug"));
+
+    // a megosztott props mindenhol átadott
+    inertia.shared.keys = s(&["slug"]);
+    assert!(!lines(&inertia, Lang::En)[0].contains("never passed"));
+    // nem olvasható `share`: nem biztos, nincs jelzés
+    inertia.shared.keys.clear();
+    inertia.shared.complete = false;
+    assert!(!lines(&inertia, Lang::En)[0].contains("never passed"));
+    inertia.shared.complete = true;
+    // nem statikus props-ú render-hely: nem biztos
+    inertia.sites[1].props = None;
+    assert!(!lines(&inertia, Lang::En)[0].contains("never passed"));
+    // minden kötelező átadva (az `errors` az Inertia sajátja)
+    inertia.sites[1].props = Some(s(&["slug"]));
+    inertia.required.insert(
+        "resources/js/Pages/Board.vue".into(),
+        s(&["slug", "title", "errors"]),
+    );
+    assert!(!lines(&inertia, Lang::En)[0].contains("never passed"));
+}
+
+const SHARE_PHP: &str = "<?php\nclass HandleInertiaRequests extends Middleware\n{\n    public function share(Request $request): array\n    {\n        return array_merge(parent::share($request), [\n            'auth' => ['user' => $request->user()],\n            'flash' => fn () => [],\n        ]);\n    }\n}\n";
+
+fn middleware_graph() -> FileGraph {
+    let mut graph = graph(
+        "/p/app/Http/Middleware/HandleInertiaRequests.php",
+        Vec::new(),
+    );
+    graph.containers = vec![Container {
+        kind: "class".into(),
+        name: "HandleInertiaRequests".into(),
+        line: 2,
+        end_line: 11,
+        is_abstract: None,
+        is_final: None,
+        extends: Some(vec!["Inertia\\Middleware".into()]),
+        implements: None,
+        traits: None,
+        doc: None,
+    }];
+    graph.methods = vec![Method {
+        container: Some("HandleInertiaRequests".into()),
+        name: "share".into(),
+        line: 4,
+        end_line: Some(10),
+        visibility: Some("public".into()),
+        is_static: false,
+        is_abstract: false,
+        kind: None,
+        params: Vec::new(),
+        return_type: None,
+        doc_types: None,
+        doc: None,
+        body: None,
+    }];
+    graph
+}
+
+/// A / B: a tény-alapú és a szöveg-olvasó út ugyanazt a render-helyet, dinamikus helyet, megosztott props-ot és
+/// nézet-sort adja.
+#[test]
+fn facts_and_the_text_reader_give_the_same_inertia_view() {
+    let source = "<?php\nclass BoardController\n{\n    public function show()\n    {\n        return Inertia::render('Board', ['title' => $t, 'extra' => 1]);\n    }\n    public function edit()\n    {\n        return Inertia::render('Board');\n    }\n    public function any($name)\n    {\n        return Inertia::render($name);\n    }\n}\n";
+    let controller_rel = "app/Http/Controllers/BoardController.php";
+    let middleware_rel = "app/Http/Middleware/HandleInertiaRequests.php";
+    let files = MemFiles::new(&[(controller_rel, source), (middleware_rel, SHARE_PHP)]);
+    let mut edit = render(10, &[]);
+    edit.caller = Some("edit".into());
+    let mut any = render(14, &[]);
+    any.caller = Some("any".into());
+    let mut controller = graph(
+        "/p/app/Http/Controllers/BoardController.php",
+        vec![render(6, &[]), edit, any],
+    );
+    let middleware = middleware_graph();
+    let mut page = graph("/p/resources/js/Pages/Board.vue", Vec::new());
+    let mut slug = prop("slug");
+    slug.readonly = true;
+    page.properties = vec![prop("title"), slug];
+    let paths = [
+        root().join(controller_rel),
+        root().join(middleware_rel),
+        root().join("resources/js/Pages/Board.vue"),
+    ];
+
+    let run = |controller: &FileGraph, middleware: &FileGraph| {
+        let mut inertia = Inertia::new(
+            &root(),
+            vue_root("resources/js/Pages"),
+            s(&["resources/js/Pages/Board.vue"]),
+        );
+        inertia.scan(
+            [
+                (paths[0].as_path(), controller),
+                (paths[1].as_path(), middleware),
+                (paths[2].as_path(), &page),
+            ],
+            &files,
+        );
+        inertia
+    };
+    // B: nincs tény (a régi szöveg-olvasó)
+    let text = run(&controller, &middleware);
+    // A: a tények az elemzéskor, forrásolvasás nélkül (üres fájlrendszer)
+    controller.facts = render::facts_of(&controller, source);
+    let mut middleware_with = middleware.clone();
+    middleware_with.facts = render::facts_of(&middleware, SHARE_PHP);
+    assert!(controller.facts.is_some() && middleware_with.facts.is_some());
+    let facts_run = {
+        let mut inertia = Inertia::new(
+            &root(),
+            vue_root("resources/js/Pages"),
+            s(&["resources/js/Pages/Board.vue"]),
+        );
+        let empty = MemFiles::new(&[]);
+        inertia.scan(
+            [
+                (paths[0].as_path(), &controller),
+                (paths[1].as_path(), &middleware_with),
+                (paths[2].as_path(), &page),
+            ],
+            &empty,
+        );
+        inertia
+    };
+    assert_eq!(text.sites(), facts_run.sites());
+    assert_eq!(text.dynamic, facts_run.dynamic);
+    assert_eq!(text.shared, facts_run.shared);
+    assert_eq!(text.shared.keys, s(&["auth", "flash"]));
+    assert_eq!(text.dynamic, vec![(controller_rel.to_owned(), 14)]);
+    let scope = s(&["resources/js/Pages/Board.vue"]);
+    let lines = facts_run.view_lines(&scope, Lang::En);
+    assert_eq!(lines, text.view_lines(&scope, Lang::En));
+    // `slug` kötelező, de se a render-helyek, se a `share` nem adja át
+    assert!(lines[0].ends_with("  ! never passed: slug"), "{lines:?}");
+    assert_eq!(
+        facts_run.rendered_by("/p/resources/js/Pages/Board.vue"),
+        text.rendered_by("/p/resources/js/Pages/Board.vue")
+    );
 }

@@ -19,12 +19,12 @@ use serde::{Deserialize, Serialize};
 use super::record::{FileFacts, FileStamp};
 use crate::error::Result;
 use crate::model::{
-    Call, Comment, Constant, Container, ControlFlow, FileGraph, Imports, Method, ParseError,
-    Property, StringLit, Write,
+    Call, Comment, Constant, Container, ControlFlow, FileGraph, FrameworkFacts, Imports, Method,
+    ParseError, Property, StringLit, Write,
 };
 
 /// A tárolt szerkezet verziója; ha változik, a régi tároló csendben újraépül.
-pub(crate) const FORMAT_VERSION: u32 = 11; // 11: a JS-kulcsok (`module`, import-célok) a projekt-gyökérhez relatívak, nem a csomaghoz; 10: JS-függvényhivatkozás (`handler`) és PHP `X::class` (`class_ref`) élek; 9: a Kotlin nav-hívás útvonala (`args`) a szűkített tényekben; 8: a Vue-prop alapértéke külön mező (`default`); 7: a szűkített tények importjai (`uses`: a csak típus-hivatkozás)
+pub(crate) const FORMAT_VERSION: u32 = 12; // 12: a PHP-fájl framework-tényei (`facts`: Inertia render-helyek, megosztott props); 11: a JS-kulcsok (`module`, import-célok) a projekt-gyökérhez relatívak, nem a csomaghoz; 10: JS-függvényhivatkozás (`handler`) és PHP `X::class` (`class_ref`) élek; 9: a Kotlin nav-hívás útvonala (`args`) a szűkített tényekben; 8: a Vue-prop alapértéke külön mező (`default`); 7: a szűkített tények importjai (`uses`: a csak típus-hivatkozás)
 
 /// A keretezett fájlok eleje.
 const MAGIC: &[u8; 4] = b"CGB1";
@@ -298,6 +298,9 @@ struct StoredGraph {
     /// A szintaktikai hibák (a régi rekordokban nincs: üres).
     #[serde(default)]
     parse_errors: Vec<ParseError>,
+    /// A framework-tények (Inertia render-helyek; a régi rekordokban nincs: `None`).
+    #[serde(default)]
+    facts: Option<FrameworkFacts>,
 }
 
 impl From<&FileGraph> for StoredGraph {
@@ -321,6 +324,7 @@ impl From<&FileGraph> for StoredGraph {
             sfc,
             binary,
             parse_errors,
+            facts,
         } = graph;
         let (entries, object) = imports.parts();
         Self {
@@ -342,6 +346,7 @@ impl From<&FileGraph> for StoredGraph {
             sfc: sfc.as_ref().map(serde_json::Value::to_string),
             binary: *binary,
             parse_errors: parse_errors.clone(),
+            facts: facts.clone(),
         }
     }
 }
@@ -366,6 +371,7 @@ impl From<StoredGraph> for FileGraph {
             sfc: stored.sfc.and_then(|text| serde_json::from_str(&text).ok()),
             binary: stored.binary,
             parse_errors: stored.parse_errors,
+            facts: stored.facts,
         }
     }
 }

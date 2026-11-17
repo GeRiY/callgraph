@@ -15,6 +15,7 @@ mod classes;
 mod classes_scan;
 mod i18n;
 mod i18n_scan;
+mod i18n_script;
 mod render;
 mod views;
 
@@ -124,7 +125,7 @@ impl CrossRef {
                 classes.tailwind = true;
             }
             match ext.as_str() {
-                "json" | "php" => {
+                "json" | "php" | "ts" | "js" | "mjs" => {
                     if let Some(i18n) = i18n.as_mut()
                         && i18n::is_lang_path(rel)
                         && let Some(text) = read(path)

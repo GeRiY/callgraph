@@ -11,14 +11,14 @@ impl Laravel {
     /// A nézet sorai a hatókörre (`scope`: a lekérdezett fájlok a gyökérhez relatívan): az ismeretlen nevek csak a
     /// hatókör fájljaiból; az összegzés a projekt egészére szól. Üres: nincs route-tábla.
     pub(crate) fn view_lines(&self, scope: &[String], lang: Lang) -> Vec<String> {
-        if self.routes.is_empty() {
+        if self.table.routes.is_empty() {
             return Vec::new();
         }
         let in_scope = |file: &str| scope.iter().any(|have| have == file);
         let mut unknown: Vec<_> = self
             .refs
             .iter()
-            .filter(|r| in_scope(&r.file) && !self.by_name.contains_key(&r.name))
+            .filter(|r| in_scope(&r.file) && !self.table.by_name.contains_key(&r.name))
             .collect();
         unknown.sort_by(|a, b| (&a.file, a.line, &a.name).cmp(&(&b.file, b.line, &b.name)));
         unknown.dedup_by(|a, b| (&a.file, a.line, &a.name) == (&b.file, b.line, &b.name));
@@ -27,7 +27,7 @@ impl Laravel {
             .into_iter()
             .partition(|r| self.dynamic_pattern(&r.name).is_some());
         // dinamikus nevű route-ok mellett az „ismeretlen” csak gyanú (`?`), és egy sor megmondja, hol vannak
-        let mark = if self.dynamic_names.is_empty() {
+        let mark = if self.table.dynamic_names.is_empty() {
             "⚠"
         } else {
             "?"
@@ -55,8 +55,13 @@ impl Laravel {
                 r.line
             )
         }));
-        if let Some((file, line)) = self.dynamic_names.first().filter(|_| !unknown.is_empty()) {
-            let more = self.dynamic_names.len() - 1;
+        if let Some((file, line)) = self
+            .table
+            .dynamic_names
+            .first()
+            .filter(|_| !unknown.is_empty())
+        {
+            let more = self.table.dynamic_names.len() - 1;
             let more = if more > 0 {
                 format!(" +{more}")
             } else {
@@ -69,18 +74,18 @@ impl Laravel {
             ));
         }
         // a `routes/` alatti, de be nem töltött fájl: a route-jai nem élnek (halott kód, vagy elfelejtett `require`)
-        for file in &self.unloaded {
+        for file in &self.table.unloaded {
             lines.push(crate::tfl!(
                 lang,
                 "? {file}: never loaded (no withRouting / require) — its routes are ignored",
                 "? {file}: sehonnan nincs betöltve (se withRouting, se require) — a route-jai nem élnek"
             ));
         }
-        let named = self.by_name.len();
+        let named = self.table.by_name.len();
         let from_js = self
             .refs
             .iter()
-            .filter(|r| r.js && self.by_name.contains_key(&r.name))
+            .filter(|r| r.js && self.table.by_name.contains_key(&r.name))
             .map(|r| r.name.as_str())
             .collect::<BTreeSet<_>>()
             .len();

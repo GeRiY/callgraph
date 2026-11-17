@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 
 use super::super::files::{ProjectFiles, Stamp};
 use super::forms::Site;
-use super::routes::Route;
+use super::parts::RouteTable;
 use super::rules::Validation;
 use super::schema::Schema;
 use super::{Laravel, models::MIGRATIONS_DIR};
@@ -36,14 +36,6 @@ const FORMAT: u32 = 2;
 
 /// Egy bemenet-halmaz ujjlenyomata: a gyökérhez relatív utak és bélyegeik, rendezve.
 pub(crate) type Fingerprint = Vec<(String, Stamp)>;
-
-/// A route-tábla levezetett adata (a `Laravel::scan` kimenete a `by_name` nélkül).
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub(super) struct RouteTable {
-    pub routes: Vec<Route>,
-    pub dynamic_names: Vec<(String, u32)>,
-    pub unloaded: Vec<String>,
-}
 
 /// A migrációkból épített séma és a kétszeri létrehozások.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -360,10 +352,8 @@ impl Laravel {
         else {
             return false;
         };
-        self.routes = table.routes;
-        self.dynamic_names = table.dynamic_names;
-        self.unloaded = table.unloaded;
-        self.rebuild_names();
+        self.table = table;
+        self.table.rebuild_names();
         true
     }
 
@@ -372,11 +362,7 @@ impl Laravel {
         let Some(inputs) = inputs else {
             return;
         };
-        let table = RouteTable {
-            routes: self.routes.clone(),
-            dynamic_names: self.dynamic_names.clone(),
-            unloaded: self.unloaded.clone(),
-        };
+        let table = self.table.clone();
         self.with_cache(|c| c.put_routes(inputs, table));
     }
 

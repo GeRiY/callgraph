@@ -109,6 +109,8 @@ impl FileFacts {
             sfc: None,
             binary: source.binary,
             parse_errors: source.parse_errors.clone(),
+            // a framework-tények kicsik, és az `inertia` nézet teljes hatókörű olvasója
+            facts: source.facts.clone(),
         };
         Self {
             graph,

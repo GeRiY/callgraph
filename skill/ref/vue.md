@@ -14,4 +14,5 @@ separate block; a long default is cut with `…`), `emits (N): a, b` and `models
 ```bash
 bash $CG --project myapp resources/js --grep 'vue::emit:save'         # who emits 'save'
 bash $CG --project myapp resources/js --grep 'Atoms/AtomButton.vue'   # where the component is used
+bash $CG --project myapp resources/js --grep 'i18n::bed.locked'       # `t('bed.locked')` in a script, via the project's own t() wrapper too
 ```

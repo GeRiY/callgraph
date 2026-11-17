@@ -14,12 +14,13 @@ const MAX_LISTED: usize = 3;
 impl Laravel {
     /// Van-e route a táblában.
     pub(crate) fn has_routes(&self) -> bool {
-        !self.routes.is_empty()
+        !self.table.routes.is_empty()
     }
 
     /// A route-fájlok, amelyekből a tábla épült (gyökérhez relatív utak).
     pub(crate) fn route_files(&self) -> BTreeSet<&str> {
-        self.routes
+        self.table
+            .routes
             .iter()
             .map(|route| route.file.as_str())
             .collect()
@@ -28,7 +29,7 @@ impl Laravel {
     /// A `routes` nézet sorai: azok a route-ok, amelyek fájlja a hatókörben van (`files`: a gyökérhez relatív
     /// utak), vagy amelyek kezelője a hatókör egyik osztálya (`classes`: teljes nevek).
     pub(crate) fn route_lines(&self, files: &[String], classes: &[String]) -> Vec<String> {
-        self.routes
+        self.table.routes
             .iter()
             .filter(|route| {
                 files.contains(&route.file)
@@ -42,7 +43,7 @@ impl Laravel {
     /// Csak a hatókörbeli route-okból (lásd [`Self::route_lines`]).
     pub(crate) fn middleware_lines(&self, files: &[String], classes: &[String]) -> Vec<String> {
         let mut by_name: BTreeMap<&str, Vec<&Route>> = BTreeMap::new();
-        for route in &self.routes {
+        for route in &self.table.routes {
             let in_scope = files.contains(&route.file)
                 || matches!(&route.action, Action::Controller { class, .. } if classes.contains(class));
             if !in_scope {
@@ -78,7 +79,7 @@ impl Laravel {
     /// (a `routes/…` fájl és a route sora) kerülnek az `inertia` nézetbe, hogy az oldal ne legyen „nem renderelt”.
     pub(crate) fn page_sites(&self) -> Vec<RenderSite> {
         let mut out: Vec<RenderSite> = Vec::new();
-        for route in &self.routes {
+        for route in &self.table.routes {
             let Some(page) = &route.page else {
                 continue;
             };

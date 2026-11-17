@@ -22,7 +22,7 @@ use crate::locate::ProjectSource;
 use crate::query::QueryResult;
 
 pub(crate) use files::DiskProjectFiles;
-pub(crate) use inertia::{Inertia, PageLink};
+pub(crate) use inertia::{Inertia, PageLink, facts_of};
 pub(crate) use laravel::Laravel;
 
 /// A sorok a framework-kötésekkel (`format`: a kért nézet). Inertia-projektben a sorok megkapják a kötéseket (az

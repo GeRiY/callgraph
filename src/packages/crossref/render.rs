@@ -161,6 +161,11 @@ impl CrossRef {
             }
             lines.push(format!("i18n: {}", parts.join(" · ")));
         }
+        if let Some(i18n) = self.i18n.as_ref()
+            && super::i18n::is_script_path(&rel)
+        {
+            lines.extend(tree_lines(&i18n.key_tree(&rel), lang));
+        }
         if let Some(classes) = &self.classes
             && is_sheet(&rel)
         {
@@ -344,6 +349,40 @@ impl CrossRef {
         out.extend(body);
         out
     }
+}
+
+/// Legfeljebb ennyi felső szintű csoport a szótár-modul kulcs-fájában.
+const TREE_GROUPS: usize = 30;
+/// Egy csoport sorában legfeljebb ennyi gyerek-név.
+const TREE_CHILDREN: usize = 8;
+
+/// A szótár-modul kulcs-fája: egy sor felső szintenként (`bed (3): locked, save`), a `név.` a további ágat jelzi.
+fn tree_lines(groups: &[super::i18n::TreeGroup], lang: Lang) -> Vec<String> {
+    if groups.is_empty() {
+        return Vec::new();
+    }
+    let total: usize = groups.iter().map(|group| group.leaves).sum();
+    let mut out = vec![format!("{} ({total}):", lang.pick("keys", "kulcsok"))];
+    for group in groups.iter().take(TREE_GROUPS) {
+        let mut line = format!("  {} ({})", group.name, group.leaves);
+        if !group.children.is_empty() {
+            let shown: Vec<&str> = group
+                .children
+                .iter()
+                .take(TREE_CHILDREN)
+                .map(String::as_str)
+                .collect();
+            line.push_str(&format!(": {}", shown.join(", ")));
+            if group.children.len() > TREE_CHILDREN {
+                line.push_str(&format!(" +{}", group.children.len() - TREE_CHILDREN));
+            }
+        }
+        out.push(line);
+    }
+    if groups.len() > TREE_GROUPS {
+        out.push(format!("  … +{}", groups.len() - TREE_GROUPS));
+    }
+    out
 }
 
 fn file_line(rel: &str, report: &super::i18n::FileReport, lang: Lang) -> String {

@@ -178,6 +178,7 @@ mod tests {
             sfc: None,
             binary: false,
             parse_errors: Vec::new(),
+            facts: None,
         }
     }
 

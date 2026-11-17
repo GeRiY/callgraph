@@ -55,6 +55,7 @@ fn graph(name: &str) -> crate::model::FileGraph {
         sfc: None,
         binary: false,
         parse_errors: Vec::new(),
+        facts: None,
     }
 }
 

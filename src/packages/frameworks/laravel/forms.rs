@@ -556,9 +556,9 @@ impl Laravel {
         graphs: impl IntoIterator<Item = (&'g Path, &'g FileGraph)>,
         files: &dyn ProjectFiles,
     ) {
-        self.forms.clear();
-        self.diagnostics.clear();
-        if self.routes.is_empty() {
+        self.forms.items.clear();
+        self.forms.diagnostics.clear();
+        if self.table.routes.is_empty() {
             return;
         }
         let mut classes: HashMap<String, String> = HashMap::new();
@@ -590,10 +590,10 @@ impl Laravel {
         sites: Vec<Site>,
         files: &dyn ProjectFiles,
     ) {
-        self.psr4 = composer_psr4(&self.root, files);
-        self.forms.clear();
-        self.diagnostics.clear();
-        if self.routes.is_empty() {
+        self.forms.psr4 = composer_psr4(&self.root, files);
+        self.forms.items.clear();
+        self.forms.diagnostics.clear();
+        if self.table.routes.is_empty() {
             return;
         }
         let mut classes: HashMap<String, String> = HashMap::new();
@@ -692,8 +692,8 @@ impl Laravel {
                 missing_required,
             });
         }
-        self.forms = forms;
-        self.diagnostics = diagnostics;
+        self.forms.items = forms;
+        self.forms.diagnostics = diagnostics;
     }
 
     /// Célzott változat: a `graphs` csak a (JS / Vue) küldő fájlok és a lekérdezett PHP-fájlok; a controller és a
@@ -704,7 +704,7 @@ impl Laravel {
         graphs: impl IntoIterator<Item = (&'g Path, &'g FileGraph)>,
         files: &dyn ProjectFiles,
     ) {
-        self.psr4 = composer_psr4(&self.root, files);
+        self.forms.psr4 = composer_psr4(&self.root, files);
         self.scan_forms(graphs, files);
     }
 
@@ -717,7 +717,7 @@ impl Laravel {
             .and_then(|rest| rest.strip_suffix(')'))
         {
             let name = literal(split_top(inner, ",").first()?)?;
-            let route = &self.routes[*self.by_name.get(&name)?];
+            let route = &self.table.routes[*self.table.by_name.get(&name)?];
             let route = self.for_verb(route, verb);
             return has_verb(&route.verb, verb).then_some(route);
         }
@@ -728,7 +728,8 @@ impl Laravel {
         }
         let segments: Vec<&str> = path.trim_matches('/').split('/').collect();
         let candidates = || {
-            self.routes
+            self.table
+                .routes
                 .iter()
                 .filter(|route| has_verb(&route.verb, verb) && uri_matches(&route.uri, &segments))
         };
@@ -744,7 +745,7 @@ impl Laravel {
         let psr4 = class
             .strip_prefix("App\\")
             .map(|rest| format!("app/{}.php", rest.replace('\\', "/")));
-        let composer = self.psr4.iter().filter_map(|(prefix, dir)| {
+        let composer = self.forms.psr4.iter().filter_map(|(prefix, dir)| {
             let rest = class.strip_prefix(prefix.as_str())?;
             Some(format!("{dir}/{}.php", rest.replace('\\', "/")))
         });
@@ -789,13 +790,14 @@ impl Laravel {
         caller: &str,
         lang: Lang,
     ) -> Vec<String> {
-        if self.forms.is_empty() {
+        if self.forms.items.is_empty() {
             return Vec::new();
         }
         let Some(rel) = self.rel(file) else {
             return Vec::new();
         };
         self.forms
+            .items
             .iter()
             .filter(|form| {
                 form.file == rel
@@ -814,7 +816,7 @@ impl Laravel {
         container: &str,
         method: &str,
     ) -> Option<String> {
-        if self.forms.is_empty() {
+        if self.forms.items.is_empty() {
             return None;
         }
         let full = match namespace.filter(|ns| !ns.is_empty()) {
@@ -822,7 +824,7 @@ impl Laravel {
             None => container.to_owned(),
         };
         let mut files: Vec<&str> = Vec::new();
-        for form in &self.forms {
+        for form in &self.forms.items {
             let class_ok =
                 form.class == full || (!form.class.contains('\\') && form.class == container);
             if class_ok && form.method == method && !files.contains(&short_file(&form.file)) {
@@ -849,11 +851,12 @@ impl Laravel {
 
     /// A (teljes gráfbeli) hívás űrlapja, ha az egy ellenőrzött `useForm` küldés.
     pub(crate) fn form_of(&self, file: &str, call: &Call) -> Option<&Form> {
-        if self.forms.is_empty() {
+        if self.forms.items.is_empty() {
             return None;
         }
         let rel = self.rel(file)?;
         self.forms
+            .items
             .iter()
             .find(|form| form.file == rel && form.line == call.line && form.target == call.target)
     }
@@ -863,11 +866,12 @@ impl Laravel {
     pub(crate) fn form_view_lines(&self, scope: &[String], lang: Lang) -> Vec<String> {
         let mut forms: Vec<&Form> = self
             .forms
+            .items
             .iter()
             .filter(|form| scope.contains(&form.file))
             .collect();
         if forms.is_empty() {
-            return self.diagnostics.footer(scope, lang);
+            return self.forms.diagnostics.footer(scope, lang);
         }
         forms.sort_by(|a, b| (&a.file, a.line).cmp(&(&b.file, b.line)));
         let mut lines: Vec<String> = forms
@@ -908,7 +912,7 @@ impl Laravel {
             "forms: {checked} checked, {issues} with issues, {bare} without validation",
             "űrlapok: {checked} ellenőrizve, {issues} problémás, {bare} validáció nélkül"
         ));
-        lines.extend(self.diagnostics.footer(scope, lang));
+        lines.extend(self.forms.diagnostics.footer(scope, lang));
         lines
     }
 }

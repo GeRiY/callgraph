@@ -257,3 +257,64 @@ fn without_inertia_the_output_is_unchanged() {
     let located = project.run(&["locate", "Board", "--all"]);
     assert!(!located.contains("page ←"), "{located}");
 }
+
+const TYPED_BOARD_VUE: &str = r"<script setup lang='ts'>
+defineProps<{ title: string; slug: string; note?: string }>()
+</script>
+
+<template>
+    <h1>{{ title }}</h1>
+</template>
+";
+
+const MIDDLEWARE: &str = r"<?php
+namespace App\Http\Middleware;
+
+use Inertia\Middleware;
+
+class HandleInertiaRequests extends Middleware
+{
+    public function share($request): array
+    {
+        return array_merge(parent::share($request), [
+            'slug' => 'x',
+            'flash' => fn () => [],
+        ]);
+    }
+}
+";
+
+/// F5: a kötelező prop, amelyet se a render-hely, se a `share` nem ad át; a megosztott props mindenhol átadott.
+#[test]
+fn inertia_view_reports_required_props_nobody_passes() {
+    let files = |middleware: bool| {
+        let mut files = vec![
+            ("composer.json", COMPOSER_JSON),
+            ("package.json", PACKAGE_JSON),
+            ("app/Http/Controllers/BoardController.php", CONTROLLER),
+            ("resources/js/app.js", APP_JS),
+            ("resources/js/Pages/Board.vue", TYPED_BOARD_VUE),
+        ];
+        if middleware {
+            files.push(("app/Http/Middleware/HandleInertiaRequests.php", MIDDLEWARE));
+        }
+        files
+    };
+    let never = Project::new(&files(false));
+    let shared = Project::new(&files(true));
+    for graph in [true, false] {
+        let out = never.run_with(&["show", ".", "--format", "inertia"], graph);
+        assert!(
+            out.contains(
+                "Pages/Board.vue  ← BoardController::show L10 · props: title, board, honorary  ! props not declared: board, honorary  ! never passed: slug\n"
+            ),
+            "graph: {graph}\n{out}"
+        );
+        let out = shared.run_with(&["show", ".", "--format", "inertia"], graph);
+        assert!(!out.contains("never passed"), "graph: {graph}\n{out}");
+        assert!(
+            out.contains("! props not declared: board, honorary"),
+            "{out}"
+        );
+    }
+}

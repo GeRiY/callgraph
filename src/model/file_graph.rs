@@ -5,7 +5,8 @@ use serde::ser::{SerializeMap, SerializeSeq};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::{
-    Call, Comment, Constant, Container, ControlFlow, Method, ParseError, Property, StringLit, Write,
+    Call, Comment, Constant, Container, ControlFlow, FrameworkFacts, Method, ParseError, Property,
+    StringLit, Write,
 };
 
 /// Egy PHP-fájl elemzésének eredménye (immutábilis; `FileGraphBuilder` állítja össze).
@@ -39,6 +40,9 @@ pub struct FileGraph {
     /// A parser szintaktikai hibái (1-alapú sor + rövid üzenet); ha van, a vázlat hiányos lehet.
     #[serde(default, rename = "parseErrors", skip_serializing_if = "Vec::is_empty")]
     pub parse_errors: Vec<ParseError>,
+    /// Framework-tények (Inertia render-helyek, megosztott props): a JSON-ba nem kerül, a pack rekordjába igen.
+    #[serde(default, skip_serializing)]
+    pub facts: Option<FrameworkFacts>,
 }
 
 impl FileGraph {

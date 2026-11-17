@@ -49,8 +49,12 @@ impl<P: PhpParser> PhpBackend<P> {
             for v in &self.visitors {
                 v.visit(parsed, &mut ctx, &mut builder);
             }
+            let mut graph = builder.build();
+            // framework-tények (Inertia render-helyek): az elemzéskor, hogy a nézetek ne olvassák újra a forrást
+            graph.facts =
+                crate::packages::frameworks::facts_of(&graph, &crate::io::decode_source(source));
             Analysis {
-                graph: builder.build(),
+                graph,
                 warnings: ctx.warnings,
             }
         })

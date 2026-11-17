@@ -59,13 +59,23 @@ pub fn import_bindings(
             } else {
                 imported.as_str()
             };
+            let mut category = categorize(source, cat_name, resolved.local);
+            // a projekt saját `t()` burkolója: a modulja vue-i18n-t importál és exportálja a nevet
+            if category == "module_use"
+                && is_translate_name(cat_name)
+                && resolver
+                    .resolve_file(source, ctx.path)
+                    .is_some_and(|file| wraps_i18n(&file, cat_name, plain))
+            {
+                category = "i18n_helper";
+            }
             out.push(ImportBinding {
                 resolved: format!(
                     "{}::{}",
                     resolved.display,
                     if plain { &local } else { &imported }
                 ),
-                category: categorize(source, cat_name, resolved.local),
+                category,
                 component: resolved.display.ends_with(".vue"),
                 import_value: format!("{}{suffix}", resolved.display),
                 package: (!resolved.local).then(|| source.to_owned()),
@@ -97,6 +107,36 @@ pub fn categorize(source: &str, imported: &str, local: bool) -> &'static str {
         return "composable_use";
     }
     if local { "module_use" } else { "package_use" }
+}
+
+/// A fordító-függvény szokásos nevei (a saját burkoló is így hívja).
+fn is_translate_name(name: &str) -> bool {
+    matches!(name, "t" | "$t" | "tc" | "translate")
+}
+
+/// A fordító-könyvtárak, amelyeket a burkoló-modul importálhat.
+const I18N_PACKAGES: [&str; 4] = ["vue-i18n", "laravel-vue-i18n", "i18next", "react-i18next"];
+
+/// A modul fájlja i18n-burkoló-e: i18n-könyvtárat importál, és exportálja a nevet (a `default`-ot, ha az az import).
+fn wraps_i18n(file: &std::path::Path, name: &str, default_import: bool) -> bool {
+    const MAX_BYTES: u64 = 200_000;
+    if std::fs::metadata(file).is_ok_and(|meta| meta.len() > MAX_BYTES) {
+        return false;
+    }
+    let Ok(text) = std::fs::read_to_string(file) else {
+        return false;
+    };
+    if !I18N_PACKAGES.iter().any(|package| text.contains(package)) {
+        return false;
+    }
+    if default_import {
+        return text.contains("export default");
+    }
+    let escaped = regex::escape(name);
+    let pattern = format!(
+        r"export\s+(?:async\s+)?(?:function\s*\*?|const|let|var)\s+{escaped}\b|export\s+(?:const|let|var)\s*\{{[^}}]*{escaped}\b|export\s*\{{[^}}]*{escaped}\b"
+    );
+    regex::Regex::new(&pattern).is_ok_and(|re| re.is_match(&text))
 }
 
 /// `/^use[A-Z]/`.

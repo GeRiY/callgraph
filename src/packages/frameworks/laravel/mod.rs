@@ -11,6 +11,7 @@
 mod cache;
 mod forms;
 mod models;
+mod parts;
 pub(crate) mod preset;
 mod route_cfg;
 mod routes;
@@ -30,19 +31,16 @@ mod targeted_tests;
 #[cfg(test)]
 mod tests;
 
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use super::files::ProjectFiles;
 use super::inertia::{Inertia, render};
-use crate::core::diag::Diagnostics;
 use crate::core::srcscan::Dialect;
 use crate::i18n::Lang;
 use crate::model::{Call, FileGraph};
 use crate::packages::Packages;
-use forms::Form;
-use models::ModelData;
 pub(crate) use models::extends_model_base;
+use parts::{FormContracts, ModelCatalog, RouteRefs, RouteTable};
 use routes::{Action, Route};
 
 /// A framework neve a `FRAMEWORKS` regiszterben (`laravel/framework`): ez kapcsolja be a stratégiát.
@@ -64,32 +62,20 @@ struct Reference {
     js: bool,
 }
 
-/// A Laravel-kötések egy projektre.
+/// A Laravel-kötések egy projektre: a gyökér és a lemezes cache, a részek (`parts.rs`) pedig külön típusban.
 #[derive(Debug, Clone)]
 pub(crate) struct Laravel {
     /// A projekt gyökere, és a kanonikus alakja (a sorok útja bármelyikkel kezdődhet).
     root: PathBuf,
     canonical: Option<PathBuf>,
     /// A route-tábla (a `scan` után; előtte üres).
-    routes: Vec<Route>,
-    /// Név → a `routes` indexe (az utolsó definíció nyer, mint a Laravelben).
-    by_name: HashMap<String, usize>,
+    table: RouteTable,
     /// A `route(..)` hivatkozások (csak a `references` kéréssel végzett `scan` után).
-    refs: Vec<Reference>,
+    refs: RouteRefs,
     /// Az ellenőrzött `useForm` küldések (csak a `scan_forms` után).
-    forms: Vec<Form>,
-    /// A kihagyott (nem értelmezhető) elemek: a nézetek lábléce összesíti (`forms.rs`).
-    diagnostics: Diagnostics,
+    forms: FormContracts,
     /// Az Eloquent-modellek és a migrációk sémája (csak a `scan_models` után).
-    models: Option<ModelData>,
-    /// A dinamikus nevű route-ok helye (`->name($name)` egy ciklusban): ilyenkor az „ismeretlen név” nem biztos.
-    dynamic_names: Vec<(String, u32)>,
-    /// A `routes/` alatti, de sehonnan be nem töltött fájlok (se `withRouting`, se `require`): a route-jaik
-    /// nincsenek a táblában.
-    unloaded: Vec<String>,
-    /// A `composer.json` PSR-4 leképezése (előtag, mappa) — csak a célzott `scan_forms_for` után; a teljes
-    /// projekt-keresésben üres (ott a gráfokból gyűjtött osztály-térkép van).
-    psr4: Vec<(String, String)>,
+    models: ModelCatalog,
     /// A lemezes cache (`cache.rs`): csak a célzott egy-fájlos betöltés alatt van bekapcsolva.
     cache: Option<cache::Handle>,
 }
@@ -226,15 +212,10 @@ impl Laravel {
         Self {
             root: root.to_path_buf(),
             canonical: root.canonicalize().ok().filter(|c| c != root),
-            routes: Vec::new(),
-            by_name: HashMap::new(),
-            refs: Vec::new(),
-            forms: Vec::new(),
-            diagnostics: Diagnostics::default(),
-            models: None,
-            dynamic_names: Vec::new(),
-            unloaded: Vec::new(),
-            psr4: Vec::new(),
+            table: RouteTable::default(),
+            refs: RouteRefs::default(),
+            forms: FormContracts::default(),
+            models: ModelCatalog::default(),
             cache: None,
         }
     }
@@ -265,7 +246,7 @@ impl Laravel {
                     && registers_routes(graph)
                     && let Some(text) = files.read(path)
                 {
-                    self.dynamic_names.extend(
+                    self.table.dynamic_names.extend(
                         dynamic_name_lines(&text)
                             .into_iter()
                             .map(|line| (rel.clone(), line)),
@@ -297,7 +278,7 @@ impl Laravel {
             .map(|(rel, text)| (rel.as_str(), text.as_str(), &no_imports))
             .collect();
         for (rel, text) in &extra {
-            self.dynamic_names.extend(
+            self.table.dynamic_names.extend(
                 dynamic_name_lines(text)
                     .into_iter()
                     .map(|line| (rel.clone(), line)),
@@ -305,11 +286,11 @@ impl Laravel {
         }
         for (rel, text, graph) in &route_files {
             if loaded.as_ref().is_some_and(|loaded| !loaded.contains(rel)) {
-                self.unloaded.push(rel.clone());
+                self.table.unloaded.push(rel.clone());
                 continue;
             }
             sources.push((rel.as_str(), text.as_str(), &graph.imports));
-            self.dynamic_names.extend(
+            self.table.dynamic_names.extend(
                 dynamic_name_lines(text)
                     .into_iter()
                     .map(|line| (rel.clone(), line)),
@@ -341,25 +322,15 @@ impl Laravel {
                     };
                 }
             }
-            self.routes.extend(parsed.routes);
+            self.table.routes.extend(parsed.routes);
         }
         // a kibontott konfig-ciklus `->name($név)`-e már nem dinamikus: a nevei a táblában vannak
-        self.dynamic_names.retain(|(file, line)| {
+        self.table.dynamic_names.retain(|(file, line)| {
             !expanded
                 .iter()
                 .any(|(rel, (from, to))| rel == file && (*from..=*to).contains(line))
         });
-        self.rebuild_names();
-    }
-
-    /// A név → route index újraépítése (az utolsó definíció nyer).
-    fn rebuild_names(&mut self) {
-        self.by_name.clear();
-        for (index, route) in self.routes.iter().enumerate() {
-            if let Some(name) = &route.name {
-                self.by_name.insert(name.clone(), index);
-            }
-        }
+        self.table.rebuild_names();
     }
 
     fn collect_references(
@@ -458,7 +429,8 @@ impl Laravel {
 
     /// A név által illesztett dinamikus nevű route (`{$code}.{$name}`) mintája, ha van ilyen a táblában.
     pub(crate) fn dynamic_pattern(&self, name: &str) -> Option<&str> {
-        self.by_name
+        self.table
+            .by_name
             .keys()
             .map(String::as_str)
             .find(|pattern| matches_dynamic(pattern, name))
@@ -467,17 +439,22 @@ impl Laravel {
     /// A tábla route-jai (a `scan` után).
     #[cfg(test)]
     pub(crate) fn routes(&self) -> &[Route] {
-        &self.routes
+        &self.table.routes
     }
 
     /// Egy (teljes gráfbeli) hívás route-ja: `None`, ha nem literál nevű `route(..)` hívás vagy a tábla üres;
     /// `Some(None)`, ha a név nem létezik.
     pub(crate) fn lookup(&self, call: &Call) -> Option<Option<&Route>> {
-        if self.routes.is_empty() {
+        if self.table.routes.is_empty() {
             return None;
         }
         let name = route_name(call)?;
-        Some(self.by_name.get(name).map(|&index| &self.routes[index]))
+        Some(
+            self.table
+                .by_name
+                .get(name)
+                .map(|&index| &self.table.routes[index]),
+        )
     }
 
     /// Az outline a hívás célja után fűzött link: ` → POST /register · RegisteredUserController@store`, hiányzó
@@ -508,7 +485,7 @@ impl Laravel {
                     )
                 )
             }
-            None if !self.dynamic_names.is_empty() => format!(
+            None if !self.table.dynamic_names.is_empty() => format!(
                 " {}",
                 lang.pick("? no static route", "? nincs statikus route")
             ),
@@ -529,7 +506,8 @@ impl Laravel {
         if has_verb(&route.verb, verb) {
             return route;
         }
-        self.routes
+        self.table
+            .routes
             .iter()
             .find(|other| other.uri == route.uri && has_verb(&other.verb, verb))
             .unwrap_or(route)
@@ -548,6 +526,7 @@ impl Laravel {
             None => container.to_owned(),
         };
         let hits: Vec<&Route> = self
+            .table
             .routes
             .iter()
             .filter(|route| match &route.action {

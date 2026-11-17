@@ -138,6 +138,12 @@ impl Resolver {
         relative(&self.config(file).workspace, &absolute(file))
     }
 
+    /// A helyi import-forrás fájlja (abszolút út); `None`, ha nem fájlra mutat. Nem ellenőrzi a létezését.
+    pub fn resolve_file(&self, spec: &str, from: &Path) -> Option<PathBuf> {
+        let cfg = self.config(from);
+        self.resolve_abs(spec, from, &cfg)
+    }
+
     /// Az import-forrás feloldása a `from` fájlból nézve.
     pub fn resolve(&self, spec: &str, from: &Path) -> Resolved {
         let cfg = self.config(from);

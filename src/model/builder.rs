@@ -173,6 +173,7 @@ impl FileGraphBuilder {
             writes: self.writes,
             binary: self.binary,
             parse_errors: ParseError::finish(self.parse_errors),
+            facts: None,
         }
     }
 }

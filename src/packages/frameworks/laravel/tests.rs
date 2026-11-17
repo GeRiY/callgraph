@@ -73,6 +73,7 @@ pub(super) fn graph(
         sfc: None,
         binary: false,
         parse_errors: Vec::new(),
+        facts: None,
     }
 }
 
@@ -1088,5 +1089,5 @@ fn a_config_driven_loop_expands_into_named_routes_with_pages() {
     assert_eq!(laravel.routes()[0].page.as_deref(), Some("Home"));
     assert_eq!(laravel.page_sites().len(), 1);
     // a kibontott ciklus `->name($name)`-je már nem dinamikus
-    assert!(laravel.dynamic_names.is_empty());
+    assert!(laravel.table.dynamic_names.is_empty());
 }
