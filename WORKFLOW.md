@@ -56,5 +56,13 @@ belül a feladatok **párhuzamosan** futnak (claude2 és codex egyszerre), mert 
 ## Lemez
 Minden munkapéldány saját `target/`-je ~300–800 MB. Beolvasztás (vagy elvetés) után a `work/<kód>/target` törlendő; a forrás, a brief és a jelentés marad.
 
+## Release
+Kiadás a `tools/release.sh <x.y.z> [--dry]`-rel, develop-checkoutból. Jóváhagyás: az owner (Geri / Zoli) kifejezett „mehet”-je; előbb `--dry`.
+1. A változásnapló szövegét (`CHANGELOG.md` + `CHANGELOG.hu.md`, `[x.y.z]` szakasz) a **changelog-writer agent** írja (`/changelog`), soha a script vagy a koordinátor.
+2. A script: precondíciók (tiszta fa, develop = `origin/develop`, a HEAD CI-futása zöld, changelog kész) → verzió-emelés (`Cargo.toml`, `Cargo.lock`) → `tools/dev.sh check` → `Release x.y.z: version and changelog` commit (mgeri1993, co-author nélkül) → szükség esetén `origin/main` beolvasztása → push develop, main (ugyanaz az SHA) → annotált `vX.Y.Z` tag → tag-push.
+3. Egyetlen build fut: a kiadási commit develop-pushát (`Release …` / `Merge main into develop…` üzenet) a workflow kihagyja, a `v*` tag-futás épít, kiad (Release, MCP Registry), és frissíti a gördülő `dev` előzetes kiadást is, így `update --dev` sosem marad a kiadás mögött.
+4. Utána: tag-futás figyelése; weboldal a `gh-pages` ágon (`python3 site/build.py --changelog-only <checkout>`, lásd `site/README.md`), látható változásról screenshot jóváhagyásra.
+5. Mérési számok a repóba, README-be, weboldalra soha nem kerülnek (csak az owner kapja meg a chatben).
+
 ## Build
 A több platformos build (macOS / Linux / Windows) a GitHub Actions-ben fut (`.github/workflows/release.yml`); helyben a `tools/dev.sh` (Docker: `build`, `test`, `check`, `skill`, `shell`), vagy helyi toolchainnel `cargo build --release` és a `tools/build-skill.sh` (a natív platformra).

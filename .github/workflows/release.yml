@@ -2,6 +2,8 @@
 # develop-pushnál ugyanezek a csomagok a gördülő `dev` előzetes kiadásba kerülnek (a `dev` tag az épített commitra
 # mozdul; `callgraph.sh update --dev`), a binárisok verziója `X.Y.Z-dev.<sha7>` (CALLGRAPH_BUILD_VERSION).
 # A `dev` tag pusholása nem indít új futást: a tag-szűrő `v*`, és a GITHUB_TOKEN-nel küldött push amúgy sem indít workflow-t.
+# Kiadási commitnál (üzenete `Release …` / `Merge main into develop…`) a develop-push nem épít: ugyanazt az SHA-t a `v*`
+# tag-futás építi, és az a Release mellett a gördülő `dev` előzetes kiadást is frissíti (a `dev` sosem marad a kiadás mögött).
 name: build
 
 on:
@@ -26,6 +28,13 @@ permissions:
 
 jobs:
   build:
+    # Kiadási commit (tools/release.sh): a develop-push kimarad, mert ugyanazt az SHA-t a `v*` tag-futás építi
+    # (és az frissíti a `dev` előzetes kiadást is) → kiadásonként egyetlen build. PR-ra és a többi develop-pushra nem vonatkozik.
+    # A package és az mcp-registry `needs` miatt ilyenkor magától kimarad.
+    if: >-
+      ${{ !(github.event_name == 'push' && github.ref == 'refs/heads/develop'
+      && (startsWith(github.event.head_commit.message, 'Release ')
+      || startsWith(github.event.head_commit.message, 'Merge main into develop'))) }}
     strategy:
       fail-fast: false
       matrix:
@@ -188,8 +197,8 @@ jobs:
       # törlése → végül a leírás (benne a `version:` sor) frissítése: a kliens a leírásból olvassa a verziót, így az
       # új verziót csak akkor látja, amikor már minden új fájl fent van. Soha nem „latest”: a releases/latest marad
       # a legutóbbi stabil. A `dev` tag pusholása nem indít új futást (tag-szűrő: `v*`; GITHUB_TOKEN-es push).
-      - name: dev előzetes kiadás (csak develop-pushnál)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+      - name: dev előzetes kiadás (develop-pushnál és `v*` tagnél)
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/tags/v'))
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

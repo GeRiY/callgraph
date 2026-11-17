@@ -29,7 +29,11 @@ CHANGELOG = os.path.join(os.path.dirname(HERE), "CHANGELOG.md")
 # the Hungarian changelog: same releases and sections, entries in Hungarian (technical terms stay English)
 CHANGELOG_HU = os.path.join(os.path.dirname(HERE), "CHANGELOG.hu.md")
 # the output folder (the gh-pages checkout): python3 site/build.py <out-dir>
-ROOT = os.path.abspath(sys.argv[1]) if len(sys.argv) > 1 else None
+# --changelog-only: kiadás után csak a változásnapló (en/hu html + md + feed) és a verziószöveget hordozó oldalak
+# (kezdőlap, llms.txt) íródnak; a többi oldalt nem érinti (a gh-pages-en vannak a generátor által még nem gyártott oldalak is)
+CHANGELOG_ONLY = "--changelog-only" in sys.argv[1:]
+_ARGS = [a for a in sys.argv[1:] if not a.startswith("--")]
+ROOT = os.path.abspath(_ARGS[0]) if _ARGS else None
 
 # The website is user documentation only: changelog entries about the project's own build, CI, packaging,
 # repository layout or internals are left out (the full CHANGELOG.md stays on GitHub).
@@ -809,9 +813,82 @@ def user_facing(releases):
     return releases
 
 
+def _read(path):
+    with open(path, encoding="utf-8") as f:
+        return f.read()
+
+
+def _splice_sections(text, new_sections, marker):
+    """A hiányzó kiadás-szakaszokat a legelső meglévő szakasz elé szúrja (marker: annak kezdete)."""
+    at = text.find(marker)
+    if at < 0 or not new_sections:
+        return text
+    return text[:at] + "".join(new_sections) + text[at:]
+
+
+def splice_changelog(releases, releases_hu, version):
+    """--changelog-only: egy már élő oldalon csak a hiányzó kiadás-szakaszokat (html + md + feed), a kiadások
+    jegyzékét és a verziószövegeket (kezdőlap, llms.txt) frissíti; a többi oldal és a kézzel bővített
+    menü / leírás érintetlen marad. Idempotens: ami már bent van, nem íródik újra."""
+    changed = []
+
+    def put(path, text):
+        if text != _read(path):
+            write(path, text)
+            changed.append(os.path.relpath(path, ROOT))
+
+    page = next(p for p in PAGES if p["key"] == "changelog")
+    for lang, rels in (("en", releases), ("hu", releases_hu)):
+        dest = out_file(page["path"][lang])
+        gen = changelog_body(lang, rels)
+        # html: hiányzó <section id="vX" class="release"> blokkok + a jegyzék (nav.toc) újragenerálása
+        sections = {m.group(1): m.group(0) for m in re.finditer(
+            r'<section id="v([^"]+)" class="release".*?</section>\n?', gen, re.S)}
+        cur = _read(dest)
+        missing = [v for v in sections if 'id="v%s"' % v not in cur]
+        cur = _splice_sections(cur, [sections[v] + ("" if sections[v].endswith("\n") else "\n") for v in missing],
+                               '<section id="v')
+        toc = re.search(r'<nav class="toc".*?</nav>', gen, re.S).group(0)
+        cur = re.sub(r'<nav class="toc".*?</nav>', lambda m: toc, cur, count=1, flags=re.S)
+        put(dest, cur)
+        # md: hiányzó "## vX — dátum" szakaszok
+        md_dest = os.path.join(os.path.dirname(dest), "index.md")
+        gen_md = to_markdown(page, lang, expand(gen, lang, version))
+        parts = re.split(r"(?m)^(?=## v\d)", gen_md)[1:]
+        cur_md = _read(md_dest)
+        new = [p_ for p_ in parts if not re.search(r"(?m)^## v%s\b" % re.escape(re.match(r"## v(\S+)", p_).group(1)), cur_md)]
+        if new:
+            at = re.search(r"(?m)^## v\d", cur_md)
+            cur_md = cur_md[:at.start()] + "".join(new) + cur_md[at.start():]
+        put(md_dest, cur_md)
+    # feed: hiányzó <entry>-k
+    feed_dest = os.path.join(ROOT, "changelog", "feed.xml")
+    feed = _read(feed_dest)
+    entries = re.findall(r"  <entry>.*?</entry>\n", atom_feed(releases), re.S)
+    new = [e for e in entries if re.search(r"<title>(.*?)</title>", e).group(1) not in feed]
+    if new:
+        feed = _splice_sections(feed, new, "  <entry>")
+        feed = re.sub(r"<updated>[^<]*</updated>", lambda m: re.search(r"<updated>[^<]*</updated>", atom_feed(releases)).group(0), feed, count=1)
+    put(feed_dest, feed)
+    # verziószövegek: a kezdőlap jelvénye alapján a régi verzió → az új (v1.1.0, "softwareVersion": "1.1.0")
+    home = _read(out_file("/"))
+    old = re.search(r'class="badge" href="/changelog/">v([0-9][^ ]*) ', home)
+    if old and old.group(1) != version:
+        o = re.escape(old.group(1))
+        for rel in ("index.html", "index.md", "hu/index.html", "hu/index.md", "llms.txt", "hu/llms.txt"):
+            path = os.path.join(ROOT, rel)
+            t = _read(path)
+            t = re.sub(r"(?<![\d.])v%s(?!\d|\.\d)" % o, "v" + version, t)
+            t = re.sub(r'("softwareVersion": ")%s"' % o, lambda m: m.group(1) + version + '"', t)
+            put(path, t)
+    print("changelog-only: version %s, %d file(s) changed" % (version, len(changed)))
+    for c in changed:
+        print("  " + c)
+
+
 def main():
     if ROOT is None or not os.path.isdir(ROOT):
-        sys.exit("usage: python3 site/build.py <gh-pages checkout>")
+        sys.exit("usage: python3 site/build.py [--changelog-only] <gh-pages checkout>")
     releases = user_facing(parse_changelog(CHANGELOG))
     if not releases:
         sys.exit("no releases found in CHANGELOG.md")
@@ -822,6 +899,8 @@ def main():
         sys.exit("CHANGELOG.hu.md is out of step with CHANGELOG.md: %s vs %s" % (versions_hu, versions))
     version = releases[0]["version"]
     lastmod = os.environ.get("LASTMOD") or max(r["date"] for r in releases if r["date"])
+    if CHANGELOG_ONLY:
+        return splice_changelog(releases, releases_hu, version)
     written = []
     for page in PAGES:
         for lang in LANGS:
