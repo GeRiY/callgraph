@@ -56,6 +56,30 @@ def emit(reason):
     sys.exit(0)
 
 
+REDIRECT = re.compile(r"^(\d*|&)(>>?|>\|)")
+
+
+def read_targets(args):
+    """A ténylegesen olvasott fájl-argumentumok: a kimeneti átirányítás célja (`> f`, `>> f`, `2>f`) és a heredoc
+    (`<<EOF`, `<<-EOF`, `<<<`) nem olvasás — `cat >> f <<EOF` hozzáfűzés, nem teljes olvasás."""
+    out, skip = [], False
+    for t in args:
+        if skip:
+            skip = False
+            continue
+        if t.startswith("<<"):
+            skip = t in ("<<", "<<-", "<<<")  # a jelölő / szöveg külön tokenben jön
+            continue
+        m = REDIRECT.match(t)
+        if m:
+            skip = m.end() == len(t)  # `>> f`: a cél a következő token; `>>f`: ugyanebben
+            continue
+        if t.startswith("-") or t == "<":  # `cat < f`: a f olvasás, maga a `<` nem fájl
+            continue
+        out.append(t)
+    return out
+
+
 def main():
     try:
         data = json.load(sys.stdin)
@@ -78,7 +102,7 @@ def main():
             except ValueError:
                 continue
             if toks and os.path.basename(toks[0]) in READERS:
-                for t in toks[1:]:
+                for t in read_targets(toks[1:]):
                     p = t if os.path.isabs(t) else os.path.join(os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd(), t)
                     r = advice(p)
                     if r:

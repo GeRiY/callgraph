@@ -152,8 +152,20 @@ def cg_abs(r, cwd):
         return None
     if os.path.isabs(os.path.expanduser(t)):
         return os.path.realpath(os.path.expanduser(t))
-    root = registry().get(r.get("project") or "") or cwd
+    root = project_root(r.get("project"), cwd)
     return os.path.realpath(os.path.join(root, t))
+
+
+def project_root(project, cwd):
+    """A --project értéke alias (projects.json) vagy mappa-út (pl. egy worktree); ha egyik sem, a cwd."""
+    if not project:
+        return cwd
+    root = registry().get(project)
+    if root:
+        return root
+    p = os.path.expanduser(project)
+    p = p if os.path.isabs(p) else os.path.join(cwd, p)
+    return os.path.realpath(p) if os.path.isdir(p) else cwd
 
 
 def is_covered(path, covered):
