@@ -81,7 +81,7 @@ impl QueryEngine {
                         source.remember(&caller.file, snippets);
                     }
                 }
-                let base = with_wired(base, &wired, graph, &source, lang, &marks);
+                let base = with_wired(base, rows.is_empty(), &wired, graph, &source, lang, &marks);
                 return Ok(render_single(SingleView {
                     rows,
                     base,
@@ -114,7 +114,7 @@ impl QueryEngine {
                     let direct = direct_rows(rows);
                     let mut wired = index.wire_invokers(&direct);
                     wired.extend(rewritten_rows(&index, pattern, &direct));
-                    base = with_wired(base, &wired, &all, &source, lang, &marks);
+                    base = with_wired(base, rows.is_empty(), &wired, &all, &source, lang, &marks);
                     (index.name_only_callers(name), all)
                 }
                 None => (
@@ -242,7 +242,8 @@ fn rewritten_rows(index: &CallerIndex, pattern: &str, direct: &[CallerRow]) -> V
 /// A bekötött closure-t meghívó metódusok szakasza (`== via stored closure`), a záró tipp (`---` + `💡`) elé
 /// szúrva; bekötés nélkül a kimenet változatlan.
 fn with_wired(
-    base: String,
+    mut base: String,
+    no_direct_rows: bool,
     wired: &[CallerRow],
     ranges: &dyn MethodRanges,
     source: &SourceLines,
@@ -251,6 +252,10 @@ fn with_wired(
 ) -> String {
     if wired.is_empty() {
         return base;
+    }
+    // nincs közvetlen találat, de van feloldott (átírt / bekötött) hívó: a „nincs találat” tipp félrevezető lenne
+    if no_direct_rows {
+        base.clear();
     }
     let mut add = String::from(t!(
         "== called through a stored closure or resolved across files\n",

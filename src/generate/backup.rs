@@ -112,6 +112,11 @@ impl<'a> Backups<'a> {
 
     /// A legutóbb mentett fájl (a legnagyobb időbélyegű mentés): `(relatív út, a mentés útja)`.
     pub fn newest_overall(&self) -> Option<(String, PathBuf)> {
+        self.newest_stamped().map(|(_, rel, path)| (rel, path))
+    }
+
+    /// Mint a `newest_overall`, az időbélyeggel együtt: `(időbélyeg, relatív út, a mentés útja)`.
+    fn newest_stamped(&self) -> Option<(String, String, PathBuf)> {
         let base_dir = self.dir();
         let mut stack = vec![base_dir.clone()];
         let mut best: Option<(String, String, PathBuf)> = None;
@@ -140,16 +145,19 @@ impl<'a> Backups<'a> {
                 }
             }
         }
-        best.map(|(_, rel, path)| (rel, path))
+        best
     }
 
     /// Menti a fájl jelenlegi tartalmát; a visszaadott érték a mentés projekt-relatív útja. Ha a `.callgraph/` nem
     /// írható, hibát ad (a hívó ilyenkor nem módosít).
     pub fn save(&self, rel: &str, content: &str) -> GenResult<String> {
         let mut secs = self.env.clock.now_secs();
-        // az új mentés időbélyege mindig nagyobb a fájl legutóbbi mentéséénél: azonos másodpercben sem írunk felül
-        // mentést, és az „újabb” sorrend akkor is igaz marad, ha az óra elmaradna egy korábban léptetett bélyegtől
-        let newest = self.list(rel).into_iter().next().map(|(s, _)| s);
+        // az új mentés időbélyege mindig nagyobb MINDEN meglévő mentésénél (fájlok között is): azonos másodpercben
+        // sem írunk felül mentést, az `undo` sorrendje pontosan fordított marad (a bélyeg csak rendezési kulcs: a
+        // másodpercenkénti többszörös írás a következő másodpercekre „csúszik”), és az „újabb” sorrend akkor is igaz
+        // marad, ha az óra elmaradna egy korábban léptetett bélyegtől. A régi (egyfájlos-maximumú) nevek ugyanígy
+        // rendeződnek, mert a név formátuma nem változott.
+        let newest = self.newest_stamped().map(|(s, _, _)| s);
         for _ in 0..10_000 {
             if newest.as_ref().is_none_or(|n| stamp(secs) > *n) {
                 break;

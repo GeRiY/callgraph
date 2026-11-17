@@ -30,6 +30,12 @@ const USER_DATA: [&str; 5] = [
 const OWNED_DIR: &str = "ref";
 
 /// A régi (nyelvi változatos) skill `skill-i18n/` mappája: a skill ma csak angol, ezért minden frissítés törli.
+///
+/// KOMPATIBILITÁSI SHIM — NE TÁVOLÍTSD EL (még néhány kiadásig): a release csomag (`tools/build-skill.sh`, `release.yml`)
+/// szándékosan tartalmaz `skill-i18n/SKILL.en.md` és `SKILL.hu.md` fájlt, mindkettő az angol `SKILL.md` másolata. A
+/// v1.0.2-es (régi) bináris `self-update`-je kicsomagolás után a telepítés maradék `skill-i18n/SKILL.<lang>.md`
+/// fájljából írja újra a `SKILL.md`-t; a shim nélkül a magyar felhasználó a régi magyar skillt kapná vissza. Az ÚJ
+/// bináris a csomag `skill-i18n/` bejegyzéseit nem telepíti (lásd `entries`), a meglévő mappát pedig törli.
 const LEGACY_DIRS: [&str; 1] = ["skill-i18n"];
 
 /// Miért nem telepíthető a csomag.
@@ -124,7 +130,9 @@ impl Installer {
                 .ok_or_else(|| InstallError::UnsafeEntry(name.clone()))?;
             let user_data =
                 rel.components().count() == 1 && USER_DATA.iter().any(|d| rel.as_os_str() == *d);
-            if file.is_dir() || rel.as_os_str().is_empty() || user_data {
+            // a régi frissítőknek szóló shim (lásd `LEGACY_DIRS`): az új bináris nem telepíti
+            let legacy = LEGACY_DIRS.iter().any(|d| rel.starts_with(d));
+            if file.is_dir() || rel.as_os_str().is_empty() || user_data || legacy {
                 continue;
             }
             let mode = file.unix_mode();

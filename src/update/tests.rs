@@ -34,6 +34,9 @@ pub(crate) fn release_zip(binary: &[u8]) -> Vec<u8> {
         // felhasználói adat a zipben: soha nem írhatja felül a meglévőt
         ("callgraph/projects.json", b"{\"evil\": \"/\"}"),
         ("callgraph/lang", b"en\n"),
+        // kompatibilitási shim a régi (v1.0.2) frissítőnek: mindkét nyelvi fájl az angol mag másolata
+        ("callgraph/skill-i18n/SKILL.en.md", b"new skill"),
+        ("callgraph/skill-i18n/SKILL.hu.md", b"new skill"),
         ("callgraph/update-check.json", b"{\"checked_at\": 1}"),
         ("callgraph/bin/linux-x86_64/callgraph", binary),
     ])
@@ -170,5 +173,34 @@ fn rejects_bad_packages_without_touching_the_skill() {
     assert_eq!(read(skill.join("SKILL.md")), "old skill");
     assert_eq!(read(skill.join("bin/linux-x86_64/callgraph")), "OLD");
     assert!(!skill.parent().unwrap().join("evil").exists());
+    let _ = std::fs::remove_dir_all(skill);
+}
+
+/// A régi (v1.0.2) frissítő a kicsomagolás után a `skill-i18n/SKILL.<lang>.md`-ből írja újra a `SKILL.md`-t: a
+/// csomag shimje (mindkét nyelv = az angol mag) miatt ez az angol magot adja egy lépésben; az új bináris a shimet
+/// nem telepíti, a `skill-i18n/` eltűnik, a `SKILL.md` a mag marad.
+#[test]
+fn legacy_layout_with_the_shim_package_ends_with_the_core_skill() {
+    let skill = fake_skill("shim");
+    let target = target_of(&skill);
+    let zip = release_zip(b"NEW");
+    // a shim a csomagban van, és mindkét fájl az angol mag
+    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(zip.as_slice())).unwrap();
+    for lang in ["en", "hu"] {
+        let mut text = String::new();
+        std::io::Read::read_to_string(
+            &mut archive
+                .by_name(&format!("callgraph/skill-i18n/SKILL.{lang}.md"))
+                .unwrap(),
+            &mut text,
+        )
+        .unwrap();
+        assert_eq!(text, "new skill");
+    }
+    Installer::new(test_platform())
+        .install(&zip, &target)
+        .unwrap();
+    assert_eq!(read(skill.join("SKILL.md")), "new skill");
+    assert!(!skill.join("skill-i18n").exists());
     let _ = std::fs::remove_dir_all(skill);
 }

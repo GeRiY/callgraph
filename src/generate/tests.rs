@@ -1096,6 +1096,33 @@ fn undo_restores_the_previous_state() {
 }
 
 #[test]
+fn undo_is_strictly_lifo_across_files_within_one_second() {
+    let fs = MemFs::with(&[("app/A.php", "a0"), ("app/B.php", "b0")]);
+    let clock = FixedClock(Cell::new(T0));
+    let e = env(&fs, &clock);
+    let backups = Backups::new(e);
+    // három írás két fájlra ugyanabban a másodpercben: A, B, A
+    backups.save("app/A.php", "a0").unwrap();
+    backups.save("app/B.php", "b0").unwrap();
+    backups.save("app/A.php", "a1").unwrap();
+    let mut order = Vec::new();
+    for _ in 0..3 {
+        let (rel, path) = backups.newest_overall().unwrap();
+        order.push((rel, fs.read(&path).unwrap()));
+        fs.remove(&path).unwrap();
+    }
+    assert_eq!(
+        order,
+        [
+            ("app/A.php".to_owned(), "a1".to_owned()),
+            ("app/B.php".to_owned(), "b0".to_owned()),
+            ("app/A.php".to_owned(), "a0".to_owned()),
+        ]
+    );
+    assert!(backups.newest_overall().is_none());
+}
+
+#[test]
 fn undo_is_a_multi_step_stack() {
     let fs = MemFs::with(&[("app/A.php", DOCUMENTED)]);
     let clock = FixedClock(Cell::new(T0));

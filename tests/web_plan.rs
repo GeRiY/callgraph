@@ -300,6 +300,9 @@ fn h10_eloquent_scope_call_resolves_to_the_scope_method() {
     let out = Fixture::laravel().run(&["show", "app", "--grep", "Shelf::scopeStocked$"]);
     assert!(out.contains("ShelfController.php"), "{out}");
     assert!(out.contains("index()"), "{out}");
+    // a feloldott hívó mellett nem jelenik meg a „nincs találat” tipp
+    assert!(!out.contains("no call target matches"), "{out}");
+    assert!(!out.contains("egyetlen hívás-cél"), "{out}");
 }
 
 // ---------------------------------------------------------------------------------------------------------------

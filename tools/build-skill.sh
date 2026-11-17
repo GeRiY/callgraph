@@ -21,6 +21,12 @@ cp -R skill/extras "$PKG/extras"
 cp -R skill/ref "$PKG/ref"   # a SKILL.md-ből hivatkozott referencia-fájlok (a skill csak angolul létezik; igény szerint olvassa őket az agent)
 cp -R skill/help "$PKG/help"   # a súgók (help/<script>.<en|hu>.txt); a felhasználó lang fájlja NEM kerül a csomagba
 cp LICENSE "$PKG/LICENSE"
+# KOMPATIBILITÁSI SHIM (tartsd meg még néhány kiadásig, ne töröld): a v1.0.2-es bináris self-update-je kicsomagolás után a
+# skill-i18n/SKILL.<lang>.md-ből írja újra a SKILL.md-t; mindkét nyelvi fájl az angol mag másolata, így a régi frissítő is
+# egy lépésben az új, angol SKILL.md-t hagyja. Az új bináris nem telepíti, a meglévő skill-i18n/ mappát törli.
+mkdir -p "$PKG/skill-i18n"
+cp skill/SKILL.md "$PKG/skill-i18n/SKILL.en.md"
+cp skill/SKILL.md "$PKG/skill-i18n/SKILL.hu.md"
 
 if [[ -d "$DIST/bin" ]]; then
     cp -R "$DIST/bin/." "$PKG/bin/"

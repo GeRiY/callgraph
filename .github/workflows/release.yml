@@ -110,6 +110,10 @@ jobs:
           cp -R skill/extras $p/extras
           cp -R skill/ref $p/ref
           cp -R skill/help $p/help
+          # kompatibilitási shim a v1.0.2-es self-updatehez (tartsd meg még néhány kiadásig): mindkét nyelvi fájl az angol mag másolata
+          mkdir -p $p/skill-i18n
+          cp skill/SKILL.md $p/skill-i18n/SKILL.en.md
+          cp skill/SKILL.md $p/skill-i18n/SKILL.hu.md
           cp -R out/${{ matrix.dir }} $p/bin/
       - uses: actions/upload-artifact@v4
         with:
