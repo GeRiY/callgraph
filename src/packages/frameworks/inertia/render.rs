@@ -4,6 +4,7 @@
 //! teljes gráfban, 60 karakterre vágva), vagy a forrásból (a szűkített tényekben nincs argumentum; a forrás a teljes
 //! szöveget adja, így a props-kulcsok sem vágódnak le).
 
+use crate::core::srcscan::{self, Dialect};
 use crate::model::{Call, FileGraph};
 
 /// A forrásbeli argumentum-keresés felső korlátja (bájt): egy lezáratlan hívás se járja be a fájl végéig.
@@ -218,19 +219,27 @@ pub(crate) fn prop_keys(arg: &str) -> Option<Vec<String>> {
     Some(keys)
 }
 
-/// A hívás argumentumai a forrásból: a `line`. sorban az első `<név>(` (a render-hívás neve), onnan a záró `)`-ig, a
-/// legfelső szintű vesszők mentén. Nem található / lezáratlan hívás: `None`.
+/// A hívás argumentumai a forrásból: a `line`. sorban kezdődő hívás-láncban az első `<név>(` (a render-hívás neve),
+/// onnan a záró `)`-ig, a legfelső szintű vesszők mentén. Nem található / lezáratlan hívás: `None`.
 pub(crate) fn source_args(text: &str, line: u32, kind: RenderKind) -> Option<Vec<String>> {
-    source_args_named(text, line, kind.name())
+    source_args_named(text, line, kind.name(), Dialect::Php)
 }
 
-/// A hívás argumentumai a forrásból, tetszőleges hívott névvel (kisbetűs `name`): a `line`. sorban az első
-/// `<name>(` — a Laravel-kötések a `route(` / `to_route(` hívásokhoz is ezt használják.
-pub(crate) fn source_args_named(text: &str, line: u32, name: &str) -> Option<Vec<String>> {
+/// A hívás argumentumai a forrásból, tetszőleges hívott névvel (kisbetűs `name`): a `line`. sorban kezdődő hívás-láncban
+/// az első `<name>(` — a Laravel-kötések a `route(` / `to_route(` hívásokhoz is ezt használják. A többsoros láncolt
+/// hívás (`form⏎.transform(..)⏎.post(..)`) hívás-sora a lánc kezdősora, ezért a keresés a lánc teljes tartományára
+/// kiterjed ([`srcscan::chain_end`]), nem csak az első sorra.
+pub(crate) fn source_args_named(
+    text: &str,
+    line: u32,
+    name: &str,
+    dialect: Dialect,
+) -> Option<Vec<String>> {
     let start = line_start(text, line)?;
     let rest = &text[start..];
-    let first = &rest[..rest.find('\n').unwrap_or(rest.len())];
-    let lower = first.to_ascii_lowercase();
+    let first_line = rest.find('\n').unwrap_or(rest.len());
+    let region_end = srcscan::chain_end(text, start, dialect, MAX_SCAN).max(start + first_line);
+    let lower = rest[..region_end - start].to_ascii_lowercase();
     let mut from = 0;
     while let Some(found) = lower[from..].find(name) {
         let at = from + found;
@@ -243,7 +252,7 @@ pub(crate) fn source_args_named(text: &str, line: u32, name: &str) -> Option<Vec
         let trimmed = tail.trim_start();
         if before_ok && trimmed.starts_with('(') {
             let open = after + (tail.len() - trimmed.len());
-            return call_args(&rest[open + 1..]);
+            return srcscan::call_args(&rest[open + 1..], dialect, MAX_SCAN);
         }
         from = after;
     }
@@ -259,112 +268,7 @@ fn line_start(text: &str, line: u32) -> Option<usize> {
     text.match_indices('\n').nth(skip - 1).map(|(i, _)| i + 1)
 }
 
-/// A `(` utáni szövegből az argumentumok a záró `)`-ig (stringeken és zárójeleken belül nem vág). A PHP-megjegyzések
-/// (`//`, `#`, `/* */`) kimaradnak az argumentumokból — a bennük álló idézőjel nem nyit stringet. Lezáratlan: `None`.
-fn call_args(text: &str) -> Option<Vec<String>> {
-    let mut args = Vec::new();
-    let mut current = String::new();
-    let mut depth = 0usize;
-    let mut quote: Option<char> = None;
-    let mut escaped = false;
-    let mut chars = text.char_indices().peekable();
-    while let Some((i, ch)) = chars.next() {
-        if i > MAX_SCAN {
-            return None;
-        }
-        if let Some(q) = quote {
-            current.push(ch);
-            if escaped {
-                escaped = false;
-            } else if ch == '\\' {
-                escaped = true;
-            } else if ch == q {
-                quote = None;
-            }
-            continue;
-        }
-        let next = chars.peek().map(|&(_, c)| c);
-        match ch {
-            '/' if next == Some('/') => skip_line(&mut chars),
-            '#' if next != Some('[') => skip_line(&mut chars),
-            '/' if next == Some('*') => {
-                chars.next();
-                let mut star = false;
-                for (_, c) in chars.by_ref() {
-                    if star && c == '/' {
-                        break;
-                    }
-                    star = c == '*';
-                }
-            }
-            '\'' | '"' => {
-                quote = Some(ch);
-                current.push(ch);
-            }
-            '(' | '[' | '{' => {
-                depth += 1;
-                current.push(ch);
-            }
-            ')' | ']' | '}' if depth > 0 => {
-                depth -= 1;
-                current.push(ch);
-            }
-            ')' => {
-                let last = current.trim();
-                if !last.is_empty() {
-                    args.push(last.to_owned());
-                }
-                return Some(args);
-            }
-            ',' if depth == 0 => {
-                args.push(current.trim().to_owned());
-                current.clear();
-            }
-            _ => current.push(ch),
-        }
-    }
-    None
-}
-
-/// Egy `//` / `#` megjegyzés a sor végéig (a sorvég megmarad elválasztónak).
-fn skip_line(chars: &mut std::iter::Peekable<std::str::CharIndices<'_>>) {
-    while let Some(&(_, c)) = chars.peek() {
-        if c == '\n' {
-            break;
-        }
-        chars.next();
-    }
-}
-
-/// A szöveg darabjai a legfelső szintű (stringeken és zárójeleken kívüli) `sep` mentén.
+/// A szöveg darabjai a legfelső szintű (stringeken és zárójeleken kívüli) `sep` mentén (PHP-forrás).
 pub(crate) fn split_top<'a>(text: &'a str, sep: &str) -> Vec<&'a str> {
-    let mut parts = Vec::new();
-    let mut depth = 0usize;
-    let mut quote: Option<char> = None;
-    let mut escaped = false;
-    let mut start = 0;
-    for (i, ch) in text.char_indices() {
-        if let Some(q) = quote {
-            if escaped {
-                escaped = false;
-            } else if ch == '\\' {
-                escaped = true;
-            } else if ch == q {
-                quote = None;
-            }
-            continue;
-        }
-        match ch {
-            '\'' | '"' => quote = Some(ch),
-            '(' | '[' | '{' => depth += 1,
-            ')' | ']' | '}' => depth = depth.saturating_sub(1),
-            _ if depth == 0 && i >= start && text[i..].starts_with(sep) => {
-                parts.push(&text[start..i]);
-                start = i + sep.len();
-            }
-            _ => {}
-        }
-    }
-    parts.push(&text[start..]);
-    parts
+    srcscan::split_top(text, sep, Dialect::Php)
 }

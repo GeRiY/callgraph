@@ -9,6 +9,7 @@ use std::sync::LazyLock;
 use regex::Regex;
 
 use super::super::inertia::render::split_top;
+use crate::core::srcscan::{self, Dialect};
 use crate::model::Imports;
 
 /// A csoport-beágyazás felső korlátja (egy kóbor, önmagát hívó szöveg se pörögjön).
@@ -763,138 +764,16 @@ fn skip_ws(text: &str, from: usize) -> usize {
 
 /// A `open` helyi nyitó zárójel párja (string- és beágyazás-tudóan); lezáratlan: `None`.
 pub(super) fn matching(text: &str, open: usize, to: usize) -> Option<usize> {
-    let mut depth = 0usize;
-    let mut quote: Option<u8> = None;
-    let mut escaped = false;
-    for (i, &b) in text.as_bytes().iter().enumerate().take(to).skip(open) {
-        if let Some(q) = quote {
-            if escaped {
-                escaped = false;
-            } else if b == b'\\' {
-                escaped = true;
-            } else if b == q {
-                quote = None;
-            }
-            continue;
-        }
-        match b {
-            b'\'' | b'"' => quote = Some(b),
-            b'(' | b'[' | b'{' => depth += 1,
-            b')' | b']' | b'}' => {
-                depth = depth.checked_sub(1)?;
-                if depth == 0 {
-                    return Some(i);
-                }
-            }
-            _ => {}
-        }
-    }
-    None
+    srcscan::matching(text, open, to, Dialect::Php)
 }
 
 /// A `from..to` szöveg argumentumai a legfelső szintű vesszők mentén (levágva, az üresek nélkül): bájt-tartományok.
 fn split_args(text: &str, from: usize, to: usize) -> Vec<(usize, usize)> {
-    let mut spans = Vec::new();
-    let mut depth = 0usize;
-    let mut quote: Option<u8> = None;
-    let mut escaped = false;
-    let mut start = from;
-    for (i, &b) in text.as_bytes().iter().enumerate().take(to).skip(from) {
-        if let Some(q) = quote {
-            if escaped {
-                escaped = false;
-            } else if b == b'\\' {
-                escaped = true;
-            } else if b == q {
-                quote = None;
-            }
-            continue;
-        }
-        match b {
-            b'\'' | b'"' => quote = Some(b),
-            b'(' | b'[' | b'{' => depth += 1,
-            b')' | b']' | b'}' => depth = depth.saturating_sub(1),
-            b',' if depth == 0 => {
-                spans.push((start, i));
-                start = i + 1;
-            }
-            _ => {}
-        }
-    }
-    spans.push((start, to));
-    spans
-        .into_iter()
-        .filter_map(|(a, b)| {
-            let raw = text.get(a..b)?;
-            let trimmed = raw.trim();
-            let lead = raw.len() - raw.trim_start().len();
-            (!trimmed.is_empty()).then_some((a + lead, a + lead + trimmed.len()))
-        })
-        .collect()
-}
-
-/// Egy karakter helyére szóköz (a sortörés marad): a bájt-helyek így nem tolódnak el.
-fn blank(out: &mut String, ch: char) {
-    if ch == '\n' {
-        out.push('\n');
-    } else {
-        out.extend(std::iter::repeat_n(' ', ch.len_utf8()));
-    }
+    srcscan::split_args(text, from, to, Dialect::Php)
 }
 
 /// A PHP-megjegyzések (`//`, `#`, `/* */`) szóközre cserélve — a bájt-helyek és a sortörések megmaradnak, és a
 /// stringeken belüli `//` (url) érintetlen.
 pub(super) fn strip_comments(text: &str) -> String {
-    let mut out = String::with_capacity(text.len());
-    let mut chars = text.chars().peekable();
-    let mut quote: Option<char> = None;
-    let mut escaped = false;
-    while let Some(ch) = chars.next() {
-        if let Some(q) = quote {
-            out.push(ch);
-            if escaped {
-                escaped = false;
-            } else if ch == '\\' {
-                escaped = true;
-            } else if ch == q {
-                quote = None;
-            }
-            continue;
-        }
-        let next = chars.peek().copied();
-        match ch {
-            '\'' | '"' => {
-                quote = Some(ch);
-                out.push(ch);
-            }
-            '/' if next == Some('/') => skip_line(&mut chars, &mut out, ch),
-            '#' if next != Some('[') => skip_line(&mut chars, &mut out, ch),
-            '/' if next == Some('*') => {
-                chars.next();
-                out.push_str("  ");
-                let mut star = false;
-                for c in chars.by_ref() {
-                    blank(&mut out, c);
-                    if star && c == '/' {
-                        break;
-                    }
-                    star = c == '*';
-                }
-            }
-            _ => out.push(ch),
-        }
-    }
-    out
-}
-
-/// Egy sor-megjegyzés a sor végéig szóközre cserélve (a sortörés megmarad).
-fn skip_line(chars: &mut std::iter::Peekable<std::str::Chars<'_>>, out: &mut String, first: char) {
-    blank(out, first);
-    while let Some(&c) = chars.peek() {
-        if c == '\n' {
-            break;
-        }
-        blank(out, c);
-        chars.next();
-    }
+    srcscan::strip_comments(text, Dialect::Php)
 }

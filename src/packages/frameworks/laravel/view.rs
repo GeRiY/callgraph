@@ -34,26 +34,26 @@ impl Laravel {
         };
         let mut lines: Vec<String> = dynamic
             .iter()
-            .map(|r| match lang {
-                Lang::En => format!(
+            .map(|r| {
+                crate::tfl!(
+                    lang,
                     "? dynamic route name '{}', not verifiable  {} L{}",
-                    r.name, r.file, r.line
-                ),
-                Lang::Hu => format!(
                     "? dinamikus route-név '{}', nem ellenőrizhető  {} L{}",
-                    r.name, r.file, r.line
-                ),
+                    r.name,
+                    r.file,
+                    r.line
+                )
             })
             .collect();
-        lines.extend(unknown.iter().map(|r| match lang {
-            Lang::En => format!(
+        lines.extend(unknown.iter().map(|r| {
+            crate::tfl!(
+                lang,
                 "{mark} unknown route name '{}'  {} L{}",
-                r.name, r.file, r.line
-            ),
-            Lang::Hu => format!(
                 "{mark} ismeretlen route-név '{}'  {} L{}",
-                r.name, r.file, r.line
-            ),
+                r.name,
+                r.file,
+                r.line
+            )
         }));
         if let Some((file, line)) = self.dynamic_names.first().filter(|_| !unknown.is_empty()) {
             let more = self.dynamic_names.len() - 1;
@@ -62,25 +62,19 @@ impl Laravel {
             } else {
                 String::new()
             };
-            lines.push(match lang {
-                Lang::En => format!(
-                    "? dynamic route names at {file} L{line}{more}: the names above may be defined there"
-                ),
-                Lang::Hu => format!(
-                    "? dinamikus route-nevek: {file} L{line}{more} — a fenti nevek ott is létrejöhetnek"
-                ),
-            });
+            lines.push(crate::tfl!(
+                lang,
+                "? dynamic route names at {file} L{line}{more}: the names above may be defined there",
+                "? dinamikus route-nevek: {file} L{line}{more} — a fenti nevek ott is létrejöhetnek"
+            ));
         }
         // a `routes/` alatti, de be nem töltött fájl: a route-jai nem élnek (halott kód, vagy elfelejtett `require`)
         for file in &self.unloaded {
-            lines.push(match lang {
-                Lang::En => format!(
-                    "? {file}: never loaded (no withRouting / require) — its routes are ignored"
-                ),
-                Lang::Hu => format!(
-                    "? {file}: sehonnan nincs betöltve (se withRouting, se require) — a route-jai nem élnek"
-                ),
-            });
+            lines.push(crate::tfl!(
+                lang,
+                "? {file}: never loaded (no withRouting / require) — its routes are ignored",
+                "? {file}: sehonnan nincs betöltve (se withRouting, se require) — a route-jai nem élnek"
+            ));
         }
         let named = self.by_name.len();
         let from_js = self
@@ -90,10 +84,11 @@ impl Laravel {
             .map(|r| r.name.as_str())
             .collect::<BTreeSet<_>>()
             .len();
-        lines.push(match lang {
-            Lang::En => format!("routes: {named} named, {from_js} referenced from JS"),
-            Lang::Hu => format!("route-ok: {named} elnevezett, {from_js} hivatkozva JS-ből"),
-        });
+        lines.push(crate::tfl!(
+            lang,
+            "routes: {named} named, {from_js} referenced from JS",
+            "route-ok: {named} elnevezett, {from_js} hivatkozva JS-ből"
+        ));
         lines
     }
 }

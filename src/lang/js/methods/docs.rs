@@ -5,6 +5,7 @@ use std::sync::LazyLock;
 use oxc_ast::ast::Comment;
 use regex::Regex;
 
+use crate::core::text::take_chars;
 use crate::lang::js::lines::LineIndex;
 
 /// A blokk kommentjei és forrása; a vezető docblockot a csomópont kezdő offsetjéből találja meg.
@@ -28,7 +29,7 @@ impl Docs<'_> {
             .filter(|l| !l.is_empty())
             .collect::<Vec<_>>()
             .join(" ");
-        (!joined.is_empty()).then(|| truncate(&joined, 300))
+        (!joined.is_empty()).then(|| take_chars(&joined, 300))
     }
 
     /// A kommentet a `/*` és `*/` nélkül.
@@ -60,10 +61,6 @@ fn strip_star(line: &str) -> &str {
     }
 }
 
-fn truncate(s: &str, max: usize) -> String {
-    s.chars().take(max).collect()
-}
-
 /// A container (modul / komponens) doc-ja: az első utasítás docblockja, különben az első blokk-komment,
 /// ha a blokk első során vagy a következőn kezdődik.
 pub fn container_doc(
@@ -80,7 +77,7 @@ pub fn container_doc(
     }
     let value = docs.value(first).trim_start_matches('*');
     let text = collapse_stars(value);
-    (!text.is_empty()).then(|| truncate(&text, 300))
+    (!text.is_empty()).then(|| take_chars(&text, 300))
 }
 
 /// `replace(/\s*\*\s?/g, ' ')` majd trim.

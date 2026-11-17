@@ -33,6 +33,8 @@ use std::path::{Path, PathBuf};
 
 use super::files::ProjectFiles;
 use super::inertia::{Inertia, render};
+use crate::core::diag::Diagnostics;
+use crate::core::srcscan::Dialect;
 use crate::i18n::Lang;
 use crate::model::{Call, FileGraph};
 use crate::packages::Packages;
@@ -74,6 +76,8 @@ pub(crate) struct Laravel {
     refs: Vec<Reference>,
     /// Az ellenőrzött `useForm` küldések (csak a `scan_forms` után).
     forms: Vec<Form>,
+    /// A kihagyott (nem értelmezhető) elemek: a nézetek lábléce összesíti (`forms.rs`).
+    diagnostics: Diagnostics,
     /// Az Eloquent-modellek és a migrációk sémája (csak a `scan_models` után).
     models: Option<ModelData>,
     /// A dinamikus nevű route-ok helye (`->name($name)` egy ciklusban): ilyenkor az „ismeretlen név” nem biztos.
@@ -219,6 +223,7 @@ impl Laravel {
             by_name: HashMap::new(),
             refs: Vec::new(),
             forms: Vec::new(),
+            diagnostics: Diagnostics::default(),
             models: None,
             dynamic_names: Vec::new(),
             unloaded: Vec::new(),
@@ -380,7 +385,7 @@ impl Laravel {
             return;
         };
         for (call, name) in candidates {
-            let literal = render::source_args_named(&text, call.line, name)
+            let literal = render::source_args_named(&text, call.line, name, Dialect::Php)
                 .and_then(|args| render::literal(args.first()?));
             // `->route(..)` csak a `redirect()` után route-hivatkozás (`$notifiable->route('mail', ..)`,
             // `$request->route('id')` nem); a `Route::has('x')`-szel őrzött hivatkozás futáskor ellenőrzött

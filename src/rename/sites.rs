@@ -102,14 +102,7 @@ pub(crate) fn walk(fs: &dyn FileSystem, root: &Path, exts: &[&str]) -> Vec<(Stri
 }
 
 /// A szöveg 1-alapú sora a bájt-helyen.
-pub(crate) fn line_of(text: &str, offset: usize) -> usize {
-    text.as_bytes()
-        .iter()
-        .take(offset)
-        .filter(|&&b| b == b'\n')
-        .count()
-        + 1
-}
+pub(crate) use crate::core::text::line_of;
 
 /// A sor szövege a bájt-helyen, levágva (a `⚠` sorokhoz).
 pub(crate) fn line_snippet(text: &str, offset: usize) -> String {

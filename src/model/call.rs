@@ -110,6 +110,72 @@ pub struct Call {
 }
 
 impl Call {
+    /// Új hívás: csak a fajta, a cél és a kategória kötelező, a többi mező üres (az alapértékek egy helyen vannak —
+    /// új mező felvételekor a hívóhelyek nem módosulnak). A többit a láncolható építők töltik.
+    pub fn new(
+        kind: impl Into<String>,
+        target: impl Into<String>,
+        category: impl Into<String>,
+    ) -> Self {
+        Self {
+            container: None,
+            caller: None,
+            line: 0,
+            end_line: None,
+            kind: kind.into(),
+            target: target.into(),
+            resolved: None,
+            on: None,
+            category: category.into(),
+            args: None,
+            handler: None,
+            from: None,
+        }
+    }
+
+    /// A hívás sora.
+    pub fn at(mut self, line: u32) -> Self {
+        self.line = line;
+        self
+    }
+
+    /// A hívó konténere és metódusa.
+    pub fn within(mut self, container: Option<String>, caller: Option<String>) -> Self {
+        self.container = container;
+        self.caller = caller;
+        self
+    }
+
+    /// A feloldott cél.
+    pub fn resolved(mut self, resolved: Option<String>) -> Self {
+        self.resolved = resolved;
+        self
+    }
+
+    /// A hívás tárolt argumentumai.
+    pub fn with_args(mut self, args: Option<Vec<String>>) -> Self {
+        self.args = args;
+        self
+    }
+
+    /// A hívott objektum / típus.
+    pub fn on(mut self, on: Option<String>) -> Self {
+        self.on = on;
+        self
+    }
+
+    /// A nem helyi import forrás-specifikátora.
+    pub fn imported_from(mut self, from: Option<String>) -> Self {
+        self.from = from;
+        self
+    }
+
+    /// Hivatkozás (nem hívás): `handler == Some(true)`.
+    pub fn reference(mut self) -> Self {
+        self.handler = Some(true);
+        self
+    }
+
     /// Hivatkozás-e a hívás (nem hívás): `handler == Some(true)` (JS template, Swift, Rust) vagy `kind == "reference"` (Kotlin).
     pub fn is_reference(&self) -> bool {
         self.handler == Some(true) || self.kind == "reference"

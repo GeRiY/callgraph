@@ -13,20 +13,10 @@ pub(super) fn call(
     category: &str,
     args: Vec<String>,
 ) -> Call {
-    Call {
-        handler: None,
-        from: None,
-        container: Some(container.into()),
-        caller: caller.map(str::to_string),
-        line,
-        end_line: None,
-        kind: kind.into(),
-        target: target.into(),
-        resolved: None,
-        on: None,
-        category: category.into(),
-        args: Some(args),
-    }
+    Call::new(kind, target, category)
+        .at(line)
+        .within(Some(container.into()), caller.map(str::to_string))
+        .with_args(Some(args))
 }
 
 /// `@mixin név(paraméterek)` / `@function név(paraméterek)` fejléc: `(fajta, név, paraméterek)`; a zárójel nélküli

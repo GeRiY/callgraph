@@ -79,16 +79,8 @@ impl<'p, 's> PythonVisitor<'p, 's> {
     }
 }
 
-/// Legfeljebb `max` karakter (a levágott szöveg végén `…`).
-pub(super) fn clip(text: &str, max: usize) -> String {
-    let flat = text.split_whitespace().collect::<Vec<_>>().join(" ");
-    if flat.chars().count() <= max {
-        return flat;
-    }
-    let mut out: String = flat.chars().take(max).collect();
-    out.push('…');
-    out
-}
+/// Legfeljebb `max` karakter, egy sorra vonva (a levágott szöveg végén `…`).
+pub(super) use crate::core::text::flat_clip as clip;
 
 /// Láthatóság: a vezető `_` (nem dunder) privát.
 pub(super) fn visibility(name: &str) -> &'static str {

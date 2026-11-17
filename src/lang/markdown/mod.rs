@@ -70,40 +70,22 @@ impl Language for MdDocument {
                         .map(|h| h.2.clone())
                         .unwrap_or_else(|| "__top__".into());
                     let target = dest_url.to_string();
-                    b.call(Call {
-                        handler: None,
-                        from: None,
-                        container: Some(name.clone()),
-                        caller: Some(caller),
-                        line: lines.line_of(range.start),
-                        end_line: None,
-                        kind: "link".into(),
-                        target: target.clone(),
-                        resolved: None,
-                        on: None,
-                        category: link_category(&target).into(),
-                        args: None,
-                    });
+                    b.call(
+                        Call::new("link", target.clone(), link_category(&target))
+                            .at(lines.line_of(range.start))
+                            .within(Some(name.clone()), Some(caller)),
+                    );
                 }
                 Event::Start(Tag::Image { dest_url, .. }) => {
                     let caller = headings
                         .last()
                         .map(|h| h.2.clone())
                         .unwrap_or_else(|| "__top__".into());
-                    b.call(Call {
-                        handler: None,
-                        from: None,
-                        container: Some(name.clone()),
-                        caller: Some(caller),
-                        line: lines.line_of(range.start),
-                        end_line: None,
-                        kind: "image".into(),
-                        target: dest_url.to_string(),
-                        resolved: None,
-                        on: None,
-                        category: "image".into(),
-                        args: None,
-                    });
+                    b.call(
+                        Call::new("image", dest_url.to_string(), "image")
+                            .at(lines.line_of(range.start))
+                            .within(Some(name.clone()), Some(caller)),
+                    );
                 }
                 Event::Start(Tag::CodeBlock(kind)) => {
                     let lang = match kind {

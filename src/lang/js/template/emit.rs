@@ -5,6 +5,7 @@ use std::collections::HashSet;
 use super::entities::decode;
 use super::expr::{expr_calls, expr_strings, pascal};
 use super::node::{Element, Node, Prop};
+use crate::core::text::take_chars;
 use crate::model::{Branch, Call, ControlFlow, Imports, StringLit};
 
 const OBJECT_PROTO: &[&str] = &[
@@ -50,7 +51,7 @@ impl Emitter<'_> {
                     let text = if *dec { decode(raw) } else { raw.clone() };
                     let value = collapse(text.trim());
                     if !value.is_empty() {
-                        self.string(*line, truncate(&value, 300));
+                        self.string(*line, take_chars(&value, 300));
                     }
                 }
             }
@@ -83,7 +84,7 @@ impl Emitter<'_> {
                     value: Some(v),
                     ..
                 } if !v.trim().is_empty() => {
-                    self.string(*line, truncate(v, 300));
+                    self.string(*line, take_chars(v, 300));
                 }
                 Prop::Attr { .. } => {}
             }
@@ -116,9 +117,9 @@ impl Emitter<'_> {
                 caller: Some("template".into()),
                 kind: format!("v-{name}"),
                 line: el.line,
-                cond: Some(truncate(&cond, 100)),
+                cond: Some(take_chars(&cond, 100)),
                 branches: vec![Branch {
-                    label: format!("v-{name}=\"{}\"", truncate(&cond, 60)),
+                    label: format!("v-{name}=\"{}\"", take_chars(&cond, 60)),
                     start_line: el.line,
                     end_line: el.end_line,
                     fall_through: None,
@@ -177,25 +178,14 @@ impl Emitter<'_> {
     fn expr_strings(&mut self, exp: &str, line: u32) {
         for (offset, value) in expr_strings(exp) {
             let breaks = exp[..offset].matches('\n').count() as u32;
-            self.string(line + breaks, truncate(&value, 300));
+            self.string(line + breaks, take_chars(&value, 300));
         }
     }
 
     fn call(&self, line: u32, kind: &str, target: String, category: &str) -> Call {
-        Call {
-            container: Some(self.container.to_string()),
-            caller: Some("template".into()),
-            line,
-            end_line: None,
-            kind: kind.into(),
-            target,
-            resolved: None,
-            on: None,
-            category: category.into(),
-            args: None,
-            handler: None,
-            from: None,
-        }
+        Call::new(kind, target, category)
+            .at(line)
+            .within(Some(self.container.to_string()), Some("template".into()))
     }
 
     fn string(&mut self, line: u32, value: String) {
@@ -233,8 +223,4 @@ fn collapse(s: &str) -> String {
         }
     }
     out
-}
-
-fn truncate(s: &str, max: usize) -> String {
-    s.chars().take(max).collect()
 }

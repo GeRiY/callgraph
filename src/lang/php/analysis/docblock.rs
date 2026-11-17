@@ -148,7 +148,7 @@ fn is_specific(ty: &str) -> bool {
 
 /// Az egymást követő szóközök egyre vonva (a többsoros shape egy sorba).
 fn squash(text: &str) -> String {
-    text.split_whitespace().collect::<Vec<_>>().join(" ")
+    crate::core::text::collapse_ws(text)
 }
 
 #[cfg(test)]

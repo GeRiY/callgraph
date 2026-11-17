@@ -1,14 +1,10 @@
 //! Tűrő template-parser: a `{{ }}`, elemek, kommentek, raw-text elemek felépítik a csomópontfát.
 
-use super::attrs::{is_ws, parse_open_tag};
+use super::attrs::parse_open_tag;
 use super::entities::decode;
 use super::node::{Element, Node, Prop};
+use crate::core::markup::{declaration_end, is_void, is_ws, raw_text_end};
 use crate::lang::js::LineIndex;
-
-const VOID: &[&str] = &[
-    "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source",
-    "track", "wbr",
-];
 
 /// Egy nyitott elem a veremben (a `v-pre` jelzővel).
 struct Open {
@@ -114,13 +110,7 @@ impl Parser<'_> {
         }
         if next == b'!' || next == b'?' {
             self.flush_text(text, at);
-            let rest = &self.src[at..self.end];
-            let stop = if let Some(body) = rest.strip_prefix("<!--") {
-                body.find("-->").map(|r| r + 7)
-            } else {
-                rest.find('>').map(|r| r + 1)
-            };
-            return Some(at + stop.unwrap_or(rest.len()));
+            return Some(declaration_end(self.src, at, self.end));
         }
         None
     }
@@ -138,7 +128,7 @@ impl Parser<'_> {
         let line = self.lines.line_of(at);
         let end_line = self.lines.line_of(open.gt);
         let after = open.gt + 1;
-        let is_void = VOID.contains(&open.tag.as_str());
+        let is_void = is_void(&open.tag);
         let el = Element {
             tag: open.tag,
             line,
@@ -159,17 +149,7 @@ impl Parser<'_> {
 
     /// RAWTEXT / RCDATA: a záró tagig tartó szöveg egy csomópont.
     fn raw_text(&mut self, name: &str, from: usize) -> usize {
-        let hay = self.src[from..self.end].to_ascii_lowercase();
-        let pat = format!("</{name}");
-        let close = hay
-            .match_indices(&pat)
-            .map(|(r, _)| r)
-            .find(|r| {
-                hay.as_bytes()
-                    .get(r + pat.len())
-                    .is_none_or(|c| is_ws(*c) || *c == b'/' || *c == b'>')
-            })
-            .map_or(self.end, |r| from + r);
+        let close = raw_text_end(self.src, from, self.end, name);
         if close > from {
             if matches!(name, "textarea" | "title") {
                 self.rcdata(from, close);
@@ -219,7 +199,7 @@ impl Parser<'_> {
         let name = written.to_ascii_lowercase();
         let gt = (name_end..self.end).find(|&i| b[i] == b'>');
         let after = gt.map_or(self.end, |g| g + 1);
-        if VOID.contains(&written) {
+        if is_void(written) {
             return after;
         }
         let Some(depth) = self

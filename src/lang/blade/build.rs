@@ -310,20 +310,9 @@ fn key_default(item: &str) -> (String, Option<String>) {
 
 /// A kitett hívás-sablon (a mezők többsége üres).
 fn call(container: &str, owner: &str, line: u32, kind: &str, target: &str, category: &str) -> Call {
-    Call {
-        container: Some(container.to_owned()),
-        caller: Some(owner.to_owned()),
-        line,
-        end_line: None,
-        kind: kind.to_owned(),
-        target: target.to_owned(),
-        resolved: None,
-        on: None,
-        category: category.to_owned(),
-        args: None,
-        handler: None,
-        from: None,
-    }
+    Call::new(kind, target, category)
+        .at(line)
+        .within(Some(container.to_owned()), Some(owner.to_owned()))
 }
 
 /// A PHP-elemző `route()` / `__()` hívásainak átminősítése: a route-név és a fordítási kulcs `resolved`-be kerül

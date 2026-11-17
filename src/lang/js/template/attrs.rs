@@ -2,6 +2,8 @@
 
 use super::entities::decode;
 use super::node::Prop;
+use crate::core::markup::is_ws;
+use crate::core::text::collapse_ws;
 use crate::lang::js::LineIndex;
 
 /// A beolvasott nyitó tag.
@@ -11,10 +13,6 @@ pub struct OpenTag {
     /// A záró `>` indexe.
     pub gt: usize,
     pub self_closing: bool,
-}
-
-pub fn is_ws(b: u8) -> bool {
-    matches!(b, b' ' | b'\t' | b'\n' | b'\r' | 0x0c)
 }
 
 fn ends_section(b: u8) -> bool {
@@ -184,9 +182,4 @@ fn parse_value(src: &str, from: usize, limit: usize) -> (Option<String>, usize) 
     }
     let end = scan_until(b, i, limit, |c| is_ws(c) || c == b'>');
     (Some(decode(&src[i..end])), end)
-}
-
-/// A `class` érték: whitespace-összevonás és vágás (mint a Vue parserben).
-fn collapse_ws(s: &str) -> String {
-    s.split_whitespace().collect::<Vec<_>>().join(" ")
 }

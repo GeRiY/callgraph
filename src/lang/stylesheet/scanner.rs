@@ -343,20 +343,11 @@ impl<'a> StylesheetScanner<'a> {
                         property.map_or_else(|| function.to_owned(), |p| format!("var({p})"));
                     let category = if function == "var" { "var" } else { "function" };
                     let line = self.line(start + i);
-                    self.builder.call(Call {
-                        handler: None,
-                        from: None,
-                        container: Some(self.container.clone()),
-                        caller: caller.clone(),
-                        line,
-                        kind: function.into(),
-                        target,
-                        resolved: None,
-                        on: None,
-                        category: category.into(),
-                        args: None,
-                        end_line: None,
-                    });
+                    self.builder.call(
+                        Call::new(function, target, category)
+                            .at(line)
+                            .within(Some(self.container.clone()), caller.clone()),
+                    );
                     i = j;
                     continue;
                 }
@@ -574,20 +565,11 @@ impl<'a> StylesheetScanner<'a> {
             let a = from + a + 2;
             let Some(b) = s[a..].find('}') else { break };
             let line = self.line(seg + a);
-            self.builder.call(Call {
-                handler: None,
-                from: None,
-                container: Some(self.container.clone()),
-                caller: caller.map(str::to_string),
-                line,
-                end_line: None,
-                kind: "interpolation".into(),
-                target: s[a..a + b].into(),
-                resolved: None,
-                on: None,
-                category: "interpolation".into(),
-                args: None,
-            });
+            self.builder.call(
+                Call::new("interpolation", &s[a..a + b], "interpolation")
+                    .at(line)
+                    .within(Some(self.container.clone()), caller.map(str::to_string)),
+            );
             from = a + b + 1;
         }
     }

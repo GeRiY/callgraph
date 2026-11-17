@@ -40,9 +40,7 @@ fn push(segs: &mut Vec<Seg>, start: usize, end: usize, kind: Kind) {
     }
 }
 
-fn is_ident(b: u8) -> bool {
-    b.is_ascii_alphanumeric() || b == b'_'
-}
+use crate::core::text::is_ident_byte as is_ident;
 
 /// A következő PHP nyitó tag helye és hossza.
 fn find_open(src: &str, from: usize) -> Option<(usize, usize)> {

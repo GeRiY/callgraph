@@ -119,5 +119,17 @@ macro_rules! tf {
     };
 }
 
+/// Mint a [`tf!`], de a nyelv explicit (nem a globális): `tfl!(lang, "{n} files", "{n} fájl")` → `String`. A
+/// nézetek, amelyek a `Lang`-ot paraméterként kapják, ezt használják a `match lang { .. }` ismétlés helyett.
+#[macro_export]
+macro_rules! tfl {
+    ($lang:expr, $en:literal, $hu:literal $(, $arg:expr)* $(,)?) => {
+        match $lang {
+            $crate::i18n::Lang::En => format!($en $(, $arg)*),
+            $crate::i18n::Lang::Hu => format!($hu $(, $arg)*),
+        }
+    };
+}
+
 #[cfg(test)]
 mod tests;

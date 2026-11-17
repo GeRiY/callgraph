@@ -4,6 +4,9 @@
 //! `<script>` és `<style>` tartalmát átugorja. A nem zárt tag, idézőjel, komment vagy címsor a fájl végéig tart —
 //! sosem pánikol: minden szeletelés ASCII-határoló bájton (vagy a szöveg végén) történik, így UTF-8-határon.
 
+use crate::core::markup::{Tag, find, find_ci, parse_tag, skip_to_gt, tag_name};
+use crate::core::text::collapse_ws;
+
 /// Egy címsor: szint (`0` = `<title>`, `1`–`6` = `<hN>`), a nyitó tag és a lezárás bájt-pozíciója, a szövege.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Heading {
@@ -41,20 +44,6 @@ pub(crate) struct Scan {
 
 /// A látható szöveget hordozó attribútumok (a `--strings` ezekben is keres).
 const TEXT_ATTRS: [&str; 5] = ["title", "alt", "placeholder", "aria-label", "value"];
-
-/// Egy attribútum: kisbetűs név, nyers érték és az érték kezdő pozíciója.
-struct Attr<'s> {
-    name: String,
-    value: &'s str,
-    start: usize,
-}
-
-/// Egy nyitó tag: kisbetűs név, attribútumok, és a tag utáni pozíció.
-struct Tag<'s> {
-    name: String,
-    attrs: Vec<Attr<'s>>,
-    end: usize,
-}
 
 /// A szkenner állapota.
 struct Scanner<'s> {
@@ -140,7 +129,7 @@ impl<'s> Scanner<'s> {
 
     /// Egy szöveg felvétele (a `raw` a forrásbeli alak a pozíciókhoz, a `decoded` az érték); üres szöveg kimarad.
     fn push_text(&mut self, from: usize, raw: &str, decoded: &str) {
-        let value = collapse(decoded);
+        let value = collapse_ws(decoded);
         if value.is_empty() {
             return;
         }
@@ -156,7 +145,7 @@ impl<'s> Scanner<'s> {
     /// A nyitott címsor lezárása az `at` pozíción (az üres címsor kimarad).
     fn close_heading(&mut self, at: usize) {
         if let Some(mut heading) = self.open.take() {
-            heading.text = collapse(&heading.text);
+            heading.text = collapse_ws(&heading.text);
             heading.end = at.max(heading.start);
             if !heading.text.is_empty() {
                 self.out.headings.push(heading);
@@ -213,7 +202,7 @@ impl<'s> Scanner<'s> {
         if tag.name == "title" {
             let raw = &self.src[tag.end..content_end];
             let decoded = decode(raw);
-            let text = collapse(&decoded);
+            let text = collapse_ws(&decoded);
             if self.out.title.is_none() && !text.is_empty() {
                 self.out.title = Some(Heading {
                     level: 0,
@@ -235,135 +224,6 @@ fn heading_level(name: &str) -> Option<u8> {
         [d @ b'1'..=b'6'] => Some(d - b'0'),
         _ => None,
     }
-}
-
-/// A tag neve kisbetűvel a `from` pozíciótól, és a név utáni pozíció.
-fn tag_name(bytes: &[u8], from: usize) -> (String, usize) {
-    let mut end = from;
-    while end < bytes.len() && is_name_byte(bytes[end]) {
-        end += 1;
-    }
-    let name = String::from_utf8_lossy(&bytes[from..end]).to_ascii_lowercase();
-    (name, end)
-}
-
-/// A tag nevének bájtja-e (betű, számjegy, `-`, `:`, `_`).
-fn is_name_byte(b: u8) -> bool {
-    b.is_ascii_alphanumeric() || matches!(b, b'-' | b':' | b'_')
-}
-
-/// Az attribútum-név végét jelző bájt-e (szóköz, `=`, `>`, `/`).
-fn ends_attr_name(b: u8) -> bool {
-    b.is_ascii_whitespace() || matches!(b, b'=' | b'>' | b'/')
-}
-
-/// Egy nyitó tag (`start`: a `<` helye): név, attribútumok (idézett, idézőjel nélküli és érték nélküli), és a záró
-/// `>` utáni pozíció (nem zárt tagnél / idézőjelnél a szöveg vége).
-fn parse_tag(src: &str, start: usize) -> Tag<'_> {
-    let bytes = src.as_bytes();
-    let len = bytes.len();
-    let (name, mut p) = tag_name(bytes, start + 1);
-    let mut attrs = Vec::new();
-    loop {
-        while p < len && bytes[p].is_ascii_whitespace() {
-            p += 1;
-        }
-        if p >= len {
-            break;
-        }
-        match bytes[p] {
-            b'>' => {
-                p += 1;
-                break;
-            }
-            b'/' => {
-                p += 1;
-                continue;
-            }
-            _ => {}
-        }
-        let name_start = p;
-        while p < len && !ends_attr_name(bytes[p]) {
-            p += 1;
-        }
-        if p == name_start {
-            // váratlan bájt (pl. magányos `=`): átlépve, hogy mindig haladjon
-            p += 1;
-            continue;
-        }
-        let attr_name = src[name_start..p].to_ascii_lowercase();
-        let mut q = p;
-        while q < len && bytes[q].is_ascii_whitespace() {
-            q += 1;
-        }
-        if q >= len || bytes[q] != b'=' {
-            // érték nélküli attribútum (`disabled`)
-            continue;
-        }
-        q += 1;
-        while q < len && bytes[q].is_ascii_whitespace() {
-            q += 1;
-        }
-        let (value_start, value_end, next) = match bytes.get(q) {
-            Some(&quote @ (b'"' | b'\'')) => {
-                let from = q + 1;
-                match bytes[from..].iter().position(|&b| b == quote) {
-                    Some(n) => (from, from + n, from + n + 1),
-                    None => (from, len, len),
-                }
-            }
-            _ => {
-                let mut e = q;
-                while e < len && !bytes[e].is_ascii_whitespace() && bytes[e] != b'>' {
-                    e += 1;
-                }
-                (q, e, e)
-            }
-        };
-        attrs.push(Attr {
-            name: attr_name,
-            value: &src[value_start..value_end],
-            start: value_start,
-        });
-        p = next;
-    }
-    Tag {
-        name,
-        attrs,
-        end: p,
-    }
-}
-
-/// A `from` pozíciótól az első `>` utáni pozíció (ha nincs, a szöveg vége).
-fn skip_to_gt(bytes: &[u8], from: usize) -> usize {
-    let from = from.min(bytes.len());
-    bytes[from..]
-        .iter()
-        .position(|&b| b == b'>')
-        .map_or(bytes.len(), |n| from + n + 1)
-}
-
-/// A `needle` első előfordulása a `from` pozíciótól.
-fn find(bytes: &[u8], from: usize, needle: &[u8]) -> Option<usize> {
-    let from = from.min(bytes.len());
-    bytes[from..]
-        .windows(needle.len())
-        .position(|w| w == needle)
-        .map(|n| from + n)
-}
-
-/// A (ASCII) `needle` első előfordulása a `from` pozíciótól, kis-/nagybetűtől függetlenül.
-fn find_ci(bytes: &[u8], from: usize, needle: &[u8]) -> Option<usize> {
-    let from = from.min(bytes.len());
-    bytes[from..]
-        .windows(needle.len())
-        .position(|w| w.eq_ignore_ascii_case(needle))
-        .map(|n| from + n)
-}
-
-/// A szóközök (sortörés, tab, több szóköz) egy szóközre vonva, a széleken levágva.
-fn collapse(text: &str) -> String {
-    text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 /// A gyakori HTML-entitások feloldása (`&amp;`, `&lt;`, `&nbsp;`, `&#39;`, `&#x2014;` …); az ismeretlen marad.

@@ -308,7 +308,6 @@ fn h10_eloquent_scope_call_resolves_to_the_scope_method() {
 // H11 – H13: űrlap, i18n
 
 #[test]
-#[ignore = "web-plan H11: a multi-line chained form post and an off-table target drop out silently; enabled in phase 5 (R4-1)"]
 fn h11_forms_view_keeps_a_multiline_chain_and_an_unknown_target() {
     let out = Fixture::laravel().run(&["show", ".", "--format", "forms"]);
     assert!(out.contains("RenewalDialog.vue"), "{out}");

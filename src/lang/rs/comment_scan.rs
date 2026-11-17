@@ -171,9 +171,7 @@ fn char_literal_end(bytes: &[u8], i: usize) -> usize {
     }
 }
 
-fn is_ident(b: u8) -> bool {
-    b.is_ascii_alphanumeric() || b == b'_'
-}
+use crate::core::text::is_ident_byte as is_ident;
 
 /// Blokk-komment szövege: soronként a `*` előtag nélkül, egy sorba vonva.
 fn clean_block(body: &str) -> String {

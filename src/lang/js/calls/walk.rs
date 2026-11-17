@@ -188,20 +188,15 @@ impl<'s> Walker<'s> {
             }
         }
         let args = (!args.is_empty()).then(|| args.iter().take(4).map(|a| self.src(a)).collect());
-        self.calls.push(Call {
-            handler: None,
-            from: r.from,
-            container: Some(self.container.clone()),
-            caller: Some(self.caller.clone()),
-            line: self.ctx.lines.line_of(start as usize),
-            end_line: None,
-            kind: r.kind.to_string(),
-            target: r.target,
-            resolved,
-            on: r.on,
-            category: r.category.to_string(),
-            args,
-        });
+        self.calls.push(
+            Call::new(r.kind, r.target, r.category)
+                .at(self.ctx.lines.line_of(start as usize))
+                .within(Some(self.container.clone()), Some(self.caller.clone()))
+                .resolved(resolved)
+                .on(r.on)
+                .with_args(args)
+                .imported_from(r.from),
+        );
     }
 
     /// Értékként átadott függvény (`Scope::reference`): hivatkozás-él (`handler`), nem hívás.
@@ -210,20 +205,15 @@ impl<'s> Walker<'s> {
         let Some(r) = self.scope.reference(e) else {
             return;
         };
-        self.calls.push(Call {
-            handler: Some(true),
-            from: r.from,
-            container: Some(self.container.clone()),
-            caller: Some(self.caller.clone()),
-            line: self.ctx.lines.line_of(e.span().start as usize),
-            end_line: None,
-            kind: r.kind.to_string(),
-            target: r.target,
-            resolved: r.resolved,
-            on: r.on,
-            category: r.category.to_string(),
-            args: None,
-        });
+        self.calls.push(
+            Call::new(r.kind, r.target, r.category)
+                .at(self.ctx.lines.line_of(e.span().start as usize))
+                .within(Some(self.container.clone()), Some(self.caller.clone()))
+                .resolved(r.resolved)
+                .on(r.on)
+                .imported_from(r.from)
+                .reference(),
+        );
     }
 
     fn record_arg_refs(&mut self, args: &[Argument<'_>]) {
@@ -234,20 +224,11 @@ impl<'s> Walker<'s> {
 
     /// Dinamikus hívás-jelölés: a cél a hívott kifejezés szövege (egy sorra vágva, ~60 karakterre rövidítve).
     fn record_dynamic(&mut self, start: u32, expr: &str) {
-        self.calls.push(Call {
-            handler: None,
-            from: None,
-            container: Some(self.container.clone()),
-            caller: Some(self.caller.clone()),
-            line: self.ctx.lines.line_of(start as usize),
-            end_line: None,
-            kind: DYNAMIC_KIND.to_string(),
-            target: Call::dynamic_target(expr),
-            resolved: None,
-            on: None,
-            category: DYNAMIC_CALL.to_string(),
-            args: None,
-        });
+        self.calls.push(
+            Call::new(DYNAMIC_KIND, Call::dynamic_target(expr), DYNAMIC_CALL)
+                .at(self.ctx.lines.line_of(start as usize))
+                .within(Some(self.container.clone()), Some(self.caller.clone())),
+        );
     }
 
     /// A kifejezés forrásszövege, egy sorba húzva (vágás nélkül).
@@ -519,20 +500,14 @@ impl<'a> Visit<'a> for Walker<'_> {
             from = (!resolved.local).then_some(spec);
         }
         let (container, caller) = (self.container.clone(), self.caller.clone());
-        self.calls.push(Call {
-            handler: None,
-            from,
-            container: Some(container),
-            caller: Some(caller),
-            line: self.ctx.lines.line_of(it.span.start as usize),
-            end_line: None,
-            kind: r.kind.to_string(),
-            target: r.target,
-            resolved: r.resolved,
-            on: None,
-            category: r.category.to_string(),
-            args: Some(args),
-        });
+        self.calls.push(
+            Call::new(r.kind, r.target, r.category)
+                .at(self.ctx.lines.line_of(it.span.start as usize))
+                .within(Some(container), Some(caller))
+                .resolved(r.resolved)
+                .with_args(Some(args))
+                .imported_from(from),
+        );
         walk::walk_import_expression(self, it);
     }
 }

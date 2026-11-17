@@ -22,6 +22,10 @@ src/
     chain.rs                    Chain<I> + Rule<I> — generikus Chain of Responsibility
     source.rs                   SourceFile { path, text, mtime } — a nyelvek bemenete
     recovery.rs                 végzetes szintaktikai hibánál az ép előtag és a hiba utáni részek (JS/TS/Vue, Rust)
+    text.rs                     közös szöveg-segédek: collapse_ws, clip_ellipsis / flat_clip, take_chars, line_of, is_ident_byte
+    srcscan.rs                  forrás-szkennelés PHP / JS nyelvjárással: strip_comments, matching, split_args / split_top, call_args, chain_end (a keretrendszer-nézetek forrás-újraolvasása)
+    markup.rs                   jelölőnyelv-primitívek: tűrő nyitó-tag szkenner (parse_tag), void elemek, komment / deklaráció, nyers-szöveg elem vége (lang/html, lang/js/template)
+    diag.rs                     Diagnostics: a csendben kihagyott elemek ok-kóddal és fájl:sorral, a nézetek lábléce összesíti
   lang/                         a nyelv-réteg
     language.rs                 trait Language (id, role, extensions, analyze), LanguageRole, Analysis
     backend.rs                  trait LanguageBackend: Language   — szerveroldal (framework-felismerés)
@@ -114,7 +118,7 @@ kiterjesztést kéri, az előbb regisztrált nyer.
   `show` és a `callers` ebből olvas — a pack a fájlonkénti cache is; a meleg lekérdezés forrásfájlt nem elemez. A levél-típusok új mezői kódváltozás nélkül tárolódnak; egy új `FileGraph`- /
   `Property`- / `Constant`-mező a `graph/codec.rs` tükrében fordítási hibát ad (egy sor).
 - **`analysis/`** — az `Analyzer` nem ismer nyelvet: ismeretlen kiterjesztésre `CallgraphError::Unsupported`.
-- **`core/`** — a nyelvek által közösen használt, nyelvfüggetlen típusok.
+- **`core/`** — a nyelvek által közösen használt, nyelvfüggetlen típusok és segédek (`text`, `srcscan`, `markup`, `diag`: egy helyen a korábbi nyelvenkénti másolatok; a `model::Call::new` + építők a hívás-literálok helyett).
 
 ## Szabályok a kódhoz
 

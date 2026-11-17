@@ -521,5 +521,5 @@ fn is_route_file(rel: &str) -> bool {
 
 /// A szóközök (sortörés, tab, több szóköz) egy szóközre cserélve.
 fn collapse_spaces(text: &str) -> String {
-    text.split_whitespace().collect::<Vec<_>>().join(" ")
+    crate::core::text::collapse_ws(text)
 }

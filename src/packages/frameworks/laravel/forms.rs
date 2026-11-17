@@ -12,14 +12,26 @@ use std::sync::LazyLock;
 use regex::Regex;
 
 use super::super::files::ProjectFiles;
-use super::super::inertia::render::{literal, source_args_named, split_top};
+use super::super::inertia::render::{literal, source_args_named};
 use super::cache::MethodInfo;
-use super::routes::{Action, Route, matching, short_class, strip_comments};
+use super::routes::{Action, Route, short_class, strip_comments};
 use super::rules::{self, Validation};
 use super::{Laravel, has_verb};
+use crate::core::diag::Diagnostics;
+use crate::core::srcscan::{self, Dialect};
 use crate::i18n::Lang;
 use crate::model::{Call, FileGraph};
 use std::path::Path;
+
+/// A JS-oldali szöveg zárójel-párja (a backtick is string).
+fn matching(text: &str, open: usize, to: usize) -> Option<usize> {
+    srcscan::matching(text, open, to, Dialect::Js)
+}
+
+/// A JS-oldali szöveg darabjai a legfelső szintű `sep` mentén (a backtick is string).
+fn split_top<'a>(text: &'a str, sep: &str) -> Vec<&'a str> {
+    srcscan::split_top(text, sep, Dialect::Js)
+}
 
 /// A `useForm` hívás feloldott neve a gráfban.
 pub(super) const USE_FORM: &str = "@inertiajs/vue3::useForm";
@@ -72,15 +84,31 @@ impl Form {
         self.class.is_empty()
     }
 
-    /// A dinamikus űrlap sora: `POST ? route unknown (dynamic URL) · 4 fields`.
+    /// Literál célú, de a route-táblán kívüli küldés (csomag-route, a keretrendszer saját route-ja): `POST /x`.
+    fn is_unrouted(&self) -> bool {
+        self.is_dynamic() && !self.uri.is_empty()
+    }
+
+    /// A dinamikus űrlap sora: `POST ? route unknown (dynamic URL) · 4 fields`; a route-táblán kívüli célnál
+    /// `POST /x · ? not in the route table · 4 fields`.
     fn dynamic_parts(&self, lang: Lang) -> Vec<String> {
-        vec![
-            self.verb.clone(),
-            lang.pick(
-                "? route unknown (dynamic URL)",
-                "? route ismeretlen (dinamikus URL)",
+        let (head, why) = if self.is_unrouted() {
+            (
+                format!("{} {}", self.verb, self.uri),
+                lang.pick("? not in the route table", "? nincs a route-táblában"),
             )
-            .to_owned(),
+        } else {
+            (
+                self.verb.clone(),
+                lang.pick(
+                    "? route unknown (dynamic URL)",
+                    "? route ismeretlen (dinamikus URL)",
+                ),
+            )
+        };
+        vec![
+            head,
+            why.to_owned(),
             format!("{} {}", self.fields.len(), lang.pick("fields", "mező")),
         ]
     }
@@ -198,7 +226,7 @@ pub(super) fn extract(rel: &str, text: &str, calls: &[Call]) -> Vec<Site> {
         .filter_map(|call| {
             let index = usize::try_from(call.line).ok()?.checked_sub(1)?;
             let var = DECL.captures(text.lines().nth(index)?)?[1].to_owned();
-            let args = source_args_named(text, call.line, "useform")?;
+            let args = source_args_named(text, call.line, "useform", Dialect::Js)?;
             // `useForm('rememberKey', {..})`: az objektum a második argumentum
             let object = match args.as_slice() {
                 [key, object, ..] if literal(key).is_some() => object,
@@ -249,9 +277,13 @@ pub(super) fn extract(rel: &str, text: &str, calls: &[Call]) -> Vec<Site> {
         else {
             continue;
         };
-        let Some(arg) = source_args_named(text, call.line, &call.target.to_ascii_lowercase())
-            .and_then(|args| args.into_iter().next())
-        else {
+        let Some(arg) = source_args_named(
+            text,
+            call.line,
+            &call.target.to_ascii_lowercase(),
+            Dialect::Js,
+        )
+        .and_then(|args| args.into_iter().next()) else {
             continue;
         };
         if sites
@@ -286,12 +318,30 @@ fn chained_var(text: &str, line: u32, decls: &[(u32, String, Vec<String>)]) -> O
         .skip(end.saturating_sub(4))
         .take(end.min(4))
         .collect();
-    let window = window.join("\n");
+    let window = format!("{}\n{}", window.join("\n"), chain_text(text, line));
     TRANSFORM
         .captures_iter(&window)
         .map(|found| found[1].to_owned())
         .filter(|var| decls.iter().any(|decl| decl.1 == *var))
         .last()
+}
+
+/// A `line`. sorban kezdődő hívás-lánc szövege (`form⏎.transform(..)⏎.post(..)`): a láncolt hívás sora a lánc
+/// kezdősora, a `.transform(` és a küldés a későbbi sorokban áll.
+fn chain_text(text: &str, line: u32) -> &str {
+    let Some(skip) = usize::try_from(line).ok().and_then(|l| l.checked_sub(1)) else {
+        return "";
+    };
+    let start = if skip == 0 {
+        0
+    } else {
+        match text.match_indices('\n').nth(skip - 1) {
+            Some((at, _)) => at + 1,
+            None => return "",
+        }
+    };
+    let end = srcscan::chain_end(text, start, Dialect::Js, 4_000).max(start);
+    &text[start..end]
 }
 
 /// Egy objektum-literál felső szintű kulcsai: `{ name: '', 'e-mail': '', password }`; ha az argumentum nem
@@ -507,6 +557,7 @@ impl Laravel {
         files: &dyn ProjectFiles,
     ) {
         self.forms.clear();
+        self.diagnostics.clear();
         if self.routes.is_empty() {
             return;
         }
@@ -541,6 +592,7 @@ impl Laravel {
     ) {
         self.psr4 = composer_psr4(&self.root, files);
         self.forms.clear();
+        self.diagnostics.clear();
         if self.routes.is_empty() {
             return;
         }
@@ -562,30 +614,44 @@ impl Laravel {
     ) {
         let mut cache: HashMap<(String, String), Option<Validation>> = HashMap::new();
         let mut forms = Vec::new();
+        let mut diagnostics = Diagnostics::default();
         for site in sites {
             let Some(route) = self.form_route(&site.arg, site.verb) else {
-                // számított cél (`form.post(path.value)`): az űrlap megmarad, route nélkül
-                if is_dynamic_target(&site.arg) {
-                    forms.push(Form {
-                        file: site.file,
-                        line: site.line,
-                        target: site.target,
-                        caller: site.caller,
-                        container: site.container,
-                        verb: site.verb.to_owned(),
-                        uri: String::new(),
-                        class: String::new(),
-                        method: String::new(),
-                        fields: site.fields,
-                        rules: Vec::new(),
-                        validated: false,
-                        unvalidated: Vec::new(),
-                        missing_required: Vec::new(),
-                    });
-                }
+                // számított cél (`form.post(path.value)`): az űrlap megmarad, route nélkül (üres uri); a route-táblán
+                // kívüli literál cél (csomag-route, Fortify) szintén: a cél szövegével, hogy a nézet kimutassa
+                let uri = if is_dynamic_target(&site.arg) {
+                    String::new()
+                } else {
+                    literal(&site.arg).unwrap_or_else(|| site.arg.trim().to_owned())
+                };
+                forms.push(Form {
+                    file: site.file,
+                    line: site.line,
+                    target: site.target,
+                    caller: site.caller,
+                    container: site.container,
+                    verb: site.verb.to_owned(),
+                    uri,
+                    class: String::new(),
+                    method: String::new(),
+                    fields: site.fields,
+                    rules: Vec::new(),
+                    validated: false,
+                    unvalidated: Vec::new(),
+                    missing_required: Vec::new(),
+                });
                 continue;
             };
             let Action::Controller { class, method } = &route.action else {
+                diagnostics.push(
+                    "form-no-controller",
+                    (
+                        "the route is not a controller action (closure, view, redirect or page)",
+                        "a route nem controller-akció (closure, view, redirect vagy oldal)",
+                    ),
+                    &site.file,
+                    site.line,
+                );
                 continue;
             };
             let validation = cache
@@ -593,6 +659,15 @@ impl Laravel {
                 .or_insert_with(|| self.validation_of(class, method, classes, files))
                 .clone();
             let Some(validation) = validation else {
+                diagnostics.push(
+                    "form-unknown-controller",
+                    (
+                        "the controller or its method was not found",
+                        "a controller vagy a metódusa nem található",
+                    ),
+                    &site.file,
+                    site.line,
+                );
                 continue;
             };
             let (unvalidated, missing_required) = if validation.found {
@@ -618,6 +693,7 @@ impl Laravel {
             });
         }
         self.forms = forms;
+        self.diagnostics = diagnostics;
     }
 
     /// Célzott változat: a `graphs` csak a (JS / Vue) küldő fájlok és a lekérdezett PHP-fájlok; a controller és a
@@ -791,13 +867,23 @@ impl Laravel {
             .filter(|form| scope.contains(&form.file))
             .collect();
         if forms.is_empty() {
-            return Vec::new();
+            return self.diagnostics.footer(scope, lang);
         }
         forms.sort_by(|a, b| (&a.file, a.line).cmp(&(&b.file, b.line)));
         let mut lines: Vec<String> = forms
             .iter()
             .filter(|form| form.mismatched() || !form.validated)
             .map(|form| {
+                if form.is_unrouted() {
+                    let parts = form.dynamic_parts(lang);
+                    return format!(
+                        "? {} L{} → useForm({}) → {}",
+                        form.file,
+                        form.line,
+                        names(&form.fields),
+                        parts[..2].join(" · ")
+                    );
+                }
                 if form.is_dynamic() {
                     return format!(
                         "? {} L{} → {}",
@@ -816,16 +902,13 @@ impl Laravel {
             .iter()
             .filter(|form| !form.validated && !form.is_dynamic())
             .count();
-        lines.push(match lang {
-            Lang::En => format!(
-                "forms: {} checked, {issues} with issues, {bare} without validation",
-                forms.len()
-            ),
-            Lang::Hu => format!(
-                "űrlapok: {} ellenőrizve, {issues} problémás, {bare} validáció nélkül",
-                forms.len()
-            ),
-        });
+        let checked = forms.len();
+        lines.push(crate::tfl!(
+            lang,
+            "forms: {checked} checked, {issues} with issues, {bare} without validation",
+            "űrlapok: {checked} ellenőrizve, {issues} problémás, {bare} validáció nélkül"
+        ));
+        lines.extend(self.diagnostics.footer(scope, lang));
         lines
     }
 }

@@ -752,3 +752,38 @@ fn a_computed_url_keeps_the_form_with_an_unknown_route() {
         "forms: 1 checked, 0 with issues, 0 without validation"
     );
 }
+
+/// A többsoros láncolt küldés (`form⏎.transform(..)⏎.post(..)`) hívás-sora a lánc kezdősora; a JS-objektum backtick
+/// stringje és `#` jele nem PHP-megjegyzés.
+#[test]
+fn a_multiline_chained_submit_and_js_syntax_in_the_object_are_read() {
+    let text = "const form = useForm({\n    color: `#fff`,\n    note: '',\n});\nconst go = () => form\n    .transform((d) => d)\n    .post('/x', {\n        preserveState: true,\n    });\n";
+    let mut post = submit(text, "const go", "form.post");
+    post.target = "post".into();
+    let calls = vec![use_form(text, "const form"), post];
+    let sites = extract("p.vue", text, &calls);
+    assert_eq!(sites.len(), 1, "{sites:?}");
+    assert_eq!(sites[0].fields, strings(&["color", "note"]));
+    assert_eq!(sites[0].arg, "'/x'");
+    assert_eq!(sites[0].verb, "POST");
+}
+
+#[test]
+fn an_off_table_literal_target_keeps_the_form_with_a_note() {
+    let text = "const form = useForm({ a: '' });\nconst s = () => form.post('/missing');\n";
+    let routes = "<?php\nRoute::post('/x', [FooController::class, 'store']);\n";
+    let vues = [(
+        "resources/js/Pages/A.vue",
+        text,
+        vec![
+            use_form(text, "const form"),
+            submit(text, "form.post('/missing')", "form.post"),
+        ],
+    )];
+    let laravel = project(routes, &[], &vues);
+    let view = laravel.form_view_lines(&["resources/js/Pages/A.vue".to_owned()], Lang::En);
+    assert_eq!(
+        view[0],
+        "? resources/js/Pages/A.vue L2 → useForm(a) → POST /missing · ? not in the route table"
+    );
+}

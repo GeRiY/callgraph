@@ -91,20 +91,15 @@ impl Language for HtmlDocument {
             } else {
                 link_category(&link.target)
             };
-            b.call(Call {
-                handler: None,
-                from: None,
-                container: Some(name.clone()),
-                caller: Some(caller_at(link.start)),
-                line: line(link.start),
-                end_line: None,
-                kind: if link.image { "image" } else { "link" }.into(),
-                target: link.target.clone(),
-                resolved: None,
-                on: None,
-                category: category.into(),
-                args: None,
-            });
+            b.call(
+                Call::new(
+                    if link.image { "image" } else { "link" },
+                    link.target.clone(),
+                    category,
+                )
+                .at(line(link.start))
+                .within(Some(name.clone()), Some(caller_at(link.start))),
+            );
         }
         Ok(Analysis {
             graph: b.build(),

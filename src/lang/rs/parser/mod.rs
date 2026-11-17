@@ -72,20 +72,10 @@ pub(crate) fn line_count_of(text: &str) -> u32 {
 }
 
 /// Whitespace-sorozatok egy szóközre cserélése.
-pub(crate) fn squash(text: &str) -> String {
-    text.split_whitespace().collect::<Vec<_>>().join(" ")
-}
+pub(crate) use crate::core::text::collapse_ws as squash;
 
 /// `max` karakterre vágás `…` jellel.
-pub(crate) fn shorten(text: &str, max: usize) -> String {
-    if text.chars().count() > max {
-        let mut cut: String = text.chars().take(max).collect();
-        cut.push('…');
-        cut
-    } else {
-        text.to_owned()
-    }
-}
+pub(crate) use crate::core::text::clip_ellipsis as shorten;
 
 /// Szintaktikai hiba helye és szövege.
 #[derive(Debug, Clone, PartialEq, Eq)]

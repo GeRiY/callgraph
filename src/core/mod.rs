@@ -1,9 +1,13 @@
 //! Nyelvfüggetlen építőkövek: a generikus lánc, a forrásfájl, a sorindex és a részleges elemzés vágási pontjai.
 
 mod chain;
+pub mod diag;
 mod lines;
+pub mod markup;
 mod recovery;
 mod source;
+pub mod srcscan;
+pub mod text;
 
 pub use chain::{Chain, Rule};
 pub use lines::LineIndex;
