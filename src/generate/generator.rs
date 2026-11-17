@@ -5,7 +5,7 @@
 
 use std::collections::BTreeSet;
 
-use super::ast::{Member, Program, TypeKind};
+use super::ast::{Member, Program, RawBlock, TypeKind};
 use super::command::{EditCommand, InsertInto, ReplaceRange, Undo, WriteNew};
 use super::edit::{
     add_imports, extend_over_docs, insert_after_line, insert_at_end, insert_before_line, join_lines,
@@ -199,6 +199,9 @@ impl<'a, E: Emitter> Generator<'a, E> {
     /// A kérés végrehajtása.
     pub fn run(&self, request: &GenRequest) -> GenResult<Output> {
         let program = parser::parse(&request.expr)?;
+        if let Some(raw) = &program.raw {
+            return self.run_raw(&program, raw, request);
+        }
         match &request.target {
             Target::Preview => self.preview(&program),
             Target::Write { file } => self.write(&program, file, request.mode),
@@ -219,6 +222,209 @@ impl<'a, E: Emitter> Generator<'a, E> {
             ),
             Target::Replace { file, at, expect } => {
                 self.replace(&program, file, at, expect.as_deref(), request.mode)
+            }
+        }
+    }
+
+    /// A nyers blokk (`php{…}` / `raw{…}`) kérése: előnézet, új fájl, beszúrás (`--at` / `--after L<n>` / a fájl vége)
+    /// vagy sortartomány cseréje.
+    fn run_raw(
+        &self,
+        program: &Program,
+        raw: &RawBlock,
+        request: &GenRequest,
+    ) -> GenResult<Output> {
+        let block = raw_lines(&raw.text);
+        // üres blokk csak `--replace`-nél van értelme: a tartomány törlése
+        if block.is_empty() && !matches!(request.target, Target::Replace { .. }) {
+            return Err(GenError::new(
+                crate::t!(
+                    "the raw block is empty (an empty `php{}` only deletes a range with --replace)",
+                    "a nyers blokk üres (az üres `php{}` csak a --replace-szel töröl egy tartományt)"
+                )
+                .to_owned(),
+            ));
+        }
+        let psr4 = Psr4::load(self.env.fs, self.env.root);
+        let scan = PhpScan::new(self.env.fs, self.env.root, &psr4);
+        let names = if raw.php {
+            self.emitter.raw_names(&raw.text)
+        } else {
+            BTreeSet::new()
+        };
+        match &request.target {
+            Target::Preview => {
+                let (_, unresolved) = self.resolve_names(&names, program, None, &[], &psr4, &scan);
+                Ok(Output {
+                    lines: block,
+                    unresolved,
+                })
+            }
+            Target::Write { file } => {
+                let rel = self.rel(file)?;
+                self.check_extension(&rel)?;
+                let (imports, unresolved) =
+                    self.resolve_names(&names, program, None, &[], &psr4, &scan);
+                let mut lines: Vec<String> = Vec::new();
+                if raw.php {
+                    lines.push("<?php".to_owned());
+                    lines.push(String::new());
+                }
+                lines.extend(block.iter().cloned());
+                lines.push(String::new());
+                let limit = lines.len();
+                add_imports(&mut lines, limit, &imports);
+                let text = join_lines(&lines, "\n");
+                self.validate(&rel, &text)?;
+                if request.mode.dry() {
+                    return Ok(Output {
+                        lines: text.lines().map(str::to_owned).collect(),
+                        unresolved,
+                    });
+                }
+                let line = WriteNew { rel, text }.execute(self.env)?;
+                Ok(Output {
+                    lines: vec![line],
+                    unresolved,
+                })
+            }
+            Target::Into { file, place, .. } => {
+                let rel = self.rel(file)?;
+                self.check_extension(&rel)?;
+                let Loaded {
+                    mut lines,
+                    eol,
+                    graph,
+                } = self.load(&rel)?;
+                let (imports, unresolved) = self.resolve_names(
+                    &names,
+                    program,
+                    graph.namespace.as_deref(),
+                    &file_imports(&graph),
+                    &psr4,
+                    &scan,
+                );
+                // egy sorhoz kötött beszúrásnál a blokk az ottani behúzást kapja (egy záráson belüli utasítás)
+                let anchor = match place {
+                    &Place::Line(n) => Some(n),
+                    Place::After(at) => at.strip_prefix('L').and_then(|d| d.parse::<usize>().ok()),
+                    _ => None,
+                };
+                let block = indented(
+                    &block,
+                    anchor.and_then(|n| lines.get(n.wrapping_sub(1))),
+                    raw.php,
+                );
+                let first = match place {
+                    Place::End => {
+                        let last = lines
+                            .iter()
+                            .rposition(|l| !l.trim().is_empty())
+                            .map_or(0, |i| i + 1);
+                        insert_after_line(&mut lines, last, &block)
+                    }
+                    &Place::Line(n) => {
+                        check_line(n, lines.len(), &rel)?;
+                        insert_before_line(&mut lines, n, &block)
+                    }
+                    Place::After(at) => {
+                        let n = at
+                            .strip_prefix('L')
+                            .and_then(|d| d.parse::<usize>().ok())
+                            .ok_or_else(|| {
+                                GenError::new(crate::t!(
+                                    "a raw block goes after a line: `--after L<n>` (or `--at L<n>`, or nothing for the end of the file)",
+                                    "a nyers blokk egy sor után mehet: `--after L<n>` (vagy `--at L<n>`, vagy semmi: a fájl végére)"
+                                ))
+                            })?;
+                        check_line(n, lines.len(), &rel)?;
+                        insert_after_line(&mut lines, n, &block)
+                    }
+                    Place::Before(_) => {
+                        return Err(GenError::new(
+                            crate::t!(
+                                "a raw block cannot go `--before` a method: use `--at L<n>`",
+                                "a nyers blokk nem mehet metódus `--before` elé: használd az `--at L<n>`-t"
+                            )
+                            .to_owned(),
+                        ));
+                    }
+                };
+                let added = add_imports(&mut lines, first, &imports);
+                let text = join_lines(&lines, eol);
+                self.validate(&rel, &text)?;
+                let start = first + added + 1;
+                let end = start + block.len() - 1;
+                if request.mode.dry() {
+                    return Ok(Output {
+                        lines: report::with_header(report::insert_header(&rel, start), block),
+                        unresolved,
+                    });
+                }
+                let summary = report::inserted_lines(block.len(), &rel, start, end);
+                let line = InsertInto { rel, text, summary }.execute(self.env)?;
+                Ok(Output {
+                    lines: vec![line],
+                    unresolved,
+                })
+            }
+            Target::Replace { file, at, expect } => {
+                let rel = self.rel(file)?;
+                self.check_extension(&rel)?;
+                let Loaded {
+                    mut lines,
+                    eol,
+                    graph,
+                } = self.load(&rel)?;
+                let (from, to) = match at {
+                    ReplaceAt::Lines(a, b) => (*a, *b),
+                    ReplaceAt::Method { class, name } => {
+                        method_range(&graph, &lines, class.as_deref(), name, &rel)?
+                    }
+                };
+                if from == 0 || from > to || to > lines.len() {
+                    return Err(GenError::new(crate::tf!(
+                        "bad line range L{}-{} ({} has {} lines)",
+                        "hibás sortartomány: L{}-{} ({} {} soros)",
+                        from,
+                        to,
+                        rel,
+                        lines.len()
+                    )));
+                }
+                target::check_expect(&lines, &rel, from, to, expect.as_deref())?;
+                let block = indented(&block, lines.get(from - 1), raw.php);
+                let (imports, unresolved) = self.resolve_names(
+                    &names,
+                    program,
+                    graph.namespace.as_deref(),
+                    &file_imports(&graph),
+                    &psr4,
+                    &scan,
+                );
+                let old: Vec<String> = lines[from - 1..to].to_vec();
+                let tail = lines.split_off(to);
+                lines.truncate(from - 1);
+                lines.extend(block.iter().cloned());
+                lines.extend(tail);
+                let added = add_imports(&mut lines, from - 1, &imports);
+                let text = join_lines(&lines, eol);
+                self.validate(&rel, &text)?;
+                let new_from = from + added;
+                let new_to = new_from + block.len().saturating_sub(1);
+                if request.mode.dry() {
+                    let header = report::replace_header(&rel, (from, to), (new_from, new_to), "");
+                    return Ok(Output {
+                        lines: report::replace_preview(header, &old, block, request.mode.diff()),
+                        unresolved,
+                    });
+                }
+                let summary = report::replaced(&rel, (from, to), (new_from, new_to), "");
+                let line = ReplaceRange { rel, text, summary }.execute(self.env)?;
+                Ok(Output {
+                    lines: vec![line],
+                    unresolved,
+                })
             }
         }
     }
@@ -249,6 +455,10 @@ impl<'a, E: Emitter> Generator<'a, E> {
 
     /// A kész szöveg ellenőrzése a nyelv parserével: hibánál semmi nem íródik.
     fn validate(&self, rel: &str, text: &str) -> GenResult<()> {
+        if rel.ends_with(".blade.php") {
+            // a Blade-nézet nem tiszta PHP: a PHP-parser nem ellenőrizheti
+            return Ok(());
+        }
         self.emitter.check(rel, text).map_err(|(line, message)| {
             GenError::new(crate::tf!(
                 "syntax error at L{}: {} (nothing written)",
@@ -281,7 +491,7 @@ impl<'a, E: Emitter> Generator<'a, E> {
             .map(|u| (alias_of(&u.fqcn, &u.alias), u.fqcn.clone()))
             .collect();
         explicit.extend(existing.iter().cloned());
-        let chain = ResolverChain::php(explicit.clone(), scan, psr4);
+        let chain = ResolverChain::php(explicit.clone(), scan, psr4, psr4.is_laravel());
         let mut imports: Vec<(String, Option<String>)> = program
             .uses
             .iter()
@@ -760,4 +970,75 @@ fn method_range(
             name
         ))),
     }
+}
+
+/// A nyers blokk sorai: a `{`-t követő első sor balról vágva, a többi a közös behúzással balra tolva; a blokk eleji és
+/// végi üres sorok nélkül.
+fn raw_lines(text: &str) -> Vec<String> {
+    let mut lines: Vec<&str> = text.lines().collect();
+    let first_blank = lines.first().is_none_or(|l| l.trim().is_empty());
+    while lines.first().is_some_and(|l| l.trim().is_empty()) {
+        lines.remove(0);
+    }
+    while lines.last().is_some_and(|l| l.trim().is_empty()) {
+        lines.pop();
+    }
+    if lines.is_empty() {
+        return Vec::new();
+    }
+    let skip = usize::from(!first_blank);
+    let indent = lines
+        .iter()
+        .skip(skip)
+        .filter(|l| !l.trim().is_empty())
+        .map(|l| l.len() - l.trim_start().len())
+        .min()
+        .unwrap_or(0);
+    lines
+        .iter()
+        .enumerate()
+        .map(|(i, l)| {
+            if i < skip {
+                l.trim().to_owned()
+            } else if l.trim().is_empty() {
+                String::new()
+            } else {
+                l[indent.min(l.len() - l.trim_start().len())..]
+                    .trim_end()
+                    .to_owned()
+            }
+        })
+        .collect()
+}
+
+/// A PHP-blokk sorai a `like` sor behúzásával (nem PHP-nál vagy ha nincs sor: változatlanul).
+fn indented(block: &[String], like: Option<&String>, php: bool) -> Vec<String> {
+    let pad: String = like
+        .filter(|_| php)
+        .map(|l| l[..l.len() - l.trim_start().len()].to_owned())
+        .unwrap_or_default();
+    block
+        .iter()
+        .map(|l| {
+            if l.is_empty() {
+                String::new()
+            } else {
+                format!("{pad}{l}")
+            }
+        })
+        .collect()
+}
+
+/// A sorszám (1-alapú) a fájlon belül van-e.
+fn check_line(n: usize, len: usize, rel: &str) -> GenResult<()> {
+    if n == 0 || n > len {
+        return Err(GenError::new(crate::tf!(
+            "line L{} is outside {} ({} lines)",
+            "az L{}. sor kívül esik ezen: {} ({} soros)",
+            n,
+            rel,
+            len
+        )));
+    }
+    Ok(())
 }

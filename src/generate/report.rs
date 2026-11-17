@@ -100,6 +100,18 @@ pub fn inserted_members(count: usize, place: &str, start: usize, end: usize) -> 
     )
 }
 
+/// `inserted 3 line(s) into routes/web.php (L12-14)`: a nyers blokk `--into` összegzése.
+pub fn inserted_lines(count: usize, rel: &str, start: usize, end: usize) -> String {
+    crate::tf!(
+        "inserted {} line(s) into {} (L{}-{})",
+        "beszúrva {} sor ide: {} (L{}-{})",
+        count,
+        rel,
+        start,
+        end
+    )
+}
+
 /// `inserted into src/A.vue: script L12-14, template L20-25`: a Vue / HTML `--into` összegzése.
 pub fn inserted_sections<S: AsRef<str>>(rel: &str, places: &[S]) -> String {
     let places: Vec<&str> = places.iter().map(AsRef::as_ref).collect();

@@ -9,7 +9,9 @@
 use std::collections::BTreeSet;
 
 use super::builder::PhpFileBuilder;
-use super::types::{doc_type, is_generator_type, member_names, needs_doc, php_type, type_names};
+use super::types::{
+    doc_type, is_generator_type, member_names, needs_doc, php_type, scan_names, type_names,
+};
 use crate::generate::ast::{Member, MemberKind, Param, TypeDecl, TypeKind, TypeRef, Visibility};
 use crate::generate::emitter::{Emitter, FileSpec};
 use crate::lang::php::PhpBackend;
@@ -66,6 +68,23 @@ fn php_param(p: &Param) -> String {
 impl PhpEmitter {
     fn header(&self, decl: &TypeDecl) -> String {
         let mut s = String::new();
+        if decl.anonymous {
+            s.push_str("return new class");
+        } else {
+            self.kind_and_name(decl, &mut s);
+        }
+        if decl.kind == TypeKind::Enum
+            && let Some(backing) = &decl.backing
+        {
+            s.push_str(": ");
+            s.push_str(&php_type(backing));
+        }
+        self.heritage(decl, &mut s);
+        s
+    }
+
+    /// A fejléc első fele: módosítók, fajta-kulcsszó és név.
+    fn kind_and_name(&self, decl: &TypeDecl, s: &mut String) {
         match decl.kind {
             TypeKind::Class | TypeKind::Struct => {
                 if decl.is_abstract {
@@ -84,12 +103,10 @@ impl PhpEmitter {
             TypeKind::Enum => s.push_str("enum "),
         }
         s.push_str(&decl.name);
-        if decl.kind == TypeKind::Enum
-            && let Some(backing) = &decl.backing
-        {
-            s.push_str(": ");
-            s.push_str(&php_type(backing));
-        }
+    }
+
+    /// A fejléc második fele: `extends` és `implements`.
+    fn heritage(&self, decl: &TypeDecl, s: &mut String) {
         if !decl.extends.is_empty()
             && matches!(
                 decl.kind,
@@ -103,7 +120,18 @@ impl PhpEmitter {
             s.push_str(" implements ");
             s.push_str(&Self::type_list(&decl.implements));
         }
-        s
+    }
+
+    /// A trait-használat sorai a törzs elején (`use A, B;`), utána egy üres sor, ha követi még valami.
+    fn trait_lines(&self, decl: &TypeDecl) -> Vec<String> {
+        if decl.traits.is_empty() {
+            return Vec::new();
+        }
+        let mut lines = vec![format!("{IND}use {};", Self::type_list(&decl.traits))];
+        if !decl.cases.is_empty() || !decl.members.is_empty() {
+            lines.push(String::new());
+        }
+        lines
     }
 
     fn type_list(types: &[TypeRef]) -> String {
@@ -317,12 +345,14 @@ impl Emitter for PhpEmitter {
         } else {
             vec![String::new()]
         };
+        let close = if decl.anonymous { "};" } else { "}" };
         std::iter::once(self.header(decl))
             .chain(std::iter::once("{".to_owned()))
+            .chain(self.trait_lines(decl))
             .chain(cases)
             .chain(gap)
             .chain(self.members(decl.kind, &decl.members))
-            .chain(std::iter::once("}".to_owned()))
+            .chain(std::iter::once(close.to_owned()))
     }
 
     fn members<'a>(
@@ -351,6 +381,9 @@ impl Emitter for PhpEmitter {
             {
                 type_names(ty, &mut names);
             }
+            for ty in &decl.traits {
+                type_names(ty, &mut names);
+            }
             for member in &decl.members {
                 member_names(member, &mut names);
             }
@@ -360,6 +393,10 @@ impl Emitter for PhpEmitter {
         }
         names.retain(|n| !decls.iter().any(|d| &d.name == n));
         names
+    }
+
+    fn raw_names(&self, text: &str) -> BTreeSet<String> {
+        scan_names(text).into_iter().collect()
     }
 
     fn file(&self, spec: &FileSpec<'_>, decls: &[TypeDecl]) -> String {

@@ -1,6 +1,7 @@
 //! Chain of Responsibility: a rövid osztálynév teljes névvé (FQCN) oldása láncolt feloldókkal, az első találatig:
 //! 1. explicit `use:` (és a célfájl meglévő importjai) → 2. a projekt osztály-indexe (PSR-4 + fájlnév) →
-//! 3. a projektben már használt importok (`use X\Y;` sorok) → 4. a PHP globális osztályai → feloldatlan.
+//! 3. a projektben már használt importok (`use X\Y;` sorok) → 4. a PHP globális osztályai → 5. Laravel-projektben a
+//!    keretrendszer gyakori osztályai → feloldatlan.
 //!
 //! A 2. és 3. lépés lustán halad: a jelölteket (fájlokat) folyamatosan adja, és az első találatnál megáll.
 
@@ -235,6 +236,79 @@ impl NameResolver for PhpGlobals {
     }
 }
 
+/// 5. A Laravel keretrendszer gyakori osztályai (a `vendor/` nincs beindexelve): csak Laravel-projektben, és csak
+///    az egyértelmű rövid nevek (a `Response` / `Middleware` több csomagban is van, ezeket `use:`-zal kell megadni).
+pub struct LaravelNames;
+
+const LARAVEL: &[(&str, &str)] = &[
+    ("Arr", "Illuminate\\Support\\Arr"),
+    ("Auth", "Illuminate\\Support\\Facades\\Auth"),
+    ("AssertableInertia", "Inertia\\Testing\\AssertableInertia"),
+    (
+        "BelongsTo",
+        "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+    ),
+    (
+        "BelongsToMany",
+        "Illuminate\\Database\\Eloquent\\Relations\\BelongsToMany",
+    ),
+    ("Builder", "Illuminate\\Database\\Eloquent\\Builder"),
+    ("Blueprint", "Illuminate\\Database\\Schema\\Blueprint"),
+    ("Cache", "Illuminate\\Support\\Facades\\Cache"),
+    ("Carbon", "Illuminate\\Support\\Carbon"),
+    ("Collection", "Illuminate\\Support\\Collection"),
+    ("DB", "Illuminate\\Support\\Facades\\DB"),
+    (
+        "Factory",
+        "Illuminate\\Database\\Eloquent\\Factories\\Factory",
+    ),
+    ("FormRequest", "Illuminate\\Foundation\\Http\\FormRequest"),
+    ("Gate", "Illuminate\\Support\\Facades\\Gate"),
+    (
+        "HasFactory",
+        "Illuminate\\Database\\Eloquent\\Factories\\HasFactory",
+    ),
+    (
+        "HasMany",
+        "Illuminate\\Database\\Eloquent\\Relations\\HasMany",
+    ),
+    (
+        "HasOne",
+        "Illuminate\\Database\\Eloquent\\Relations\\HasOne",
+    ),
+    ("Hash", "Illuminate\\Support\\Facades\\Hash"),
+    ("Inertia", "Inertia\\Inertia"),
+    ("JsonResponse", "Illuminate\\Http\\JsonResponse"),
+    ("Log", "Illuminate\\Support\\Facades\\Log"),
+    ("Migration", "Illuminate\\Database\\Migrations\\Migration"),
+    ("Model", "Illuminate\\Database\\Eloquent\\Model"),
+    ("RedirectResponse", "Illuminate\\Http\\RedirectResponse"),
+    (
+        "RefreshDatabase",
+        "Illuminate\\Foundation\\Testing\\RefreshDatabase",
+    ),
+    ("Request", "Illuminate\\Http\\Request"),
+    ("Route", "Illuminate\\Support\\Facades\\Route"),
+    ("Rule", "Illuminate\\Validation\\Rule"),
+    ("Schema", "Illuminate\\Support\\Facades\\Schema"),
+    ("Seeder", "Illuminate\\Database\\Seeder"),
+    ("ServiceProvider", "Illuminate\\Support\\ServiceProvider"),
+    ("SoftDeletes", "Illuminate\\Database\\Eloquent\\SoftDeletes"),
+    ("Storage", "Illuminate\\Support\\Facades\\Storage"),
+    ("Str", "Illuminate\\Support\\Str"),
+    ("Validator", "Illuminate\\Support\\Facades\\Validator"),
+    ("WithFaker", "Illuminate\\Foundation\\Testing\\WithFaker"),
+];
+
+impl NameResolver for LaravelNames {
+    fn resolve(&self, short: &str) -> Option<String> {
+        LARAVEL
+            .iter()
+            .find(|(name, _)| *name == short)
+            .map(|(_, fqcn)| (*fqcn).to_owned())
+    }
+}
+
 /// A lánc: a tagok sorban, az első találatig.
 pub struct ResolverChain<'a> {
     links: Vec<Box<dyn NameResolver + 'a>>,
@@ -242,15 +316,22 @@ pub struct ResolverChain<'a> {
 
 impl<'a> ResolverChain<'a> {
     /// A PHP-lánc: explicit → projekt-index → használt importok → globálisok.
-    pub fn php(explicit: Vec<(String, String)>, scan: &'a PhpScan<'_>, psr4: &'a Psr4) -> Self {
-        Self {
-            links: vec![
-                Box::new(ExplicitUse::new(explicit)),
-                Box::new(ProjectClasses::new(scan, psr4)),
-                Box::new(UsedImports::new(scan)),
-                Box::new(PhpGlobals),
-            ],
+    pub fn php(
+        explicit: Vec<(String, String)>,
+        scan: &'a PhpScan<'_>,
+        psr4: &'a Psr4,
+        laravel: bool,
+    ) -> Self {
+        let mut links: Vec<Box<dyn NameResolver + 'a>> = vec![
+            Box::new(ExplicitUse::new(explicit)),
+            Box::new(ProjectClasses::new(scan, psr4)),
+            Box::new(UsedImports::new(scan)),
+            Box::new(PhpGlobals),
+        ];
+        if laravel {
+            links.push(Box::new(LaravelNames));
         }
+        Self { links }
     }
 
     /// A teljes név, vagy `None` (feloldatlan).

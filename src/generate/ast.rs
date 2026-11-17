@@ -227,6 +227,10 @@ pub struct TypeDecl {
     pub backing: Option<TypeRef>,
     pub cases: Vec<EnumCase>,
     pub members: Vec<Member>,
+    /// Trait-használat a törzs elején (`use A, B;`): `c:Post > use:HasFactory,Notifiable`.
+    pub traits: Vec<TypeRef>,
+    /// Névtelen osztály (`a:<Migration>`): `return new class extends Migration { … };`.
+    pub anonymous: bool,
 }
 
 impl TypeDecl {
@@ -242,6 +246,8 @@ impl TypeDecl {
             backing: None,
             cases: Vec::new(),
             members: Vec::new(),
+            traits: Vec::new(),
+            anonymous: false,
         }
     }
 }
@@ -253,6 +259,14 @@ pub struct UseImport {
     pub alias: Option<String>,
 }
 
+/// Nyers szövegblokk (`php{ … }` / `raw{ … }`): utasítások osztály nélkül (route-ok, `bootstrap/app.php`,
+/// Blade-nézet). `php`: a PHP-fájl `<?php` fejlécet kap és importokat; egyébként a szöveg szó szerint kerül be.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RawBlock {
+    pub text: String,
+    pub php: bool,
+}
+
 /// Egy kifejezés eredménye.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Program {
@@ -262,4 +276,6 @@ pub struct Program {
     pub decls: Vec<TypeDecl>,
     /// Típus nélküli, „csupasz” tagok (`--into` / `--replace` célra).
     pub loose: Vec<Member>,
+    /// Nyers blokk (`php{…}` / `raw{…}`), típus és csupasz tag nélkül.
+    pub raw: Option<RawBlock>,
 }

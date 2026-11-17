@@ -13,6 +13,8 @@ const STYLE_SAMPLE: usize = 50;
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Psr4 {
     entries: Vec<(String, String)>,
+    /// A `composer.json` `require` / `require-dev` részében szerepel a `laravel/framework`.
+    laravel: bool,
 }
 
 impl Psr4 {
@@ -46,7 +48,15 @@ impl Psr4 {
                 }
             }
         }
-        Self { entries }
+        let laravel = ["require", "require-dev"]
+            .iter()
+            .any(|k| doc[k].get("laravel/framework").is_some());
+        Self { entries, laravel }
+    }
+
+    /// Laravel-projekt-e (`laravel/framework` a függőségek között).
+    pub fn is_laravel(&self) -> bool {
+        self.laravel
     }
 
     pub fn is_empty(&self) -> bool {

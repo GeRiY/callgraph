@@ -2,7 +2,7 @@
 //! a fából az ismétlések és a `$` számlálók kifejtése után a nyelvfüggetlen AST (`Program`). A fej-szintaxis a
 //! `head` modulban él.
 
-use super::ast::{Member, Program, TypeDecl, UseImport};
+use super::ast::{Member, Program, RawBlock, TypeDecl, TypeRef, UseImport};
 use super::error::{GenError, GenResult};
 use super::head;
 use super::lexer::{Lexer, Tok};
@@ -35,6 +35,7 @@ enum Item {
     Use(Vec<UseImport>),
     Decl(TypeDecl),
     Member(Member),
+    Raw(RawBlock),
 }
 
 struct Parser {
@@ -300,6 +301,15 @@ fn build(elem: &Elem, children: &[Node], counter: Option<u32>) -> GenResult<Item
         no_children("use:")?;
         return head::parse_uses(rest).map(Item::Use).map_err(located);
     }
+    if (text == "php" || text == "raw")
+        && let Some(body) = &elem.raw
+    {
+        no_children(&text)?;
+        return Ok(Item::Raw(RawBlock {
+            text: body.clone(),
+            php: text == "php",
+        }));
+    }
     if head::is_decl_head(&text) {
         if elem.raw.is_some() {
             return Err(located(GenError::new(
@@ -314,6 +324,17 @@ fn build(elem: &Elem, children: &[Node], counter: Option<u32>) -> GenResult<Item
         for item in expand(children, counter)? {
             match item {
                 Item::Member(m) => decl.members.push(m),
+                Item::Use(uses) => {
+                    // típus alatt a `use:` trait-használat (`use A, B;`), nem import
+                    for u in uses {
+                        let name = if u.fqcn.contains('\\') {
+                            format!("\\{}", u.fqcn)
+                        } else {
+                            u.fqcn
+                        };
+                        decl.traits.push(TypeRef::Named(name));
+                    }
+                }
                 _ => {
                     return Err(located(GenError::new(
                         crate::t!(
@@ -350,7 +371,17 @@ fn assemble(items: Vec<Item>) -> GenResult<Program> {
             Item::Use(uses) => program.uses.extend(uses),
             Item::Decl(decl) => program.decls.push(decl),
             Item::Member(member) => program.loose.push(member),
+            Item::Raw(raw) => program.raw = Some(raw),
         }
+    }
+    if program.raw.is_some() && (!program.decls.is_empty() || !program.loose.is_empty()) {
+        return Err(GenError::new(
+            crate::t!(
+                "`php{…}` / `raw{…}` stands alone: it cannot be mixed with types or members",
+                "a `php{…}` / `raw{…}` önállóan áll: típussal vagy taggal nem keverhető"
+            )
+            .to_owned(),
+        ));
     }
     if !program.decls.is_empty() && !program.loose.is_empty() {
         return Err(GenError::new(
@@ -361,7 +392,7 @@ fn assemble(items: Vec<Item>) -> GenResult<Program> {
             .to_owned(),
         ));
     }
-    if program.decls.is_empty() && program.loose.is_empty() {
+    if program.decls.is_empty() && program.loose.is_empty() && program.raw.is_none() {
         return Err(GenError::new(
             crate::t!(
                 "nothing to generate: the expression has only `ns:` / `use:`",

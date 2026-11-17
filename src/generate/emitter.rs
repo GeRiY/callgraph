@@ -35,6 +35,11 @@ pub trait Emitter {
     /// A kifejezésben magában deklarált nevek kimaradnak.
     fn referenced_names(&self, decls: &[TypeDecl], loose: &[Member]) -> BTreeSet<String>;
 
+    /// A nyers blokk (`php{…}`) szövegében hivatkozott, importra szoruló osztály-nevek.
+    fn raw_names(&self, _text: &str) -> BTreeSet<String> {
+        BTreeSet::new()
+    }
+
     /// A teljes új fájl szövege a fejléccel és a deklarációkkal.
     fn file(&self, spec: &FileSpec<'_>, decls: &[TypeDecl]) -> String;
 

@@ -1531,3 +1531,264 @@ fn write_shares_the_walk_between_names_and_strict_detection() {
     assert!(fs.reads_of("app/Other.php") <= 1);
     assert!(fs.reads_of("composer.json") <= 1);
 }
+
+// ---- trait-használat, névtelen osztály, nyers blokk, Laravel-nevek ----
+
+const LARAVEL_COMPOSER: &str =
+    r#"{"require":{"laravel/framework":"^12.0"},"autoload":{"psr-4":{"App\\":"app/"}}}"#;
+
+fn laravel_project() -> MemFs {
+    MemFs::with(&[
+        ("composer.json", LARAVEL_COMPOSER),
+        (
+            "app/Http/Controllers/PostController.php",
+            "<?php\n\nnamespace App\\Http\\Controllers;\n\nclass PostController {}\n",
+        ),
+        (
+            "routes/web.php",
+            "<?php\n\nuse Illuminate\\Support\\Facades\\Route;\n\nRoute::get('/', fn () => 1);\n",
+        ),
+    ])
+}
+
+#[test]
+fn a_type_takes_trait_uses() {
+    let text = emit("c:Post<Model> > use:HasFactory,Notifiable + +a():void");
+    assert!(
+        text.contains("{\n    use HasFactory, Notifiable;\n\n    public function a(): void"),
+        "{text}"
+    );
+}
+
+#[test]
+fn an_anonymous_class_returns_new_class() {
+    let text = emit("a:<Migration> > +up():void{ run(); }");
+    assert!(
+        text.starts_with("return new class extends Migration\n{\n"),
+        "{text}"
+    );
+    assert!(text.ends_with("\n};"), "{text}");
+}
+
+#[test]
+fn laravel_framework_names_resolve_only_in_laravel_projects() {
+    let clock = FixedClock(Cell::new(T0));
+    let fs = laravel_project();
+    let out = run(
+        &fs,
+        &clock,
+        &request(
+            "a:<Migration> > +up():void{ Schema::create('t', function (Blueprint $t) { $t->id(); }); }",
+            true,
+            Target::Write {
+                file: "database/migrations/2026_01_01_000000_create_t_table.php".into(),
+            },
+        ),
+    )
+    .unwrap();
+    let text = out.lines.join("\n");
+    assert!(
+        text.contains("use Illuminate\\Database\\Migrations\\Migration;"),
+        "{text}"
+    );
+    assert!(
+        text.contains("use Illuminate\\Database\\Schema\\Blueprint;"),
+        "{text}"
+    );
+    assert!(
+        text.contains("use Illuminate\\Support\\Facades\\Schema;"),
+        "{text}"
+    );
+    assert!(out.unresolved.is_empty(), "{:?}", out.unresolved);
+    let plain = project();
+    let out = run(
+        &plain,
+        &clock,
+        &request("c:A<Model>", true, Target::Preview),
+    )
+    .unwrap();
+    assert_eq!(out.unresolved, ["Model"]);
+}
+
+#[test]
+fn a_raw_php_block_is_written_with_header_and_imports() {
+    let clock = FixedClock(Cell::new(T0));
+    let fs = laravel_project();
+    run(
+        &fs,
+        &clock,
+        &request(
+            "php{ Route::get('/posts', [PostController::class, 'index']); }",
+            false,
+            Target::Write {
+                file: "routes/extra.php".into(),
+            },
+        ),
+    )
+    .unwrap();
+    let text = fs.get("routes/extra.php").unwrap();
+    assert_eq!(
+        text,
+        "<?php\n\nuse App\\Http\\Controllers\\PostController;\nuse Illuminate\\Support\\Facades\\Route;\n\nRoute::get('/posts', [PostController::class, 'index']);\n"
+    );
+}
+
+fn into_web(place: Place) -> Target {
+    Target::Into {
+        file: "routes/web.php".into(),
+        class: None,
+        place,
+        upsert: false,
+        expect: None,
+    }
+}
+
+#[test]
+fn a_raw_php_block_goes_into_a_file_end_a_line_and_replaces_a_range() {
+    let clock = FixedClock(Cell::new(T0));
+    let fs = laravel_project();
+    run(
+        &fs,
+        &clock,
+        &request(
+            "php{\n    Route::get('/posts', [PostController::class, 'index']);\n    Route::get('/about', fn () => 2);\n}",
+            false,
+            into_web(Place::End),
+        ),
+    )
+    .unwrap();
+    let text = fs.get("routes/web.php").unwrap();
+    assert!(
+        text.contains("use App\\Http\\Controllers\\PostController;"),
+        "{text}"
+    );
+    assert!(
+        text.ends_with("Route::get('/about', fn () => 2);\n"),
+        "{text}"
+    );
+    assert!(
+        text.contains("Route::get('/', fn () => 1);\n\nRoute::get('/posts'"),
+        "{text}"
+    );
+
+    run(
+        &fs,
+        &clock,
+        &request(
+            "php{ Route::get('/home', fn () => 3); }",
+            false,
+            Target::Replace {
+                file: "routes/web.php".into(),
+                at: ReplaceAt::Lines(6, 6),
+                expect: None,
+            },
+        ),
+    )
+    .unwrap();
+    let text = fs.get("routes/web.php").unwrap();
+    assert!(text.contains("Route::get('/home', fn () => 3);"), "{text}");
+    assert!(!text.contains("Route::get('/', fn () => 1);"), "{text}");
+
+    run(
+        &fs,
+        &clock,
+        &request(
+            "php{ Route::get('/x', fn () => 4); }",
+            false,
+            into_web(Place::After("L6".into())),
+        ),
+    )
+    .unwrap();
+    assert!(fs.get("routes/web.php").unwrap().contains("'/x'"));
+
+    let err = run(
+        &fs,
+        &clock,
+        &request(
+            "php{ Route::get('/y', fn () => 5); }",
+            false,
+            into_web(Place::After("index".into())),
+        ),
+    )
+    .unwrap_err();
+    assert!(err.contains("L<n>"), "{err}");
+}
+
+#[test]
+fn a_raw_block_in_a_blade_view_is_verbatim_and_unchecked() {
+    let clock = FixedClock(Cell::new(T0));
+    let fs = laravel_project();
+    run(
+        &fs,
+        &clock,
+        &request(
+            "raw{\n<!DOCTYPE html>\n<html>\n<head>@vite(['resources/js/app.js'])</head>\n<body>@inertia</body>\n</html>\n}",
+            false,
+            Target::Write {
+                file: "resources/views/app.blade.php".into(),
+            },
+        ),
+    )
+    .unwrap();
+    assert_eq!(
+        fs.get("resources/views/app.blade.php").unwrap(),
+        "<!DOCTYPE html>\n<html>\n<head>@vite(['resources/js/app.js'])</head>\n<body>@inertia</body>\n</html>\n"
+    );
+}
+
+#[test]
+fn a_raw_block_cannot_be_mixed_with_types() {
+    assert!(parser::parse("php{ run(); } + c:A").is_err());
+}
+
+#[test]
+fn a_raw_php_block_takes_the_indent_of_the_line_it_replaces() {
+    let clock = FixedClock(Cell::new(T0));
+    let fs = laravel_project();
+    fs.put(
+        "bootstrap/x.php",
+        "<?php\n\nreturn function () {\n    //\n};\n",
+    );
+    run(
+        &fs,
+        &clock,
+        &request(
+            "php{ $a = 1;\n$b = 2; }",
+            false,
+            Target::Replace {
+                file: "bootstrap/x.php".into(),
+                at: ReplaceAt::Lines(4, 4),
+                expect: None,
+            },
+        ),
+    )
+    .unwrap();
+    assert_eq!(
+        fs.get("bootstrap/x.php").unwrap(),
+        "<?php\n\nreturn function () {\n    $a = 1;\n    $b = 2;\n};\n"
+    );
+}
+
+#[test]
+fn an_empty_raw_block_deletes_a_range_with_replace_only() {
+    let clock = FixedClock(Cell::new(T0));
+    let fs = laravel_project();
+    fs.put("routes/y.php", "<?php\n\nfoo();\nbar();\nbaz();\n");
+    run(
+        &fs,
+        &clock,
+        &request(
+            "php{}",
+            false,
+            Target::Replace {
+                file: "routes/y.php".into(),
+                at: ReplaceAt::Lines(4, 4),
+                expect: None,
+            },
+        ),
+    )
+    .unwrap();
+    assert_eq!(fs.get("routes/y.php").unwrap(), "<?php\n\nfoo();\nbaz();\n");
+    let err = run(&fs, &clock, &request("php{}", false, into_web(Place::End)));
+    assert!(err.is_err());
+}

@@ -1641,3 +1641,30 @@ fn module_errors_and_routing() {
 }
 
 mod html;
+
+#[test]
+fn replace_by_section_name_takes_the_whole_section_content() {
+    let sfc = "<script setup>\nconst a = 1;\nconst b = 2;\n</script>\n\n<template>\n  <p>old</p>\n  <p>older</p>\n</template>\n";
+    let fs = MemFs::with(&[("src/B.vue", sfc)]);
+    let at = |name: &str| Target::Replace {
+        file: "src/B.vue".to_owned(),
+        at: ReplaceAt::Method {
+            class: None,
+            name: name.to_owned(),
+        },
+        expect: None,
+    };
+    go(&fs, "template>h1{New}", false, at("template")).unwrap();
+    let text = fs.get("src/B.vue").unwrap();
+    assert!(
+        text.contains("<template>\n  <h1>New</h1>\n</template>"),
+        "{text}"
+    );
+    assert!(!text.contains("older"), "{text}");
+    go(&fs, "script>const:x:int=5", false, at("script")).unwrap();
+    let text = fs.get("src/B.vue").unwrap();
+    assert!(text.contains("const x = 5"), "{text}");
+    assert!(!text.contains("const a = 1"), "{text}");
+    let err = go(&fs, "style>.a{color:red}", false, at("style")).unwrap_err();
+    assert!(err.contains("style"), "{err}");
+}

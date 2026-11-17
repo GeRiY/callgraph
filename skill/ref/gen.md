@@ -20,8 +20,13 @@ members `+`/`-`/`#` visibility, `::` static, `name(Type $p):Type{body}`, `$prop:
 Unknown class names are imported from the project (`unresolved:` lists the ones it could not place). `--dry` prints the
 code; with `--into` / `--replace` a first `→ file::Class after method (L41)` line says where it would go.
 `--replace ...:L42-L87 --expect <sha256-prefix>` refuses if those lines changed since you read them.
-Placement: `--into <file>::Class` takes `--after <method>`, `--before <method>` or `--at L<n>`; `--into x.vue::template#id` appends to that element; `--upsert` replaces the member if it already exists. `--diff` (with `--replace`) prints only the old / new lines of the change instead of the new code (nothing is written).
+Placement: `--into <file>::Class` takes `--after <method>`, `--before <method>` or `--at L<n>`; `--into x.vue::template#id` appends to that element; `--upsert` replaces the member if it already exists. `--replace x.vue::template` / `::script` / `::style` swaps a whole section (tags stay); `--diff` (with `--replace`) prints only the old / new lines of the change instead of the new code (nothing is written).
 MCP `generate` parameters: `expr`, `dry`, `write`, `into`, `after`, `before`, `at`, `upsert`, `diff`, `replace`, `expect`, `project`.
 
 Also Vue / JS / TS / HTML (by the file extension) and `laravel:Fee>create(name:str)+index` (a whole feature, one undo).
+PHP: `use:HasFactory,Notifiable` under a type = trait use inside the class (`c:Post<Model> > use:HasFactory + +comments():HasMany{…}`);
+`a:<Migration> > +up():void{…}` = anonymous class (`return new class extends Migration {…};`, Laravel migrations); in a Laravel project
+(`laravel/framework` in composer.json) unknown short names (`Model`, `Schema`, `Blueprint`, `Route`, `HasMany`, `Request`, `Rule`, `RefreshDatabase`, …) are imported without `use:`.
+Statements without a class: `php{ Route::get('/posts', [PostController::class, 'index']); }` with `--write routes/x.php` (adds `<?php` + imports),
+`--into routes/web.php` (end of file, or `--at L<n>` / `--after L<n>`), or `--replace bootstrap/app.php:L14-L16` (the block takes the indentation of the line it goes at / replaces; an empty `php{}` with `--replace` deletes the range); `raw{…}` writes the text verbatim (e.g. `--write resources/views/app.blade.php`, not syntax-checked).
 MCP: the `generate`, `rename` and `undo` tools are listed only when the server runs with `--generate` (`CALLGRAPH_GENERATE=1`).

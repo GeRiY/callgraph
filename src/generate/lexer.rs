@@ -333,7 +333,11 @@ impl Lexer {
                 }
                 '{' | '[' => break,
                 '<' => {
-                    if prev.is_some_and(|p| p.is_alphanumeric() || p == '_' || p == '\\') {
+                    // `a:<Base>` (névtelen osztály): a `<` közvetlenül a `:` után is nyit
+                    let anonymous_head = self.chars[from..self.pos] == ['a', ':'];
+                    if anonymous_head
+                        || prev.is_some_and(|p| p.is_alphanumeric() || p == '_' || p == '\\')
+                    {
                         angle += 1;
                     }
                     self.pos += 1;

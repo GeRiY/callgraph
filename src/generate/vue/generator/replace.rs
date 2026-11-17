@@ -273,6 +273,28 @@ pub(super) fn replace_range(
             }
             Ok((a - 1, *b, None))
         }
+        // `x.vue::script` / `::template` / `::style`: a szakasz teljes tartalma (a tagek nélkül)
+        ReplaceAt::Method { name, .. }
+            if kind == FileKind::Vue
+                && matches!(name.as_str(), "script" | "template" | "style") =>
+        {
+            let candidates: &[SfcBlockKind] = match name.as_str() {
+                "script" => &[SfcBlockKind::ScriptSetup, SfcBlockKind::Script],
+                "template" => &[SfcBlockKind::Template],
+                _ => &[SfcBlockKind::Style],
+            };
+            for candidate in candidates {
+                if let Some((tag, close)) = block_range(doc, *candidate, name)? {
+                    return Ok((tag + 1, close, Some(name.clone())));
+                }
+            }
+            Err(GenError::new(crate::tf!(
+                "no <{}> section in {}",
+                "nincs <{}> szakasz ebben: {}",
+                name,
+                rel
+            )))
+        }
         ReplaceAt::Method { name, .. } => {
             let (lo, hi) = match kind {
                 FileKind::Vue => {

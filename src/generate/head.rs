@@ -169,12 +169,15 @@ pub fn is_decl_head(head: &str) -> bool {
         return false;
     };
     let mut chars = prefix.chars();
-    matches!(chars.next(), Some('c' | 'i' | 't' | 'e' | 's'))
-        && chars.all(|c| matches!(c, '!' | '~' | '%'))
+    let first = chars.next();
+    // `a:<Base>` névtelen osztály: a név helyén közvetlenül az ős / a lista áll
+    let anonymous = first == Some('a') && rest.starts_with(['<', '[']);
+    let named = matches!(first, Some('c' | 'i' | 't' | 'e' | 's'))
         && rest
             .chars()
             .next()
-            .is_some_and(|c| c.is_alphabetic() || c == '_')
+            .is_some_and(|c| c.is_alphabetic() || c == '_');
+    (anonymous || named) && chars.all(|c| matches!(c, '!' | '~' | '%'))
 }
 
 /// Típus-deklaráció feje (a tagok nélkül); `list`: a külön álló `[A, B]` (implements).
@@ -182,8 +185,9 @@ pub fn parse_decl(head: &str, list: Option<&str>) -> GenResult<TypeDecl> {
     let Some((prefix, rest)) = head.split_once(':') else {
         return Err(bad(crate::t!("bad type head", "hibás típus-fej").to_owned()));
     };
+    let anonymous = prefix.starts_with('a');
     let kind = match prefix.chars().next() {
-        Some('c') => TypeKind::Class,
+        Some('c' | 'a') => TypeKind::Class,
         Some('i') => TypeKind::Interface,
         Some('t') => TypeKind::Trait,
         Some('e') => TypeKind::Enum,
@@ -191,10 +195,11 @@ pub fn parse_decl(head: &str, list: Option<&str>) -> GenResult<TypeDecl> {
     };
     let name_end = rest.find(['<', '[', ':', '(']).unwrap_or(rest.len());
     let name = rest[..name_end].trim();
-    if !is_ident(name) {
+    if !anonymous && !is_ident(name) {
         return Err(bad_name(name));
     }
     let mut decl = TypeDecl::new(kind, name);
+    decl.anonymous = anonymous;
     for modifier in prefix.chars().skip(1) {
         match modifier {
             '!' => decl.is_final = true,
