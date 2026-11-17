@@ -24,9 +24,24 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 - **`gen --diff` és további elhelyezési lehetőségek:** a `--diff` a `--replace`-t rövid unified diffként mutatja,
   semmit nem ír. PHP `--into` mellett a `--before <metódus>` és az `--at L<n>` egy metódus elé vagy egy sorba teszi a
   kódot, az `--upsert` pedig egy létező metódus `--into`-ját cserévé alakítja. A Vue `--into fajl.vue::template#id`
-  (vagy `::#id`, `::.class`) az adott template-elem belsejébe fűz. A `.callgraph/gen.toml`-ban megnevezett
-  komponenseket a tsconfig / Vite aliasok mögött is megtalálja. Az MCP `generate` eszköz megkapta a `before`, `at`,
-  `upsert` és `diff` paramétert.
+  (vagy `::#id`, `::.class`) az adott template-elem belsejébe fűz, a `--replace fajl.vue::script` / `::template` /
+  `::style` pedig az egész szakasz tartalmát cseréli (a tagek maradnak), elavulható sortartomány nélkül. A
+  `.callgraph/gen.toml`-ban megnevezett komponenseket a tsconfig / Vite aliasok mögött is megtalálja. Az MCP
+  `generate` eszköz megkapta a `before`, `at`, `upsert` és `diff` paramétert.
+- **`gen` PHP: traitek, névtelen osztályok és Laravel-osztálynevek:** egy típus alatti `use:HasFactory,Notifiable`
+  az osztálytörzsbe `use HasFactory, Notifiable;` sort ír (`c:Post<Model> > use:HasFactory + +comments():HasMany{…}`).
+  Az `a:<Migration> > +up():void{…}` névtelen osztályt ír, `return new class extends Migration { … };`, ahogy a
+  Laravel migrációkban szokás. Laravel-projektben (`laravel/framework` a `composer.json`-ban) a gyakori
+  framework-osztályokat, pl. `Model`, `Schema`, `Blueprint`, `Route`, `Request`, `Rule`, `Builder`, `HasMany` vagy
+  `RefreshDatabase`, `use:` nélkül is importálja; a több csomagban is létező nevekhez (pl. `Response`) továbbra is
+  `use:` kell.
+- **`gen` PHP-utasítások osztályon kívül: `php{ … }` és `raw{ … }`:** a `php{ Route::get('/posts',
+  [PostController::class, 'index']); }` sima PHP-kódot ír. `--write routes/x.php` mellett létrehozza a fájlt (a
+  `<?php` sorral és az importokkal), `--into routes/web.php` mellett a fájl végére fűzi, vagy `--at L<n>` /
+  `--after L<n>` helyre teszi, `--replace bootstrap/app.php:L14-L16` mellett pedig azt a sortartományt vagy egy
+  metódust cseréli. A kód átveszi annak a sornak a behúzását, ahová kerül vagy amelyet cserél, és egy üres `php{}`
+  `--replace fajl:La-Lb` mellett törli a sorokat. A `raw{ … }` a szöveget pontosan úgy írja ki, ahogy megadtad, pl.
+  egy Blade-nézetet `--write resources/views/app.blade.php` mellett; a Blade-fájlokon nincs PHP-szintaxisellenőrzés.
 - **Vue prop-ok interfészből, alapértékekkel és `defineModel`-lel:** a `defineProps<Props>()` mostantól feloldja a
   helyi `interface`-t vagy típusaliast (az `extends`-et és az `A & B`-t is); a `withDefaults` alapértékei
   `type $name = default` alakban látszanak, és a prop nem számít kötelezőnek; a `defineModel` `model:` sorként jelenik

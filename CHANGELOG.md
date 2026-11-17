@@ -23,8 +23,23 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 - **`gen --diff` and more placement options:** `--diff` shows a `--replace` as a short unified diff without writing
   anything. For PHP `--into`, `--before <method>` and `--at L<n>` place the code before a method or at a line, and
   `--upsert` turns an `--into` of an existing method into a replace. Vue `--into file.vue::template#id` (or `::#id`,
-  `::.class`) appends inside that template element. Components named in `.callgraph/gen.toml` are also found behind
-  tsconfig / Vite aliases. The MCP `generate` tool got `before`, `at`, `upsert` and `diff`.
+  `::.class`) appends inside that template element, and `--replace file.vue::script` / `::template` / `::style`
+  replaces the whole content of that section (the tags stay), with no line range that can go stale. Components named
+  in `.callgraph/gen.toml` are also found behind tsconfig / Vite aliases. The MCP `generate` tool got `before`, `at`,
+  `upsert` and `diff`.
+- **`gen` PHP: traits, anonymous classes and Laravel class names:** `use:HasFactory,Notifiable` under a type writes
+  `use HasFactory, Notifiable;` inside the class body (`c:Post<Model> > use:HasFactory + +comments():HasMany{…}`).
+  `a:<Migration> > +up():void{…}` writes an anonymous class, `return new class extends Migration { … };`, as in
+  Laravel migrations. In a Laravel project (`laravel/framework` in `composer.json`) common framework classes such as
+  `Model`, `Schema`, `Blueprint`, `Route`, `Request`, `Rule`, `Builder`, `HasMany` or `RefreshDatabase` are imported
+  without `use:`; names that exist in several packages (e.g. `Response`) still need `use:`.
+- **`gen` PHP statements outside a class: `php{ … }` and `raw{ … }`:** `php{ Route::get('/posts', [PostController::class,
+  'index']); }` writes plain PHP code. With `--write routes/x.php` it creates the file (adding `<?php` and the
+  imports), with `--into routes/web.php` it appends to the end of the file or goes to `--at L<n>` / `--after L<n>`, and
+  with `--replace bootstrap/app.php:L14-L16` it replaces that line range or a method. The code takes the indentation
+  of the line it goes at or replaces, and an empty `php{}` with `--replace file:La-Lb` deletes the lines. `raw{ … }`
+  writes the text exactly as given, e.g. a Blade view with `--write resources/views/app.blade.php`; Blade files are
+  not PHP-syntax-checked.
 - **Vue props from interfaces, defaults and `defineModel`:** `defineProps<Props>()` now resolves a local `interface`
   or type alias (including `extends` and `A & B`); `withDefaults` defaults are shown as `type $name = default` and the
   prop is not marked required; `defineModel` appears as `model:` in the outline and as a `model` section in
