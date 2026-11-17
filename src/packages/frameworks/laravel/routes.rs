@@ -9,11 +9,14 @@ use std::sync::LazyLock;
 use regex::Regex;
 
 use super::super::inertia::render::split_top;
+use super::route_cfg::{Configs, Env, Loop, resolve_name};
 use crate::core::srcscan::{self, Dialect};
 use crate::model::Imports;
 
 /// A csoport-beágyazás felső korlátja (egy kóbor, önmagát hívó szöveg se pörögjön).
 const MAX_DEPTH: usize = 8;
+/// Egy konfig-ciklusból legfeljebb ennyi elem bomlik ki route-okra.
+const MAX_LOOP: usize = 200;
 
 /// Egy route kezelője.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -65,11 +68,15 @@ pub(crate) struct Route {
     /// Mindig `/`-rel kezdődik (`/register`, a gyökér: `/`).
     pub uri: String,
     pub action: Action,
-    /// A route-fájl a gyökérhez relatívan, és a route sora (a tábla helye; most a tesztek olvassák).
-    #[allow(dead_code)]
+    /// A route-fájl a gyökérhez relatívan, és a route sora (a tábla helye).
     pub file: String,
-    #[allow(dead_code)]
     pub line: u32,
+    /// A csoportokból örökölt és a saját `->middleware(..)` nevei, a Laravel sorrendjében (osztály: teljes név).
+    #[serde(default)]
+    pub middleware: Vec<String>,
+    /// A konfigból generált route Inertia-komponense (`'component' => 'Welcome'` a config-tömbben), ha van.
+    #[serde(default)]
+    pub page: Option<String>,
 }
 
 /// Az osztály rövid neve (névtér nélkül).
@@ -83,10 +90,13 @@ pub(super) struct Ctx {
     prefix: String,
     name: String,
     controller: Option<String>,
+    /// A csoportok `->middleware(..)` nevei (a beágyazás sorrendjében összefűzve).
+    middleware: Vec<String>,
 }
 
 impl Ctx {
-    /// Üres-e (nincs örökölt előtag, név-előtag, controller).
+    /// Üres-e (nincs örökölt előtag, név-előtag, controller). A puszta middleware nem számít: az nem változtatja meg a
+    /// betöltött fájl route-jait (uri, név, kezelő), csak a middleware-oszlopot.
     pub(super) fn is_empty(&self) -> bool {
         self.prefix.is_empty() && self.name.is_empty() && self.controller.is_none()
     }
@@ -129,6 +139,27 @@ pub(super) fn parse_file_in(
     imports: &Imports,
     ctx: &Ctx,
 ) -> (Vec<Route>, Vec<Include>) {
+    let parsed = parse_file_cfg(rel, text, imports, ctx, &Configs::default());
+    (parsed.routes, parsed.includes)
+}
+
+/// Egy route-fájl beolvasott tartalma.
+pub(super) struct Parsed {
+    pub routes: Vec<Route>,
+    pub includes: Vec<Include>,
+    /// A konfig-ciklussal kibontott láncok sor-tartományai (kezdő, záró sor): az ott álló `->name($név)` nem dinamikus.
+    pub expanded: Vec<(u32, u32)>,
+}
+
+/// Mint a [`parse_file_in`], és a `foreach (config('a.b') as $k => $v) Route::…` ciklusok a `configs` literál
+/// tömbjéből route-okra bomlanak (a változó-használat a tömb értékeivel behelyettesítve).
+pub(super) fn parse_file_cfg(
+    rel: &str,
+    text: &str,
+    imports: &Imports,
+    ctx: &Ctx,
+    configs: &Configs,
+) -> Parsed {
     let clean = strip_comments(text);
     let mut starts = vec![0usize];
     starts.extend(clean.match_indices('\n').map(|(i, _)| i + 1));
@@ -137,11 +168,18 @@ pub(super) fn parse_file_in(
         starts,
         imports,
         rel,
+        configs,
+        env: None,
         out: Vec::new(),
         includes: Vec::new(),
+        expanded: Vec::new(),
     };
     parser.block(0, clean.len(), ctx, 0);
-    (parser.out, parser.includes)
+    Parsed {
+        routes: parser.out,
+        includes: parser.includes,
+        expanded: parser.expanded,
+    }
 }
 
 struct Parser<'a> {
@@ -149,8 +187,12 @@ struct Parser<'a> {
     starts: Vec<usize>,
     imports: &'a Imports,
     rel: &'a str,
+    configs: &'a Configs,
+    /// A éppen kibontott konfig-ciklus változói (`None`: nincs ciklus).
+    env: Option<Env>,
     out: Vec<Route>,
     includes: Vec<Include>,
+    expanded: Vec<(u32, u32)>,
 }
 
 impl Parser<'_> {
@@ -164,13 +206,18 @@ impl Parser<'_> {
         self.text.get(from..to).unwrap_or("").trim()
     }
 
+    /// Az argumentum szövege; konfig-ciklusban a ciklus változói a tömb értékeire cserélve.
+    fn arg(&self, range: (usize, usize)) -> String {
+        let raw = self.slice(range);
+        match &self.env {
+            Some(env) => env.subst(raw),
+            None => raw.to_owned(),
+        }
+    }
+
     /// A szegmens argumentumai szövegként.
     fn texts(&self, segment: &Segment) -> Vec<String> {
-        segment
-            .args
-            .iter()
-            .map(|&range| self.slice(range).to_owned())
-            .collect()
+        segment.args.iter().map(|&range| self.arg(range)).collect()
     }
 
     /// A `from..to` tartomány `Route::` láncai, egymás után (a csoportok törzse rekurzívan).
@@ -181,17 +228,110 @@ impl Parser<'_> {
         let mut at = from;
         // a láncok közötti szöveg (a láncok belsejét a csoportjuk saját `block`-ja nézi): `require` egy csoportban
         let mut gap = from;
+        let loops = if self.configs.is_empty() {
+            Vec::new()
+        } else {
+            self.loops(from, to)
+        };
         while let Some(found) = next_route(self.text, at, to) {
             if let Some(chain) = self.chain(found, to) {
                 self.requires(gap, found, ctx);
                 at = chain.end;
                 gap = at;
-                self.apply(&chain, ctx, depth);
+                let around: Vec<&Loop> = loops
+                    .iter()
+                    .filter(|l| l.body.0 <= found && found < l.body.1)
+                    .collect();
+                if !around.is_empty() {
+                    let (first, last) = (self.line_of(chain.start), self.line_of(chain.end));
+                    self.expanded.push((first, last));
+                }
+                self.run(&chain, ctx, depth, &around);
             } else {
                 at = found + "Route::".len();
             }
         }
         self.requires(gap, to, ctx);
+    }
+
+    /// A lánc kibontása a körülvevő konfig-ciklusokkal (kívülről befelé); ciklus nélkül egyszer.
+    fn run(&mut self, chain: &Chain, ctx: &Ctx, depth: usize, loops: &[&Loop]) {
+        let Some((first, rest)) = loops.split_first() else {
+            self.apply(chain, ctx, depth);
+            return;
+        };
+        let outer = self.env.clone();
+        for env in &first.envs {
+            self.env = Some(env.merged(outer.as_ref()));
+            self.run(chain, ctx, depth, rest);
+        }
+        self.env = outer;
+    }
+
+    /// A `from..to` tartomány `foreach (config('a.b') as $k => $v)` ciklusai, amelyek forrása literál konfig-tömb.
+    fn loops(&self, from: usize, to: usize) -> Vec<Loop> {
+        static HEAD: LazyLock<Regex> = LazyLock::new(|| {
+            Regex::new(
+                r#"^\s*(?:config\(\s*['"]([\w.\-]+)['"]\s*(?:,[^)]*)?\)|\$(\w+))\s+as\s+(?:\$(\w+)\s*=>\s*)?\$(\w+)\s*$"#,
+            )
+            .expect("érvényes regex")
+        });
+        let bytes = self.text.as_bytes();
+        let mut out = Vec::new();
+        let mut at = from;
+        while let Some(found) = find_word(self.text, "foreach", at, to) {
+            at = found + "foreach".len();
+            let open = skip_ws(self.text, at);
+            if bytes.get(open) != Some(&b'(') {
+                continue;
+            }
+            let Some(close) = matching(self.text, open, to) else {
+                continue;
+            };
+            let Some(caps) = HEAD.captures(&self.text[open + 1..close]) else {
+                continue;
+            };
+            let path = match (caps.get(1), caps.get(2)) {
+                (Some(path), _) => path.as_str().to_owned(),
+                (None, Some(var)) => match self.assigned_config(var.as_str()) {
+                    Some(path) => path,
+                    None => continue,
+                },
+                (None, None) => continue,
+            };
+            let Some((entries, imports)) = self.configs.lookup(&path) else {
+                continue;
+            };
+            let (key_var, value_var) = (caps.get(3).map(|m| m.as_str()), &caps[4]);
+            let envs = entries
+                .iter()
+                .take(MAX_LOOP)
+                .map(|entry| Env::of(key_var, value_var, entry, imports))
+                .collect();
+            let body_from = skip_ws(self.text, close + 1);
+            let body = if bytes.get(body_from) == Some(&b'{') {
+                matching(self.text, body_from, to).map(|end| (body_from + 1, end))
+            } else {
+                self.text
+                    .get(body_from..to)
+                    .and_then(|rest| rest.find(';'))
+                    .map(|end| (body_from, body_from + end + 1))
+            };
+            if let Some(body) = body {
+                out.push(Loop { body, envs });
+            }
+        }
+        out
+    }
+
+    /// A `$változó = config('a.b');` értékadás konfig-kulcsa (a `foreach ($változó as ..)` forrása).
+    fn assigned_config(&self, var: &str) -> Option<String> {
+        let pattern = format!(
+            r#"\${}\s*=\s*config\(\s*['"]([\w.\-]+)['"]"#,
+            regex::escape(var)
+        );
+        let caps = Regex::new(&pattern).ok()?.captures(self.text)?;
+        Some(caps[1].to_owned())
     }
 
     /// A `from..to` szöveg `require __DIR__.'/x.php'` / `require base_path('routes/x.php')` sorai, ha egy csoport
@@ -287,7 +427,7 @@ impl Parser<'_> {
                 // dinamikus mintaként kezeli
                 s.args
                     .first()
-                    .and_then(|&range| dynamic_text(self.slice(range), true))
+                    .and_then(|&range| dynamic_text(&self.arg(range), true))
             })
             .collect();
         let prefixes: Vec<String> = mods
@@ -296,18 +436,27 @@ impl Parser<'_> {
             .filter_map(|s| {
                 s.args
                     .first()
-                    .and_then(|&range| dynamic_text(self.slice(range), false))
+                    .and_then(|&range| dynamic_text(&self.arg(range), false))
             })
             .collect();
         let controller = mods
             .iter()
             .filter(|s| s.name == "controller")
-            .find_map(|s| s.args.first().and_then(|&r| self.class_of(self.slice(r))));
+            .find_map(|s| s.args.first().and_then(|&r| self.class_of(&self.arg(r))));
         let mut own = ctx.clone();
         own.prefix = join_uri(
             std::iter::once(ctx.prefix.as_str()).chain(prefixes.iter().map(String::as_str)),
         );
         own.name.push_str(&names);
+        own.middleware.extend(
+            mods.iter()
+                .filter(|s| s.name == "middleware")
+                .flat_map(|s| {
+                    s.args
+                        .iter()
+                        .flat_map(|&r| self.middleware_names(&self.arg(r)))
+                }),
+        );
         if controller.is_some() {
             own.controller = controller;
         }
@@ -325,7 +474,7 @@ impl Parser<'_> {
             return;
         };
         if term.args.len() >= 2 {
-            let attributes = self.slice(term.args[0]).to_owned();
+            let attributes = self.arg(term.args[0]);
             self.attributes(&attributes, &mut ctx);
         }
         // `->group(base_path('routes/admin.php'))` / `->group(__DIR__.'/admin.php')`: a fájl a csoport környezetével
@@ -368,6 +517,7 @@ impl Parser<'_> {
                         ctx.controller = Some(class);
                     }
                 }
+                "middleware" => ctx.middleware.extend(self.middleware_names(value)),
                 _ => {}
             }
         }
@@ -405,8 +555,26 @@ impl Parser<'_> {
             action,
             file: self.rel.to_owned(),
             line,
+            middleware: ctx.middleware.clone(),
+            page: self.env.as_ref().and_then(Env::page),
         };
         self.out.push(route);
+    }
+
+    /// A `->middleware(..)` argumentum nevei: `'auth'`, `X::class` (teljes név) vagy ezek tömbje; más (változó,
+    /// hívás) kimarad.
+    fn middleware_names(&self, arg: &str) -> Vec<String> {
+        let arg = arg.trim();
+        if let Some(inner) = arg.strip_prefix('[').and_then(|a| a.strip_suffix(']')) {
+            return split_top(inner, ",")
+                .into_iter()
+                .flat_map(|item| self.middleware_names(item))
+                .collect();
+        }
+        unquote(arg)
+            .or_else(|| self.class_of(arg))
+            .into_iter()
+            .collect()
     }
 
     /// A route kezelője: `[X::class, 'm']`, `X::class` (invokálható), `'X@m'`, `'m'` (a csoport controllerén),
@@ -459,19 +627,7 @@ impl Parser<'_> {
 
     /// Az osztálynév teljes alakja a fájl `use`-aiból (a vezető `\` = már teljes).
     fn resolve(&self, raw: &str) -> String {
-        let raw = raw.trim();
-        if let Some(full) = raw.strip_prefix('\\') {
-            return full.to_owned();
-        }
-        let (head, rest) = match raw.split_once('\\') {
-            Some((head, rest)) => (head, Some(rest)),
-            None => (raw, None),
-        };
-        match (self.imports.get(head), rest) {
-            (Some(full), Some(rest)) => format!("{full}\\{rest}"),
-            (Some(full), None) => full.to_owned(),
-            (None, _) => raw.to_owned(),
-        }
+        resolve_name(self.imports, raw)
     }
 
     /// `Route::resource('photos', PhotoController::class)` → 7 route; `apiResource` → 5 (`create` / `edit` nélkül);
@@ -538,6 +694,8 @@ impl Parser<'_> {
                 },
                 file: self.rel.to_owned(),
                 line,
+                middleware: ctx.middleware.clone(),
+                page: None,
             });
         }
     }
@@ -737,6 +895,25 @@ fn join_uri<'a>(parts: impl IntoIterator<Item = &'a str>) -> String {
         .filter(|segment| !segment.is_empty())
         .collect();
     format!("/{}", segments.join("/"))
+}
+
+/// A `word` kulcsszó következő előfordulása (szóhatárral) a `from..to` tartományban.
+fn find_word(text: &str, word: &str, from: usize, to: usize) -> Option<usize> {
+    let mut at = from;
+    while at < to {
+        let found = at + text.get(at..to)?.find(word)?;
+        let after = found + word.len();
+        let bytes = text.as_bytes();
+        let before_ok = found == 0 || !crate::core::text::is_ident_byte(bytes[found - 1]);
+        let after_ok = bytes
+            .get(after)
+            .is_none_or(|b| !crate::core::text::is_ident_byte(*b));
+        if before_ok && after_ok {
+            return Some(found);
+        }
+        at = after;
+    }
+    None
 }
 
 /// A következő `Route::` (szó elején) a `from..to` tartományban.

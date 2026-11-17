@@ -55,6 +55,7 @@ A `::metódus` kijelölés szűrése közös: `selection.rs` (a callgraph jq-sz�
 ### R6f: framework-nézetek (`events`, `routes`, `middleware`, `validation`, `jobs`, `providers`, `magic`, `di`, `views`)
 `src/query/format/framework/`: a közös `RuleView` formázó + nézetenként egy gyűjtőfüggvény (`rules.rs`), a regexek egyszer fordítva (`re!`, `LazyLock`).
 Új nézet: egy gyűjtőfüggvény a `rules.rs`-ben + egy sor a `framework::register` táblájában.
+Laravel-tényekkel kiegészülő nézetek: a `routes` a projekt route-táblájából ír (`route_table.rs`; ige, teljes URI, kezelő, név, `[middleware]`, `fájl:sor`; a legacy gyűjtő a nem Laravel projektnek és a nem route-fájloknak marad), az `events` / `jobs` / `middleware` a `wired.rs` `finish` lépésével egészül ki (kiváltó ↔ figyelő, observer ↔ modell, sorba állítható osztályok, a middleware route-oszlopa). A drótozás (`index/wiring.rs`) a hívó-indexbe is bekerül: az Eloquent scope-hívás (`Shelf::query()->stocked()` → `Shelf::scopeStocked`) és a kiváltó → figyelő / job / notification / observer élek `rewritten` élek (a `--grep Típus::metódus` „resolved across files” szakasza mutatja). A `config/*.php` / `lang/**/*.php` `return [..]` fájl outline-ja kulcs-útvonalakat ad (`outline_config.rs`, `core::phpval`).
 **Szándékos eltérés:** a callgraph `jobs` mintájában a `later\\\\(` bezáratlan zárójelet ad, a jq hibával kilép, és a nézet mindig „(nincs job/queue találat)”;
 az callgraph a szándékolt `later\(` mintát használja (így a `sp_jobs` golden-eset ELTÉR — a golden itt a hibát rögzíti).
 

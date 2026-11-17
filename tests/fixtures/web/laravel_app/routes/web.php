@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\CatalogueController;
+use App\Http\Controllers\ReaderCardController;
 use App\Http\Controllers\ShelfController;
 use App\Http\Middleware\EnsureReaderCard;
 use Illuminate\Support\Facades\Route;
@@ -15,3 +16,12 @@ Route::middleware(EnsureReaderCard::class)->group(function () {
 foreach (config('library.pages') as $name => $page) {
     Route::get($page['uri'], $page['action'])->name($name);
 }
+
+Route::middleware(['auth', 'verified'])->prefix('cards')->name('cards.')->controller(ReaderCardController::class)->group(function () {
+    Route::get('/', 'index')->name('index');
+    Route::post('/', 'store');
+
+    Route::prefix('{card}')->name('item.')->middleware('can:renew')->group(fn () => [
+        Route::get('/edit', 'edit')->name('edit'),
+    ]);
+});

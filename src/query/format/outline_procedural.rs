@@ -18,17 +18,27 @@ pub(super) fn procedural(
 ) {
     let g = &row.graph;
     let calls = source.map(|lines| (row, lines));
+    // PHP konfig- / nyelvfájl (`return [ … ];`): a kulcs-útvonalak, mint a JSON-fájlnál
+    let keys = super::outline_config::keys(row, lang);
     if g.calls.is_empty() {
         s.push_str(lang.pick(
             "(no class/interface/trait, and no calls either)\n",
             "(nincs class/interface/trait, és nincs hívás sem)\n",
         ));
+        if let Some(keys) = keys {
+            s.push('\n');
+            s.push_str(&keys);
+        }
         return;
     }
     s.push_str(lang.pick(
         "(procedural file — no class/interface/trait)\n\n",
         "(procedurális fájl — nincs class/interface/trait)\n\n",
     ));
+    if let Some(keys) = keys {
+        s.push_str(&keys);
+        s.push('\n');
+    }
     let target = |c: &crate::model::Call| c.resolved.clone().unwrap_or_else(|| c.target.clone());
     // a csomaghoz rendelt külső hívások külön sorban, a csomag címkéjével (`guzzle: …`; csomagtérkép nélkül nincs)
     let mut groups: BTreeMap<(&str, Option<String>), BTreeSet<String>> = BTreeMap::new();

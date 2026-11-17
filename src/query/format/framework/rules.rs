@@ -189,7 +189,26 @@ pub(super) fn providers(g: &FileGraph, ns: &str, out: &mut Vec<String>) {
     let call = re!(
         r"(?i)(?:^|::|->|\.)(?:singleton|scoped|bind|instance|register|boot|loadMigrationsFrom|loadRoutesFrom|publishes|publish|mergeConfigFrom|loadTranslationsFrom|loadViewsFrom)$"
     );
-    for c in calls(g).filter(|c| call.is_match(&c.target)) {
+    // Laravelben a regisztráló hívás (`bind`, `boot`, `register` …) csak a service provider osztályokban számít: máshol
+    // (egy modell `boot`-ja, egy lekérdezés `bind`-ja) nem szolgáltatás-regisztráció
+    let laravel = g.framework.as_deref() == Some("laravel");
+    let in_provider = |c: &Call| {
+        !laravel
+            || g.file.contains("Providers")
+            || g.file.ends_with("bootstrap/app.php")
+            || c.container.as_deref().is_some_and(|name| {
+                name.ends_with("Provider")
+                    || g.containers.iter().any(|container| {
+                        container.name == name
+                            && container
+                                .extends
+                                .iter()
+                                .flatten()
+                                .any(|parent| parent.ends_with("ServiceProvider"))
+                    })
+            })
+    };
+    for c in calls(g).filter(|c| call.is_match(&c.target) && in_provider(c)) {
         out.push(at_line("provider  ", &c.target, ns, c));
     }
     let class = re!(r"(?i)(?:^|\\)\w*Provider::");

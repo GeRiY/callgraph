@@ -12,9 +12,11 @@ mod cache;
 mod forms;
 mod models;
 pub(crate) mod preset;
+mod route_cfg;
 mod routes;
 mod rules;
 mod schema;
+mod table;
 mod view;
 
 #[cfg(test)]
@@ -110,7 +112,7 @@ pub(crate) fn route_names(files: &[(String, String)]) -> Vec<String> {
         .iter()
         .map(|(rel, text)| (rel.as_str(), text.as_str(), &imports))
         .collect();
-    resolve_routes(&sources, Vec::new())
+    resolve_routes(&sources, Vec::new(), &route_cfg::Configs::default())
         .into_iter()
         .flat_map(|parsed| parsed.routes)
         .filter_map(|route| route.name)
@@ -123,6 +125,8 @@ struct ParsedFile {
     routes: Vec<Route>,
     /// A legfelső szinten (üres környezettel) olvasva; `false`: egy csoport töltötte be, a csoport környezetével.
     top: bool,
+    /// A konfig-ciklussal kibontott láncok sor-tartományai.
+    expanded: Vec<(u32, u32)>,
 }
 
 /// A route-fájlok (`(rel, szöveg, use-ok)`) route-jai: amit egy csoport tölt be (`->group(base_path('routes/x.php'))`,
@@ -131,30 +135,32 @@ struct ParsedFile {
 fn resolve_routes(
     files: &[(&str, &str, &crate::model::Imports)],
     entry: Vec<routes::Include>,
+    configs: &route_cfg::Configs,
 ) -> Vec<ParsedFile> {
     let top = routes::Ctx::default();
-    let defaults: Vec<(Vec<Route>, Vec<routes::Include>)> = files
+    let defaults: Vec<routes::Parsed> = files
         .iter()
-        .map(|(rel, text, imports)| routes::parse_file_in(rel, text, imports, &top))
+        .map(|(rel, text, imports)| routes::parse_file_cfg(rel, text, imports, &top, configs))
         .collect();
     // a csoportból betöltött fájlok: ezeket csak a csoport környezetével olvassuk (a legfelső szint hamis neveket adna)
     let targets: std::collections::BTreeSet<String> = entry
         .iter()
-        .chain(defaults.iter().flat_map(|(_, includes)| includes))
+        .chain(defaults.iter().flat_map(|parsed| &parsed.includes))
         .map(|include| include.file.clone())
         .collect();
     let mut out = Vec::new();
     let mut queue: std::collections::VecDeque<routes::Include> = entry.into();
-    for ((rel, ..), (routes, includes)) in files.iter().zip(defaults) {
+    for ((rel, ..), parsed) in files.iter().zip(defaults) {
         if targets.contains(*rel) {
             continue;
         }
         out.push(ParsedFile {
             rel: (*rel).to_owned(),
-            routes,
+            routes: parsed.routes,
             top: true,
+            expanded: parsed.expanded,
         });
-        queue.extend(includes);
+        queue.extend(parsed.includes);
     }
     let mut seen = std::collections::BTreeSet::new();
     let mut budget = 256usize;
@@ -169,13 +175,14 @@ fn resolve_routes(
         let Some((rel, text, imports)) = files.iter().find(|(rel, ..)| *rel == include.file) else {
             continue;
         };
-        let (routes, more) = routes::parse_file_in(rel, text, imports, &include.ctx);
+        let parsed = routes::parse_file_cfg(rel, text, imports, &include.ctx, configs);
         out.push(ParsedFile {
             rel: (*rel).to_owned(),
-            routes,
+            routes: parsed.routes,
             top: false,
+            expanded: parsed.expanded,
         });
-        queue.extend(more);
+        queue.extend(parsed.includes);
     }
     out
 }
@@ -309,7 +316,20 @@ impl Laravel {
             );
         }
         sources.sort_by(|a, b| a.0.cmp(b.0));
-        for mut parsed in resolve_routes(&sources, self.entry_includes(files)) {
+        // a konfig-ciklusok forrása: a `config/*.php` literál tömbjei (csak ha egy route-fájl olvas konfigot)
+        let configs = if sources.iter().any(|(_, text, _)| text.contains("config(")) {
+            route_cfg::Configs::load(&self.root, files)
+        } else {
+            route_cfg::Configs::default()
+        };
+        let mut expanded: Vec<(String, (u32, u32))> = Vec::new();
+        for mut parsed in resolve_routes(&sources, self.entry_includes(files), &configs) {
+            expanded.extend(
+                parsed
+                    .expanded
+                    .iter()
+                    .map(|&range| (parsed.rel.clone(), range)),
+            );
             // a `routes/api.php` route-jai elé a Laravel `/api`-t tesz (vagy a `bootstrap/app.php` `apiPrefix:`-át);
             // ha egy csoport tölti be (régi `RouteServiceProvider`), az előtagot a csoport adja
             if parsed.top && parsed.rel == "routes/api.php" {
@@ -323,6 +343,12 @@ impl Laravel {
             }
             self.routes.extend(parsed.routes);
         }
+        // a kibontott konfig-ciklus `->name($név)`-e már nem dinamikus: a nevei a táblában vannak
+        self.dynamic_names.retain(|(file, line)| {
+            !expanded
+                .iter()
+                .any(|(rel, (from, to))| rel == file && (*from..=*to).contains(line))
+        });
         self.rebuild_names();
     }
 

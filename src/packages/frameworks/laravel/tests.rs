@@ -992,3 +992,101 @@ fn the_strategy_needs_the_laravel_package() {
     assert!(Laravel::detect(&root(), &with_laravel).is_some());
     assert!(with_laravel.frameworks().contains(&NAME));
 }
+
+#[test]
+fn a_controller_group_gives_its_routes_prefix_name_action_and_middleware() {
+    let text = r#"<?php
+Route::middleware(['auth', 'verified'])->prefix('cards')->name('cards.')->controller(ReaderCardController::class)->group(function () {
+    Route::get('/', 'index')->name('index');
+    Route::post('/', 'store');
+
+    Route::prefix('{card}')->name('item.')->middleware('can:renew')->group(fn () => [
+        Route::get('/edit', 'edit')->name('edit'),
+    ]);
+});
+"#;
+    let laravel = table(
+        text,
+        &[(
+            "ReaderCardController",
+            "App\\Http\\Controllers\\ReaderCardController",
+        )],
+    );
+    let got: Vec<(String, String, String, String, Vec<String>)> = laravel
+        .routes()
+        .iter()
+        .map(|r| {
+            (
+                r.name.clone().unwrap_or_default(),
+                r.verb.clone(),
+                r.uri.clone(),
+                r.action.label(),
+                r.middleware.clone(),
+            )
+        })
+        .collect();
+    let mw = |extra: &[&str]| -> Vec<String> {
+        ["auth", "verified"]
+            .iter()
+            .chain(extra)
+            .map(|name| (*name).to_owned())
+            .collect()
+    };
+    let row = |name: &str, verb: &str, uri: &str, action: &str, middleware: Vec<String>| {
+        (
+            name.to_owned(),
+            verb.to_owned(),
+            uri.to_owned(),
+            action.to_owned(),
+            middleware,
+        )
+    };
+    assert_eq!(
+        got,
+        vec![
+            row(
+                "cards.index",
+                "GET",
+                "/cards",
+                "ReaderCardController@index",
+                mw(&[])
+            ),
+            row(
+                "cards.",
+                "POST",
+                "/cards",
+                "ReaderCardController@store",
+                mw(&[])
+            ),
+            row(
+                "cards.item.edit",
+                "GET",
+                "/cards/{card}/edit",
+                "ReaderCardController@edit",
+                mw(&["can:renew"])
+            ),
+        ]
+    );
+}
+
+#[test]
+fn a_config_driven_loop_expands_into_named_routes_with_pages() {
+    let routes = "<?php\nforeach (config('site.pages') as $name => $page) {\n    Route::get($page['uri'], $page['action'])->name($name);\n}\n";
+    let config = "<?php\nuse App\\Http\\Controllers\\HomeController;\nreturn ['pages' => ['home' => ['uri' => '/', 'component' => 'Home', 'action' => HomeController::class], 'about' => ['uri' => '/about', 'action' => HomeController::class]]];\n";
+    let files = MemFiles::new(&[("routes/web.php", routes), ("config/site.php", config)]);
+    let web = graph("/p/routes/web.php", None, &[], Vec::new());
+    let path = root().join("routes/web.php");
+    let mut laravel = Laravel::new(&root());
+    laravel.scan([(path.as_path(), &web)], &files, false);
+    assert_eq!(
+        rows(&laravel),
+        vec![
+            row("home", "GET", "/", "HomeController@__invoke"),
+            row("about", "GET", "/about", "HomeController@__invoke"),
+        ]
+    );
+    assert_eq!(laravel.routes()[0].page.as_deref(), Some("Home"));
+    assert_eq!(laravel.page_sites().len(), 1);
+    // a kibontott ciklus `->name($name)`-je már nem dinamikus
+    assert!(laravel.dynamic_names.is_empty());
+}

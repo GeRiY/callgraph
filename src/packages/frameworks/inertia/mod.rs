@@ -154,6 +154,19 @@ impl Inertia {
         inertia
     }
 
+    /// További render-helyek (a konfigból generált route-ok Inertia-komponensei): a már ismert (oldal, fájl, sor)
+    /// hármas nem kerül be kétszer.
+    pub(crate) fn add_sites(&mut self, sites: Vec<RenderSite>) {
+        for site in sites {
+            let known = self.sites.iter().any(|have| {
+                have.page == site.page && have.file == site.file && have.line == site.line
+            });
+            if !known {
+                self.sites.push(site);
+            }
+        }
+    }
+
     /// A projekt render-helyei (a `scan` után).
     pub(crate) fn sites(&self) -> &[RenderSite] {
         &self.sites

@@ -14,6 +14,7 @@ mod json;
 mod lines;
 mod method_index;
 mod outline;
+mod outline_config;
 mod outline_members;
 mod outline_procedural;
 mod parse_errors;

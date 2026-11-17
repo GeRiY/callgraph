@@ -4,6 +4,7 @@ mod chain;
 pub mod diag;
 mod lines;
 pub mod markup;
+pub mod phpval;
 mod recovery;
 mod source;
 pub mod srcscan;

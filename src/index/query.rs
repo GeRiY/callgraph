@@ -7,6 +7,7 @@ use serde::Serialize;
 
 use super::hierarchy::{TypeHierarchy, ViaMatcher, normalize, same_type, split_target};
 use super::uncertain::{bare_name, is_uncertain, uncertain_match};
+use super::wiring::PhpWiring;
 use crate::error::Result;
 use crate::model::FileGraph;
 
@@ -64,8 +65,10 @@ impl CallerIndex {
         let properties = property_types(&records);
         let rust_traits = rust_trait_methods(&records);
         let kotlin_routes = kotlin_routes(&records);
+        // Laravel-drótozás: Eloquent scope-hívás, event → figyelő, observer, job / notification (csak PHP)
+        let wiring = PhpWiring::build(&records);
         let mut edges = Vec::new();
-        for (path, graph) in records {
+        for &(path, graph) in &records {
             let namespace = graph.namespace.as_deref().unwrap_or("");
             for call in &graph.calls {
                 let caller = call.caller.clone().unwrap_or_else(|| "__top__".to_string());
@@ -84,6 +87,12 @@ impl CallerIndex {
                         // Kotlin: másik fájlban deklarált `composable(..)` útvonal (az `on` = `route:<arg>`)
                         (call.resolved.is_none() && path.ends_with(".kt"))
                             .then(|| route_target(&kotlin_routes, call.on.as_deref()?))
+                            .flatten()
+                    })
+                    .or_else(|| {
+                        // PHP: `Shelf::query()->stocked()` → `Shelf::scopeStocked`
+                        path.ends_with(".php")
+                            .then(|| wiring.scope_target(path, call))
                             .flatten()
                     });
                 let target = chained
@@ -127,6 +136,36 @@ impl CallerIndex {
                         .then_some((call.line, call.end_line.unwrap_or(call.line))),
                 });
             }
+        }
+        // a keretrendszer által hívott célok (event → figyelő …): a kiváltó hely hívja őket
+        let namespaces: HashMap<&str, &str> = records
+            .iter()
+            .map(|&(path, graph)| (path, graph.namespace.as_deref().unwrap_or("")))
+            .collect();
+        for link in wiring.links() {
+            let namespace = namespaces.get(link.file.as_str()).copied().unwrap_or("");
+            edges.push(Edge {
+                row: CallerRow {
+                    file: link.file.clone(),
+                    container: link.container.clone(),
+                    caller: link.caller.clone(),
+                    line: link.line,
+                    target: link.target.clone(),
+                    level: 0,
+                    via: None,
+                    guessed: false,
+                    reference: false,
+                },
+                lookup: link.target.clone(),
+                caller_key: symbol_key(namespace, link.container.as_deref(), &link.caller),
+                caller_type: link
+                    .container
+                    .as_deref()
+                    .map(|container| normalize(&symbol_key(namespace, None, container))),
+                guessable: false,
+                wire: None,
+                rewritten: true,
+            });
         }
         let mut reverse: HashMap<String, Vec<Edge>> = HashMap::new();
         let mut by_method: HashMap<String, Vec<(String, usize)>> = HashMap::new();

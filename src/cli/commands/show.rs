@@ -167,6 +167,8 @@ impl Command for ShowCommand {
                     | "jsonl"
                     | "inertia"
                     | "ziggy"
+                    | "routes"
+                    | "middleware"
                     | "forms"
                     | "models"
                     | "i18n"

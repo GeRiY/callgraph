@@ -32,7 +32,7 @@ use crate::packages::cache::{CacheStore, DirCache, decode, encode};
 /// A cache fájlneve a `.callgraph/` mappában.
 const FILE: &str = "laravel.bin";
 /// A tárolt szerkezet verziója; ha változik (vagy új build jön), a régi cache csendben újraépül.
-const FORMAT: u32 = 1;
+const FORMAT: u32 = 2;
 
 /// Egy bemenet-halmaz ujjlenyomata: a gyökérhez relatív utak és bélyegeik, rendezve.
 pub(crate) type Fingerprint = Vec<(String, Stamp)>;
@@ -344,6 +344,13 @@ impl Laravel {
             .filter(|path| is_php(path))
             .collect();
         listed.extend(files.files_under(&self.root.join("app/Providers")));
+        // a konfig-vezérelt route-ciklusok (`foreach (config('a.b') ..)`) a `config/*.php` literál tömbjeiből bomlanak ki
+        listed.extend(
+            files
+                .files_under(&self.root.join("config"))
+                .into_iter()
+                .filter(|path| is_php(path)),
+        );
         self.fingerprint(files, &listed, &[self.root.join("bootstrap/app.php")])
     }
 

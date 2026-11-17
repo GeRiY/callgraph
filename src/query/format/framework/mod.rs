@@ -8,8 +8,10 @@ mod crossref;
 mod forms;
 mod inertia;
 mod models;
+mod route_table;
 mod routes;
 mod rules;
+mod wired;
 mod ziggy;
 
 use super::selection::selected;
@@ -60,34 +62,11 @@ impl Formatter for RuleView {
 
 pub(super) fn register(registry: &mut FormatterRegistry) {
     type Empty = (&'static str, &'static str);
-    let views: [(&'static str, Empty, Collect); 9] = [
-        (
-            "events",
-            (
-                "(no event/listener matches)",
-                "(nincs event/listener találat)",
-            ),
-            rules::events,
-        ),
-        (
-            "routes",
-            ("(no route matches)", "(nincs route találat)"),
-            rules::routes,
-        ),
-        (
-            "middleware",
-            ("(no middleware matches)", "(nincs middleware találat)"),
-            rules::middleware,
-        ),
+    let views: [(&'static str, Empty, Collect); 5] = [
         (
             "validation",
             ("(no validation matches)", "(nincs validation találat)"),
             rules::validation,
-        ),
-        (
-            "jobs",
-            ("(no job/queue matches)", "(nincs job/queue találat)"),
-            rules::jobs,
         ),
         (
             "providers",
@@ -119,6 +98,41 @@ pub(super) fn register(registry: &mut FormatterRegistry) {
     for (name, empty, collect) in views {
         registry.register(name, Box::new(RuleView { empty, collect }));
     }
+    // a Laravel-tényekkel (drótozás, route-tábla) kiegészülő nézetek
+    let with_facts: [(&'static str, Empty, Collect, wired::Finish); 3] = [
+        (
+            "events",
+            (
+                "(no event/listener matches)",
+                "(nincs event/listener találat)",
+            ),
+            rules::events,
+            wired::events_finish,
+        ),
+        (
+            "middleware",
+            ("(no middleware matches)", "(nincs middleware találat)"),
+            rules::middleware,
+            wired::middleware_finish,
+        ),
+        (
+            "jobs",
+            ("(no job/queue matches)", "(nincs job/queue találat)"),
+            rules::jobs,
+            wired::jobs_finish,
+        ),
+    ];
+    for (name, empty, collect, finish) in with_facts {
+        registry.register(
+            name,
+            Box::new(wired::WiredView {
+                empty,
+                collect,
+                finish,
+            }),
+        );
+    }
+    registry.register("routes", Box::new(route_table::RoutesView));
     registry.register("inertia", Box::new(inertia::InertiaView));
     registry.register("ziggy", Box::new(ziggy::ZiggyView));
     registry.register("forms", Box::new(forms::FormsView));

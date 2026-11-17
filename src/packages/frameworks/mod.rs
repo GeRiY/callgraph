@@ -57,8 +57,11 @@ pub(crate) fn annotate(rows: &mut [QueryResult], root: &Path, format: &str) {
     let scan_forms = with_forms
         && (format == "forms"
             || (matches!(format, "outline" | "json" | "jsonl") && rows.iter().any(needs_forms)));
+    // a `routes` / `middleware` nézet a route-táblából ír, az `inertia` nézet a konfigból generált route-ok oldalait is
+    // ismeri
     let scan_laravel = laravel.is_some()
-        && (format == "ziggy"
+        && (matches!(format, "ziggy" | "routes" | "middleware")
+            || (format == "inertia" && inertia.is_some())
             || scan_forms
             || (matches!(format, "outline" | "json" | "jsonl") && rows.iter().any(needs_routes)));
     // az Eloquent-modell összefoglaló (modellek + migrációk) csak modell-fájlnál és a `models` nézetnél
@@ -93,6 +96,12 @@ pub(crate) fn annotate(rows: &mut [QueryResult], root: &Path, format: &str) {
                     if scan_models {
                         laravel.scan_models(code(), &DiskProjectFiles);
                     }
+                }
+                if scan_inertia
+                    && scan_laravel
+                    && let (Some(inertia), Some(laravel)) = (inertia.as_mut(), laravel.as_ref())
+                {
+                    inertia.add_sites(laravel.page_sites());
                 }
             });
         } else {

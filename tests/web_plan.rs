@@ -143,7 +143,6 @@ fn h01_events_view_has_no_noise_and_keeps_the_real_events() {
 }
 
 #[test]
-#[ignore = "web-plan F3/H1: events are not paired with their listener; enabled in phase 6"]
 fn h01_events_view_pairs_dispatch_with_listener() {
     let out = Fixture::laravel().run(&["show", "app", "--format", "events"]);
     let line = out
@@ -297,7 +296,6 @@ fn h09_class_constant_reference_is_found_by_grep_and_locate() {
 }
 
 #[test]
-#[ignore = "web-plan H10: Shelf::query()->stocked() does not resolve to the scope; enabled in phase 6 (F3)"]
 fn h10_eloquent_scope_call_resolves_to_the_scope_method() {
     let out = Fixture::laravel().run(&["show", "app", "--grep", "Shelf::scopeStocked$"]);
     assert!(out.contains("ShelfController.php"), "{out}");
@@ -482,12 +480,12 @@ fn h23_story_files_are_not_a_page_layer() {
 // H24 – H29: route-ok, konfig
 
 #[test]
-#[ignore = "web-plan H24/F4: routes generated from config are unknown to ziggy and inertia; enabled in phase 6"]
 fn h24_config_generated_routes_and_pages_are_static_facts() {
     let fixture = Fixture::laravel();
     let ziggy = fixture.run(&["show", ".", "--format", "ziggy"]);
     assert!(!ziggy.contains("unknown route name 'start'"), "{ziggy}");
-    assert!(ziggy.contains("routes: 5 named"), "{ziggy}");
+    // 3 kézzel írt + 3 a `cards` csoportból (`cards.index`, a névtelen `cards.`, `cards.item.edit`) + 2 a konfigból
+    assert!(ziggy.contains("routes: 8 named"), "{ziggy}");
     let inertia = fixture.run(&["show", ".", "--format", "inertia"]);
     assert!(
         lines_starting(&inertia, "unrendered").is_empty(),
@@ -496,7 +494,6 @@ fn h24_config_generated_routes_and_pages_are_static_facts() {
 }
 
 #[test]
-#[ignore = "web-plan H26/F4: the routes view lacks middleware and the full route table; enabled in phase 6 (R6)"]
 fn h26_routes_view_is_the_full_table_without_noise() {
     let out = Fixture::laravel().run(&["show", ".", "--format", "routes"]);
     let rows = lines_starting(&out, "route ");
@@ -511,10 +508,42 @@ fn h26_routes_view_is_the_full_table_without_noise() {
         .unwrap_or_else(|| panic!("nincs /catalogue sor:\n{out}"));
     assert!(reports.contains("EnsureReaderCard"), "{reports}");
     assert!(rows.iter().any(|r| r.contains("name=start")), "{out}");
+    assert!(
+        rows.iter().all(|r| r.contains("routes/web.php:")),
+        "a sorok fájl:sor helye hiányzik:\n{out}"
+    );
+}
+
+/// A controller-csoportban (`->controller(X::class)->group(..)`, nyíl-függvénnyel és beágyazva is) a sztring-akció
+/// `X::metódus`, és az előtag, a név és a middleware összefűződik a beágyazáson át — minden nézet ugyanazt a táblát látja.
+#[test]
+fn routes_in_a_controller_group_inherit_prefix_name_action_and_middleware() {
+    let fixture = Fixture::laravel();
+    let out = fixture.run(&["show", ".", "--format", "routes"]);
+    let rows = lines_starting(&out, "route ");
+    let find = |needle: &str| {
+        *rows
+            .iter()
+            .find(|r| r.contains(needle))
+            .unwrap_or_else(|| panic!("nincs `{needle}` sor:\n{out}"))
+    };
+    let index = find("name=cards.index");
+    assert!(index.contains("GET  /cards  "), "{index}");
+    assert!(index.contains("ReaderCardController@index"), "{index}");
+    assert!(index.contains("[auth, verified]"), "{index}");
+    let store = find("ReaderCardController@store");
+    assert!(store.contains("POST  /cards  "), "{store}");
+    assert!(store.contains("name=cards."), "{store}");
+    let edit = find("name=cards.item.edit");
+    assert!(edit.contains("GET  /cards/{card}/edit"), "{edit}");
+    assert!(edit.contains("ReaderCardController@edit"), "{edit}");
+    assert!(edit.contains("[auth, verified, can:renew]"), "{edit}");
+    // a ziggy nézet ugyanebből a táblából: a csoport nevei ismertek
+    let ziggy = fixture.run(&["show", ".", "--format", "ziggy"]);
+    assert!(!ziggy.contains("cards.index"), "{ziggy}");
 }
 
 #[test]
-#[ignore = "web-plan H29/F10: the outline of a PHP config file shows no keys; enabled in phase 6 (F10)"]
 fn h29_php_config_outline_shows_key_paths() {
     let out = Fixture::laravel().run(&["show", "config/library.php"]);
     assert!(out.contains("pages.start.uri"), "{out}");
