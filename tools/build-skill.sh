@@ -52,9 +52,10 @@ else
 fi
 chmod +x "$PKG"/*.sh "$PKG"/bin/*/callgraph* "$PKG"/extras/hooks/* "$PKG"/extras/tools/* 2>/dev/null || true
 
+# kis- és nagybetű számít: a gépfüggő utak (`/Users/`, `/home/`) így szerepelnek; az `admin/users/` példa nem az
 FORBIDDEN='/Users/|/home/'
 [[ -f "$ROOT/tools/forbidden.local" ]] && FORBIDDEN="$(head -1 "$ROOT/tools/forbidden.local")"
-if grep -rIn -i -E "$FORBIDDEN" "$PKG" --exclude-dir=bin; then echo "✗ gép- vagy projektfüggő szöveg (fent)"; exit 1; fi
+if grep -rIn -E "$FORBIDDEN" "$PKG" --exclude-dir=bin; then echo "✗ gép- vagy projektfüggő szöveg (fent)"; exit 1; fi
 for b in "$PKG"/bin/*/callgraph*; do
     if strings "$b" | grep -q -i -E "$FORBIDDEN"; then echo "✗ gépfüggő útvonal a binárisban: ${b#$PKG/}"; exit 1; fi
 done

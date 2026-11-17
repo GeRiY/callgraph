@@ -5,7 +5,7 @@
 ## Blade (`*.blade.php`)
 
 Own language, not a PHP file. Container: one `view` per file, named by the dotted path under `resources/views`
-(`admin/users/index.blade.php` → `admin.users.index`; an anonymous component `components.alert`); `@extends('x')` is its
+(`admin/accounts/index.blade.php` → `admin.accounts.index`; an anonymous component `components.alert`); `@extends('x')` is its
 `extends`. "Methods" are the blocks, with line ranges: `section:content`, `push:scripts` (`@push`, `@pushOnce`, `@pushIf`),
 `prepend:x`, `slot:header` (`@slot` and `<x-slot:header>`), and the part outside sections as `template` (only if it has a
 call or a branch). A one-line `@section('title', 'x')` is not a block. `@props([...])` keys are properties.
