@@ -15,13 +15,16 @@ use super::receivers::{
     ClassFrame, Frame, TypeRef, arrow_frame, class_frame, function_frame, program_frame,
 };
 use crate::lang::js::analysis::PassContext;
+use crate::lang::js::imports::categorize;
 use crate::lang::js::methods::{Docs, MethodIndex};
+use crate::lang::js::resolve::Resolver;
 use crate::model::{Call, DYNAMIC_CALL, DYNAMIC_KIND};
 
 pub struct Walker<'s> {
     ctx: &'s PassContext<'s>,
     docs: &'s Docs<'s>,
     index: &'s MethodIndex,
+    resolver: &'s Resolver,
     scope: Scope,
     caller: String,
     container: String,
@@ -37,6 +40,7 @@ impl<'s> Walker<'s> {
         ctx: &'s PassContext<'s>,
         docs: &'s Docs<'s>,
         index: &'s MethodIndex,
+        resolver: &'s Resolver,
         scope: Scope,
         top: &str,
     ) -> Self {
@@ -44,6 +48,7 @@ impl<'s> Walker<'s> {
             ctx,
             docs,
             index,
+            resolver,
             scope,
             caller: top.to_string(),
             container: index.main.clone(),
@@ -292,6 +297,22 @@ impl<'s> Walker<'s> {
 }
 
 /// Literál kulcs / argumentum: sztring, szám, helyettesítés nélküli sablon.
+/// A szöveg-literál (string vagy helyettesítés nélküli sablon) értéke; a szám nem az.
+fn literal_string(e: &Expression<'_>) -> Option<String> {
+    match e.get_inner_expression() {
+        Expression::StringLiteral(s) => Some(s.value.display().to_string()),
+        Expression::TemplateLiteral(t) if t.is_no_substitution_template() => {
+            t.quasis.first().map(|q| {
+                q.value
+                    .cooked
+                    .as_ref()
+                    .map_or_else(|| q.value.raw.to_string(), |c| c.display().to_string())
+            })
+        }
+        _ => None,
+    }
+}
+
 fn is_literal(e: &Expression<'_>) -> bool {
     let e = e.get_inner_expression();
     matches!(
@@ -444,18 +465,27 @@ impl<'a> Visit<'a> for Walker<'_> {
             let s = o.without_parentheses().span();
             args.push(self.docs.src_of(s.start, s.end, 60));
         }
-        let r = Callee::expr();
+        // a szöveg-literál forrás feloldva: fájl- (`module_use`) vagy csomag-használat (`package_use`), mint a statikus importnál
+        let mut r = Callee::expr();
+        let mut from = None;
+        if let Some(spec) = literal_string(&it.source) {
+            let resolved = self.resolver.resolve(&spec, self.ctx.path);
+            r.target = "import".to_string();
+            r.category = categorize(&spec, "import", resolved.local);
+            r.resolved = Some(format!("{}::default", resolved.display));
+            from = (!resolved.local).then_some(spec);
+        }
         let (container, caller) = (self.container.clone(), self.caller.clone());
         self.calls.push(Call {
             handler: None,
-            from: None,
+            from,
             container: Some(container),
             caller: Some(caller),
             line: self.ctx.lines.line_of(it.span.start as usize),
             end_line: None,
             kind: r.kind.to_string(),
             target: r.target,
-            resolved: None,
+            resolved: r.resolved,
             on: None,
             category: r.category.to_string(),
             args: Some(args),

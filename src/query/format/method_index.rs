@@ -30,13 +30,17 @@ impl Formatter for MethodIndex {
                     key_index(&mut s, r, c, lang);
                 }
                 for m in methods {
+                    // a Vue-komponens `<script setup>` tagjai mind privátak: a címke nem információ
+                    let visibility = match m.visibility.as_deref() {
+                        Some("private") if r.graph.sfc.is_some() => String::new(),
+                        other => format!("[{}]  ", other.unwrap_or("public")),
+                    };
                     writeln!(
                         s,
-                        "  {}()  L{}-{}  [{}]  {} {}",
+                        "  {}()  L{}-{}  {visibility}{} {}",
                         m.name,
                         m.line,
                         m.end_line.unwrap_or(m.line),
-                        m.visibility.as_deref().unwrap_or("public"),
                         lang.pick("calls:", "hívás:"),
                         r.graph
                             .calls

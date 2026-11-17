@@ -101,11 +101,23 @@ fn literal_import_is_not_dynamic() {
 }
 
 #[test]
-fn literal_import_keeps_its_old_record() {
-    let all = analyze("/p/x.ts", "function f() { import('./a.js'); }\n");
+fn literal_import_is_a_module_or_package_use() {
+    let all = analyze(
+        "/p/x.ts",
+        "function f() { import('./a.js'); import('chart.js'); }\n",
+    );
     assert!(
-        all.iter()
-            .any(|c| c.target == "<expr>" && c.category == "external_call"),
+        all.iter().any(|c| c.target == "import"
+            && c.category == "module_use"
+            && c.resolved
+                .as_deref()
+                .is_some_and(|r| r.ends_with("a.js::default"))),
+        "{all:?}"
+    );
+    assert!(
+        all.iter().any(|c| c.target == "import"
+            && c.category == "package_use"
+            && c.from.as_deref() == Some("chart.js")),
         "{all:?}"
     );
 }

@@ -37,6 +37,13 @@ impl SourceLines {
         if let Some(code) = self.known.get(file).and_then(|lines| lines.get(&line)) {
             return Some(code.clone());
         }
+        self.with_lines(file, |lines| {
+            compact(lines.get(usize::try_from(line).ok()?.checked_sub(1)?)?)
+        })
+    }
+
+    /// A fájl sorai (egyszer beolvasva) a `f`-nek; `None`, ha a fájl nem olvasható.
+    fn with_lines<T>(&self, file: &str, f: impl FnOnce(&[String]) -> Option<T>) -> Option<T> {
         let mut files = self.files.borrow_mut();
         let lines = files.entry(file.to_owned()).or_insert_with(|| {
             std::fs::read(file).ok().map(|bytes| {
@@ -46,11 +53,48 @@ impl SourceLines {
                     .collect()
             })
         });
-        let text = lines
-            .as_ref()?
-            .get(usize::try_from(line).ok()?.checked_sub(1)?)?;
-        compact(text)
+        f(lines.as_ref()?)
     }
+
+    /// A láncolt hívás sora: a hívás `line`-ja a teljes kifejezés kezdete, a `->név(` / `::név(` / `.név(` viszont a
+    /// lánc egy későbbi során állhat. A kezdősortól az utasítás végéig (`;` / `{` / `}` záró sor, legfeljebb
+    /// `CHAIN_SCAN` sor) keresi a `nth`-edik (0-tól) `név(` előfordulást; nincs találat → a hívás sora.
+    pub(crate) fn call_line(&self, file: &str, line: u32, name: &str, nth: usize) -> u32 {
+        self.with_lines(file, |lines| {
+            let start = usize::try_from(line).ok()?.checked_sub(1)?;
+            let mut seen = 0;
+            for (offset, text) in lines.iter().skip(start).take(CHAIN_SCAN).enumerate() {
+                let here = method_mentions(text, name);
+                if nth < seen + here {
+                    return u32::try_from(start + offset + 1).ok();
+                }
+                seen += here;
+                let end = text.trim_end();
+                if end.ends_with([';', '{', '}']) {
+                    break;
+                }
+            }
+            None
+        })
+        .unwrap_or(line)
+    }
+}
+
+/// Ennyi sorig keresi a lánc egy tagját a kezdősortól.
+const CHAIN_SCAN: usize = 30;
+
+/// A `név(` hívás-alakú előfordulásai a sorban (`->név(`, `?->név(`, `::név(`, `.név(`).
+fn method_mentions(text: &str, name: &str) -> usize {
+    if name.is_empty() {
+        return 0;
+    }
+    text.match_indices(name)
+        .filter(|(at, _)| {
+            let before = text[..*at].chars().next_back();
+            let after = text[at + name.len()..].trim_start().starts_with('(');
+            after && matches!(before, Some('>' | ':' | '.'))
+        })
+        .count()
 }
 
 /// Egy forrássor tömörítve: trim, a szóköz-sorozatok egy szóközre, `MAX_CHARS` fölött `…`. Üres sorra `None`.
@@ -212,6 +256,17 @@ pub(crate) fn more(lang: Lang, lines: &[u32]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn method_mentions_counts_call_shaped_occurrences_only() {
+        assert_eq!(method_mentions("    ->stocked()", "stocked"), 1);
+        assert_eq!(method_mentions("$a?->get()->get ()", "get"), 2);
+        assert_eq!(
+            method_mentions("$stocked = Shelf::stockedAt;", "stocked"),
+            0
+        );
+        assert_eq!(method_mentions("->stockedAt()", "stocked"), 0);
+    }
 
     #[test]
     fn compact_trims_collapses_and_truncates() {

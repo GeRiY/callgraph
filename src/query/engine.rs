@@ -358,8 +358,8 @@ impl QueryEngine {
     }
 
     /// A szöveges kimenet útvonalai a projekt-gyökérhez relatívan: ha az abszolút gyökér legalább kétszer
-    /// szerepelne, egyszer, az első sorban (`root: /abs/projekt`) áll, utána minden út relatív. Egyetlen út
-    /// változatlan marad (az önmagában is egyszer írja ki a gyökeret). A gépi formátumokra (json, mermaid…) nem kell.
+    /// szerepelne, egyszer, az első sorban (`root: /abs/projekt`) áll, utána minden út relatív. Egyetlen
+    /// előfordulásnál nincs `root:` sor, csak az út lesz relatív. A gépi formátumokra (json, mermaid…) nem kell.
     pub fn relativize(&self, text: &str) -> String {
         let root = self.root.to_string_lossy();
         let root = root.trim_end_matches(std::path::MAIN_SEPARATOR);
@@ -369,12 +369,9 @@ impl QueryEngine {
         let prefix = format!("{root}{}", std::path::MAIN_SEPARATOR);
         // Windowson a canonicalize `\\?\C:\…` alakot ad: a kiírt útból ezt elhagyjuk (az illesztés a teljes alakkal megy)
         let shown = strip_verbatim(root);
+        // egyetlen előfordulásnál nincs `root:` sor, de az út akkor is relatív (a következő hívásba másolható)
         if text.matches(&prefix).count() < 2 {
-            return if shown == root {
-                text.to_owned()
-            } else {
-                text.replace(&prefix, &format!("{shown}{}", std::path::MAIN_SEPARATOR))
-            };
+            return text.replace(&prefix, "");
         }
         let branch = super::branch::root_suffix(&self.root);
         let mut out = tf!("root: {shown}{branch}\n", "gyökér: {shown}{branch}\n");

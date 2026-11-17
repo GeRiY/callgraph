@@ -60,7 +60,7 @@ impl JsPass for CallsPass {
             comments: &program.comments,
         };
         let top = if ctx.setup { "setup" } else { "__module__" };
-        let mut w = walk::Walker::new(ctx, &docs, &index, scope, top);
+        let mut w = walk::Walker::new(ctx, &docs, &index, &self.resolver, scope, top);
         w.run(program);
         for call in w.calls {
             out.builder.call(call);

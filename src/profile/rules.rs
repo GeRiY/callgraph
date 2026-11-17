@@ -246,6 +246,8 @@ pub(crate) static FOLDER_RULES: &[FolderRule] = &[
         High,
         ANY,
     ),
+    // Histoire / Storybook: a story-fájlok teszt-szerűek (a `pages/` mappájuk nem a projekt page rétege)
+    folder(&["stories", "storybook"], None, "test", High, JS),
     // minta- / fixture-mappák (golden/samples/*, tests/fixtures/*): a bennük lévő, akár más nyelvű mintakód nem a
     // projekt architektúrája
     folder(
@@ -460,6 +462,8 @@ pub(crate) static DOTTED_RULES: &[(&str, &str, Confidence)] = &[
     ("router", "route", High),
     ("test", "test", High),
     ("spec", "test", High),
+    ("story", "test", High),
+    ("stories", "test", High),
     ("config", "config", High),
     ("composable", "composable", High),
     ("page", "page", Medium),

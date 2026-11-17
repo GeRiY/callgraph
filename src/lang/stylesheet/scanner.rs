@@ -327,15 +327,21 @@ impl<'a> StylesheetScanner<'a> {
                     j += 1;
                 }
                 if b.get(j) == Some(&b'(') {
-                    let target = &raw[i..j];
-                    if matches!(
-                        target,
-                        "translateY" | "blur" | "scale" | "cubic-bezier" | "set"
-                    ) {
-                        i = j;
-                        continue;
-                    }
-                    let category = if target == "var" { "var" } else { "function" };
+                    let function = &raw[i..j];
+                    // a `var(--x, fallback)` olvasás célja a custom property neve (a függvénynév nem információ)
+                    let property = if function == "var" {
+                        raw[j + 1..]
+                            .split([',', ')'])
+                            .next()
+                            .map(str::trim)
+                            .filter(|name| name.starts_with("--"))
+                    } else {
+                        None
+                    };
+                    // `var(--x)` alakban: a `--grep var` és a property neve is megtalálja
+                    let target =
+                        property.map_or_else(|| function.to_owned(), |p| format!("var({p})"));
+                    let category = if function == "var" { "var" } else { "function" };
                     let line = self.line(start + i);
                     self.builder.call(Call {
                         handler: None,
@@ -343,8 +349,8 @@ impl<'a> StylesheetScanner<'a> {
                         container: Some(self.container.clone()),
                         caller: caller.clone(),
                         line,
-                        kind: target.into(),
-                        target: target.into(),
+                        kind: function.into(),
+                        target,
                         resolved: None,
                         on: None,
                         category: category.into(),

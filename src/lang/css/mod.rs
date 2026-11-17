@@ -26,7 +26,12 @@ mod tests {
         assert_eq!(a.graph.containers[0].name, "theme");
         assert_eq!(a.graph.methods[0].body, None);
         assert_eq!(a.graph.imports.get("print.css"), Some("print.css"));
-        assert!(a.graph.calls.iter().any(|c| c.target == "var"));
+        assert!(
+            a.graph
+                .calls
+                .iter()
+                .any(|c| c.category == "var" && c.target == "var(--brand)")
+        );
         assert_eq!(
             f.resolve_module("print.css", std::path::Path::new("/tmp/css/theme.css")),
             Some(std::path::PathBuf::from("/tmp/css/print.css"))
@@ -192,7 +197,8 @@ mod tests {
                 .map(|c| c.caller.as_deref())
                 .collect()
         };
-        assert_eq!(callers("var"), [Some(".card"), Some(".card .title")]);
+        assert_eq!(callers("var(--brand)"), [Some(".card")]);
+        assert_eq!(callers("var(--gap)"), [Some(".card .title")]);
         assert_eq!(callers("calc"), [Some(":root"), Some(".card .title")]);
     }
 }

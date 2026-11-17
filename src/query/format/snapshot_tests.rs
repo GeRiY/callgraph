@@ -54,7 +54,7 @@ fn css_outline_snapshot() {
         "  :root  L2-4\n",
         "  .card  L6-9\n",
         &calls("function", "calc"),
-        &calls("var", "var"),
+        &calls("var", "var(--brand)"),
         "  @media (min-width: 640px)  L10-12\n",
         "  .card .title  L11-11\n",
     ]

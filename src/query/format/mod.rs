@@ -34,7 +34,7 @@ mod snapshot_tests;
 mod tests;
 
 pub use body::BodyMode;
-pub(crate) use outline::{call_lines, closing_tip, grep_outline, method_calls, parens};
+pub(crate) use outline::{call_lines, closing_tip, grep_outline, method_calls, parens, shown_line};
 pub use parse_errors::trailer as parse_trailer;
 pub(crate) use parse_errors::{file_lines as parse_error_lines, issue as parse_issue};
 

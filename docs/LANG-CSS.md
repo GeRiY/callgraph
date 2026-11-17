@@ -71,14 +71,14 @@ Minden hívás a közös `calls` alakot használja: `container`, `caller`, `line
 
 - `include` — `@include button($brand)`;
 - `extend` — `@extend %card`;
-- `variable` — `var(--brand, blue)` vagy SCSS `$brand`-hivatkozás;
+- `var` — `var(--brand, blue)` vagy SCSS `$brand`-hivatkozás;
 - `function` — `darken($brand, 10%)`, `map-get(...)`, `calc(...)`;
 - `url` — `url("fonts/app.woff2")`.
 
 Az `@debug` és `@warn` diagnosztikai direktíva `directive` típusú, rendre
 `debug` és `warn` célú call; az `@return` a function body-jának része.
 
-`target` a hívás neve (`button`, `%card`, `--brand`, `darken`, `url`),
+`target` a hívás neve (`button`, `%card`, `var(--brand)`, `darken`, `url`),
 `caller` a körülvevő rule/mixin/function neve. A CSS custom property
 deklarációja nem hívás, csak a `var(--x)` olvasása az.
 
@@ -121,6 +121,6 @@ $brand: #2463eb;
 ```
 
 Itt a container `button`-t tartalmazó `stylesheet`, a methods egy `rule`
-`.button`-nal, a constants egy `$brand` rekorddal, a calls egy `variable`
+`.button`-nal, a constants egy `$brand` rekorddal, a calls egy `var`
 `--text` és egy `include` `rounded` hívással, a strings üres. A sorok minden
 rekordnál a fenti inkluzív, 1-alapú szabályt követik.

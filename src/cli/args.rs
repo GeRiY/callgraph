@@ -769,6 +769,17 @@ impl CliArgs {
                 cache = Some(PathBuf::from(value));
             } else if let Some(value) = arg.strip_prefix("--cache=") {
                 cache = Some(PathBuf::from(value));
+            } else if arg.starts_with("--")
+                && !matches!(arg.as_str(), "--" | "--project" | "--label")
+                && !arg.starts_with("--project=")
+            {
+                // ismeretlen kapcsoló: nem út, így nem indul el az elemzés (és nem ömlik ki nyers JSONL)
+                return Err(CallgraphError::Usage(crate::tf!(
+                    "unknown option {}; for a view use `callgraph show <path> --format <name>`; {}",
+                    "ismeretlen kapcsoló: {}; nézethez: `callgraph show <út> --format <név>`; {}",
+                    arg,
+                    usage()
+                )));
             } else {
                 paths.push(PathBuf::from(arg));
             }

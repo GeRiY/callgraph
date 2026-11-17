@@ -347,6 +347,28 @@ pub(crate) fn method_calls<'g>(g: &'g FileGraph, m: &Method) -> Vec<&'g Call> {
         .collect()
 }
 
+/// A hívás kiírt sora: a metódus- / statikus hívás láncban a `->név(` sora (az azonos kezdősorú, azonos nevű hívások
+/// sorban egymás utáni előfordulást kapnak); minden más hívásé a tárolt sor.
+pub(crate) fn shown_line(source: &SourceLines, file: &str, calls: &[&Call], call: &Call) -> u32 {
+    if !matches!(
+        call.kind.as_str(),
+        "method_call" | "nullsafe_method_call" | "static_call"
+    ) {
+        return call.line;
+    }
+    let name = call
+        .target
+        .rsplit(['>', ':', '.'])
+        .next()
+        .unwrap_or(&call.target);
+    let nth = calls
+        .iter()
+        .take_while(|c| !std::ptr::eq(**c, call))
+        .filter(|c| c.line == call.line && c.kind == call.kind && c.target == call.target)
+        .count();
+    source.call_line(file, call.line, name, nth)
+}
+
 /// A hívások helye soronként egyszer (`L25 [via X] │ kód`); az azonos (és azonos `via`-jú) sorok egy sorba vonva
 /// (`L12, L40 │ kód`), legfeljebb `snippet::MAX_PER_METHOD` sor, a többi `… +N more: L55, L61`.
 pub(crate) fn call_lines(
@@ -357,19 +379,19 @@ pub(crate) fn call_lines(
     lang: Lang,
     indent: &str,
 ) {
-    let mut lines: Vec<u32> = calls.iter().map(|c| c.line).collect();
+    // a láncolt hívás sora a hívás tagjáé, nem a lánc kezdősoráé
+    let located: Vec<(u32, &Call)> = calls
+        .iter()
+        .map(|&c| (shown_line(source, &row.graph.file, calls, c), c))
+        .collect();
+    let mut lines: Vec<u32> = located.iter().map(|(line, _)| *line).collect();
     lines.sort_unstable();
     lines.dedup();
     let sites = snippet::merge(lines.iter().map(|&line| {
-        let via = calls
-            .iter()
-            .filter(|c| c.line == line)
-            .find_map(|c| row.via_of(c));
+        let at = || located.iter().filter(|(l, _)| *l == line).map(|(_, c)| *c);
+        let via = at().find_map(|c| row.via_of(c));
         // csak hivatkozásokat tartalmazó sor `(ref)`: a sor többi hívása hívás marad
-        let reference = calls
-            .iter()
-            .filter(|c| c.line == line)
-            .all(|c| c.is_reference());
+        let reference = at().all(Call::is_reference);
         (line, (via, reference), source.get(&row.graph.file, line))
     }));
     let (shown, rest) = snippet::cap(sites);
@@ -410,6 +432,9 @@ pub(super) fn categories(row: &QueryResult, m: &Method, lang: Lang) -> Vec<(Stri
         // wire / inject / nav: a hívás-fajta a kategória-oszlopban (`wire   RealtimeSocket::onFrame`)
         let column = if matches!(c.kind.as_str(), "wire" | "inject" | "nav") {
             c.kind.clone()
+        } else if c.kind == "const_fetch" && c.category == "external_call" {
+            // az enum-eset / osztály-konstans olvasása nem hívás: külön sor (a json kategóriája változatlan)
+            "const_use".to_owned()
         } else {
             c.category.clone()
         };

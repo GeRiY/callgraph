@@ -109,15 +109,16 @@ fn grep_prints_root_once_and_relative_paths() {
 }
 
 #[test]
-fn single_path_output_stays_absolute_without_root_line() {
+fn single_path_output_is_relative_without_root_line() {
     let project = Project::new();
     let out = project.run(&["show", "src/Controller.php"]);
     let root = project.root();
     assert!(!out.starts_with("root: "), "{out}");
     assert!(
-        out.contains(&format!("FILE  {root}{}", sep("/src/Controller.php"))),
+        out.starts_with(&format!("FILE  {}", sep("src/Controller.php"))),
         "{out}"
     );
+    assert!(!out.contains(root.as_str()), "{out}");
 }
 
 #[test]

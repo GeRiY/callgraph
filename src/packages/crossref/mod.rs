@@ -157,7 +157,8 @@ impl CrossRef {
             }
             views
         });
-        let scan_i18n = need.i18n == I18nNeed::Full;
+        // nyelvfájl nélkül nincs mit használatnak minősíteni: a forrás-olvasás kimarad
+        let scan_i18n = need.i18n == I18nNeed::Full && i18n.as_ref().is_some_and(I18n::has_sets);
         let scan_classes = classes.as_ref().is_some_and(|c| c.defined_count() > 0);
         if scan_i18n || scan_classes {
             let defined = classes.as_ref().map(Classes::defined).unwrap_or_default();

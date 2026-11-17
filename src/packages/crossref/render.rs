@@ -31,6 +31,46 @@ fn list(total: usize, sample: &[String]) -> String {
     }
 }
 
+/// Egy i18n-kulcs a kimenetben: a pont-kulcs teljes (kereshető), a mondat-kulcs (szóközzel) rövidítve.
+fn key_text(key: &str) -> String {
+    if key.contains(char::is_whitespace) {
+        short(key, 40)
+    } else {
+        key.to_owned()
+    }
+}
+
+/// `a.b.{c, d.e} +N`: a kulcsok teljesek; a közös szegmens-előtag (legalább egy szegmens) kapcsos zárójel elé kerül.
+fn key_list(total: usize, sample: &[String]) -> String {
+    let more = if total > sample.len() {
+        format!(" +{}", total - sample.len())
+    } else {
+        String::new()
+    };
+    let plain = |sample: &[String]| {
+        sample
+            .iter()
+            .map(|key| key_text(key))
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    if sample.len() < 2 || sample.iter().any(|key| key.contains(char::is_whitespace)) {
+        return format!("{}{more}", plain(sample));
+    }
+    let segments: Vec<Vec<&str>> = sample.iter().map(|key| key.split('.').collect()).collect();
+    // a közös előtag legfeljebb a legrövidebb kulcs utolsó előtti szegmenséig tart
+    let limit = segments.iter().map(|s| s.len() - 1).min().unwrap_or(0);
+    let common = (0..limit)
+        .take_while(|&i| segments.iter().all(|s| s[i] == segments[0][i]))
+        .count();
+    if common == 0 {
+        return format!("{}{more}", plain(sample));
+    }
+    let prefix = segments[0][..common].join(".");
+    let rest: Vec<String> = segments.iter().map(|s| s[common..].join(".")).collect();
+    format!("{prefix}.{{{}}}{more}", rest.join(", "))
+}
+
 /// Az érték rövidítve, egy sorra.
 fn short(text: &str, max: usize) -> String {
     let one: String = text
@@ -235,7 +275,7 @@ impl CrossRef {
         for ((key, status), sites) in warnings.into_iter().take(WARN_LINES) {
             body.push(format!(
                 "⚠ {} · {status} ← {}",
-                short(&key, 40),
+                key_text(&key),
                 places(&sites)
             ));
         }
@@ -312,14 +352,14 @@ fn file_line(rel: &str, report: &super::i18n::FileReport, lang: Lang) -> String 
         parts.push(format!(
             "{} {locale} {total}: {}",
             lang.pick("missing in", "hiányzik itt:"),
-            list(*total, sample)
+            key_list(*total, sample)
         ));
     }
     for (locale, total, sample) in &report.lacks {
         parts.push(format!(
             "{} {total} vs {locale}: {}",
             lang.pick("lacks", "hiányzó:"),
-            list(*total, sample)
+            key_list(*total, sample)
         ));
     }
     if report.unused.0 > 0 {
@@ -327,7 +367,7 @@ fn file_line(rel: &str, report: &super::i18n::FileReport, lang: Lang) -> String 
             "{} {}: {}",
             lang.pick("unused", "nem használt"),
             report.unused.0,
-            list(report.unused.0, &report.unused.1)
+            key_list(report.unused.0, &report.unused.1)
         ));
     }
     format!("{rel}  {}", parts.join(" · "))
@@ -357,7 +397,7 @@ fn key_line(i18n: &super::i18n::I18n, row: &super::i18n::KeyRow, lang: Lang) -> 
             .collect();
         format!("{}: {}", lang.pick("used", "használja"), places(&sites))
     };
-    format!("{}  {} · {used}", short(&row.key, 40), values.join(" · "))
+    format!("{}  {} · {used}", key_text(&row.key), values.join(" · "))
 }
 
 /// A CSS-szabály nevek osztályai (`.btn, .btn-primary`) és soronként a használatuk.

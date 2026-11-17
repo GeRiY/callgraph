@@ -40,7 +40,7 @@ Ismert maradék (99%+ FileGraph-eltérés, halasztva): a grep-outline sorszáma 
 helye és forrássora (`L25 │ kód`, `query/snippet.rs`, metódusonként ≤ 5 sor); a `--depth` szintjein is. Rokon típuson át
 (interfész / szülő / trait, felül nem definiáló leszármazott) illesztett hívás: `L25 via Resolver │ …`
 (`index::TypeHierarchy` + `ViaMatcher`, csak `::`-os mintára; `QueryResult::via`, `CallerRow::via`). A szöveges kimenetben,
-ha az abszolút gyökér ≥ 2-szer szerepelne, az első sor `root: <gyökér>`, utána relatív utak (`QueryEngine::relativize`;
+ha az abszolút gyökér ≥ 2-szer szerepelne, az első sor `root: <gyökér>`, utána relatív utak; egyetlen előfordulásnál nincs `root:` sor, de az út relatív (`QueryEngine::relativize`;
 a json / jsonl / mermaid / dot kivétel).
 Hibaüzenetek: az `[error-id]` sort a callgraph-burok (R6g) teszi hozzá — az callgraph csak az üzenetsort írja.
 

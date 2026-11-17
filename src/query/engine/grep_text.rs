@@ -10,7 +10,7 @@ use crate::index::{CallerIndex, CallerRow};
 use crate::model::FileGraph;
 use crate::notes::{NoteMarks, strip_mark};
 use crate::profile::{Count, LayerRun, LayerScope, group_header};
-use crate::query::format::{call_lines, grep_outline, method_calls};
+use crate::query::format::{call_lines, grep_outline, method_calls, shown_line};
 use crate::query::hint::{self, Catalog};
 use crate::query::snippet::{self, SourceLines};
 use crate::{t, tf};
@@ -863,10 +863,11 @@ fn flat_lines(
         for ((container, caller), calls) in groups {
             let sites = snippet::merge(calls.iter().map(|call| {
                 let target = call.resolved.as_deref().unwrap_or(&call.target);
+                let line = shown_line(source, &row.graph.file, &calls, call);
                 (
-                    call.line,
+                    line,
                     (target, row.via_of(call), call.is_reference()),
-                    source.get(&row.graph.file, call.line),
+                    source.get(&row.graph.file, line),
                 )
             }));
             let (shown, rest) = snippet::cap(sites);

@@ -2,7 +2,7 @@
 //! Egy Laravel-lánc (`Route::middleware(..)->post(..)->name(..)`) hívásai a lánc kezdősorán, kívülről befelé
 //! egymás után jönnek, és a legbelső `Route::…` statikus hívással zárulnak — egy ilyen futam egy route.
 
-use super::{at_line, re};
+use super::{at_line, call_site, re};
 use crate::model::{Call, FileGraph};
 
 /// HTTP-ige / regisztráló hívás → a sorban megjelenő metódus.
@@ -39,7 +39,12 @@ pub(super) fn collect(g: &FileGraph, ns: &str, out: &mut Vec<String>) {
                     .rev()
                     .find(|c| verb(short(&c.target)).is_some())
                     .unwrap_or(c);
-                out.push(at_line("route     ", &line, ns, anchor));
+                // a fájl-szintű route-táblán a `@ __top__::__top__` nem információ: csak a sor
+                if call_site(ns, anchor).ends_with("__top__::__top__") {
+                    out.push(format!("route     {line}  L{}", anchor.line));
+                } else {
+                    out.push(at_line("route     ", &line, ns, anchor));
+                }
             }
             start = i + 1;
         }

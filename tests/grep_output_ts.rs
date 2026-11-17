@@ -132,7 +132,7 @@ fn typed_property_call_matches_the_type_qualified_pattern() {
     // egyetlen fájl a kimenetben: az út abszolút marad (nincs `root:` sor)
     assert!(
         out.lines()
-            .any(|l| l.starts_with("FILE  ") && l.ends_with(&sep("/src/PlaylistResolver.ts"))),
+            .any(|l| l.starts_with("FILE  ") && l.ends_with(&sep("src/PlaylistResolver.ts"))),
         "{out}"
     );
     // a fájlnévvel azonos nevű osztály metódusa egyszer (nem a `module PlaylistResolver` alatt is)

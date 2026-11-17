@@ -116,7 +116,6 @@ fn baseline_fixtures_analyze_cleanly() {
 // H1 – H3: regex-alapú PHP framework-nézetek
 
 #[test]
-#[ignore = "web-plan H1: the events view matches every call containing 'on' + letter and misses dispatch; enabled in phase 1"]
 fn h01_events_view_has_no_noise_and_keeps_the_real_events() {
     let out = Fixture::laravel().run(&["show", ".", "--format", "events"]);
     assert!(
@@ -139,7 +138,6 @@ fn h01_events_view_pairs_dispatch_with_listener() {
 }
 
 #[test]
-#[ignore = "web-plan H2: the middleware label is glued to the target; enabled in phase 1"]
 fn h02_middleware_label_is_separated_from_the_target() {
     let out = Fixture::laravel().run(&["show", ".", "--format", "middleware"]);
     let rows = lines_starting(&out, "middleware");
@@ -153,7 +151,6 @@ fn h02_middleware_label_is_separated_from_the_target() {
 }
 
 #[test]
-#[ignore = "web-plan H3: the validation view matches substrings and unrelated strings; enabled in phase 1"]
 fn h03_validation_view_only_shows_real_validation() {
     let out = Fixture::laravel().run(&["show", ".", "--format", "validation"]);
     for noise in ["invalidate", "cards.renewed", "expire-reader", "Your card"] {
@@ -218,14 +215,12 @@ fn h05_alias_import_and_relative_import_share_one_key() {
 }
 
 #[test]
-#[ignore = "web-plan H6: the literal import('...') is an unresolved <expr> call; enabled in phase 1"]
 fn h06_literal_dynamic_import_resolves_to_the_page() {
     let out = Fixture::monorepo().run(&["show", ".", "--grep", "views/OverviewView.vue"]);
     assert!(out.contains("FILE  ui/src/router/index.ts"), "{out}");
 }
 
 #[test]
-#[ignore = "web-plan H6: a package loaded with import('pkg') counts as unused in deps; enabled in phase 1"]
 fn h06_dynamic_import_of_a_package_counts_as_use() {
     let out = Fixture::monorepo().run(&["deps"]);
     assert!(!out.contains("chart.js"), "{out}");
@@ -319,7 +314,6 @@ fn h12_dictionary_outline_shows_the_key_tree() {
 }
 
 #[test]
-#[ignore = "web-plan H13: i18n keys are truncated with an ellipsis; enabled in phase 1"]
 fn h13_i18n_view_keys_are_complete_and_searchable() {
     let out = Fixture::laravel().run(&["show", ".", "--format", "i18n"]);
     assert!(!out.contains('…'), "{out}");
@@ -331,7 +325,6 @@ fn h13_i18n_view_keys_are_complete_and_searchable() {
 // H14 – H15: CSS / Tailwind 4
 
 #[test]
-#[ignore = "web-plan H14: var(--x) loses the property name in the outline; enabled in phase 1"]
 fn h14_css_var_read_keeps_the_property_name() {
     let out = Fixture::laravel().run(&["show", "resources/css/app.css"]);
     for row in out.lines() {
@@ -343,7 +336,6 @@ fn h14_css_var_read_keeps_the_property_name() {
 }
 
 #[test]
-#[ignore = "web-plan H14: locate finds only the definition of a custom property, not its use; enabled in phase 1"]
 fn h14_locate_finds_the_custom_property_use() {
     let out = Fixture::laravel().run(&["locate", "--color-binding"]);
     assert!(out.contains("L19"), "a használat (L19) hiányzik:\n{out}");
@@ -399,7 +391,6 @@ fn h18_emit_key_is_component_scoped_and_wired_to_the_listener() {
 }
 
 #[test]
-#[ignore = "web-plan H19: an enum case read is listed among the external_call rows; enabled in phase 1"]
 fn h19_enum_case_read_is_not_an_external_call() {
     let out = Fixture::laravel().run(&["show", "app/Http/Controllers/ShelfController.php"]);
     for row in lines_starting(out.trim_start(), "    external_call") {
@@ -415,14 +406,12 @@ fn h19_enum_case_read_is_not_an_external_call() {
 // H20 – H23: kimenet-alak
 
 #[test]
-#[ignore = "web-plan H20: the --grep source line is the chain start, not the match; enabled in phase 1"]
 fn h20_grep_shows_the_line_of_the_matched_chain_call() {
     let out = Fixture::laravel().run(&["show", "app", "--grep", "(^|::|\\.|->)stocked$"]);
     assert!(out.contains("L16 │ ->stocked()"), "{out}");
 }
 
 #[test]
-#[ignore = "web-plan H21: an unknown first word runs the bare analyzer and dumps raw JSONL; enabled in phase 1"]
 fn h21_unknown_flag_is_an_error_without_raw_output() {
     let out = Fixture::laravel().run_raw(&[".", "--format", "ziggy"]);
     assert!(!out.status.success(), "a hibás hívás kilépési kódja 0");
@@ -436,7 +425,6 @@ fn h21_unknown_flag_is_an_error_without_raw_output() {
 }
 
 #[test]
-#[ignore = "web-plan H22: the FILE line of a single-file outline is an absolute path; enabled in phase 1"]
 fn h22_single_file_outline_uses_a_relative_path() {
     let out = Fixture::laravel().run(&["show", "app/Models/Shelf.php"]);
     let first = out.lines().next().unwrap();
@@ -444,7 +432,6 @@ fn h22_single_file_outline_uses_a_relative_path() {
 }
 
 #[test]
-#[ignore = "web-plan H23: a Histoire story directory is classified as a page layer; enabled in phase 1"]
 fn h23_story_files_are_not_a_page_layer() {
     let out = Fixture::laravel().run(&["profile", "--full"]);
     let mut in_page = false;
