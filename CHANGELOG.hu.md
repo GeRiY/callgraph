@@ -235,8 +235,19 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   sorban is megadja az emit-listát (`--format api`).
 - **Nincs téves hívás a Vue-attribútumok template literaljából:** a kötött attribútum template literaljában lévő
   szöveg (`` :title="`… név (pl. …)`" ``) már nem számít hívásnak (az ékezetes betűk váltották ki).
-- **A `--format forms` megtartja a számított URL-re küldött űrlapot:** a `form.post(path.value)` szerepel a
-  listán, az útvonala pedig ismeretlen/dinamikus jelölést kap.
+- **A `--format forms` nem hagy el csendben űrlapot:** a számított URL-re küldött űrlap (`form.post(path.value)`)
+  szerepel a listán, az útvonala ismeretlen/dinamikus jelölést kap; ha a cél olyan URL vagy route-név, amely nincs a
+  route-táblában (pl. egy csomag vagy az auth-scaffolding route-ja), az űrlap `? nincs a route-táblában` jelöléssel
+  szerepel; a mégis kihagyott űrlapokat a nézet végén összesíti, az okkal, fájllal és sorral
+  (`? 2 kihagyva: <ok> (a.vue L3, b.vue L9)`). A több sorra tördelt láncolt küldést (`form` / `.transform(…)` /
+  `.post(…)`) is beolvassa, és a `useForm({…})` objektumban lévő template string vagy `#` már nem rontja el a mezők
+  olvasását.
+- **Az opcionális read-guard hook nem tekinti olvasásnak az írást:** a kimeneti átirányítás és a heredoc már nem
+  olvasás, így a `cat >> f`, `cat > f <<EOF` vagy `2>f` nagy forrásfájlon nincs letiltva; a `cat f` és a `cat < f`
+  továbbra is olvasásnak számít.
+- **Az opcionális callgraph-first hook mappát is elfogad `--project`-ként:** a `--project <mappa útja>` (pl. egy git
+  worktree) futás is számít az ott lévő fájlokra, nem csak a regisztrált projektnév, így a hook már nem írja, hogy
+  arra a fájlra még nem futott callgraph.
 - **A `--grep useX --depth N` kihagyja a destrukturált értékeket:** a `useX()`-ből destrukturált érték használatai
   már nem szerepelnek a `useX` hívásaiként.
 - **A `callgraph.sh rename` működik:** a wrapper szkript már továbbítja (a súgó eddig is hirdette).

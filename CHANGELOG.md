@@ -219,8 +219,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   produces the emits list (`--format api`).
 - **No false calls from template-literal text in Vue attributes:** text inside a template literal of a bound
   attribute (`` :title="`… név (pl. …)`" ``) is no longer read as a call (accented letters were the trigger).
-- **`--format forms` keeps forms submitted to a computed URL:** `form.post(path.value)` is listed, and its route is
-  marked unknown/dynamic.
+- **`--format forms` no longer drops forms silently:** a form submitted to a computed URL (`form.post(path.value)`) is
+  listed with its route marked unknown/dynamic; a form whose target is a URL or route name missing from the route
+  table (e.g. a package or auth-scaffolding route) is listed with `? not in the route table`; and the forms that are
+  still skipped are summed up at the end with the reason and their file and line (`? 2 skipped: <reason> (a.vue L3,
+  b.vue L9)`). A submit chained over several lines (`form` / `.transform(…)` / `.post(…)`) is read, and a template
+  string or `#` inside the `useForm({…})` object no longer breaks reading the fields.
+- **Optional read-guard hook ignores writes:** an output redirect or heredoc is not a read any more, so
+  `cat >> f`, `cat > f <<EOF` or `2>f` on a large source file is no longer blocked; `cat f` and `cat < f` still count.
+- **Optional callgraph-first hook accepts a folder as `--project`:** a callgraph run with `--project <folder path>`
+  (e.g. a git worktree), not only a registered project name, now counts for the files in it, so the hook no longer
+  says that callgraph has not run on that file.
 - **`--grep useX --depth N` skips destructured values:** uses of a value destructured from `useX()` are no longer
   listed as calls of `useX`.
 - **`callgraph.sh rename` works:** the wrapper script now forwards it (the help already advertised it).
