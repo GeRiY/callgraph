@@ -14,9 +14,9 @@ use rmcp::model::{CallToolResult, ContentBlock, Implementation, ServerCapabiliti
 use rmcp::{ServerHandler, tool, tool_handler, tool_router};
 
 use super::params::{
-    FindCallersParams, FrameworkViewParams, GenerateParams, LocateParams, MethodBodyParams,
-    NextParams, NotesParams, OutlineParams, PackageUsageParams, ProfileParams, RenameParams,
-    SearchParams, UndoParams,
+    FindCallersParams, FrameworkViewParams, GenerateParams, GuideParams, LocateParams,
+    MethodBodyParams, NextParams, NotesParams, OutlineParams, PackageUsageParams, ProfileParams,
+    RenameParams, SearchParams, UndoParams,
 };
 use super::request::ShowQuery;
 use super::runner::QueryRunner;
@@ -378,11 +378,14 @@ impl CallgraphServer {
             idempotent_hint = true,
             open_world_hint = false
         ),
-        description = "The full callgraph manual (SKILL.md in the configured language): every query with CLI examples, language specifics, formats, limits. Call it once when the server instructions are not enough; CLI flags map to these tools (see its MCP section)."
+        description = "The core callgraph manual (SKILL.md): queries with CLI examples, formats, output limit. Call it once when the server instructions are not enough. `topic` returns one reference file instead: php, blade, js, vue, css, rust, swift, kotlin, python, go, gen, mcp, reference. Example: {\"topic\": \"php\"}."
     )]
-    async fn guide(&self) -> CallToolResult {
+    async fn guide(&self, Parameters(p): Parameters<GuideParams>) -> CallToolResult {
         let started = Instant::now();
-        let result = Ok(super::guide::manual(crate::i18n::lang()));
+        let result = match p.topic.as_deref() {
+            None => Ok(super::guide::manual()),
+            Some(topic) => super::guide::topic(topic),
+        };
         self.finish(&Self::plain(CommandKind::Guide, started, None), result)
     }
 }
@@ -395,9 +398,7 @@ impl ServerHandler for CallgraphServer {
                 "callgraph",
                 crate::update::build_version(),
             ))
-            .with_instructions(
-                super::guide::instructions(crate::i18n::lang()) + &self.runner.startup_note(),
-            )
+            .with_instructions(super::guide::instructions() + &self.runner.startup_note())
     }
 }
 

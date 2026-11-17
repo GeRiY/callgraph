@@ -181,6 +181,14 @@ pub(crate) struct FrameworkViewParams {
     pub full: bool,
 }
 
+// `guide`: az alap-útmutató, vagy egy téma (referencia-fájl).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, JsonSchema)]
+pub(crate) struct GuideParams {
+    /// One reference file instead of the core manual: php, blade, js, vue, css, rust, swift, kotlin, python, go, gen, mcp or reference.
+    #[serde(default)]
+    pub topic: Option<String>,
+}
+
 // `notes` (pilot): a fájlokhoz / metódusokhoz írt jegyzetek keresése (csak olvas).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, JsonSchema)]
 pub(crate) struct NotesParams {

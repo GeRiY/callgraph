@@ -30,6 +30,7 @@ pub(crate) fn release_zip(binary: &[u8]) -> Vec<u8> {
         ("callgraph/SKILL.md", b"new skill"),
         ("callgraph/callgraph.sh", b"#!/usr/bin/env bash\n# new\n"),
         ("callgraph/help/callgraph.en.txt", b"new help"),
+        ("callgraph/ref/web.md", b"new web"),
         // felhasználói adat a zipben: soha nem írhatja felül a meglévőt
         ("callgraph/projects.json", b"{\"evil\": \"/\"}"),
         ("callgraph/lang", b"en\n"),
@@ -52,8 +53,11 @@ pub(crate) fn fake_skill(tag: &str) -> PathBuf {
         ("feedback.jsonl", "{\"id\":\"y\"}\n"),
         ("update-check.json", "{\"latest\": \"0.2.0\"}\n"),
         ("mine.txt", "user file"),
+        ("ref/gone.md", "stale reference"),
+        ("skill-i18n/SKILL.hu.md", "legacy Hungarian skill"),
         ("bin/linux-x86_64/callgraph", "OLD"),
     ] {
+        std::fs::create_dir_all(dir.join(name).parent().unwrap()).unwrap();
         std::fs::write(dir.join(name), text).unwrap();
     }
     dir
@@ -74,7 +78,7 @@ fn installs_skill_files_and_binary_but_keeps_user_data() {
     let report = Installer::new(test_platform())
         .install(&release_zip(b"NEW"), &target)
         .unwrap();
-    assert_eq!(report.files, 4);
+    assert_eq!(report.files, 5);
     assert_eq!(
         report.binary,
         target.skill_dir().join("bin/linux-x86_64/callgraph")
@@ -85,6 +89,11 @@ fn installs_skill_files_and_binary_but_keeps_user_data() {
         "#!/usr/bin/env bash\n# new\n"
     );
     assert_eq!(read(skill.join("help/callgraph.en.txt")), "new help");
+    // az új referencia-fájl megjön, a régi (megszűnt) eltűnik
+    assert_eq!(read(skill.join("ref/web.md")), "new web");
+    assert!(!skill.join("ref/gone.md").exists());
+    // a régi (magyar / nyelvi forrás) skill-i18n/ mappa teljesen eltűnik
+    assert!(!skill.join("skill-i18n").exists());
     assert_eq!(read(skill.join("bin/linux-x86_64/callgraph")), "NEW");
     assert_eq!(
         read(skill.join("projects.json")),

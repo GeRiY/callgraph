@@ -1,14 +1,32 @@
-//! Az MCP-kliensek útmutatója a skill-utasítás forrásából (`skill/skill-i18n/SKILL.<nyelv>.md`, fordításkor
-//! beágyazva), hogy a kettő ne csússzon szét:
-//! - `instructions`: az `initialize` válaszába kerülő tömör útmutató — a forrás `<!-- mcp:<név> -->` …
+//! Az MCP-kliensek útmutatója a skill-utasítás forrásából (fordításkor beágyazva), hogy a kettő ne csússzon szét.
+//! A skill csak angolul létezik (`skill/SKILL.md` + `skill/ref/*.md`):
+//! - `instructions`: az `initialize` válaszába kerülő tömör útmutató — a források `<!-- mcp:<név> -->` …
 //!   `<!-- /mcp -->` közé jelölt szakaszai a [`SECTIONS`] sorrendjében, a CLI-kapcsolók az MCP-eszköz / -paraméter
-//!   nevére cserélve ([`CLI_TO_MCP`]);
-//! - `manual`: a `guide` eszköz válasza — a teljes SKILL.md-törzs (frontmatter és jelölő-sorok nélkül).
+//!   nevére cserélve ([`CLI_TO_MCP`]). A források: az alap SKILL.md (`start`, `callers`, `output`), a `ref/mcp.md`
+//!   (`tools`) és a `ref/reference.md` (`limits`);
+//! - `manual`: a `guide` eszköz válasza téma nélkül — az alap SKILL.md-törzs (frontmatter és jelölő-sorok nélkül);
+//! - `topic`: a `guide` eszköz válasza `topic`-kal — pontosan az adott `ref/*.md` fájl.
 
 use crate::i18n::Lang;
 
-const SKILL_EN: &str = include_str!("../../skill/skill-i18n/SKILL.en.md");
-const SKILL_HU: &str = include_str!("../../skill/skill-i18n/SKILL.hu.md");
+const SKILL: &str = include_str!("../../skill/SKILL.md");
+
+/// A `guide` témái: név → a beágyazott `skill/ref/<név>.md`.
+const TOPICS: [(&str, &str); 13] = [
+    ("php", include_str!("../../skill/ref/php.md")),
+    ("blade", include_str!("../../skill/ref/blade.md")),
+    ("js", include_str!("../../skill/ref/js.md")),
+    ("vue", include_str!("../../skill/ref/vue.md")),
+    ("css", include_str!("../../skill/ref/css.md")),
+    ("rust", include_str!("../../skill/ref/rust.md")),
+    ("swift", include_str!("../../skill/ref/swift.md")),
+    ("kotlin", include_str!("../../skill/ref/kotlin.md")),
+    ("python", include_str!("../../skill/ref/python.md")),
+    ("go", include_str!("../../skill/ref/go.md")),
+    ("gen", include_str!("../../skill/ref/gen.md")),
+    ("mcp", include_str!("../../skill/ref/mcp.md")),
+    ("reference", include_str!("../../skill/ref/reference.md")),
+];
 
 /// A kivágott szakaszok, az útmutatóbeli sorrendjükben (a munkamegosztás és a `locate` elöl, utána az eszközök).
 const SECTIONS: [&str; 5] = ["start", "tools", "callers", "output", "limits"];
@@ -36,13 +54,22 @@ const CLI_TO_MCP: [(&str, &str); 15] = [
     ("$'`", "$`"),
 ];
 
-fn source(lang: Lang) -> &'static str {
-    lang.pick(SKILL_EN, SKILL_HU)
+fn topic_source(name: &str) -> Option<&'static str> {
+    TOPICS
+        .iter()
+        .find(|(topic, _)| *topic == name)
+        .map(|(_, text)| *text)
 }
 
-/// Az `initialize` válaszának `instructions` mezője az adott nyelven.
-pub(crate) fn instructions(lang: Lang) -> String {
-    instructions_from(source(lang))
+/// Az összes jelölt szakasz forrása: az alap és a szakaszokat tartalmazó két referencia-fájl.
+fn marked_sources() -> String {
+    let part = |name| topic_source(name).unwrap_or_default();
+    format!("{SKILL}\n{}\n{}", part("mcp"), part("reference"))
+}
+
+/// Az `initialize` válaszának `instructions` mezője.
+pub(crate) fn instructions() -> String {
+    instructions_from(&marked_sources())
 }
 
 /// Az útmutató vége (`initialize`): a munkakönyvtár tömör projekt-profilja a nevekből (gyors, elemzés nélkül), vagy
@@ -68,9 +95,17 @@ pub(crate) fn startup_note(root: &std::path::Path, lang: Lang) -> String {
     }
 }
 
-/// A `guide` eszköz válasza: a teljes skill-útmutató az adott nyelven.
-pub(crate) fn manual(lang: Lang) -> String {
-    manual_from(source(lang))
+/// A `guide` eszköz válasza téma nélkül: az alap skill-útmutató.
+pub(crate) fn manual() -> String {
+    manual_from(SKILL)
+}
+
+/// A `guide` eszköz válasza `topic`-kal: pontosan a téma `ref/*.md` fájlja; ismeretlen témára hibaüzenet.
+pub(crate) fn topic(name: &str) -> Result<String, String> {
+    topic_source(name).map(str::to_owned).ok_or_else(|| {
+        let names: Vec<&str> = TOPICS.iter().map(|(topic, _)| *topic).collect();
+        format!("unknown topic `{name}`; available: {}", names.join(", "))
+    })
 }
 
 fn instructions_from(source: &str) -> String {
@@ -142,108 +177,75 @@ mod tests {
     ];
 
     #[test]
-    fn every_section_is_marked_once_in_both_sources() {
-        for src in [SKILL_EN, SKILL_HU] {
-            for name in SECTIONS {
-                let text = section(src, name).unwrap_or_else(|| panic!("section {name}"));
-                assert!(!text.trim().is_empty(), "section {name} is empty");
-                assert!(!text.contains("<!-- mcp:"), "nested marker in {name}");
-            }
-            // nincs más (elírt / árva) jelölő
-            assert_eq!(src.matches("<!-- mcp:").count(), SECTIONS.len());
-            assert_eq!(src.matches(END).count(), SECTIONS.len());
+    fn every_section_is_marked_once() {
+        let src = marked_sources();
+        for name in SECTIONS {
+            let text = section(&src, name).unwrap_or_else(|| panic!("section {name}"));
+            assert!(!text.trim().is_empty(), "section {name} is empty");
+            assert!(!text.contains("<!-- mcp:"), "nested marker in {name}");
         }
+        // nincs más (elírt / árva) jelölő
+        assert_eq!(src.matches("<!-- mcp:").count(), SECTIONS.len());
+        assert_eq!(src.matches(END).count(), SECTIONS.len());
     }
 
     #[test]
-    fn instructions_are_compact_and_complete_in_both_languages() {
-        for (lang, root) in [(Lang::En, "`root: "), (Lang::Hu, "`gyökér: ")] {
-            let text = instructions(lang);
-            let lines = text.lines().count();
-            assert!((25..=70).contains(&lines), "{lang:?}: {lines} lines");
-            assert!(text.len() <= 6500, "{lang:?}: {} bytes", text.len());
-            for item in [
-                "`(^|::|\\.|->)",
-                root,
-                "`via ",
-                "`?::",
-                "`raw: true`",
-                "`doc: true`",
-                "`depth`",
-                "`guess: true`",
-                "`full: true`",
-                "400",
-            ] {
-                assert!(text.contains(item), "{lang:?}: missing {item}\n{text}");
-            }
-            for tool in TOOLS {
-                assert!(text.contains(&format!("`{tool}`")), "{lang:?}: {tool}");
-            }
-            // csak MCP-nevek: CLI-kapcsoló, shell-parancs és idézett minta nem maradhat benne
-            assert!(!text.contains("`--"), "{lang:?}: CLI flag left\n{text}");
-            assert!(!text.contains("bash "), "{lang:?}: shell command left");
-            assert!(!text.contains("`'"), "{lang:?}: quoted pattern left");
-            assert!(!text.contains("<!--"), "{lang:?}: marker left");
+    fn instructions_are_compact_and_complete() {
+        let text = instructions();
+        let lines = text.lines().count();
+        assert!((25..=70).contains(&lines), "{lines} lines");
+        assert!(text.len() <= 6500, "{} bytes", text.len());
+        for item in [
+            "`(^|::|\\.|->)",
+            "`root: ",
+            "`via ",
+            "`?::",
+            "`raw: true`",
+            "`doc: true`",
+            "`depth`",
+            "`guess: true`",
+            "`full: true`",
+            "400",
+        ] {
+            assert!(text.contains(item), "missing {item}\n{text}");
         }
-        assert_ne!(instructions(Lang::En), instructions(Lang::Hu));
+        for tool in TOOLS {
+            assert!(text.contains(&format!("`{tool}`")), "{tool}");
+        }
+        // csak MCP-nevek: CLI-kapcsoló, shell-parancs és idézett minta nem maradhat benne
+        assert!(!text.contains("`--"), "CLI flag left\n{text}");
+        assert!(!text.contains("bash "), "shell command left");
+        assert!(!text.contains("`'"), "quoted pattern left");
+        assert!(!text.contains("<!--"), "marker left");
     }
 
     #[test]
     fn start_section_carries_the_recipes_with_mcp_names() {
-        for lang in Lang::ALL {
-            let text = instructions(lang);
-            let marker = lang.pick("**Recipes:**", "**Receptek:**");
-            let recipes = text
-                .lines()
-                .skip_while(|line| !line.starts_with(marker))
-                .take(3)
-                .collect::<Vec<_>>()
-                .join("\n");
-            assert!(recipes.starts_with(marker), "{lang:?}: no recipes\n{text}");
-            // a négy recept eszköz-nevei (bug fix, hívók, ismeretlen projekt, szöveg / konstans)
-            for tool in [
-                "`locate`",
-                "`outline`",
-                "`method_body`",
-                "`find_callers`",
-                "`depth`",
-                "`project_profile`",
-                "`search` (strings)",
-                "`search` (constants)",
-            ] {
-                assert!(recipes.contains(tool), "{lang:?}: {tool}\n{recipes}");
-            }
-            assert!(
-                !recipes.contains("--"),
-                "{lang:?}: CLI flag left\n{recipes}"
-            );
-            assert!(!recipes.contains("bash "), "{lang:?}: shell command left");
-            assert!(
-                recipes.contains("Grep"),
-                "{lang:?}: exact text goes to Grep"
-            );
+        let text = instructions();
+        let marker = "**Recipes:**";
+        let recipes = text
+            .lines()
+            .skip_while(|line| !line.starts_with(marker))
+            .take(3)
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(recipes.starts_with(marker), "no recipes\n{text}");
+        // a négy recept eszköz-nevei (bug fix, hívók, ismeretlen projekt, szöveg / konstans)
+        for tool in [
+            "`locate`",
+            "`outline`",
+            "`method_body`",
+            "`find_callers`",
+            "`depth`",
+            "`project_profile`",
+            "`search` (strings)",
+            "`search` (constants)",
+        ] {
+            assert!(recipes.contains(tool), "{tool}\n{recipes}");
         }
-    }
-
-    #[test]
-    fn both_languages_have_the_same_shape() {
-        let en = instructions(Lang::En);
-        let hu = instructions(Lang::Hu);
-        let bullets = |s: &str| s.lines().filter(|l| l.starts_with("- ")).count();
-        assert_eq!(bullets(&en), bullets(&hu));
-        let tokens = |s: &str| {
-            [
-                "`raw: true`",
-                "`doc: true`",
-                "`guess: true`",
-                "`full: true`",
-                "`find_callers`",
-                "`method_body`",
-                "`search`",
-            ]
-            .map(|t| s.matches(t).count())
-        };
-        assert_eq!(tokens(&en), tokens(&hu));
+        assert!(!recipes.contains("--"), "CLI flag left\n{recipes}");
+        assert!(!recipes.contains("bash "), "shell command left");
+        assert!(recipes.contains("Grep"), "exact text goes to Grep");
     }
 
     #[test]
@@ -273,25 +275,76 @@ mod tests {
 
     #[test]
     fn crlf_sources_give_the_same_text() {
-        let crlf = SKILL_HU.replace('\n', "\r\n");
-        assert_eq!(instructions_from(&crlf), instructions(Lang::Hu));
-        assert_eq!(manual_from(&crlf), manual(Lang::Hu));
+        let crlf = marked_sources().replace('\n', "\r\n");
+        assert_eq!(instructions_from(&crlf), instructions());
+        assert_eq!(manual_from(&SKILL.replace('\n', "\r\n")), manual());
     }
 
     #[test]
-    fn manual_is_the_skill_body_without_frontmatter_and_markers() {
-        assert!(manual(Lang::En).starts_with("# callgraph — code map without Read\n"));
-        assert!(manual(Lang::Hu).starts_with("# callgraph — kód-térkép Read nélkül\n"));
-        for lang in Lang::ALL {
-            let text = manual(lang);
-            assert!(!text.contains("<!--"), "{lang:?}");
-            assert!(!text.contains("\nname: callgraph"), "{lang:?}");
-            assert!(text.contains("## MCP"), "{lang:?}");
+    fn topics_match_the_reference_directory_and_the_router() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("skill/ref");
+        let mut files: Vec<String> = std::fs::read_dir(&dir)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        files.sort();
+        let mut names: Vec<String> = TOPICS.iter().map(|(n, _)| format!("{n}.md")).collect();
+        names.sort();
+        assert_eq!(files, names);
+        for (name, _) in TOPICS {
+            assert!(SKILL.contains(&format!("(ref/{name}.md)")), "{name}");
             assert!(
-                text.contains("`--grep`"),
-                "{lang:?}: the long form keeps the CLI"
+                SKILL.contains(&format!("`{name}`")),
+                "{name} in the guide hint"
             );
-            assert!(text.ends_with(".\n") || text.ends_with("`\n"), "{lang:?}");
         }
+        assert!(SKILL.contains("guide {topic:"), "the MCP hint");
+    }
+
+    #[test]
+    fn every_topic_returns_exactly_its_file_starting_with_its_heading() {
+        for (name, _) in TOPICS {
+            let text = topic(name).unwrap_or_else(|e| panic!("{name}: {e}"));
+            let file = std::fs::read_to_string(
+                std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join("skill/ref")
+                    .join(format!("{name}.md")),
+            )
+            .unwrap();
+            assert_eq!(
+                text.replace("\r\n", "\n"),
+                file.replace("\r\n", "\n"),
+                "{name}"
+            );
+            assert!(text.starts_with("# callgraph — "), "{name}: {text}");
+            assert!(text.len() > 200, "{name}");
+        }
+    }
+
+    #[test]
+    fn unknown_topic_is_an_error_listing_the_topics() {
+        let err = topic("cobol").unwrap_err();
+        assert!(err.contains("unknown topic `cobol`"), "{err}");
+        for (name, _) in TOPICS {
+            assert!(err.contains(name), "{err}");
+        }
+        assert!(topic("").is_err());
+        assert!(topic("Php").is_err());
+    }
+
+    #[test]
+    fn manual_is_the_core_body_without_frontmatter_and_markers() {
+        let text = manual();
+        assert!(text.starts_with("# callgraph — code map without Read\n"));
+        assert!(!text.contains("<!--"));
+        assert!(!text.contains("\nname: callgraph"));
+        assert!(text.contains("## Read next"));
+        assert!(text.contains("`--grep`"), "the long form keeps the CLI");
+        assert!(
+            text.len() <= 15_000,
+            "the core manual is {} bytes",
+            text.len()
+        );
+        assert!(text.ends_with('\n') && !text.ends_with("\n\n"));
     }
 }

@@ -241,7 +241,7 @@ pub enum CliArgs {
         /// `--allow <mappa>` (ismételhető): további gyökerek, amelyek alatti utakat az MCP-őr elfogad.
         allow: Vec<String>,
     },
-    /// Skill-parancs (`project`, `feedback`, `wrap`, `error`, `set-lang`, `self-update`, `skill-sync`) nyers argumentumokkal.
+    /// Skill-parancs (`project`, `feedback`, `wrap`, `error`, `set-lang`, `self-update`) nyers argumentumokkal.
     Skill { command: String, args: Vec<String> },
 }
 
@@ -343,7 +343,6 @@ impl CliArgs {
                     | "error"
                     | "set-lang"
                     | "self-update"
-                    | "skill-sync"
                     | "usage-check"
             )
         }) {

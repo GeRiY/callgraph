@@ -374,9 +374,9 @@ A Claude Code-skill mellett (változatlan, teljes értékűen támogatott) ugyan
 [MCP](https://modelcontextprotocol.io)-szerver is stdio-n, így bármely MCP-kliens használhatja: `callgraph mcp`.
 Eszközök: `locate`, `outline`, `method_body`, `find_callers`, `search`, `framework_view`, `notes`, `projects`, `guide`, `project_profile`. Ugyanazt
 a tömör szöveget adják, mint a CLI, ugyanazzal a kimeneti korláttal; csak olvas, az utak a projekt-gyökéren belül
-maradnak, a lekérdezések nem használnak hálózatot (csak a lenti, naponta egyszeri frissítés-ellenőrzés). Kapcsolódáskor a szerver rövid használati útmutatót küld a kliensnek a beállított
-nyelven (melyik eszköz mire, hogyan keresd a hívókat, hogyan olvasd a kimenetet); a Claude Code ezt az agent
-utasításai közé teszi. A `guide` eszköz a teljes skill-útmutatót adja. Mindkettő a `SKILL.md` forrásából készül, így
+maradnak, a lekérdezések nem használnak hálózatot (csak a lenti, naponta egyszeri frissítés-ellenőrzés). Kapcsolódáskor a szerver rövid használati útmutatót küld a kliensnek angolul
+(melyik eszköz mire, hogyan keresd a hívókat, hogyan olvasd a kimenetet); a Claude Code ezt az agent
+utasításai közé teszi. A `guide` eszköz az alap skill-útmutatót adja (a `topic` paraméterrel egy-egy nyelvi / témafájlt). A skill-útmutató csak angolul létezik. Mindkettő a `SKILL.md` forrásából készül, így
 mindig egyezik vele.
 
 A telepítő a Claude Code-ban regisztrálni is tudja: a `bash install.sh` rákérdez (ha a `claude` parancs elérhető), a

@@ -6,7 +6,7 @@ A használat leírása a `SKILL.md`-ben van.
 
 ## Csomag
 
-`SKILL.md`, `README.md`, `TELEPITES.md` (lépésenkénti telepítés), `install.sh`, `callgraph.sh`, `lib.sh`, `projects.sh`, `feedback.sh`, `extras/`, `help/` (a scriptek súgója angolul és magyarul),
+`SKILL.md`, `README.md`, `TELEPITES.md` (lépésenkénti telepítés), `install.sh`, `callgraph.sh`, `lib.sh`, `projects.sh`, `feedback.sh`, `extras/`, `help/` (a scriptek súgója angolul és magyarul), `ref/` (a `SKILL.md`-ből hivatkozott referencia-fájlok: nyelvek, `gen`, MCP; az agent igény szerint olvassa őket),
 `bin/<os>-<arch>/callgraph`.
 
 ## Telepítés
@@ -31,9 +31,7 @@ A terminál-kimenet és a súgó angol (alapértelmezés) vagy magyar. Váltás:
 lekérdezés: `set-lang` argumentum nélkül) — a skill-mappa `lang` fájljába menti, frissítéskor megmarad. Egy futásra: `CALLGRAPH_LANG=hu bash callgraph.sh …`
 (a környezeti változó erősebb az elmentett beállításnál).
 
-A nyelvváltás a skill-utasítást is cseréli: a `set-lang` a `skill-i18n/SKILL.<en|hu>.md`-ből újraírja a `SKILL.md`-t
-(a másik nyelvű eltűnik); az első telepítés (`install.sh` → `callgraph skill-sync`) és a frissítés is az érvényes nyelvűt
-hagyja ott. Az új utasítás betöltéséhez indítsd újra a Claude Code-ot. A `SKILL.md` generált fájl — a `skill-i18n/` forrásokat szerkeszd.
+A nyelv csak a terminál-kimenetre és a súgóra vonatkozik: a skill-utasítás (`SKILL.md`) és a `ref/` fájlok csak angolul léteznek, a `set-lang` nem érinti őket.
 
 ## Frissítés
 

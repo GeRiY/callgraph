@@ -16,8 +16,7 @@
 5. Indítsd újra a Claude Code-ot, hogy a skillt (`SKILL.md`) és — ha regisztráltad — az MCP-szervert betöltse.
 6. Nyelv (nem kötelező): a kimenet és a súgó alapból angol; magyarra: `bash ~/.claude/skills/callgraph/callgraph.sh set-lang hu`
    (vissza: `set-lang en`). Egy futásra a `CALLGRAPH_LANG=hu` környezeti változó is jó.
-   A nyelvváltás a skill-utasítást (`SKILL.md`) is az adott nyelvűre cseréli; utána indítsd újra a Claude Code-ot.
-   Kézi (másolásos) frissítés után futtasd újra a `bash install.sh`-t, hogy a `SKILL.md` ismét a beállított nyelvű legyen.
+   A skill-utasítás (`SKILL.md`, `ref/`) csak angolul létezik; a nyelvváltás nem érinti.
 
 Melyik csomag kell?
 

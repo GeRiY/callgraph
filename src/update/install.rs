@@ -25,6 +25,13 @@ const USER_DATA: [&str; 5] = [
     super::check::STATE_FILE,
 ];
 
+/// A csomag által teljes egészében birtokolt almappa: ha a zip tartalmaz belőle fájlt, a régi tartalma előbb törlődik,
+/// így a már nem létező (átnevezett / megszűnt) referencia-fájlok nem maradnak a régi telepítésből.
+const OWNED_DIR: &str = "ref";
+
+/// A régi (nyelvi változatos) skill `skill-i18n/` mappája: a skill ma csak angol, ezért minden frissítés törli.
+const LEGACY_DIRS: [&str; 1] = ["skill-i18n"];
+
 /// Miért nem telepíthető a csomag.
 #[derive(Debug)]
 pub(crate) enum InstallError {
@@ -159,6 +166,17 @@ impl Installer {
         staging: &Path,
         target: &InstallTarget,
     ) -> Result<(), InstallError> {
+        let owned = entries
+            .iter()
+            .any(|e| e.rel.starts_with(OWNED_DIR))
+            .then_some(OWNED_DIR);
+        for dir in owned.into_iter().chain(LEGACY_DIRS) {
+            match std::fs::remove_dir_all(target.skill_dir().join(dir)) {
+                Ok(()) => {}
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                Err(e) => return Err(e.into()),
+            }
+        }
         for entry in entries {
             let dest = target.skill_dir().join(&entry.rel);
             if let Some(dir) = dest.parent() {

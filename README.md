@@ -376,8 +376,8 @@ Tools: `locate`, `outline`, `method_body`, `find_callers`, `search`, `framework_
 the same compact text as the CLI, with the same output cap; read-only, paths are confined to the project root, and
 queries never use the network (only the once-a-day update check below does).
 On connect the server sends the client a short usage guide in your language (which tool to use when, how to find
-callers, how to read the output); Claude Code puts it into the agent's instructions. The `guide` tool returns the full
-skill manual. Both come from the same source as `SKILL.md`, so they always match.
+callers, how to read the output); Claude Code puts it into the agent's instructions. The `guide` tool returns the core
+skill manual (or one topic file with `topic`). Both come from the same source as `SKILL.md`, so they always match.
 
 The installer can register it for Claude Code for you: `bash install.sh` asks (if the `claude` command is available),
 `bash install.sh --mcp` does it without asking, `--no-mcp` skips it. Remove it with

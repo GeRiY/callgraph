@@ -152,7 +152,7 @@ fn initialize_list_and_call_outline() {
         );
     }
 
-    // `guide`: a teljes SKILL.md a beállított nyelven, frontmatter és jelölők nélkül
+    // `guide`: az alap SKILL.md a beállított nyelven, frontmatter és jelölők nélkül
     let guide = s.call(30, "guide", json!({}));
     assert_ne!(guide["isError"], json!(true), "{guide}");
     let manual = text(&guide);
@@ -160,8 +160,23 @@ fn initialize_list_and_call_outline() {
         manual.starts_with("# callgraph — code map without Read\n"),
         "{manual}"
     );
-    assert!(manual.contains("## MCP server"), "{manual}");
+    assert!(manual.contains("## Read next"), "{manual}");
+    assert!(manual.len() < 15_000, "{manual}");
     assert!(!manual.contains("<!--"), "{manual}");
+
+    // `guide` `topic`-kal: pontosan a referencia-fájl; ismeretlen témára hibaüzenet
+    let web = s.call(31, "guide", json!({"topic": "php"}));
+    assert_ne!(web["isError"], json!(true), "{web}");
+    assert!(
+        text(&web).starts_with("# callgraph — PHP / Laravel / Inertia"),
+        "{web}"
+    );
+    let unknown = s.call(32, "guide", json!({"topic": "cobol"}));
+    assert_eq!(unknown["isError"], json!(true), "{unknown}");
+    assert!(
+        text(&unknown).contains("unknown topic `cobol`"),
+        "{unknown}"
+    );
 
     let outline = s.call(
         3,

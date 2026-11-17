@@ -23,7 +23,7 @@ ugyanaz a tömör kimenet, amit a `callgraph show` kiír (ez a token-hatékony r
 | `framework_view` | `view` (`routes`\|`middleware`\|`validation`\|`jobs`\|`events`\|`providers`\|`magic`\|`di`\|`views`\|`inertia`), `path`, `project?`, `full?` | framework-nézet | `show <út> --format <nézet>` |
 | `notes` (pilot) | `pattern?` (regex a szövegre / horgonyra; üres = mind), `path?`, `project?` | a fájlokhoz / metódusokhoz írt jegyzetek: `út[::metódus]  idő  📝 szöveg`, `[orphaned]`, ha a metódus már nincs | `show <út> --notes <minta>` |
 | `projects` | — | a regisztrált aliasok és gyökereik | `projects.sh list` |
-| `guide` | — | a teljes skill-útmutató (`SKILL.md` törzse, frontmatter nélkül) a beállított nyelven | `skill/SKILL.md` |
+| `guide` | `topic` (nem kötelező) | az alap skill-útmutató (`SKILL.md` törzse, frontmatter nélkül), vagy a `topic` referencia-fájlja | `skill/SKILL.md` |
 | `project_profile` | `project?`, `full?` | projekt-profil: architektúra, rétegek mappával és fájlszámmal, minták, a rétegek közti hívásirány, ismeretlen mappák (~15 sor; `full`: mappánként) | `profile [--full]` |
 
 Réteg-paraméterek (opcionálisak, alapból a kimenet változatlan): `layer` (`outline`, `search`, `find_callers`: csak az
@@ -51,20 +51,19 @@ hívók keresése a név szerinti mintával (`(^|::|\.|->)név$`) és a `Típus:
 (`root:` / `gyökér:` sor, `L12 │ kód`, `via <Típus>`, `?::név`, `… +N more`), a tömör törzs vs. `doc` / `raw`, a
 kimeneti korlát és a statikus elemzés korlátai.
 
-- **Egy forrás:** a szöveg a skill-utasítás forrásából készül (`skill/skill-i18n/SKILL.en.md` / `SKILL.hu.md`,
-  fordításkor beágyazva, `src/mcp/guide.rs`). Az oda tartozó szakaszokat `<!-- mcp:<név> -->` … `<!-- /mcp -->`
-  jelöli (`tools`, `callers`, `output`, `limits`; az útmutatóban ebben a sorrendben). A `tools` szakasz a SKILL.md
-  „MCP server” fejezete; a többi a CLI-szövegből jön, a CLI-kapcsolók az MCP-nevekre cserélve (`--grep` →
-  `find_callers`, `--body` → `method_body`, `--raw` → `raw: true`, `--depth` → `depth`, …). Teszt őrzi, hogy mindkét
-  nyelvben minden szakasz pontosan egyszer szerepel, a szöveg a méretkereten belül van, és nem marad benne
-  CLI-kapcsoló.
-- **Nyelv:** mint a CLI-é (`CALLGRAPH_LANG` › `callgraph set-lang` › angol).
+- **Egy forrás:** a szöveg a skill-utasítás forrásából készül (`skill/SKILL.md` és `skill/ref/*.md`, fordításkor
+  beágyazva, `src/mcp/guide.rs`). A skill csak angolul létezik, az útmutató is angol. Az oda tartozó szakaszokat
+  `<!-- mcp:<név> -->` … `<!-- /mcp -->` jelöli (`start`, `tools`, `callers`, `output`, `limits`; az útmutatóban ebben a
+  sorrendben): a `tools` a `skill/ref/mcp.md`-ben, a `limits` a `skill/ref/reference.md`-ben, a többi az alap
+  SKILL.md-ben van; a CLI-kapcsolók az MCP-nevekre cserélve (`--grep` → `find_callers`, `--body` → `method_body`,
+  `--raw` → `raw: true`, `--depth` → `depth`, …). Teszt őrzi, hogy minden szakasz pontosan egyszer szerepel, a szöveg a
+  méretkereten belül van, és nem marad benne CLI-kapcsoló.
+- **Nyelv:** az útmutató mindig angol; a `CALLGRAPH_LANG` / `set-lang` csak a profil-összegzés szövegét és a CLI-kimenetet érinti.
 - **Projekt-profil a végén:** ha a szerver munkakönyvtára projekt-mappa (`composer.json`, `package.json`,
   `Cargo.toml`, `Package.swift`, `.git` vagy `.callgraph`), az útmutató végére a tömör profil kerül (csak a nevekből,
   elemzés nélkül, egyszer számolva); különben egy mondat a `project_profile` eszközről. Az `initialize` emiatt nem
   bukhat el.
-- **`guide` eszköz:** a teljes `SKILL.md`-törzs a beállított nyelven, a beágyazott forrásból (nem a fájlrendszerből),
-  a jelölő-sorok nélkül — ha az agentnek a hosszú forma kell (nyelvenkénti részletek, formátumok, CLI-példák).
+- **`guide` eszköz:** `topic` nélkül az alap `SKILL.md`-törzs (~13 KB, a jelölő-sorok nélkül); `topic`-kal (`php`, `blade`, `js`, `vue`, `css`, `rust`, `swift`, `kotlin`, `python`, `go`, `gen`, `mcp`, `reference`) pontosan az adott `skill/ref/<téma>.md` fájl — a beágyazott forrásból, így a fájlrendszer-hozzáférés nélküli kliensnek is elérhető; ismeretlen témára hibaüzenet a témák listájával.
 
 ## Biztonság
 
