@@ -93,9 +93,32 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   használnak egy osztályt, és kiad egy engedékeny listát a nem használtakról (a dinamikusan összeállított osztályokat
   és a Tailwind utility-ket soha nem jelzi). A lang fájlok, a stíluslapok és a `$t(…)` hívások a vázlatban rövid
   tippet is kapnak, az MCP `framework_view` eszköz pedig megkapta az `i18n` és `classes` értéket.
+- **MCP `guide` eszköz `topic` paraméterrel:** az opcionális `topic` (pl. `{topic: "php"}`) az alap-útmutató
+  helyett a skill egy részletező fájlját adja vissza, így a csak MCP-t használó kliensek is elolvashatják. Témák:
+  `php`, `blade`, `js`, `vue`, `css`, `rust`, `swift`, `kotlin`, `python`, `go`, `gen`, `mcp`, `reference`.
 
 ### Változás
 
+- **Rövidebb skill, nyelvenkénti részletek:** az agent skill mostantól egy rövid, angol nyelvű `SKILL.md` mag (kb.
+  13 KB a korábbi 30 KB helyett, nagyjából 3 500 token 7 800 helyett), plusz a `ref/` mappa részletező fájljai (php,
+  blade, js, vue, css, rust, swift, kotlin, python, go, gen, mcp, reference), amelyeket az agent csak a projekt
+  nyelveihez olvas be. A Kotlin és a Blade először kap leírást a skillben. A `self-update` az új szerkezetet telepíti.
+- **Kevesebb zaj a framework-nézetekben:** a `--format events`, `middleware`, `validation`, `jobs`, `providers` és
+  `di` csak a megfelelő helyen illeszti a mintáit, így pl. a `config` vagy a `response` már nem jelenik meg
+  eseményként, az `X::dispatch` és az `Event::listen` viszont szerepel. A middleware címkéje már nem tapad a céljához,
+  a validáció pedig csak a valódi szabálylistának számító stringeket veszi figyelembe.
+- **Teljes fordítási kulcsok az i18n-nézetben:** a `--format i18n` levágott kulcsok helyett a teljes kulcsokat
+  mutatja, a közös előtagot egyszer kiírva (`a.b.{c, d}`), és gyorsabb a fordítási fájl nélküli projektekben.
+- **A CSS/SCSS `var()` megmutatja a property-t:** a `var(--brand)` hívás `var(--brand)` alakban szerepel, és a
+  `--grep` `var`-ként és `--brand`-ként is megtalálja. A `translateY`, `blur`, `scale` és hasonló függvények már nem
+  rejtőznek el.
+- **Tisztább sorok a vázlatban és a nézetekben:** a PHP enum- és konstansolvasások `external_call` helyett
+  `const_use` sorként látszanak; a `--format routes` sorai már nem végződnek `@ __top__::__top__`-ra, a Vue
+  metódusindex sorain pedig nincs `[private]`.
+- **Az egyfájlos kimenet relatív útvonalat használ:** ha a `show` kimenetében a projekt útvonala csak egyszer
+  szerepel, a `FILE` útvonal relatív, és nincs `root:` sor, így bemásolható a következő hívásba.
+- **A story-k tesztnek számítanak:** a story-fájlok (`*.story.*`, `*.stories.*`) és a `stories` / `storybook`
+  mappák a projektprofilban tesztek, nem oldalak.
 - **A Laravel űrlapellenőrzés követi a `form.transform(...)`-ot:** a `--format forms`, a `form:` sorok és a `laravel:`
   generátor űrlap ↔ szabály ellenőrzése mostantól azokat a kulcsokat vizsgálja, amelyeket a transform visszaad;
   `...data` szórás esetén az űrlapmezőket és a hozzáadott kulcsokat. A láncolt `form.transform(…).post(…)` hívással
@@ -115,7 +138,7 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   pedig egyszer olvassa a `composer.json`-t.
 - **Rövidebb MCP használati hibák:** a `generate`, `rename` vagy `undo` használati hibája MCP-n már nem fűzi hozzá a
   teljes használati szöveget; a CLI nem változik. A `generate` eszköz leírása is rövidebb — a nyelvtan az útmutatóban
-  és a SKILL `gen` szakaszában van.
+  és a skill `ref/gen.md` fájljában van (MCP: `guide`, `topic: "gen"`).
 - **A `laravel:` preset a `gen` generátorán át ír:** a FormRequest-ek, a controller-metódusok és az Inertia/Vue
   oldalak mostantól ugyanúgy formázódnak, mint maga a `gen`: PHPDoc `@return array<string, list<string>|string>`,
   `function submit()` a Vue oldalakon, a hosszú tagek attribútumonként tördelve, elöl az `@inertiajs/vue3` import, a
@@ -142,6 +165,13 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ### Javítás
 
+- **A literális `import('…')` használatnak számít:** a fix stringgel írt dinamikus `import('./x')` vagy
+  `import('pkg')` JS-ben, TS-ben és Vue-ban mostantól a fájlra vagy a csomagra mutat, így a `deps` már nem jelzi az
+  ilyen csomagokat nem használtnak, az importáló komponens pedig felsorolja a betöltött fájlokat.
+- **A `--grep` a láncolt hívás illeszkedő sorát mutatja:** a több sorra tördelt hívásláncnál a megjelenített
+  forrássor az illeszkedés sora, nem a lánc első sora.
+- **Az ismeretlen `--kapcsoló` hibát ad:** az elemzés elgépelt kapcsolója mostantól a használati szöveggel áll le,
+  nyers JSONL-kimenet helyett.
 - **A `laravel:` preset írás előtt szintaxist ellenőriz a generált `.ts`, `.js` és `.html` fájlokon is:** korábban
   csak a PHP- és Vue-fájlokat ellenőrizte.
 - **Projekten kívüli JS/TS-fájlok modulútvonala:** a `package.json`, `tsconfig` vagy `jsconfig` nélküli fájl
@@ -175,6 +205,12 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   hívóit.
 - **Swift: az `Extensions` mappa saját kód:** a Swift-fájlokat tartalmazó `Extensions` mappát korábban vendorként
   kezelte.
+
+### Eltávolítva
+
+- **A magyar skill-változat és a `skill-sync`:** a skill és az MCP-útmutató csak angol; a CLI kimenetének nyelve nem
+  változik (`callgraph set-lang hu`, `CALLGRAPH_LANG`). A `callgraph skill-sync` megszűnt, a `set-lang` már nem írja
+  át a `SKILL.md`-t, a `self-update` pedig törli a régi `skill-i18n/` mappát.
 
 ## [1.0.2] — 2026-11-16
 

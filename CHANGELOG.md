@@ -86,9 +86,31 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 - **Stylesheet class usage with `--format classes`:** shows which templates and components use a class, and a lenient
   list of unused classes (dynamic class building and Tailwind utilities are never reported). Lang files, stylesheets
   and `$t(…)` calls also get a short hint in the outline, and the MCP `framework_view` tool got `i18n` and `classes`.
+- **MCP `guide` tool with a `topic`:** the optional `topic` parameter (e.g. `{topic: "php"}`) returns one detail file
+  of the skill instead of the core manual, so clients that only use MCP can read them too. Topics: `php`, `blade`,
+  `js`, `vue`, `css`, `rust`, `swift`, `kotlin`, `python`, `go`, `gen`, `mcp`, `reference`.
 
 ### Changed
 
+- **Shorter skill, details per language:** the agent skill is now a short English core `SKILL.md` (about 13 KB
+  instead of 30 KB, roughly 3 500 instead of 7 800 tokens) plus detail files in `ref/` (php, blade, js, vue, css,
+  rust, swift, kotlin, python, go, gen, mcp, reference) that the agent reads only for the languages of the project.
+  Kotlin and Blade are covered in the skill for the first time. `self-update` installs the new layout.
+- **Less noise in the framework views:** `--format events`, `middleware`, `validation`, `jobs`, `providers` and `di`
+  match their patterns only at the right place, so e.g. `config` or `response` no longer show up as events, while
+  `X::dispatch` and `Event::listen` are listed. The middleware label is no longer glued to its target, and validation
+  only counts strings that are real rule lists.
+- **Full translation keys in the i18n view:** `--format i18n` shows whole keys with the shared prefix written once
+  (`a.b.{c, d}`) instead of cut-off keys, and it is faster in projects without translation files.
+- **CSS/SCSS `var()` shows the property:** a `var(--brand)` call is listed as `var(--brand)` and is found by `--grep`
+  both as `var` and as `--brand`. Functions such as `translateY`, `blur` and `scale` are no longer hidden.
+- **Cleaner rows in the outline and views:** enum and constant reads in PHP show as `const_use` instead of
+  `external_call`; `--format routes` rows no longer end in `@ __top__::__top__`, and Vue method index rows no longer
+  carry `[private]`.
+- **Single-file output uses a relative path:** when a `show` output contains the project path only once, the `FILE`
+  path is relative and there is no `root:` line, so it can be copied into the next call.
+- **Stories count as tests:** story files (`*.story.*`, `*.stories.*`) and `stories` / `storybook` folders are tests
+  in the project profile, not pages.
 - **The Laravel form check follows `form.transform(...)`:** `--format forms`, the `form:` lines and the form ↔ rules
   check of the `laravel:` generator now check the keys the transform returns; with a `...data` spread, the form
   fields plus the added keys. A form submitted with a chained `form.transform(…).post(…)` is found too.
@@ -106,7 +128,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   `composer.json` once.
 - **Shorter MCP usage errors:** a usage error of `generate`, `rename` or `undo` over MCP no longer appends the whole
   usage text; the CLI is unchanged. The `generate` tool description is shorter too — the grammar is in the guide and
-  in the SKILL `gen` section.
+  in the skill's `ref/gen.md` (MCP: `guide` with `topic: "gen"`).
 - **The `laravel:` preset writes through the `gen` generator:** FormRequests, controller methods and Inertia/Vue pages
   now follow the same formatting as `gen` itself: PHPDoc `@return array<string, list<string>|string>`, Vue pages with
   `function submit()`, long tags wrapped one attribute per line, the `@inertiajs/vue3` import first, and
@@ -132,6 +154,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ### Fixed
 
+- **Literal `import('…')` is a use:** a dynamic `import('./x')` or `import('pkg')` with a fixed string in JS, TS or
+  Vue now links to the file or package, so `deps` no longer reports such packages as unused and the importing
+  component lists the files it loads.
+- **`--grep` shows the matching line of a chained call:** for a call chain spread over several lines, the shown
+  source line is the line of the match, not the first line of the chain.
+- **An unknown `--option` is an error:** a mistyped option of an analysis now stops with the usage text instead of
+  printing raw JSONL output.
 - **The `laravel:` preset syntax-checks generated `.ts`, `.js` and `.html` files before writing:** before, only PHP
   and Vue files were checked.
 - **Module paths of JS/TS files outside a project:** a file with no `package.json`, `tsconfig` or `jsconfig` above it
@@ -162,6 +191,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 - **`locate` caller counts stay within the language family:** a Vue function no longer counts the PHP callers of a
   same-named method.
 - **Swift: an `Extensions` folder is own code:** a folder named `Extensions` with Swift files was treated as vendor.
+
+### Removed
+
+- **Hungarian skill variant and `skill-sync`:** the skill and the MCP guide are English only; the CLI output language
+  is unchanged (`callgraph set-lang hu`, `CALLGRAPH_LANG`). `callgraph skill-sync` is removed, `set-lang` no longer
+  rewrites `SKILL.md`, and `self-update` deletes the old `skill-i18n/` folder.
 
 ## [1.0.2] — 2026-11-16
 
