@@ -247,8 +247,15 @@ impl<'a, 'arena> Walker<'a, 'arena, State> for Collector<'_, '_> {
             let m = super::lossy(name.value);
             let x = self.push(s, n, "static_call", format!("{}::{m}", shown(&c)));
             s.calls[x].resolved = Some(format!("{}::{m}", s.resolver.resolve_class(&c)));
-            s.calls[x].args = self.args(&n.argument_list)
+            s.calls[x].args = self.args(&n.argument_list);
+            self.invokable_route(s, n, &c, &m);
         }
+    }
+    fn walk_in_array(&self, n: &Array<'arena>, s: &mut State) {
+        self.callable_pair(s, n, n.elements.iter());
+    }
+    fn walk_in_legacy_array(&self, n: &LegacyArray<'arena>, s: &mut State) {
+        self.callable_pair(s, n, n.elements.iter());
     }
     fn walk_in_instantiation(&self, n: &Instantiation<'arena>, s: &mut State) {
         if let Some(c) = self.class(n.class) {
@@ -262,8 +269,12 @@ impl<'a, 'arena> Walker<'a, 'arena, State> for Collector<'_, '_> {
     fn walk_in_class_constant_access(&self, n: &ClassConstantAccess<'arena>, s: &mut State) {
         if let (Some(c), ClassLikeConstantSelector::Identifier(k)) =
             (self.class(n.class), &n.constant)
-            && k.value != b"class"
         {
+            if k.value == b"class" {
+                // `X::class`: osztály-hivatkozás (a `self` / `static` / `parent` nem az)
+                self.class_ref(s, n, &c, None);
+                return;
+            }
             let x = self.push(
                 s,
                 n,

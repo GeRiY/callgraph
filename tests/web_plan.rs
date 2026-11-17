@@ -104,16 +104,27 @@ fn baseline_fixtures_analyze_cleanly() {
     let laravel = Fixture::laravel();
     let out = laravel.run(&[".", "--no-cache"]);
     assert!(out.lines().count() >= 25, "laravel_app: {out}");
-    assert!(out.contains("routes/web.php") && out.contains("ShelfController.php"));
+    // Windows-on a JSONL-ben az útvonal `\\`-sel jön; csak itt egységesítünk (a PHP-névterek miatt nem globálisan)
+    let paths = out.replace("\\\\", "/");
+    assert!(paths.contains("routes/web.php") && paths.contains("ShelfController.php"));
 
     let mono = Fixture::monorepo();
     let out = mono.run(&[".", "--no-cache"]);
     assert!(out.lines().count() >= 20, "monorepo: {out}");
-    assert!(out.contains("BedPlanner.vue") && out.contains("endpoints/beds.ts"));
+    let paths = out.replace("\\\\", "/");
+    assert!(paths.contains("BedPlanner.vue") && paths.contains("endpoints/beds.ts"));
 }
 
 // ---------------------------------------------------------------------------------------------------------------
 // H1 – H3: regex-alapú PHP framework-nézetek
+
+/// Egy `Event` nevű osztály `::class` hivatkozása (reláció) nem dispatch: a hivatkozás-él nem kerül a nézetekbe.
+#[test]
+fn class_reference_in_a_relation_is_not_an_event_dispatch() {
+    let out = Fixture::laravel().run(&["show", ".", "--format", "events"]);
+    assert!(!out.contains("Book::event"), "{out}");
+    assert!(!out.contains("-->  Event  "), "{out}");
+}
 
 #[test]
 fn h01_events_view_has_no_noise_and_keeps_the_real_events() {
@@ -237,7 +248,6 @@ fn h07_deps_knows_the_vitest_environment_package() {
 // H8 – H10: hivatkozás-élek
 
 #[test]
-#[ignore = "web-plan H8/F1: a function passed as a value gives no caller edge; enabled in phase 2"]
 fn h08_function_passed_as_value_is_a_ref_edge() {
     let out = Fixture::monorepo().run(&["show", ".", "--grep", "(^|::|\\.|->)streamSensor$"]);
     assert!(out.contains("FILE  svc/src/endpoints/beds.ts"), "{out}");
@@ -252,7 +262,6 @@ fn h08_function_passed_as_value_is_a_ref_edge() {
 }
 
 #[test]
-#[ignore = "web-plan H9/F2: X::class references are not searchable; enabled in phase 2"]
 fn h09_class_constant_reference_is_found_by_grep_and_locate() {
     let fixture = Fixture::laravel();
     let out = fixture.run(&["show", ".", "--grep", "CatalogueController"]);
@@ -369,7 +378,6 @@ fn h16_vue_outline_lists_props_once_and_emits_on_one_line() {
 }
 
 #[test]
-#[ignore = "web-plan H17: a .value array method on a computed is reported as a Vue API call; enabled in phase 2"]
 fn h17_computed_value_array_method_is_not_a_vue_api() {
     let out = Fixture::laravel().run(&["show", "resources/js/pages/Shelves/Browse.vue"]);
     assert!(!out.contains("computed().value"), "{out}");

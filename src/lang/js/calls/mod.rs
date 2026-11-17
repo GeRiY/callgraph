@@ -45,6 +45,9 @@ impl JsPass for CallsPass {
         let imports = import_bindings(program, ctx, &self.resolver);
         scope.types = receivers::TypeNames::new(program, &imports);
         for b in imports {
+            if b.import_value.ends_with("::*") {
+                scope.namespaces.insert(b.local.clone());
+            }
             scope.bindings.insert(
                 b.local,
                 Binding {

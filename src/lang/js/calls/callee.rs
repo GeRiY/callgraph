@@ -143,6 +143,8 @@ pub struct Scope {
     pub names: HashSet<String>,
     pub local_fns: HashSet<String>,
     pub bindings: HashMap<String, Binding>,
+    /// A `import * as ns from './x'` névterek helyi nevei (az `ns.fn` értékként átadva hivatkozás).
+    pub namespaces: HashSet<String>,
     /// A fogadó-típusok feloldásához ismert típusnevek (osztályok, interfészek, importok).
     pub types: TypeNames,
 }
@@ -207,7 +209,46 @@ pub fn member_root<'a, 'b>(mut e: &'b Expression<'a>) -> (Root<'b>, Vec<String>)
     }
 }
 
+/// Kisbetűvel (vagy `_`-lel) kezdődő név: függvény-konvenció (az osztály / komponens / konstans nem hivatkozás).
+fn is_fn_name(name: &str) -> bool {
+    name.chars()
+        .next()
+        .is_some_and(|c| c.is_lowercase() || c == '_')
+}
+
 impl Scope {
+    /// Értékként átadott függvény (`auth(api.chatSocket)`, `[a, b]`, `{ k: handler }`): a fájl saját függvénye, a
+    /// fájlon belüli objektum-literál metódusa, helyi import vagy névtér-import tagja. Más (változó, csomag,
+    /// osztály, konstans) nem hivatkozás — a kötés a feloldás nélküli `Callee`-t adja vissza.
+    pub fn reference(&self, e: &Expression<'_>) -> Option<Callee> {
+        match e.without_parentheses() {
+            Expression::Identifier(i) => {
+                let nm = i.name.as_str();
+                if let Some(b) = self.bindings.get(nm) {
+                    let import =
+                        b.from.is_none() && !b.resolved.contains('(') && b.category == "module_use";
+                    return (import && is_fn_name(nm)).then(|| self.ident(nm));
+                }
+                self.local_fns.contains(nm).then(|| self.ident(nm))
+            }
+            m @ Expression::StaticMemberExpression(s) => {
+                let Expression::Identifier(o) = s.object.without_parentheses() else {
+                    return None;
+                };
+                let (obj, prop) = (o.name.as_str(), s.property.name.as_str());
+                if !is_fn_name(prop) {
+                    return None;
+                }
+                let own_object = !self.bindings.contains_key(obj)
+                    && self.names.contains(&format!("{obj}.{prop}"));
+                let namespace = self.namespaces.contains(obj)
+                    && self.bindings.get(obj).is_some_and(|b| b.from.is_none());
+                (own_object || namespace).then(|| self.member(m))
+            }
+            _ => None,
+        }
+    }
+
     pub fn resolve(&self, callee: &Expression<'_>) -> Callee {
         match callee.without_parentheses() {
             Expression::Identifier(i) => self.ident(i.name.as_str()),
@@ -253,6 +294,15 @@ impl Scope {
             Root::Ident(nm) => {
                 let tgt = format!("{nm}.{joined}");
                 if let Some(b) = self.bindings.get(nm) {
+                    // `const x = computed(…)` / `ref(…)`: az `x.value.…` már a saját adat (tömb-, string-metódus),
+                    // nem a Vue API
+                    if b.category == "vue_api"
+                        && b.resolved.contains("()")
+                        && parts.len() > 1
+                        && parts.first().is_some_and(|p| p == "value")
+                    {
+                        return Callee::new(&last, Some(nm), None, "external_call", m);
+                    }
                     let resolved = format!("{}.{joined}", b.resolved);
                     let mut callee = Callee::new(&tgt, Some(nm), Some(resolved), b.category, m);
                     callee.from.clone_from(&b.from);

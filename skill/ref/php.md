@@ -7,6 +7,8 @@
 PHP receiver types come from `new Foo()`, `Foo::create()`, typed parameters / properties and the Laravel container:
 `$x = app(Foo::class)` (also `resolve()`, `app()->make()`, `$this->app->make()`, `App::make()`) and the chained
 `app(Foo::class)->bar()` resolve to `Foo::bar`; a string id (`app('foo')`) does not.
+`Foo::class`, `[Foo::class, 'm']` (resolves to `Foo::m`) and `Route::get($uri, Foo::class)` (`Foo::__invoke`) are
+reference edges marked `(ref)`: `--grep Foo` and `locate Foo` also find the routes / config / bindings that name it.
 
 **Framework views** (`--format …`): `routes`, `middleware`, `validation`, `jobs`, `events`, `providers`,
 `magic`, `di`, `views`. Run them on a directory (e.g. `bash $CG --project myapp routes --format routes`). Laravel +

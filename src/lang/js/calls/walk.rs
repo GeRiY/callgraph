@@ -1,9 +1,10 @@
 //! A bejárás: hívások, `new`, dinamikus import; a kötések a deklarátoroknál töltődnek (forrásbeli sorrendben).
 
 use oxc_ast::ast::{
-    Argument, ArrowFunctionExpression, BindingPattern, CallExpression, Class, Expression, Function,
-    ImportExpression, JSXElementName, JSXMemberExpression, JSXMemberExpressionObject,
-    JSXOpeningElement, NewExpression, Program, VariableDeclarator,
+    Argument, ArrayExpression, ArrowFunctionExpression, BindingPattern, CallExpression, Class,
+    Expression, Function, ImportExpression, JSXElementName, JSXMemberExpression,
+    JSXMemberExpressionObject, JSXOpeningElement, NewExpression, ObjectProperty, Program,
+    VariableDeclarator,
 };
 use oxc_ast_visit::{Visit, walk};
 use oxc_span::GetSpan;
@@ -201,6 +202,34 @@ impl<'s> Walker<'s> {
             category: r.category.to_string(),
             args,
         });
+    }
+
+    /// Értékként átadott függvény (`Scope::reference`): hivatkozás-él (`handler`), nem hívás.
+    fn record_ref(&mut self, e: &Expression<'_>) {
+        let e = strip_ts(e);
+        let Some(r) = self.scope.reference(e) else {
+            return;
+        };
+        self.calls.push(Call {
+            handler: Some(true),
+            from: r.from,
+            container: Some(self.container.clone()),
+            caller: Some(self.caller.clone()),
+            line: self.ctx.lines.line_of(e.span().start as usize),
+            end_line: None,
+            kind: r.kind.to_string(),
+            target: r.target,
+            resolved: r.resolved,
+            on: r.on,
+            category: r.category.to_string(),
+            args: None,
+        });
+    }
+
+    fn record_arg_refs(&mut self, args: &[Argument<'_>]) {
+        for e in args.iter().filter_map(Argument::as_expression) {
+            self.record_ref(e);
+        }
     }
 
     /// Dinamikus hívás-jelölés: a cél a hívott kifejezés szövege (egy sorra vágva, ~60 karakterre rövidítve).
@@ -419,7 +448,20 @@ impl<'a> Visit<'a> for Walker<'_> {
                 }
             }
         }
+        self.record_arg_refs(&it.arguments);
         walk::walk_call_expression(self, it);
+    }
+
+    fn visit_array_expression(&mut self, it: &ArrayExpression<'a>) {
+        for e in it.elements.iter().filter_map(|el| el.as_expression()) {
+            self.record_ref(e);
+        }
+        walk::walk_array_expression(self, it);
+    }
+
+    fn visit_object_property(&mut self, it: &ObjectProperty<'a>) {
+        self.record_ref(&it.value);
+        walk::walk_object_property(self, it);
     }
 
     fn visit_jsx_opening_element(&mut self, it: &JSXOpeningElement<'a>) {
@@ -447,6 +489,7 @@ impl<'a> Visit<'a> for Walker<'_> {
             };
         }
         self.record(it.span.start, r, &it.arguments);
+        self.record_arg_refs(&it.arguments);
         walk::walk_new_expression(self, it);
     }
 

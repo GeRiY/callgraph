@@ -1,11 +1,17 @@
 //! A framework-nézetek gyűjtői (a callgraph.sh azonos nevű jq-ágainak mása, szekciónként azonos sorrendben).
 
 use super::{at_line, call_site, quoted_line, re, resolved_or_target, string_site};
-use crate::model::FileGraph;
+use crate::model::{Call, FileGraph};
+
+/// A nézetek hívásai: a hivatkozás (`handler`, `X::class`, függvény értékként) nem hívás — nem dispatch, nem
+/// regisztráció (`belongsTo(Event::class)` ne legyen `dispatch`).
+fn calls(g: &FileGraph) -> impl Iterator<Item = &Call> {
+    g.calls.iter().filter(|c| !c.is_reference())
+}
 
 pub(super) fn events(g: &FileGraph, ns: &str, out: &mut Vec<String>) {
     let arrow = |label: &str, pattern: &regex::Regex, out: &mut Vec<String>| {
-        for c in g.calls.iter().filter(|c| pattern.is_match(&c.target)) {
+        for c in calls(g).filter(|c| pattern.is_match(&c.target)) {
             out.push(format!(
                 "{label}{}  -->  {}  L{}",
                 call_site(ns, c),
@@ -33,7 +39,7 @@ pub(super) fn events(g: &FileGraph, ns: &str, out: &mut Vec<String>) {
         re!(r"(?i)attachEventHandler|detachEventHandler|hasEventHandler"),
         out,
     );
-    for c in g.calls.iter().filter(|c| c.target == "trigger") {
+    for c in calls(g).filter(|c| c.target == "trigger") {
         out.push(format!(
             "trigger   {}  -->  trigger()  L{}",
             call_site(ns, c),
@@ -66,16 +72,12 @@ pub(super) fn routes(g: &FileGraph, ns: &str, out: &mut Vec<String>) {
 pub(super) fn middleware(g: &FileGraph, ns: &str, out: &mut Vec<String>) {
     // a metódusnévre horgonyozva: `middleware`, `prependMiddleware`, `pushMiddleware`, `aliasMiddleware`, …
     let call = re!(r"(?i)middleware$");
-    for c in g.calls.iter().filter(|c| call.is_match(&c.target)) {
+    for c in calls(g).filter(|c| call.is_match(&c.target)) {
         out.push(at_line("middleware  ", &c.target, ns, c));
     }
     // osztály-sor: csak a `…Middleware` nevű osztály hívásai (a névtér-szegmens nem számít)
     let class_call = re!(r"(?i)(?:^|\\)\w*Middleware::");
-    for c in g
-        .calls
-        .iter()
-        .filter(|c| class_call.is_match(resolved_or_target(c)))
-    {
+    for c in calls(g).filter(|c| class_call.is_match(resolved_or_target(c))) {
         out.push(at_line("class     ", resolved_or_target(c), ns, c));
     }
     let class = re!(r"(?i)Middleware|middleware");
@@ -89,7 +91,7 @@ pub(super) fn validation(g: &FileGraph, ns: &str, out: &mut Vec<String>) {
     let call = re!(
         r"(?i)Validator::make|(?:^|::|->|\.)(?:validate\w*|rules|withValidator|setRules|addError)$"
     );
-    for c in g.calls.iter().filter(|c| call.is_match(&c.target)) {
+    for c in calls(g).filter(|c| call.is_match(&c.target)) {
         out.push(at_line("validate  ", &c.target, ns, c));
     }
     for s in g.strings.iter().filter(|s| is_rule_string(&s.value)) {
@@ -169,16 +171,12 @@ fn is_rule_string(value: &str) -> bool {
 /// itt a szándékolt `later\(` szerepel.
 pub(super) fn jobs(g: &FileGraph, ns: &str, out: &mut Vec<String>) {
     let call = re!(r"(?i)Queue::push|(?:^|::|->|\.)(?:dispatch\w*|later|pushOn)$");
-    for c in g.calls.iter().filter(|c| call.is_match(&c.target)) {
+    for c in calls(g).filter(|c| call.is_match(&c.target)) {
         out.push(at_line("dispatch  ", &c.target, ns, c));
     }
     // a `Handle` nem minta: az `EnsureReaderCard::handle` nem job
     let class = re!(r"(?i)\\Jobs\\|(?:^|\\)\w*(?:Job|Queue)\w*::");
-    for c in g
-        .calls
-        .iter()
-        .filter(|c| class.is_match(resolved_or_target(c)))
-    {
+    for c in calls(g).filter(|c| class.is_match(resolved_or_target(c))) {
         out.push(at_line("job       ", resolved_or_target(c), ns, c));
     }
     let string = re!(r"(?i)queue|Queue|job|Job");
@@ -191,15 +189,11 @@ pub(super) fn providers(g: &FileGraph, ns: &str, out: &mut Vec<String>) {
     let call = re!(
         r"(?i)(?:^|::|->|\.)(?:singleton|scoped|bind|instance|register|boot|loadMigrationsFrom|loadRoutesFrom|publishes|publish|mergeConfigFrom|loadTranslationsFrom|loadViewsFrom)$"
     );
-    for c in g.calls.iter().filter(|c| call.is_match(&c.target)) {
+    for c in calls(g).filter(|c| call.is_match(&c.target)) {
         out.push(at_line("provider  ", &c.target, ns, c));
     }
     let class = re!(r"(?i)(?:^|\\)\w*Provider::");
-    for c in g
-        .calls
-        .iter()
-        .filter(|c| class.is_match(resolved_or_target(c)))
-    {
+    for c in calls(g).filter(|c| class.is_match(resolved_or_target(c))) {
         out.push(at_line("class     ", resolved_or_target(c), ns, c));
     }
 }
@@ -222,26 +216,18 @@ pub(super) fn magic(g: &FileGraph, ns: &str, out: &mut Vec<String>) {
 pub(super) fn di(g: &FileGraph, ns: &str, out: &mut Vec<String>) {
     let caller = |c: &crate::model::Call| c.caller.clone().unwrap_or_default();
     let component = re!(r"(?i)components|behaviors|container");
-    for c in g.calls.iter().filter(|c| component.is_match(&c.target)) {
+    for c in calls(g).filter(|c| component.is_match(&c.target)) {
         out.push(at_line("di        ", &c.target, ns, c));
     }
     let (bind, in_provider) = (
         re!(r"(?i)(?:^|::|->|\.)(?:singleton|scoped|bind|extend|alias)$"),
         re!(r"(?i)^(?:register|boot)"),
     );
-    for c in g
-        .calls
-        .iter()
-        .filter(|c| bind.is_match(&c.target) && in_provider.is_match(&caller(c)))
-    {
+    for c in calls(g).filter(|c| bind.is_match(&c.target) && in_provider.is_match(&caller(c))) {
         out.push(at_line("di        ", &c.target, ns, c));
     }
     let factory = re!(r"(?i)^(?:register|boot|create|resolve|get)");
-    for c in g
-        .calls
-        .iter()
-        .filter(|c| c.kind == "new" && factory.is_match(&caller(c)))
-    {
+    for c in calls(g).filter(|c| c.kind == "new" && factory.is_match(&caller(c))) {
         out.push(at_line("new       ", &c.target, ns, c));
     }
 }
@@ -253,11 +239,7 @@ pub(super) fn views(g: &FileGraph, _ns: &str, out: &mut Vec<String>) {
     let line = |label: &str, text: &str, at: u32| format!("{label}{text}  @  {}  L{at}", g.file);
     // Blade-sablon: a nézet-használat (`@extends`, `@include`, `<x-…>`) a valódi gráfból
     if g.file.to_ascii_lowercase().ends_with(".blade.php") {
-        for c in g
-            .calls
-            .iter()
-            .filter(|c| matches!(c.category.as_str(), "view_use" | "component_use"))
-        {
+        for c in calls(g).filter(|c| matches!(c.category.as_str(), "view_use" | "component_use")) {
             out.push(line(
                 "view      ",
                 &format!("{} {}", c.kind, c.target),
@@ -266,21 +248,15 @@ pub(super) fn views(g: &FileGraph, _ns: &str, out: &mut Vec<String>) {
         }
         return;
     }
-    for c in g
-        .calls
-        .iter()
-        .filter(|c| c.kind == "method_call" || c.kind == "static_call")
-    {
+    for c in calls(g).filter(|c| c.kind == "method_call" || c.kind == "static_call") {
         out.push(line("view      ", &c.target, c.line));
     }
     let widget = re!(r"(?i)Yii::|Html::|ActiveForm|GridView|DetailView|LinkPager");
-    for c in g.calls.iter().filter(|c| widget.is_match(&c.target)) {
+    for c in calls(g).filter(|c| widget.is_match(&c.target)) {
         out.push(line("widget    ", &c.target, c.line));
     }
     let variable = re!(r"\$[a-z]");
-    for c in g
-        .calls
-        .iter()
+    for c in calls(g)
         .filter(|c| c.kind == "method_call" && variable.is_match(c.on.as_deref().unwrap_or("")))
     {
         let on = c.on.as_deref().unwrap_or("");

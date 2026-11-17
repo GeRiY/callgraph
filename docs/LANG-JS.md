@@ -37,6 +37,14 @@ Top-level `ImportDeclaration`. Kulcs = helyi név; érték = `display` + `''` (d
 `categorize` (104): forrás `vue` → `vue_api`; `@inertiajs/*` → `inertia`; `vue-i18n`/`laravel-vue-i18n` → `i18n_helper`; `ziggy-js` vagy `ziggy` a névben → `route_helper`; `axios` vagy `…AxiosHandler.js` → `http_call`; lokális és (`/Composable(s)/` az útban vagy `use[A-Z]…` név) → `composable_use`; `use[A-Z]…` bármi → `composable_use`; lokális → `module_use`; különben `package_use`.
 `resolveCallee` (399–435) további: `internal_helper` (metódusnév / fájlon belüli függvény / `this.metódus`), `vue_macro` (VUE_MACROS, `resolved:'vue::<név>'`), `route_helper` (`route`, `resolved:'ziggy::route'`), `i18n_helper` (`t`,`$t`), `native_js` (NATIVE_GLOBALS), `global_helper` (ismeretlen azonosító), `external_call` (ismeretlen tag-hívás, `on:'<expr>'` nem azonosító gyökérnél), `vue_emit`, `vue_props`, `instantiation` (NewExpression, nem natív), `component_use` (template), `inertia` (`this.$inertia/$page`). A golden-ben előfordul még 6 hívás `category` nélkül (template `exprCalls` ágak) — a Rust-portnak ezt is reprodukálnia kell.
 
+## Függvény-hivatkozás (`handler: true`, `(ref)`)
+Hívás-/`new`-argumentumban, tömb-elemben és objektum-tulajdonság értékben álló azonosító vagy `ns.név`, ha a fájl saját
+függvénye (`local_fns`), helyi import (kisbetűs, `module_use`), fájlon belüli objektum-literál metódusa, vagy
+névtér-import (`import * as ns`) tagja: ugyanolyan `Call`, mint a hívás (`resolved`, `category`), de `handler = true`
+— a kimenet `(ref)`-fel jelöli, a hívó-keresés és a `--depth` számolja (`Call::is_reference`). Csomag-, változó-,
+osztály- és konstans-hivatkozás nem keletkezik. A `const x = computed(…)` kötés `x.value.….metódus` hívása `external_call`
+(nem Vue API).
+
 ## Dinamikus hívás-jelölés (`dynamic_call`)
 `obj[expr](…)` nem literál kulccsal (`type:"dynamic"`, `target` = `obj[expr]`, a régi `obj.[]` `external_call` helyett),
 `new (expr)(…)` / `new obj[k]()`, `import(expr)` nem literál forrással (a literál `import('./x')` marad a régi `<expr>`

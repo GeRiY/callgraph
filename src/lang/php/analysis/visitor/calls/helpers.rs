@@ -33,6 +33,83 @@ impl Collector<'_, '_> {
         s.calls.len() - 1
     }
 
+    /// `X::class` (`method == None`) vagy `[X::class, 'm']` (`X::m`): osztály- / hívható-hivatkozás, nem hívás
+    /// (`handler`): a `--grep`, a `locate` és a hívó-lista látja, a `(ref)` jelöli.
+    pub(super) fn class_ref(
+        &self,
+        s: &mut State,
+        n: &impl HasSpan,
+        class: &str,
+        method: Option<&str>,
+    ) {
+        if ["self", "static", "parent"]
+            .iter()
+            .any(|own| class.eq_ignore_ascii_case(own))
+        {
+            return;
+        }
+        let shown = class.trim_start_matches('\\');
+        let resolved = s.resolver.resolve_class(class);
+        let (target, resolved) = match method {
+            Some(m) => (format!("{shown}::{m}"), format!("{resolved}::{m}")),
+            None => (shown.to_string(), resolved),
+        };
+        let x = self.push(s, n, "class_ref", target);
+        s.calls[x].resolved = Some(resolved);
+        s.calls[x].handler = Some(true);
+    }
+
+    /// `[X::class, 'method']`: a hívható-tömb metódus-hivatkozás (`X::method`).
+    pub(super) fn callable_pair<'x, 'y: 'x>(
+        &self,
+        s: &mut State,
+        n: &impl HasSpan,
+        elements: impl Iterator<Item = &'x ArrayElement<'y>>,
+    ) {
+        let items: Vec<_> = elements.collect();
+        let [ArrayElement::Value(first), ArrayElement::Value(second)] = items.as_slice() else {
+            return;
+        };
+        let (Expression::Access(Access::ClassConstant(c)), Expression::Literal(Literal::String(m))) =
+            (strip(first.value), strip(second.value))
+        else {
+            return;
+        };
+        let is_class =
+            matches!(&c.constant, ClassLikeConstantSelector::Identifier(k) if k.value == b"class");
+        let method = m.value.map(lossy).filter(|m| !m.is_empty());
+        if let (true, Some(class), Some(method)) = (is_class, self.class(c.class), method) {
+            self.class_ref(s, n, &class, Some(&method));
+        }
+    }
+
+    /// `Route::get('/x', X::class)`: az invokálható controller `X::__invoke` hivatkozás.
+    pub(super) fn invokable_route(
+        &self,
+        s: &mut State,
+        n: &StaticMethodCall<'_>,
+        class: &str,
+        method: &str,
+    ) {
+        if class.trim_start_matches('\\').rsplit('\\').next() != Some("Route") {
+            return;
+        }
+        let position = match method.to_ascii_lowercase().as_str() {
+            "get" | "post" | "put" | "patch" | "delete" | "options" | "any" => 1,
+            "match" => 2,
+            _ => return,
+        };
+        let Some(Argument::Positional(arg)) = n.argument_list.arguments.iter().nth(position) else {
+            return;
+        };
+        if let Expression::Access(Access::ClassConstant(c)) = strip(arg.value)
+            && matches!(&c.constant, ClassLikeConstantSelector::Identifier(k) if k.value == b"class")
+            && let Some(class) = self.class(c.class)
+        {
+            self.class_ref(s, arg.value, &class, Some("__invoke"));
+        }
+    }
+
     pub(super) fn args(&self, l: &ArgumentList<'_>) -> Option<Vec<String>> {
         if l.arguments.is_empty() {
             return None;

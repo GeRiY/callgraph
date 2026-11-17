@@ -24,7 +24,7 @@ use crate::model::{
 };
 
 /// A tárolt szerkezet verziója; ha változik, a régi tároló csendben újraépül.
-pub(crate) const FORMAT_VERSION: u32 = 9; // 9: a Kotlin nav-hívás útvonala (`args`) a szűkített tényekben; 8: a Vue-prop alapértéke külön mező (`default`); 7: a szűkített tények importjai (`uses`: a csak típus-hivatkozás)
+pub(crate) const FORMAT_VERSION: u32 = 10; // 10: JS-függvényhivatkozás (`handler`) és PHP `X::class` (`class_ref`) élek; 9: a Kotlin nav-hívás útvonala (`args`) a szűkített tényekben; 8: a Vue-prop alapértéke külön mező (`default`); 7: a szűkített tények importjai (`uses`: a csak típus-hivatkozás)
 
 /// A keretezett fájlok eleje.
 const MAGIC: &[u8; 4] = b"CGB1";
