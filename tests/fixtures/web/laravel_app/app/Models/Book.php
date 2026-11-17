@@ -12,4 +12,9 @@ class Book extends Model
     {
         return $this->belongsTo(Event::class);
     }
+
+    public function coverUrl(): string
+    {
+        return '/covers/' . $this->shelf_no . '.png';
+    }
 }

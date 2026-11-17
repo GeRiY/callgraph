@@ -1,5 +1,8 @@
 //! Hívások gyűjtése és kategorizálása.
 
+mod docs;
+#[cfg(test)]
+mod docs_tests;
 mod dynamic;
 mod helpers;
 mod state;

@@ -153,19 +153,22 @@ impl Collector<'_, '_> {
                 let Expression::Variable(Variable::Direct(v)) = strip(p.object) else {
                     return None;
                 };
-                if v.name != b"$this" {
-                    return None;
-                }
                 let ClassLikeMemberSelector::Identifier(i) = &p.property else {
                     return None;
                 };
                 let name = lossy(i.value);
+                if v.name != b"$this" {
+                    // `$x->book`: az `$x` típusa `@property`-vel deklarálja
+                    return self.doc_property_type(s, p.object, &name);
+                }
                 s.tracker
                     .type_of(&format!("this->{name}"))
                     .or_else(|| s.tracker.type_of(name.trim_start_matches('$')))
             }
             // `app(Foo::class)->bar()`, `resolve(Foo::class)->bar()`: a konténerből kért példány
-            Expression::Call(_) => self.container_type(s, e),
+            Expression::Call(_) => self
+                .container_type(s, e)
+                .or_else(|| self.this_call_type(s, e)),
             _ => None,
         }
     }
@@ -257,6 +260,9 @@ impl Collector<'_, '_> {
     /// (`container_type`; a referenciában nincs).
     pub(super) fn typed_expr(&self, s: &State, e: &Expression<'_>) -> Option<String> {
         if let Some(ty) = self.container_type(s, e) {
+            return Some(ty);
+        }
+        if let Some(ty) = self.this_call_type(s, e) {
             return Some(ty);
         }
         match strip(e) {

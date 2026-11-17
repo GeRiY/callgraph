@@ -1,4 +1,4 @@
-use super::{helpers::Collector, state::State};
+use super::{docs::ClassDocs, helpers::Collector, state::State};
 use mago_span::HasSpan;
 use mago_syntax::cst::*;
 use mago_syntax::walker::Walker;
@@ -6,6 +6,7 @@ use mago_syntax::walker::Walker;
 impl<'a, 'arena> Walker<'a, 'arena, State> for Collector<'_, '_> {
     fn walk_in_class(&self, n: &Class<'arena>, s: &mut State) {
         s.container = Some(super::lossy(n.name.value));
+        s.tracker.clear_properties();
         self.collect_properties(&n.members, s);
         s.resolver.enter_container(
             s.container.as_deref().unwrap_or(""),
@@ -18,46 +19,58 @@ impl<'a, 'arena> Walker<'a, 'arena, State> for Collector<'_, '_> {
                         .collect()
                 })
                 .unwrap_or_default(),
-        )
+        );
+        self.enter_class_docs(s, &n.members, n.span().start.offset);
     }
     fn walk_out_class(&self, _: &Class<'arena>, s: &mut State) {
         s.container = None;
+        s.docs = ClassDocs::default();
         s.resolver.leave_container()
     }
     fn walk_in_interface(&self, n: &Interface<'arena>, s: &mut State) {
         s.container = Some(super::lossy(n.name.value));
+        s.tracker.clear_properties();
         self.collect_properties(&n.members, s);
         s.resolver
-            .enter_container(s.container.as_deref().unwrap_or(""), vec![])
+            .enter_container(s.container.as_deref().unwrap_or(""), vec![]);
+        self.enter_class_docs(s, &n.members, n.span().start.offset);
     }
     fn walk_out_interface(&self, _: &Interface<'arena>, s: &mut State) {
         s.container = None;
+        s.docs = ClassDocs::default();
         s.resolver.leave_container()
     }
     fn walk_in_trait(&self, n: &Trait<'arena>, s: &mut State) {
         s.container = Some(super::lossy(n.name.value));
+        s.tracker.clear_properties();
         self.collect_properties(&n.members, s);
         s.resolver
-            .enter_container(s.container.as_deref().unwrap_or(""), vec![])
+            .enter_container(s.container.as_deref().unwrap_or(""), vec![]);
+        self.enter_class_docs(s, &n.members, n.span().start.offset);
     }
     fn walk_out_trait(&self, _: &Trait<'arena>, s: &mut State) {
         s.container = None;
+        s.docs = ClassDocs::default();
         s.resolver.leave_container()
     }
     fn walk_in_enum(&self, n: &Enum<'arena>, s: &mut State) {
         s.container = Some(super::lossy(n.name.value));
+        s.tracker.clear_properties();
         self.collect_properties(&n.members, s);
         s.resolver
-            .enter_container(s.container.as_deref().unwrap_or(""), vec![])
+            .enter_container(s.container.as_deref().unwrap_or(""), vec![]);
+        self.enter_class_docs(s, &n.members, n.span().start.offset);
     }
     fn walk_out_enum(&self, _: &Enum<'arena>, s: &mut State) {
         s.container = None;
+        s.docs = ClassDocs::default();
         s.resolver.leave_container()
     }
     fn walk_in_anonymous_class(&self, n: &AnonymousClass<'arena>, s: &mut State) {
         s.anon.enter(n, &mut s.container, &s.caller);
         // a referencia itt a property-típusokat a névtelen osztályéra cseréli, és kilépéskor nem állítja vissza
         s.tracker.clear_properties();
+        s.docs = ClassDocs::default();
         self.collect_properties(&n.members, s);
     }
     fn walk_out_anonymous_class(&self, _: &AnonymousClass<'arena>, s: &mut State) {
@@ -115,18 +128,28 @@ impl<'a, 'arena> Walker<'a, 'arena, State> for Collector<'_, '_> {
                 }
             }
         }
+        // a natív típus nélküli paraméterek: `@param Book $book`
+        self.doc_param_types(s, n);
     }
     fn walk_in_assignment(&self, n: &Assignment<'arena>, s: &mut State) {
         self.register_local_closure(s, n);
         if !n.operator.is_assign() {
             return;
         }
-        let Some(ty) = self.typed_expr(s, n.rhs) else {
+        let Expression::Variable(Variable::Direct(v)) = super::strip(n.lhs) else {
             return;
         };
-        if let Expression::Variable(Variable::Direct(v)) = super::strip(n.lhs) {
-            s.tracker.set(super::lossy(v.name), ty);
+        // az értékből kikövetkeztetett típus erősebb a `@var`-nál
+        let name = super::lossy(v.name);
+        let ty = self
+            .typed_expr(s, n.rhs)
+            .or_else(|| self.var_doc_type(s, n.span().start.offset, &name));
+        if let Some(ty) = ty {
+            s.tracker.set(name, ty);
         }
+    }
+    fn walk_in_foreach(&self, n: &Foreach<'arena>, s: &mut State) {
+        self.foreach_var_types(s, n);
     }
     fn walk_out_method(&self, _: &Method<'arena>, s: &mut State) {
         s.caller = None
@@ -178,8 +201,12 @@ impl<'a, 'arena> Walker<'a, 'arena, State> for Collector<'_, '_> {
                 }
                 _ => "<expr>".into(),
             });
+            let name = super::lossy(m.value);
             if let Some(ty) = self.set_receiver_type(s, n.object) {
-                s.calls[x].resolved = Some(format!("{ty}::{}", super::lossy(m.value)));
+                s.calls[x].resolved = Some(format!("{ty}::{name}"));
+            } else if let Some(target) = self.this_method_target(s, n.object, &name) {
+                // `@method`-dal deklarált, vagy a `@mixin` osztályra továbbított `$this->m()`
+                s.calls[x].resolved = Some(target);
             }
             s.calls[x].args = self.args(&n.argument_list);
             self.dynamic_container_make(s, n, n.object, m.value, &n.argument_list);

@@ -1,11 +1,15 @@
 use super::super::context::AnonFrames;
+use super::docs::ClassDocs;
 use crate::lang::php::{
     analysis::{NameResolver, type_tracker::TypeMap},
     categorize::{CallInfo, CategoryChain},
     framework::{FrameworkStrategy, GenericStrategy},
 };
 use crate::model::Call;
-use std::{collections::HashSet, rc::Rc};
+use std::{
+    collections::{HashMap, HashSet},
+    rc::Rc,
+};
 
 pub(super) struct State {
     pub(super) container: Option<String>,
@@ -20,6 +24,10 @@ pub(super) struct State {
     pub(super) calls: Vec<Call>,
     /// A függvény hívható változói (`Closure` / `callable` paraméter, closure-literál értékadás): a `$var()` nem dinamikus.
     pub(super) callables: HashSet<String>,
+    /// Az aktuális osztály docblock-adatai (`@mixin`, `@method`, visszatérési típusok).
+    pub(super) docs: ClassDocs,
+    /// A fájl osztályainak `@property`-vel deklarált property-típusai: `kisbetűs\osztály::név` → feloldott osztály.
+    pub(super) class_props: HashMap<String, String>,
 }
 
 impl Default for State {
@@ -36,6 +44,8 @@ impl Default for State {
             chain: CategoryChain::with_defaults(),
             calls: Vec::new(),
             callables: HashSet::new(),
+            docs: ClassDocs::default(),
+            class_props: HashMap::new(),
         }
     }
 }

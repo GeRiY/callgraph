@@ -550,3 +550,21 @@ fn h29_php_config_outline_shows_key_paths() {
     assert!(out.contains("pages.start.uri"), "{out}");
     assert!(out.lines().count() <= 40, "{out}");
 }
+
+/// A docblock-típusok (`@mixin`, `@var`) hívó-élei: a modell metódusát a resource és a controller is hívja.
+#[test]
+fn docblock_types_resolve_callers_of_a_model_method() {
+    let out = Fixture::laravel().run(&["show", ".", "--grep", "Book::coverUrl"]);
+    for file in [
+        "app/Http/Resources/BookResource.php",
+        "app/Http/Controllers/BookCoverController.php",
+    ] {
+        assert!(
+            out.contains(&format!("FILE  {}", sep(file))),
+            "{file}: {out}"
+        );
+    }
+    // a `@var` mindkét alakja (értékadás, foreach) a controller két metódusában
+    assert!(out.contains("show"), "{out}");
+    assert!(out.contains("index"), "{out}");
+}

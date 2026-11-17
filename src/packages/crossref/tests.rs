@@ -499,8 +499,10 @@ fn ts_dictionary_modules_are_language_files() {
     );
     assert_eq!(view[0], "i18n src/locales: de, en · 3 keys");
     assert!(
-        view.iter()
-            .any(|line| line.replace('\\', "/").starts_with("src/locales/en.ts") && line.contains("missing in de 2")),
+        view.iter().any(
+            |line| line.replace('\\', "/").starts_with("src/locales/en.ts")
+                && line.contains("missing in de 2")
+        ),
         "{view:?}"
     );
     assert!(
