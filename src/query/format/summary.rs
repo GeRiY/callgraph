@@ -152,3 +152,88 @@ fn write_row(out: &mut String, row: &QueryResult, dir: &str, indent: &str, lang:
         out.push('\n');
     }
 }
+
+/// Egy mappa összesítő sora: fájlok, konténerek, metódusok; kevés fájlnál a fájlnevek is (`… +N`).
+struct FolderTotal<'a> {
+    key: String,
+    files: Vec<&'a str>,
+    containers: usize,
+    methods: usize,
+}
+
+/// A mappa-szintű összesítés: mappánként egy sor (`dir/  3 files · 4 containers · 21 methods — a.vue, b.ts`).
+/// Ha ez is több sor lenne `max`-nál, a mappák az útjuk első néhány szegmensére vonódnak (egyre durvábban).
+/// A `--format summary` korlát fölötti alakja; minden fájl száma megmarad, a részlet almappával kérhető.
+pub(crate) fn folder_summary(rows: &[QueryResult], lang: Lang, max: usize) -> String {
+    let segments = |file: &str| -> Vec<String> {
+        let dir = dir_of(file).trim_end_matches(['/', '\\']);
+        dir.split(['/', '\\'])
+            .filter(|segment| !segment.is_empty())
+            .map(str::to_owned)
+            .collect()
+    };
+    let deepest = rows
+        .iter()
+        .map(|row| segments(&row.graph.file).len())
+        .max()
+        .unwrap_or(0);
+    let mut depth = deepest;
+    loop {
+        let mut totals: Vec<FolderTotal<'_>> = Vec::new();
+        for row in rows {
+            let parts = segments(&row.graph.file);
+            let key = format!("{}/", parts[..parts.len().min(depth)].join("/"));
+            let name = row
+                .graph
+                .file
+                .rsplit(['/', '\\'])
+                .next()
+                .unwrap_or(&row.graph.file);
+            let at = match totals.iter().position(|t| t.key == key) {
+                Some(at) => at,
+                None => {
+                    totals.push(FolderTotal {
+                        key,
+                        files: Vec::new(),
+                        containers: 0,
+                        methods: 0,
+                    });
+                    totals.len() - 1
+                }
+            };
+            let total = &mut totals[at];
+            total.files.push(name);
+            total.containers += row.graph.containers.len();
+            total.methods += row.graph.methods.len();
+        }
+        if totals.len() <= max || depth <= 1 {
+            let mut out = String::new();
+            for total in &totals {
+                let key = if total.key == "/" { "./" } else { &total.key };
+                let n = total.files.len();
+                let (files, containers, methods) = match lang {
+                    Lang::En => (
+                        if n == 1 { "file" } else { "files" },
+                        "containers",
+                        "methods",
+                    ),
+                    Lang::Hu => ("fájl", "konténer", "metódus"),
+                };
+                write!(
+                    out,
+                    "{key}  {n} {files} · {} {containers} · {} {methods}",
+                    total.containers, total.methods
+                )
+                .unwrap();
+                if n <= 6 {
+                    write!(out, " — {}", total.files.join(", ")).unwrap();
+                } else {
+                    write!(out, " — {}, … +{}", total.files[..4].join(", "), n - 4).unwrap();
+                }
+                out.push('\n');
+            }
+            return out;
+        }
+        depth -= 1;
+    }
+}

@@ -217,7 +217,7 @@ fn is_fn_name(name: &str) -> bool {
 }
 
 impl Scope {
-    /// Értékként átadott függvény (`auth(api.chatSocket)`, `[a, b]`, `{ k: handler }`): a fájl saját függvénye, a
+    /// Értékként átadott függvény (`guarded(rest.listBeds)`, `[a, b]`, `{ k: handler }`): a fájl saját függvénye, a
     /// fájlon belüli objektum-literál metódusa, helyi import vagy névtér-import tagja. Más (változó, csomag,
     /// osztály, konstans) nem hivatkozás — a kötés a feloldás nélküli `Callee`-t adja vissza.
     pub fn reference(&self, e: &Expression<'_>) -> Option<Callee> {

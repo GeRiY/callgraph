@@ -12,7 +12,7 @@ use super::Formatter;
 pub struct Outline;
 impl Formatter for Outline {
     fn format(&self, rows: &[QueryResult], lang: Lang) -> String {
-        render(rows, lang, None, None)
+        render(rows, lang, None, None, false)
     }
 }
 
@@ -33,7 +33,7 @@ pub(crate) fn grep_outline(
     source: &SourceLines,
     marks: Option<&NoteMarks>,
 ) -> String {
-    render(rows, lang, Some(source), marks)
+    render(rows, lang, Some(source), marks, false)
 }
 
 fn render(
@@ -41,10 +41,11 @@ fn render(
     lang: Lang,
     source: Option<&SourceLines>,
     marks: Option<&NoteMarks>,
+    compact: bool,
 ) -> String {
     let mut text = rows
         .iter()
-        .map(|row| outline(row, lang, source, marks))
+        .map(|row| outline(row, lang, source, marks, compact))
         .collect::<Vec<_>>()
         .join("\n---\n");
     text.push_str(closing_tip(lang));
@@ -66,6 +67,7 @@ fn outline(
     lang: Lang,
     source: Option<&SourceLines>,
     marks: Option<&NoteMarks>,
+    compact: bool,
 ) -> String {
     let g = &row.graph;
     let notes: &[crate::notes::Note] = marks.map_or(&[], |marks| marks.of(&g.file));
@@ -100,7 +102,12 @@ fn outline(
         super::outline_procedural::procedural(row, &mut s, lang, source);
         return s;
     }
-    for (i, c) in g.containers.iter().enumerate() {
+    // a Vue `defineProps<X>()` interfésze nem külön konténer (a komponens props-listája ugyanezt mondja)
+    let visible = g
+        .containers
+        .iter()
+        .filter(|c| !super::outline_members::is_props_duplicate(g, c));
+    for (i, c) in visible.enumerate() {
         if i > 0 {
             s.push('\n');
         }
@@ -147,59 +154,10 @@ fn outline(
                 writeln!(s, "  {line}").unwrap();
             }
         }
-        let cons: Vec<_> = g
-            .constants
-            .iter()
-            .filter(|x| g.owns(c, x.container.as_deref(), x.line))
-            .collect();
-        if !cons.is_empty() {
-            writeln!(s, "  constants ({}):", cons.len()).unwrap();
-            // package.json / composer.json: a függőség sorának végén a lockban zárolt verzió
-            let locks = manifest_locks(row);
-            // jq: name + (value → " = value") + (enum_case → " [enum case]")
-            for x in cons {
-                let value = x
-                    .value
-                    .as_ref()
-                    .map(|v| format!(" = {v}"))
-                    .unwrap_or_default();
-                let case = if x.kind == "enum_case" {
-                    " [enum case]"
-                } else {
-                    ""
-                };
-                let locked = locks
-                    .as_ref()
-                    .and_then(|locks| locked_version(locks, x))
-                    .map(|version| format!(" · lock {version}"))
-                    .unwrap_or_default();
-                writeln!(s, "    {}{value}{case}{locked}", x.name).unwrap();
-            }
-        }
-        let props: Vec<_> = g
-            .properties
-            .iter()
-            .filter(|p| g.owns(c, p.container.as_deref(), p.line))
-            .collect();
-        if !props.is_empty() {
-            writeln!(s, "  properties ({}):", props.len()).unwrap();
-            for p in props {
-                writeln!(
-                    s,
-                    "    {} ${}{}{}{}",
-                    p.type_hint.clone().unwrap_or_else(|| "mixed".to_owned()),
-                    p.name.trim_start_matches('$'),
-                    // Vue-prop alapértéke (`withDefaults`)
-                    p.default
-                        .as_deref()
-                        .map(|d| format!(" = {d}"))
-                        .unwrap_or_default(),
-                    if p.readonly { " [readonly]" } else { "" },
-                    if p.is_static { " [static]" } else { "" }
-                )
-                .unwrap();
-            }
-        }
+        // package.json / composer.json: a függőség sorának végén a lockban zárolt verzió
+        let locks = manifest_locks(row);
+        super::outline_members::constants(&mut s, row, c, locks.as_ref(), compact);
+        super::outline_members::properties(&mut s, g, c, compact);
         if collapsed {
             if let (Some(first), Some(last)) = (methods.first(), methods.last()) {
                 let n = methods.len();
@@ -247,6 +205,7 @@ fn outline(
                 }
             }
             for (category, list) in categories(row, m, lang) {
+                let list = if compact { cap_list(&list) } else { list };
                 // Eloquent-reláció: a cél az `orm_relation` sor végén (`belongsToMany → Role`)
                 let target = row
                     .laravel
@@ -268,9 +227,11 @@ fn outline(
             if let Some(lines) = source {
                 call_lines(&mut s, row, &method_calls(g, m), lines, lang, "    ");
             }
+            // kompakt alakban a megjegyzések (💬) elmaradnak
             for comment in g
                 .comments
                 .iter()
+                .filter(|_| !compact)
                 .filter(|comment| comment.caller.as_deref() == Some(&m.name))
                 .filter(|comment| comment.container.as_deref() == m.container.as_deref())
             {
@@ -284,6 +245,28 @@ fn outline(
     }
     s
 }
+/// A kompakt alakban egy hívás-lista legfeljebb ennyi célt mutat (a többi `… +N`).
+const COMPACT_TARGETS: usize = 8;
+
+/// A hívás-lista (`a, b, c`) első `COMPACT_TARGETS` eleme, a többi `… +N`.
+fn cap_list(list: &str) -> String {
+    let parts: Vec<&str> = list.split(", ").collect();
+    if parts.len() <= COMPACT_TARGETS + 2 {
+        return list.to_owned();
+    }
+    format!(
+        "{}, … +{}",
+        parts[..COMPACT_TARGETS].join(", "),
+        parts.len() - COMPACT_TARGETS
+    )
+}
+
+/// Az `outline` kompakt alakja (a `--limit` fölötti kimenet első lépcsője, a metódus-index előtt): megjegyzések
+/// nélkül, a hosszú tag-listák tördelve, a hívás-listák legfeljebb nyolc céllal (`… +N`). Minden tag megmarad.
+pub(crate) fn compact_outline(rows: &[QueryResult], lang: Lang) -> String {
+    render(rows, lang, None, None, true)
+}
+
 /// A Markdown-címsor szintje (a szakasz `visibility`-je `h1` … `h6`); más tagnál `None`.
 fn heading_level(m: &Method) -> Option<usize> {
     let digits = m.visibility.as_deref()?.strip_prefix('h')?;
@@ -466,7 +449,7 @@ pub(super) fn categories(row: &QueryResult, m: &Method, lang: Lang) -> Vec<(Stri
                 category.as_str(),
                 "anchor" | "external_url" | "internal_file" | "image"
             );
-            let list = unique
+            let items: Vec<String> = unique
                 .iter()
                 .map(|(target, count)| {
                     if counted && *count > 1 {
@@ -475,8 +458,12 @@ pub(super) fn categories(row: &QueryResult, m: &Method, lang: Lang) -> Vec<(Stri
                         target.clone()
                     }
                 })
-                .collect::<Vec<_>>()
-                .join(", ");
+                .collect();
+            let list = if category == "component_use" {
+                factor_paths(&items)
+            } else {
+                items.join(", ")
+            };
             let list = match label {
                 Some(label) => format!("{label}: {list}"),
                 None => list,
@@ -484,6 +471,45 @@ pub(super) fn categories(row: &QueryResult, m: &Method, lang: Lang) -> Vec<(Stri
             (category, list)
         })
         .collect()
+}
+
+/// A komponens-utak közös mappa-előtagja kiemelve: `ui/src/components/{atoms/A, organisms/B}.vue`, ha minden
+/// elem `<mappa>/Név/Név.vue` alakú (a kapcsos zárójel utáni `.vue` azt jelenti: minden `X` az `X/X.vue`); egyéb
+/// esetben `ui/src/components/{atoms/A/A.vue, b.vue}` (teljes fájlnevek). Három elem alatt, vagy ha nincs közös
+/// mappa, a lista változatlan.
+fn factor_paths(items: &[String]) -> String {
+    let plain = || items.join(", ");
+    if items.len() < 3
+        || items
+            .iter()
+            .any(|item| item.contains([' ', '{', '}', ',', '\\']))
+    {
+        return plain();
+    }
+    let parts: Vec<Vec<&str>> = items.iter().map(|item| item.split('/').collect()).collect();
+    let shortest = parts.iter().map(|p| p.len() - 1).min().unwrap_or(0);
+    let common = (0..shortest)
+        .take_while(|&i| parts.iter().all(|p| p[i] == parts[0][i]))
+        .count();
+    if common == 0 {
+        return plain();
+    }
+    let prefix = parts[0][..common].join("/");
+    // minden elem `…/Név/Név.ext` és azonos kiterjesztésű?
+    let doubled = |p: &Vec<&str>| -> Option<(String, String)> {
+        let (stem, ext) = p[p.len() - 1].rsplit_once('.')?;
+        let dir_at = p.len().checked_sub(2).filter(|at| *at >= common)?;
+        (p[dir_at] == stem).then(|| (p[common..p.len() - 1].join("/"), ext.to_owned()))
+    };
+    let collapsed: Option<Vec<(String, String)>> = parts.iter().map(doubled).collect();
+    if let Some(collapsed) = collapsed
+        && collapsed.iter().all(|(_, ext)| *ext == collapsed[0].1)
+    {
+        let names: Vec<&str> = collapsed.iter().map(|(name, _)| name.as_str()).collect();
+        return format!("{prefix}/{{{}}}.{}", names.join(", "), collapsed[0].1);
+    }
+    let rest: Vec<String> = parts.iter().map(|p| p[common..].join("/")).collect();
+    format!("{prefix}/{{{}}}", rest.join(", "))
 }
 
 /// A hívás kiírt célja: a feloldott (különben a nyers) cél; Inertia render-hívásnál utána a page-fájl rövid alakja
@@ -536,7 +562,7 @@ fn manifest_locks(row: &QueryResult) -> Option<std::collections::HashMap<String,
 }
 
 /// A függőség-kulcs (`dependencies.vue`, `require.laravel/framework`) zárolt verziója.
-fn locked_version<'l>(
+pub(super) fn locked_version<'l>(
     locks: &'l std::collections::HashMap<String, String>,
     key: &crate::model::Constant,
 ) -> Option<&'l str> {

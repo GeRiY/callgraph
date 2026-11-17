@@ -14,6 +14,7 @@ mod json;
 mod lines;
 mod method_index;
 mod outline;
+mod outline_members;
 mod outline_procedural;
 mod parse_errors;
 mod reexports;
@@ -34,9 +35,12 @@ mod snapshot_tests;
 mod tests;
 
 pub use body::BodyMode;
-pub(crate) use outline::{call_lines, closing_tip, grep_outline, method_calls, parens, shown_line};
+pub(crate) use outline::{
+    call_lines, closing_tip, compact_outline, grep_outline, method_calls, parens, shown_line,
+};
 pub use parse_errors::trailer as parse_trailer;
 pub(crate) use parse_errors::{file_lines as parse_error_lines, issue as parse_issue};
+pub(crate) use summary::folder_summary;
 
 use crate::error::{CallgraphError, Result};
 use crate::i18n::Lang;

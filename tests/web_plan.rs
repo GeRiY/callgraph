@@ -386,7 +386,6 @@ fn h15_tailwind_utility_is_a_class_definition() {
 // H16 – H19: Vue / TS kimenet
 
 #[test]
-#[ignore = "web-plan H16: props listed twice (component + interface) and emits one per line; enabled in phase 4 (O1)"]
 fn h16_vue_outline_lists_props_once_and_emits_on_one_line() {
     let out = Fixture::monorepo().run(&["show", "ui/src/components/BedPlanner.vue", "--full"]);
     assert_eq!(out.matches("focusCellId").count(), 1, "{out}");
@@ -413,7 +412,7 @@ fn h17_computed_value_array_method_is_not_a_vue_api() {
 fn h18_emit_key_is_component_scoped_and_wired_to_the_listener() {
     let out = Fixture::monorepo().run(&["show", "ui/src", "--grep", "CellMenu.vue::emit:remove$"]);
     assert!(
-        out.contains("FILE  ui/src/components/MessageActions.vue"),
+        out.contains("FILE  ui/src/components/CellMenu.vue"),
         "{out}"
     );
     assert!(

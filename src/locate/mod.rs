@@ -10,7 +10,7 @@
 mod callers;
 mod format;
 mod matcher;
-mod rank;
+pub(crate) mod rank;
 mod reasons;
 mod source;
 mod terms;

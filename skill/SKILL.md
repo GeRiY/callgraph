@@ -160,6 +160,7 @@ file(s) from this skill's `ref/` directory:
 - [ref/blade.md](ref/blade.md): Blade (`*.blade.php`)
 - [ref/js.md](ref/js.md): JS / TS (`--grep` keys, TS receiver types)
 - [ref/vue.md](ref/vue.md): Vue (`setup`, `template`, emits, component usage)
+- [ref/jsx.md](ref/jsx.md): React (`.jsx` / `.tsx`: components, hooks)
 - [ref/css.md](ref/css.md): CSS / SCSS / HTML
 - [ref/rust.md](ref/rust.md): Rust
 - [ref/swift.md](ref/swift.md): Swift / SwiftUI
@@ -171,5 +172,5 @@ file(s) from this skill's `ref/` directory:
 - [ref/reference.md](ref/reference.md): rarely needed: profile details, data and cache, ignore files, new-version notice
   (a last output line `ℹ callgraph X.Y.Z …`), `[error-id: …]` feedback, notes, suggested next step, limits
 
-MCP clients without file access: the `guide` tool with `topic` = `php`, `blade`, `js`, `vue`, `css`, `rust`, `swift`, `kotlin`, `python`, `go`, `gen`, `mcp` or
+MCP clients without file access: the `guide` tool with `topic` = `php`, `blade`, `js`, `jsx`, `vue`, `css`, `rust`, `swift`, `kotlin`, `python`, `go`, `gen`, `mcp` or
 `reference` returns the same file (`guide {topic: "php"}`).

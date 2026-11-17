@@ -271,10 +271,12 @@ fn grep_fallback_merges_and_caps_call_lines_too() {
     ]);
     let file = sep("src/Many.php");
     let expected = format!(
-        "{file}  Many::run  L10, L12  ← App\\Services\\Repo::find │ $this->repo->find($id);\n\
-         {file}  Many::run  L11  ← App\\Services\\Repo::find │ $this->repo->find(1);\n\
-         {file}  Many::run  L13  ← App\\Services\\Repo::find │ $this->repo->find(2);\n\
-         {file}  Many::run  … +2 more: L14, L15\n"
+        "← App\\Services\\Repo::find\n\
+         {file}\n\
+         \x20 Many::run  L10, L12 │ $this->repo->find($id);\n\
+         \x20 Many::run  L11 │ $this->repo->find(1);\n\
+         \x20 Many::run  L13 │ $this->repo->find(2);\n\
+         \x20 Many::run  … +2 more: L14, L15\n"
     );
     assert!(out.contains("1 line per call instead"), "{out}");
     assert!(out.contains(&expected), "{out}");

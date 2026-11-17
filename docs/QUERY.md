@@ -50,7 +50,7 @@ Hibaüzenetek: az `[error-id]` sort a callgraph-burok (R6g) teszi hozzá — az 
 | `--format coverage` | `coverage.rs` | publikus metódusok docblock-lefedettsége |
 | `--format mermaid` / `dot` | `graph_text.rs` | öröklési és hívási élek, bájtsorrendben, ismétlés nélkül |
 A `::metódus` kijelölés szűrése közös: `selection.rs` (a callgraph jq-szűrőjének mása). A kimenet-korlát az outline, flow, api, mermaid és dot formátumra él
-(mappán summary, egy fájlon metódus-index a tényleges formátumnévvel).
+(mappán summary, egy fájlon először a kompakt outline — `compact_outline`: megjegyzések nélkül, tördelt / `… +N` listák —, és csak ha az sem fér bele, a metódus-index a tényleges formátumnévvel). A mappa-`summary` is korlátos: fölötte mappánkénti összesítés (`folder_summary`). A `--grep` lapos nézete fájlonként egy fejsor alá írja a hívókat; a `--depth` a teszt- / story-hívókat szintenként egy sorba vonja (`--full`: mind), és sor-korlátra vágja.
 
 ### R6f: framework-nézetek (`events`, `routes`, `middleware`, `validation`, `jobs`, `providers`, `magic`, `di`, `views`)
 `src/query/format/framework/`: a közös `RuleView` formázó + nézetenként egy gyűjtőfüggvény (`rules.rs`), a regexek egyszer fordítva (`re!`, `LazyLock`).

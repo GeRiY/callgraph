@@ -378,7 +378,7 @@ impl CallgraphServer {
             idempotent_hint = true,
             open_world_hint = false
         ),
-        description = "The core callgraph manual (SKILL.md): queries with CLI examples, formats, output limit. Call it once when the server instructions are not enough. `topic` returns one reference file instead: php, blade, js, vue, css, rust, swift, kotlin, python, go, gen, mcp, reference. Example: {\"topic\": \"php\"}."
+        description = "The core callgraph manual (SKILL.md): queries with CLI examples, formats, output limit. Call it once when the server instructions are not enough. `topic` returns one reference file instead: php, blade, js, jsx, vue, css, rust, swift, kotlin, python, go, gen, mcp, reference. Example: {\"topic\": \"php\"}."
     )]
     async fn guide(&self, Parameters(p): Parameters<GuideParams>) -> CallToolResult {
         let started = Instant::now();

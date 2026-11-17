@@ -38,6 +38,50 @@ impl OutputLimit {
             "⚠ A --format {format} kimenete {n} sor lenne — helyette metódus-index. Egy metódus: <fájl>::<metódus> [--format outline|flow] vagy --body; a teljes kimenet: --full.\n\n{index}"
         )
     }
+    /// Egyfájlos kimenet: a korlát fölött először a kompakt alak (ha az már belefér), csak utána a metódus-index.
+    pub fn compact_or_index(
+        &self,
+        format: &str,
+        text: String,
+        compact: impl FnOnce() -> String,
+        index: String,
+    ) -> String {
+        if self.full {
+            return text;
+        }
+        let n = text.lines().count();
+        if n <= self.limit {
+            return text;
+        }
+        let compact = compact();
+        let m = compact.lines().count();
+        if m > self.limit {
+            return self.method_index_for(format, text, index);
+        }
+        ltf!(
+            self.lang,
+            "⚠ --format {format} output would be {n} lines — compact form ({m} lines: comments dropped, long lists wrapped or capped with '… +N'; every member kept). One method: <file>::<method> [--format outline|flow] or --body; full output: --full.\n\n{compact}",
+            "⚠ A --format {format} kimenete {n} sor lenne — kompakt alak ({m} sor: megjegyzések nélkül, a hosszú listák tördelve vagy „… +N”-nel rövidítve; minden tag megvan). Egy metódus: <fájl>::<metódus> [--format outline|flow] vagy --body; a teljes kimenet: --full.\n\n{compact}"
+        )
+    }
+    /// Mappa-szintű `summary`: a korlát fölött a mappánkénti összesítés.
+    pub fn summary_or_folders(
+        &self,
+        text: String,
+        folders: impl FnOnce() -> String,
+        file_count: usize,
+    ) -> String {
+        if self.full || text.lines().count() <= self.limit {
+            return text;
+        }
+        let n = text.lines().count();
+        let folders = folders();
+        ltf!(
+            self.lang,
+            "⚠ --format summary output would be {n} lines ({file_count} files) — folder totals instead (files, containers, methods per folder; small folders list their files). Narrow it down: a subfolder or a single file; full output: --full.\n\n{folders}",
+            "⚠ A --format summary kimenete {n} sor lenne ({file_count} fájl) — helyette mappánkénti összesítés (fájl, konténer, metódus mappánként; a kis mappák felsorolják a fájljaikat). Szűkíts: almappa vagy egy fájl; a teljes kimenet: --full.\n\n{folders}"
+        )
+    }
     pub fn directory_summary(
         &self,
         text: String,

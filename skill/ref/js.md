@@ -6,7 +6,7 @@
 
 Same switches. TS: a call on a typed parameter / property (`repo: Repo`, `constructor(private repo: Repo)`,
 `new Repo()`) resolves to `Repo::find`, so `Type::method` and `via <Interface>` work in TS too; untyped, `any` or
-union receivers stay unresolved (search those by name). A function passed as a value (`route('GET', p, api.chatSocket)`,
+union receivers stay unresolved (search those by name). A function passed as a value (`route('GET', p, rest.listBeds)`,
 `auth(handler)`, `[a, b]`, `{ k: handler }`; a local function, a local import or `ns.fn` of a namespace import) is a
 reference edge: it appears in callers lists and counts for `--depth`, marked `(ref)`. Searchable keys for `--grep`:
 

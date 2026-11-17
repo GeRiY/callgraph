@@ -12,10 +12,11 @@ use crate::i18n::Lang;
 const SKILL: &str = include_str!("../../skill/SKILL.md");
 
 /// A `guide` témái: név → a beágyazott `skill/ref/<név>.md`.
-const TOPICS: [(&str, &str); 13] = [
+const TOPICS: [(&str, &str); 14] = [
     ("php", include_str!("../../skill/ref/php.md")),
     ("blade", include_str!("../../skill/ref/blade.md")),
     ("js", include_str!("../../skill/ref/js.md")),
+    ("jsx", include_str!("../../skill/ref/jsx.md")),
     ("vue", include_str!("../../skill/ref/vue.md")),
     ("css", include_str!("../../skill/ref/css.md")),
     ("rust", include_str!("../../skill/ref/rust.md")),

@@ -211,8 +211,34 @@ impl Command for ShowCommand {
                 None => FormatterRegistry::format("summary", &rows)?,
             };
             limiter.directory_summary(text, summary, &self.format, rows.len())
+        } else if self.format == "outline" && !self.layers.layers {
+            // a metódus-index előtt a kompakt outline (megjegyzések nélkül, tördelt listák, minden tag megvan)
+            limiter.compact_or_index(
+                &self.format,
+                text,
+                || crate::query::format::compact_outline(&rows, crate::i18n::lang()),
+                index,
+            )
         } else {
             limiter.method_index_for(&self.format, text, index)
+        };
+        // a mappa-summary korlátja: fölötte mappánkénti összesítés
+        let text = if self.format == "summary"
+            && !self.body
+            && self.lines.is_none()
+            && self.strings.is_none()
+            && self.const_filter.is_none()
+            && !self.layers.layers
+            && rows.len() > 1
+        {
+            let max = limiter.limit;
+            limiter.summary_or_folders(
+                text,
+                || crate::query::format::folder_summary(&rows, crate::i18n::lang(), max),
+                rows.len(),
+            )
+        } else {
+            text
         };
         // A gépi formátumok (json, mermaid, dot) útjai abszolútak maradnak; a szövegesekben a gyökér egyszer áll.
         let machine = matches!(self.format.as_str(), "json" | "jsonl" | "mermaid" | "dot")

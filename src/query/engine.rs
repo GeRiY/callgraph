@@ -1,5 +1,7 @@
 //! A query facade: projektútvonalakból elemzett vagy cache-elt gráfokat ad.
 
+mod grep_depth;
+mod grep_flat;
 mod grep_text;
 mod issues;
 mod json_keys;
