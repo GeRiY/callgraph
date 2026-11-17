@@ -34,3 +34,6 @@
 __pycache__/
 # belső mérési követelmények (privát)
 /.measure/
+
+# benchmark-leírások: helyben, nem a repóba (Geri, 2026-11-17)
+docs/bench/
