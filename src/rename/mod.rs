@@ -11,6 +11,9 @@
 //! - **method** (`method.rs`): PHP-metódus — deklaráció (leszármazottak, implementálók), a projekt-elemző által
 //!   feloldott hívások, callable tömbök és route-akciók; a feloldatlan fogadójú hívás csak jelzés.
 //!
+//! - **term** (`term.rs`): egy fogalom (szó) átnevezése minden írásmódjában (`Post` → `Article`: osztály-, fájl-,
+//!   változó-, reláció-, útvonal-, route-név-, Vue-komponens-részek), fájl-áthelyezéssel és átnevező migrációval.
+//!
 //! Tervezési minták:
 //! - **Strategy** — a három tervező ugyanazt adja: `Plan` (szerkesztések, jelzések, fájl-áthelyezések);
 //! - **Command / Memento** — a `sites::finish` a generátor `WriteGroup`-ját használja: mentés + napló, így egyetlen
@@ -25,6 +28,7 @@ mod method;
 mod php;
 mod route;
 mod sites;
+mod term;
 
 #[cfg(test)]
 mod tests;
@@ -38,6 +42,7 @@ pub enum Kind {
     Route,
     Class,
     Method,
+    Term,
 }
 
 impl Kind {
@@ -47,6 +52,7 @@ impl Kind {
             "route" => Some(Self::Route),
             "class" => Some(Self::Class),
             "method" => Some(Self::Method),
+            "term" => Some(Self::Term),
             _ => None,
         }
     }
@@ -91,6 +97,7 @@ impl<'a> Renamer<'a> {
             Kind::Route => route::plan(self.env, request)?,
             Kind::Class => class::plan(self.env, request)?,
             Kind::Method => method::plan(self.env, request)?,
+            Kind::Term => term::plan(self.env, request)?,
         };
         sites::finish(self.env, &what, plan, request.dry)
     }

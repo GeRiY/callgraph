@@ -15,6 +15,11 @@ bash $CG gen 'c:Pay' --dry --project myapp                                      
 bash $CG undo --project myapp                                                      # restore the last change (a preset / rename: all its files)
 ```
 
+Rename (one call, one `undo`; `--dry` shows files moved, sites per file, flagged strings and the migration to be created):
+`rename route 'a.*' 'b.*'` (route names), `rename class 'App\Models\Fee' 'App\Models\Charge'` (one class), `rename method 'App\Pay::charge' bill`,
+`rename term post article` (a whole concept in every spelling: `Post`/`posts`/`post_id`/`PostController`/`/posts/{post}`/`admin.posts.index`/`Posts/Index.vue`;
+files whose path has the word are moved; tables and `*_id` columns get a new `rename_post_to_article` migration, old migrations stay; skips `POST`, `->post(`/`.post(`/`postJson(` calls; a bare `'post'` string is only flagged; irregular plural: `person/people`).
+
 Expression grammar: `c:` class `i:` interface `t:` trait `e:` enum; `>` child, `+` sibling, `^` up, `*n` repeat;
 members `+`/`-`/`#` visibility, `::` static, `name(Type $p):Type{body}`, `$prop:Type=1`, `K=1`, `ctor(-Type $x)` promoted.
 Unknown class names are imported from the project (`unresolved:` lists the ones it could not place). `--dry` prints the

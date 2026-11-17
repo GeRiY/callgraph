@@ -821,3 +821,185 @@ fn overlapping_edits_are_a_conflict_not_a_corruption() {
     assert!(finish(env(&fs, &clock), "test", plan, false).is_err());
     assert_eq!(fs.snapshot(), before);
 }
+
+// ------------------------------------------------------------ term
+
+const TERM_CONTROLLER: &str = "<?php
+
+namespace App\\Http\\Controllers;
+
+class PostController
+{
+    public function index()
+    {
+        $posts = [];
+        return Inertia::render('Posts/Index', ['posts' => $posts, 'postId' => 1]);
+    }
+}
+";
+
+const TERM_TEST: &str = "<?php
+
+class PostTest
+{
+    public function test_it()
+    {
+        $post = route('post');
+        $this->post('/posts', ['method' => 'post']);
+        $this->postJson('/admin/posts/' . $post);
+        $this->assertDatabaseHas('posts', ['id' => 1]);
+    }
+}
+";
+
+const TERM_VUE: &str = "<script setup>
+defineProps({ posts: Array })
+</script>
+
+<template>
+  <div>{{ posts.length }}</div>
+</template>
+";
+
+const TERM_MIGRATION: &str = "<?php
+
+use Illuminate\\Database\\Migrations\\Migration;
+use Illuminate\\Database\\Schema\\Blueprint;
+use Illuminate\\Support\\Facades\\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('posts', function (Blueprint $table) {
+            $table->id();
+        });
+        Schema::create('post_tag', function (Blueprint $table) {
+            $table->foreignId('post_id')->constrained('posts');
+            $table->string('kind')->default('post');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('post_tag');
+        Schema::dropIfExists('posts');
+    }
+};
+";
+
+fn term_project() -> MemFs {
+    MemFs::with(&[
+        ("composer.json", COMPOSER),
+        ("app/Http/Controllers/PostController.php", TERM_CONTROLLER),
+        ("tests/Feature/PostTest.php", TERM_TEST),
+        ("resources/js/Pages/Posts/Index.vue", TERM_VUE),
+        (
+            "database/migrations/2026_01_01_000000_create_posts_table.php",
+            TERM_MIGRATION,
+        ),
+    ])
+}
+
+#[test]
+fn term_renames_every_spelling_moves_files_and_writes_a_migration() {
+    let fs = term_project();
+    run(&fs, &request(Kind::Term, "post", "article")).expect("term rename");
+
+    assert!(fs.get("app/Http/Controllers/PostController.php").is_none());
+    let controller = fs
+        .get("app/Http/Controllers/ArticleController.php")
+        .expect("moved controller");
+    assert!(
+        controller.contains("class ArticleController"),
+        "{controller}"
+    );
+    assert!(controller.contains("'Articles/Index'"), "{controller}");
+    assert!(
+        controller.contains("'articles' => $articles"),
+        "{controller}"
+    );
+    assert!(controller.contains("'articleId' => 1"), "{controller}");
+
+    // a HTTP-hívások, a magányos 'post' sztring és a migrációk érintetlenek
+    let test = fs.get("tests/Feature/ArticleTest.php").expect("moved test");
+    assert!(test.contains("$this->post('/articles'"), "{test}");
+    assert!(test.contains("'method' => 'post'"), "{test}");
+    assert!(test.contains("$article = route('article')"), "{test}");
+    assert!(
+        test.contains("$this->postJson('/admin/articles/' . $article)"),
+        "{test}"
+    );
+    assert!(test.contains("assertDatabaseHas('articles'"), "{test}");
+    assert!(
+        fs.get("resources/js/Pages/Articles/Index.vue")
+            .is_some_and(|v| v.contains("articles: Array") && v.contains("articles.length"))
+    );
+    assert_eq!(
+        fs.get("database/migrations/2026_01_01_000000_create_posts_table.php")
+            .as_deref(),
+        Some(TERM_MIGRATION)
+    );
+
+    let migration = fs
+        .get("database/migrations/2026_01_01_000001_rename_post_to_article.php")
+        .expect("rename migration");
+    assert!(
+        migration.contains("Schema::rename('posts', 'articles');"),
+        "{migration}"
+    );
+    assert!(
+        migration.contains("Schema::rename('post_tag', 'article_tag');"),
+        "{migration}"
+    );
+    assert!(
+        migration.contains("Schema::table('post_tag'")
+            && migration.contains("renameColumn('post_id', 'article_id')"),
+        "{migration}"
+    );
+    // a `default('post')` nem oszlopnév
+    assert!(!migration.contains("renameColumn('post',"), "{migration}");
+    assert!(
+        migration.contains("Schema::rename('articles', 'posts');"),
+        "{migration}"
+    );
+}
+
+#[test]
+fn term_dry_run_writes_nothing_and_undo_restores_everything() {
+    let fs = term_project();
+    let before = fs.snapshot();
+    let mut dry = request(Kind::Term, "post", "article");
+    dry.dry = true;
+    let out = run(&fs, &dry).expect("dry");
+    assert!(
+        out.lines
+            .iter()
+            .any(|l| l.contains("rename_post_to_article"))
+    );
+    assert_eq!(fs.snapshot(), before);
+
+    run(&fs, &request(Kind::Term, "post", "article")).expect("term rename");
+    undo(&fs);
+    assert!(fs.get("app/Http/Controllers/PostController.php").is_some());
+    assert!(fs.get("tests/Feature/PostTest.php").is_some());
+    assert!(
+        fs.get("database/migrations/2026_01_01_000001_rename_post_to_article.php")
+            .is_none()
+    );
+}
+
+#[test]
+fn term_matches_whole_words_only_and_derives_ies_plurals() {
+    let fs = MemFs::with(&[(
+        "app/Cat.php",
+        "<?php\n\nclass Cat\n{\n    public $categoryList = [];\n    public $categories = [];\n    public $category = 2;\n    public $categoryx = 3;\n}\n",
+    )]);
+    run(&fs, &request(Kind::Term, "category", "topic")).expect("term");
+    let text = fs.get("app/Cat.php").unwrap();
+    assert!(text.contains("$topicList"), "{text}");
+    assert!(text.contains("$topics = []"), "{text}");
+    assert!(text.contains("$topic = 2"), "{text}");
+    assert!(text.contains("$categoryx"), "{text}");
+    assert!(run(&fs, &request(Kind::Term, "a b", "c")).is_err());
+}

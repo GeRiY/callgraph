@@ -59,6 +59,8 @@ pub(crate) struct Plan {
     pub moves: Vec<(String, String)>,
     /// Figyelmeztetések (`⚠ …`), a kimenet végén.
     pub notes: Vec<String>,
+    /// Új fájlok (pl. a táblát átnevező migráció), a szerkesztésekkel egy tranzakcióban.
+    pub created: Vec<GroupFile>,
 }
 
 /// Mappák, amelyekbe a bejárás nem lép be.
@@ -190,6 +192,7 @@ pub(crate) fn finish(env: Env<'_>, what: &str, plan: Plan, dry: bool) -> GenResu
         uncertain,
         moves,
         notes,
+        created,
     } = plan;
     if sites.is_empty() {
         return Err(GenError::new(crate::tf!(
@@ -240,6 +243,8 @@ pub(crate) fn finish(env: Env<'_>, what: &str, plan: Plan, dry: bool) -> GenResu
                 message
             )));
         }
+        // a 0 hosszú, üres szerkesztés csak a fájl áthelyezését jelzi: nem hely
+        list_real(&mut list);
         for site in &list {
             previews.push(format!(
                 "{}:L{}  {} → {}",
@@ -261,6 +266,18 @@ pub(crate) fn finish(env: Env<'_>, what: &str, plan: Plan, dry: bool) -> GenResu
         });
     }
     let file_count = files.len();
+    for file in created {
+        if let Err(message) = check_text(&file.rel, &file.text) {
+            return Err(GenError::new(crate::tf!(
+                "the generated {} is invalid: {} (nothing written)",
+                "a generált {} érvénytelen: {} (nem írtam semmit)",
+                file.rel,
+                message
+            )));
+        }
+        counts.push(format!("+ {}", file.rel));
+        files.push(file);
+    }
 
     if !dry {
         let removals: Vec<String> = moves.iter().map(|(from, _)| from.clone()).collect();
@@ -314,6 +331,11 @@ pub(crate) fn finish(env: Env<'_>, what: &str, plan: Plan, dry: bool) -> GenResu
         lines,
         unresolved: Vec::new(),
     })
+}
+
+/// A valódi szerkesztések: az üres, 0 hosszú beszúrás kiesik.
+fn list_real(list: &mut Vec<Site>) {
+    list.retain(|s| s.start != s.end || !s.new.is_empty());
 }
 
 /// Egy előnézet-érték: egy sorra vágva, rövidítve.

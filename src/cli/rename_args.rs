@@ -1,5 +1,5 @@
 //! A `rename` parancs kapcsolói:
-//! `callgraph rename <route|class|method> <régi> <új> [--dry] [--strings] [--keep-table] [--project alias|mappa]`.
+//! `callgraph rename <route|class|method|term> <régi> <új> [--dry] [--strings] [--keep-table] [--project alias|mappa]`.
 //! Külön fájlban, hogy az `args.rs` csak egy-egy sorral bővüljön.
 
 use crate::error::{CallgraphError, Result};
@@ -9,8 +9,8 @@ use super::CliArgs;
 
 fn rename_usage() -> String {
     crate::t!(
-        "callgraph rename <route|class|method> <old> <new> [--dry] [--strings] [--keep-table] [--project alias]  (e.g. rename route profile.edit account.edit | rename route 'profile.*' 'account.*' | rename class 'App\\Models\\Fee' 'App\\Models\\Charge' | rename method 'App\\Services\\Pay::charge' bill; one `callgraph undo` reverts it)",
-        "callgraph rename <route|class|method> <régi> <új> [--dry] [--strings] [--keep-table] [--project alias]  (pl. rename route profile.edit account.edit | rename route 'profile.*' 'account.*' | rename class 'App\\Models\\Fee' 'App\\Models\\Charge' | rename method 'App\\Services\\Pay::charge' bill; egy `callgraph undo` visszavonja)"
+        "callgraph rename <route|class|method|term> <old> <new> [--dry] [--strings] [--keep-table] [--project alias]  (e.g. rename route profile.edit account.edit | rename route 'profile.*' 'account.*' | rename class 'App\\Models\\Fee' 'App\\Models\\Charge' | rename method 'App\\Services\\Pay::charge' bill | rename term post article; one `callgraph undo` reverts it)",
+        "callgraph rename <route|class|method|term> <régi> <új> [--dry] [--strings] [--keep-table] [--project alias]  (pl. rename route profile.edit account.edit | rename route 'profile.*' 'account.*' | rename class 'App\\Models\\Fee' 'App\\Models\\Charge' | rename method 'App\\Services\\Pay::charge' bill | rename term post article; egy `callgraph undo` visszavonja)"
     )
     .to_owned()
 }

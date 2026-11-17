@@ -295,7 +295,7 @@ impl GenerateParams {
 // (Típus-szintű `//` komment: a `///` a sémába kerülne.)
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, JsonSchema)]
 pub(crate) struct RenameParams {
-    /// `route` (Laravel route name; `a.*` renames a prefix), `class` (PHP FQCN or unique short name), `method` (`Class::method`).
+    /// `route` (Laravel route name; `a.*` renames a prefix), `class` (PHP FQCN or unique short name), `method` (`Class::method`), `term` (a word in all spellings: `post` `article` renames Post/posts/post_id/PostController, files and a migration).
     pub kind: String,
     /// Current name.
     pub old: String,
