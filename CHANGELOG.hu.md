@@ -6,6 +6,8 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-11-17
+
 ### Új
 
 - **A Blade sablonok (`.blade.php`) önálló nyelvként elemződnek** (korábban üres eredmény): fájlonként egy nézet,
@@ -15,10 +17,11 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   is elemződik; az `@if` / `@foreach` … vezérlési ágként jelenik meg; a `route('x')` a Laravel route-ra mutat
   (`→ POST /users · Controller@method`, ismeretlen név jelölve); a `__()` / `@lang` részt vesz az i18n-ellenőrzésben;
   a „rendered by” sor pedig a controllerek `view('…')` hívásait mutatja.
-- **MCP `undo` eszköz:** visszaállítja a `generate` vagy a `rename` utolsó változtatását — fájl megadásakor azt az
-  egy fájlt, egyébként az utolsó változtatáscsoport egészét. Az előzmény többlépéses: minden hívás egy változtatással
-  tovább lép vissza (korábban két egymás utáni undo az utolsó változtatást ide-oda kapcsolgatta). A `generate`-hez és a `rename`-hez hasonlóan csak akkor
-  létezik, ha a szerver `--generate` / `CALLGRAPH_GENERATE=1` móddal fut, és `readOnlyHint: false` jelölést kap.
+- **MCP `undo` eszköz:** visszaállítja a `generate` vagy a `rename` utolsó változtatását — fájl megadásakor azt az egy
+  fájlt, egyébként az utolsó változtatáscsoport egészét. Az előzmény többlépéses: minden hívás egy változtatással
+  tovább lép vissza (korábban két egymás utáni undo az utolsó változtatást ide-oda kapcsolgatta). A `generate`-hez és
+  a `rename`-hez hasonlóan csak akkor létezik, ha a szerver `--generate` / `CALLGRAPH_GENERATE=1` móddal fut, és
+  `readOnlyHint: false` jelölést kap.
 - **`rename term <régi> <új>`: egy teljes fogalom átnevezése minden írásmódjában:** a `rename term post article`
   a PHP-, JS-, TS- és Vue-kódban mindenhol lecseréli a szót, ahol egész szóként szerepel, a kis- és nagybetűt és a
   többes számot megtartva: `Post` / `post` / `posts`, `post_id`, `StorePostRequest`, `/posts/{post}`,
@@ -30,15 +33,16 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   érték-helyzetű, idézőjeles szót, amely HTTP-ige is lehet (`'method' => 'post'`), csak jelzi, nem módosítja. A
   `--dry` a teljes tervet mutatja (áthelyezett fájlok, fájlonkénti változások, jelzett sztringek, a migráció), és
   egyetlen `undo` mindent visszavon, az új migrációt is. MCP-n a `rename` eszköz `term` fajtája.
-- **A `gen --dry` megmutatja, hová kerülne a kód:** `--into` / `--replace` mellett a próbafutás először kiírja az
-  elhelyezést, pl. `→ app/Pay.php::Pay after charge (L41)` vagy `→ f.vue: script L12-14`.
-- **`gen --diff` és további elhelyezési lehetőségek:** a `--diff` a `--replace`-t rövid unified diffként mutatja,
-  semmit nem ír. PHP `--into` mellett a `--before <metódus>` és az `--at L<n>` egy metódus elé vagy egy sorba teszi a
-  kódot, az `--upsert` pedig egy létező metódus `--into`-ját cserévé alakítja. A Vue `--into fajl.vue::template#id`
-  (vagy `::#id`, `::.class`) az adott template-elem belsejébe fűz, a `--replace fajl.vue::script` / `::template` /
-  `::style` pedig az egész szakasz tartalmát cseréli (a tagek maradnak), elavulható sortartomány nélkül. A
-  `.callgraph/gen.toml`-ban megnevezett komponenseket a tsconfig / Vite aliasok mögött is megtalálja. Az MCP
-  `generate` eszköz megkapta a `before`, `at`, `upsert` és `diff` paramétert.
+- **`gen` előnézetek és további elhelyezési lehetőségek:** `--into` / `--replace` mellett a `--dry` először kiírja,
+  hová kerülne a kód, pl. `→ app/Pay.php::Pay after charge (L41)` vagy `→ f.vue: script L12-14`, a `--diff` pedig a
+  `--replace`-t rövid unified diffként mutatja, semmit nem ír. PHP `--into` mellett a `--before <metódus>` és az
+  `--at L<n>` egy metódus elé vagy egy sorba teszi a kódot (az osztálytörzsön kívüli, pl. a `{` sorára mutató `--at`
+  azonnal hibát ad, az üzenet megadja a törzs sortartományát), az `--upsert` pedig egy létező metódus `--into`-ját
+  cserévé alakítja (`--expect` mellett az elvárást akkor ellenőrzi, ha a tag már létezik). A Vue
+  `--into fajl.vue::template#id` (vagy `::#id`, `::.class`) az adott template-elem belsejébe fűz, a kifejezést
+  sablon-markupként olvasva, a `--replace fajl.vue::script` / `::template` / `::style` pedig az egész szakasz
+  tartalmát cseréli (a tagek maradnak), elavulható sortartomány nélkül. Az MCP `generate` eszköz megkapta a `before`,
+  `at`, `upsert` és `diff` paramétert.
 - **`gen` PHP: traitek, névtelen osztályok és Laravel-osztálynevek:** egy típus alatti `use:HasFactory,Notifiable`
   az osztálytörzsbe `use HasFactory, Notifiable;` sort ír (`c:Post<Model> > use:HasFactory + +comments():HasMany{…}`).
   Az `a:<Migration> > +up():void{…}` névtelen osztályt ír, `return new class extends Migration { … };`, ahogy a
@@ -59,46 +63,45 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   meg a vázlatban, a `--format api`-ban pedig `model` szakaszként. A csak típust használó `defineEmits` is a valódi
   sorát mutatja.
 - **Kotlin-támogatás (`.kt`, `.kts`):** osztályok, data/sealed/enum osztályok, objektumok és companion objectek,
-  interfészek, felső szintű és extension függvények, `suspend` és `@Composable` függvények, property-k (a `by lazy`
-  és a `by viewModels()` is), hívások fogadótípus-feloldással, `::ref` / `Type::name` hivatkozások és vezérlési
-  ágak. A kategóriák lefedik a Compose-t (nézetek, modifierek, API), a coroutine-okat, az Androidot és a Kotlin
-  standard könyvtárat; a `*.gradle.kts` fájlok Gradle build scriptként vannak jelölve. A `hiltViewModel()`, a `viewModel()` és a
-  `by viewModels()` injektálási él, a view modelen hívott metódusok pedig a típusára oldódnak fel. A Hilt
-  `@Inject constructor`, `@Provides` és `@Binds` megmutatja, mi injektálódik és melyik metódus szolgáltat egy típust.
-  A `NavHost` `composable("route") { Screen() }` és a `navController.navigate("…")` navigációs él (a típusbiztos
-  útvonalak is: `navigate(Detail(…))` / `composable<Detail>`), akkor is, ha a `NavHost` másik fájlban van. Az interfészmetódus és a megvalósításai hívói látják egymást. Az Android-projektek profilt kapnak
-  (ui / view model / data / domain / di rétegek; a `*.gradle.kts` nem számít alkalmazáskódnak), a Kotlin pedig
-  megjelenik a használati statisztikában. A `!!` nem rejti el a hívás fogadóját, a `*Test.kt` fájlok és az
-  `androidTest` mappák a `locate`-ban tesztnek számítanak, a metódustörzsek szűrése pedig helyes (kommentek, raw
-  stringek).
+  interfészek, felső szintű és extension függvények, `suspend` és `@Composable` függvények, property-k (a `by lazy` és
+  a `by viewModels()` is), hívások fogadótípus-feloldással, `::ref` / `Type::name` hivatkozások és vezérlési ágak. A
+  kategóriák lefedik a Compose-t (nézetek, modifierek, API), a coroutine-okat, az Androidot és a Kotlin standard
+  könyvtárat; a `*.gradle.kts` fájlok Gradle build scriptként vannak jelölve. A `hiltViewModel()`, a `viewModel()` és
+  a `by viewModels()` injektálási él, a view modelen hívott metódusok pedig a típusára oldódnak fel. A Hilt `@Inject
+  constructor`, `@Provides` és `@Binds` megmutatja, mi injektálódik és melyik metódus szolgáltat egy típust. A
+  `NavHost` `composable("route") { Screen() }` és a `navController.navigate("…")` navigációs él (a típusbiztos
+  útvonalak is: `navigate(Detail(…))` / `composable<Detail>`), akkor is, ha a `NavHost` másik fájlban van. Az
+  interfészmetódus és a megvalósításai hívói látják egymást. Az Android-projektek profilt kapnak (ui / view model /
+  data / domain / di rétegek; a `*.gradle.kts` nem számít alkalmazáskódnak), a Kotlin pedig megjelenik a használati
+  statisztikában. A `!!` nem rejti el a hívás fogadóját, a `*Test.kt` fájlok és az `androidTest` mappák a `locate`-ban
+  tesztnek számítanak, a metódustörzsek szűrése pedig helyes (kommentek, raw stringek).
 - **Swift: callback-ek, protokollok és navigáció:** a callback-argumentumként átadott metódushivatkozás
-  (`Composer(onSend: vm.send)`) a hivatkozott metódus hívása. A callback-property-ben tárolt closure
-  (`socket.onFrame = { … }`) össze van kötve azzal a hellyel, ahol a property-t meghívják; `--depth 2` mellett a
-  meghívó metódus `via <Type>::onFrame` hívóként jelenik meg. A protokollmetódus és a megvalósításai hívói látják
-  egymást (`via`), és az `extension`-ben deklarált megfelelés is számít. A `.environment(store)` /
+  (`Composer(onSend: vm.send)`) a hivatkozott metódus hívása. A callback-property-ben tárolt closure (`socket.onFrame
+  = { … }`) össze van kötve azzal a hellyel, ahol a property-t meghívják. A protokollmetódus és a megvalósításai hívói
+  látják egymást (`via`), és az `extension`-ben deklarált megfelelés is számít. A `.environment(store)` /
   `.environmentObject` injektálási él, a `navigationDestination`, `sheet`, `fullScreenCover`, `popover` vagy
   `NavigationLink` alatt épített nézetek navigációs élek. A fogadótípust a `@State`, `@Bindable`, `let x: T`,
   `@Environment(T.self)` és a paraméterek adják. A pozícionálisan (`.onChange(of: x, vm.changed)`) vagy `#selector(…)`
-  útján átadott hivatkozás hivatkozás-hívás; a key path nem hívás. A SwiftData `@Query var items: [Item]` modell-él,
-  a `modelContext` hívásai pedig kategorizáltak. A `navigationDestination { switch … }` minden nézete navigációs él,
-  a generikus nézetek (`List<Item>(…)`) komponenshasználatnak számítanak, az actor metódusok pedig feloldódnak. A
+  útján átadott hivatkozás hivatkozás-hívás; a key path nem hívás. A SwiftData `@Query var items: [Item]` modell-él, a
+  `modelContext` hívásai pedig kategorizáltak. A `navigationDestination { switch … }` minden nézete navigációs él, a
+  generikus nézetek (`List<Item>(…)`) komponenshasználatnak számítanak, az actor metódusok pedig feloldódnak. A
   fájlokon átívelő property-láncon át indított hívás (`self.store.session.user.load()`) az utolsó property típusának
   metódusára oldódik fel. A tárolt closure-t meghívó metódus (`onFrame?(…)`) a closure hívottjainak közvetlen
-  hívójaként jelenik meg, a „called through a stored closure” alatt, `via <Type>::<property>` jelöléssel. A fájlokon át feloldott hívók (Kotlin-útvonalak, Swift property-láncok,
-  Rust trait-korlátok) a hívólista első szintjén jelennek meg, a „called through a stored closure or resolved across
-  files” alatt.
+  hívójaként jelenik meg, `via <Type>::<property>` jelöléssel; ezek a hívók és a fájlokon át feloldott hívók
+  (Kotlin-útvonalak, Swift property-láncok, Rust trait-korlátok) a hívólista első szintjén szerepelnek, a „called
+  through a stored closure or resolved across files” alatt.
 - **`callgraph mcp --allow <mappa>`:** az MCP-szerver egy további mappát is olvashat, pl. egy testvér `../android`
   mappát. A kapcsoló ismételhető, vagy a `CALLGRAPH_MCP_ALLOW` környezeti változó használható; alapból a szerver a
   projektgyökérre korlátozott marad.
 - **Rust: függvényhivatkozások és több fogadótípus:** az értékként átadott függvény vagy metódus (`.map(Self::parse)`,
   `.and_then(Foo::new)`, `.map(helper)`) hívásnak számít. A generikus korláttal (`T: Trait`, `where`) vagy a metódus
-  visszatérési típusával (`self.make()?`, `Type::open().unwrap()`) típusozott fogadók feloldódnak.
-  A ciklusváltozók (`for b in self.bars`), az `if let Some(x)` / `while let` / `match Some(x)` kötések és az
-  iterátor-closure paraméterek (`items.iter().map(|x| x.name())`) megkapják az elemtípusukat, így a metódushívásaik
-  feloldódnak; `T: A + B` esetén a metódust deklaráló trait számít, akkor is, ha a traitek más fájlokban vannak deklarálva. A `#[test]` / `#[tokio::test]` függvények és a
-  `#[cfg(test)]` modulok tesztként vannak jelölve, a `Some` / `Ok` / `Err` / `Box::new` / `Default::default` már nem
-  zsúfolja a híváslistát, a helyi closure hívása pedig dinamikusnak van jelölve. A trait-metódus és a megvalósításai
-  hívói mindkét irányban látják egymást (`via`).
+  visszatérési típusával (`self.make()?`, `Type::open().unwrap()`) típusozott fogadók feloldódnak. A ciklusváltozók
+  (`for b in self.bars`), az `if let Some(x)` / `while let` / `match Some(x)` kötések és az iterátor-closure
+  paraméterek (`items.iter().map(|x| x.name())`) megkapják az elemtípusukat, így a metódushívásaik feloldódnak; `T: A
+  + B` esetén a metódust deklaráló trait számít, akkor is, ha a traitek más fájlokban vannak deklarálva. A `#[test]` /
+  `#[tokio::test]` függvények és a `#[cfg(test)]` modulok tesztként vannak jelölve, a `Some` / `Ok` / `Err` /
+  `Box::new` / `Default::default` már nem zsúfolja a híváslistát, a helyi closure hívása pedig dinamikusnak van
+  jelölve. A trait-metódus és a megvalósításai hívói mindkét irányban látják egymást (`via`).
 - **JS/TS: az értékként átadott függvények hívónak számítanak:** a hívás- vagy `new`-argumentumként, tömbelemként
   vagy objektum-property értékeként (rövidített alakban is) átadott függvény, pl. egy route-tábla handlere
   `guarded(api.listX)`-ben, `(ref)` jelölésű hivatkozás-él. Megjelenik a hívólistákban, számít a `--depth` /
@@ -129,14 +132,15 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   teljes URI, action, `name=`, `[middleware]` és `fájl:sor`; a csoportok prefixét, nevét és middleware-ét a beágyazott
   csoportok is öröklik. Ugyanez a tábla táplálja a `--format ziggy`, `inertia` és `forms` nézetet. A literál
   konfigtömbből ciklusban generált útvonalak (`foreach (config('catalogue.pages') as $name => $page)
-  Route::get($page['uri'], …)->name($name)`) valódi sorokká bomlanak ki. A tárolt route-adat egyszer, csendben
-  újraépül.
+  Route::get($page['uri'], …)->name($name)`) valódi sorokká bomlanak ki, és már nem dinamikusak: a `ziggy` ismeri a
+  nevüket, az `inertia` pedig az oldalaikat (a konfigban megnevezett, de nem létező oldalkomponenst jelzi). A tárolt
+  route-adat egyszer, csendben újraépül.
 - **A framework által végzett Laravel-drótozás:** azok a hívások, amelyek csak a Laravelen keresztül léteznek,
   mostantól a céljukra mutatnak, így a cél hívólistája is mutatja őket: az Eloquent local scope hívása
   (`Product::query()->stocked()`, `Product::stocked()`) a `scopeStocked`-ra; az esemény kiváltása (`E::dispatch(…)`,
-  `event(new E)`) a listenerére (amelyet a `handle(E $e)`, az `Event::listen` vagy a `$listen` tömb alapján talál meg);
-  a `Job::dispatch(…)` a job `handle` metódusára; a `->notify(new N)` az `N::toMail`-re; a `Model::observe(O::class)`
-  / `#[ObservedBy]` pedig az observer metódusaira.
+  `event(new E)`) a listenerére (amelyet a `handle(E $e)`, az `Event::listen` vagy a `$listen` tömb alapján talál
+  meg); a `Job::dispatch(…)` a job `handle` metódusára; a `->notify(new N)` az `N::toMail`-re; a
+  `Model::observe(O::class)` / `#[ObservedBy]` pedig az observer metódusaira.
 - **A `--format inertia` jelzi a soha át nem adott propokat:** ha egy oldal olyan kötelező propot deklarál, amelyet
   sem render-hely, sem `HandleInertiaRequests::share` kulcs nem ad át, `! never passed: x` sort kap. A tárolt gráf
   egyszer, csendben újraépül.
@@ -154,14 +158,15 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   verzió.
 - **Fordítási kulcsok a `--format i18n` móddal:** egy lang fájlnál megmutatja, mely kulcsok hiányoznak a többi
   nyelvből és melyek nem használtak; egy kulcsnál (`lang/en.json::board.title`) hol használják és mi az értéke
-  nyelvenként; a forráskódnál pedig mely használt kulcsok nem léteznek (`⚠ missing in hu.json`). Lefedi a lang JSON- és
-  PHP-fájlokat, valamint a `$t` / `t` / `trans` / `__` / `@lang` / `Lang::get` használatokat. A dinamikus kulcsokat
+  nyelvenként; a forráskódnál pedig mely használt kulcsok nem léteznek (`⚠ missing in hu.json`). Lefedi a lang JSON-
+  és PHP-fájlokat, valamint a `$t` / `t` / `trans` / `__` / `@lang` / `Lang::get` használatokat. A dinamikus kulcsokat
   (`` `x.${y}` ``, összefűzés) soha nem jelzi hiányzónak, a mondatszerű kulcsokat (a Laravel „strings as keys"
-  megoldása) pedig soha nem jelzi nem használtnak. A TS / JS szótármodulok (`export default { … }` a
-  `locales/en.ts`, `i18n/de.ts` fájlban) is nyelvfájlnak számítanak: rájuk is jelzi a hiányzó, nem használt és
-  ismeretlen kulcsokat, a vázlatuk pedig a kulcsfát mutatja. A projekt saját `t()` burkolójával (egy helyi modul,
-  amely a `vue-i18n`-re vagy az `i18next`-re épül és `t`-t exportál) a scriptekben lévő `t('a.b')` hívások is
-  kulcshasználatnak számítanak.
+  megoldása) pedig soha nem jelzi nem használtnak. A TS / JS szótármodulok (`export default { … }` a `locales/en.ts`,
+  `i18n/de.ts` fájlban) is nyelvfájlnak számítanak: rájuk is jelzi a hiányzó, nem használt és ismeretlen kulcsokat, a
+  vázlatuk pedig a kulcsfát mutatja. A projekt saját `t()` burkolójával (egy helyi modul, amely a `vue-i18n`-re vagy
+  az `i18next`-re épül és `t`-t exportál) a scriptekben lévő `t('a.b')` hívások is kulcshasználatnak számítanak. A
+  kulcsok teljes alakban látszanak, a közös előtagot egyszer kiírva (`a.b.{c, d}`), és a nézet a fordítási fájl
+  nélküli projektekben is gyors.
 - **Stíluslap-osztályok használata a `--format classes` móddal:** megmutatja, mely template-ek és komponensek
   használnak egy osztályt, és kiad egy engedékeny listát a nem használtakról (a dinamikusan összeállított osztályokat
   és a Tailwind utility-ket soha nem jelzi). A lang fájlok, a stíluslapok és a `$t(…)` hívások a vázlatban rövid
@@ -177,11 +182,10 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   mappájához), minden platformon `/` elválasztóval. Monorepóban így egy fájlnak egy kulcsa van, a
   `--grep 'ui/src/x.ts::fn'` minden csomagból megtalálja a hívókat; korábban minden importáló csomag a saját relatív
   kulcsát látta. Az egycsomagos projektek kulcsai nem változnak. A tárolt gráf egyszer, csendben újraépül.
-- **Rövidebb skill, nyelvenkénti részletek:** az agent skill mostantól egy rövid, angol nyelvű `SKILL.md` mag (kb.
-  13 KB a korábbi 30 KB helyett, nagyjából 3 500 token 7 800 helyett), plusz a `ref/` mappa részletező fájljai (php,
-  blade, js, jsx, vue, css, rust, swift, kotlin, python, go, gen, mcp, reference), amelyeket az agent csak a projekt
-  nyelveihez olvas be. A Kotlin, a Blade és a React (`ref/jsx.md`: komponensek, hookok, jelenlegi korlátok) először
-  kap leírást a skillben. A `self-update` az új szerkezetet telepíti.
+- **Rövidebb skill, nyelvenkénti részletek:** az agent skill mostantól egy jóval rövidebb, angol nyelvű `SKILL.md`
+  mag, plusz a `ref/` mappa részletező fájljai (php, blade, js, jsx, vue, css, rust, swift, kotlin, python, go, gen,
+  mcp, reference), amelyeket az agent csak a projekt nyelveihez olvas be. A Kotlin, a Blade és a React (`ref/jsx.md`:
+  komponensek, hookok, jelenlegi korlátok) először kap leírást a skillben. A `self-update` az új szerkezetet telepíti.
 - **Kevesebb zaj a framework-nézetekben:** a `--format events`, `middleware`, `validation`, `jobs`, `providers` és
   `di` csak a megfelelő helyen illeszti a mintáit, így pl. a `config` vagy a `response` már nem jelenik meg
   eseményként, az `X::dispatch` és az `Event::listen` viszont szerepel. A middleware címkéje már nem tapad a céljához,
@@ -192,11 +196,6 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   sorait mutatja, az esemény-kiváltásokat pedig már nem; a `middleware` megmutatja, mely útvonalak használják az egyes
   middleware-eket; a `providers` csak a service provider osztályokon belüli regisztráló hívásokat számolja, így egy
   modell `boot`-ja vagy egy lekérdezés `bind`-ja (pl. tesztekben) nem jelenik meg.
-- **Teljes fordítási kulcsok az i18n-nézetben:** a `--format i18n` levágott kulcsok helyett a teljes kulcsokat
-  mutatja, a közös előtagot egyszer kiírva (`a.b.{c, d}`), és gyorsabb a fordítási fájl nélküli projektekben.
-- **A CSS/SCSS `var()` megmutatja a property-t:** a `var(--brand)` hívás `var(--brand)` alakban szerepel, és a
-  `--grep` `var`-ként és `--brand`-ként is megtalálja. A `translateY`, `blur`, `scale` és hasonló függvények már nem
-  rejtőznek el.
 - **Tisztább sorok a vázlatban és a nézetekben:** a PHP enum- és konstansolvasások `external_call` helyett
   `const_use` sorként látszanak; a `--format routes` sorai már nem végződnek `@ __top__::__top__`-ra, a Vue
   metódusindex sorain pedig nincs `[private]`.
@@ -207,16 +206,18 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 - **A Laravel űrlapellenőrzés követi a `form.transform(...)`-ot:** a `--format forms`, a `form:` sorok és a `laravel:`
   generátor űrlap ↔ szabály ellenőrzése mostantól azokat a kulcsokat vizsgálja, amelyeket a transform visszaad;
   `...data` szórás esetén az űrlapmezőket és a hozzáadott kulcsokat. A láncolt `form.transform(…).post(…)` hívással
-  elküldött űrlapot is megtalálja.
+  elküldött űrlapot is megtalálja, akkor is, ha a lánc több sorra van tördelve (`form` / `.transform(…)` /
+  `.post(…)`).
 - **A Laravel preset gondosabban választ űrlapkomponenst:** a komponens csak akkor kap szerepet, ha megvan rajta a
   kötött prop (a hibaállapot-blokkot már nem használja mezőhibaként). A mezőburkoló komponens (címke + hiba + slot,
   pl. `FormField`) körbeveszi a mezőket, a textarea és a checkbox komponenseket pedig a `text` / `bool` mezők kapják;
   a `.callgraph/gen.toml` kulcsai: `field`, `textarea`, `checkbox`. A preset a tsconfig `paths` / Vite alias mögötti
-  űrlapkomponenseket is megtalálja (pl. `@ui` egy különálló UI-csomagra), és előnyben részesíti azokat, amelyeket a
+  űrlapkomponenseket is megtalálja (pl. `@ui` egy különálló UI-csomagra), a `.callgraph/gen.toml`-ban
+  megnevezetteket is, és előnyben részesíti azokat, amelyeket a
   meglévő oldalak már importálnak.
 - **Egyértelműbb jelölések a kimenetben (minden nyelven):** a hivatkozás-hívások `(ref)` jelölést kapnak a vázlatban,
-  a `--grep` soraiban és a hívóknál. A teszt függvények `[test]`, a csak tesztből álló modul `[tests]` jelölést kap, és
-  egy darabszám-sorrá van összecsukva. Az injektálási, navigációs és callback-bekötési élek a fajtájukat (`inject`,
+  a `--grep` soraiban és a hívóknál. A teszt függvények `[test]`, a csak tesztből álló modul `[tests]` jelölést kap,
+  és egy darabszám-sorrá van összecsukva. Az injektálási, navigációs és callback-bekötési élek a fajtájukat (`inject`,
   `nav`, `wire`) mutatják a kategória oszlopban.
 - **A `gen` gyorsabb nagy PHP-projektekben:** az ismeretlen típusneveket egyetlen projektbejárással oldja fel
   (korábban nevenként egy bejárás), minden projektfájlt hívásonként legfeljebb egyszer olvas be, a Laravel preset
@@ -230,7 +231,9 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   `const props =` pedig csak ott, ahol a script használja. A Ziggyt a `composer.json` / `package.json` függőséglistái
   alapján ismeri fel, nem szövegkereséssel.
 - **Stíluslap-hívások és JSON-kulcsok a vázlatban:** a CSS/SCSS hívások (`var()`, `@include`, függvények, `@extend`) a
-  szabályuk alatt jelennek meg, és a `--grep` megtalálja őket. A metódus nélküli JSON-fájl rövid kulcsindexet kap a
+  szabályuk alatt jelennek meg, és a `--grep` megtalálja őket; a `var(--brand)` hívás `var(--brand)` alakban
+  szerepel, és `var`-ként és `--brand`-ként is megtalálható, a `translateY`, `blur`, `scale` és hasonló függvények
+  pedig már nem rejtőznek el. A metódus nélküli JSON-fájl rövid kulcsindexet kap a
   metódusindexben (a felső kulcsok gyerekszámmal, a skalár sorozatok összevonva). A `--format summary` JSON-nál,
   Markdown/HTML-nél és stíluslapoknál „0 metódus" helyett kulcsokat, szakaszokat vagy szabályokat számol.
 - **Pontosabb SCSS-vázlat:** a `&--#{$x}` és a `.span-#{$i}` megtartja a teljes szelektornevét; a többsoros
@@ -242,9 +245,9 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 - **Nincs ismétlődő tipp MCP-n:** a záró 💡 tipp sor már nem kerül minden MCP-válaszba (a CLI megtartja). A skill
   mostantól az md, json, css, scss és html fájlok szerkezetére is a callgraphot ajánlja.
 - **Tömörebb Vue-vázlat:** a propok egyszer szerepelnek (a komponens propjait megismétlő `defineProps<X>` interfész
-  már nem külön blokk), az emitek és a modellek egy-egy sorban állnak (`emits (N): a, b, …`, `models (N): name: Type`),
-  a sornál hosszabb prop-alapérték `…`-tel le van vágva, a közös mappájú `component_use` útvonalak pedig egyszer
-  írják ki a mappát (`dir/{atoms/A, organisms/B}.vue`). Egy nagy komponens vázlata így jóval rövidebb.
+  már nem külön blokk), az emitek és a modellek egy-egy sorban állnak (`emits (N): a, b, …`, `models (N): name:
+  Type`), a sornál hosszabb prop-alapérték `…`-tel le van vágva, a közös mappájú `component_use` útvonalak pedig
+  egyszer írják ki a mappát (`dir/{atoms/A, organisms/B}.vue`). Egy nagy komponens vázlata így jóval rövidebb.
 - **A nagy egyfájlos vázlat előbb tömörödik, csak utána jön a metódusindex:** a kimenet-korlát fölött a vázlat
   először kompakt alakban jelenik meg (megjegyzések nélkül, a konstansok és propertyk tördelve, a híváslisták 8 elem
   után `… +N`-nel rövidítve, minden tag megmarad); metódusindex csak akkor, ha ez sem fér bele. A `--full` a teljes
@@ -292,8 +295,7 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   `route('en.x')` „dinamikus, nem ellenőrizhető" lesz ismeretlen helyett, a `routes/` mappán kívüli, ilyen útvonalakat
   regisztráló segédfüggvényre pedig a program felhívja a figyelmet. Ugyanez igaz a számított prefixű vagy nevű
   csoportokra (`Route::prefix($code)->name($code.'.')->group(…)`, konfigból vezérelt ciklusok) a `--format ziggy`
-  kimenetben. A literál konfigtömbön futó ciklus már nem dinamikus: a `ziggy` ismeri az útvonalai nevét, az `inertia`
-  pedig az oldalait (a konfigban megnevezett, de nem létező oldalkomponenst jelzi).
+  kimenetben.
 - **Az egysoros, típusos `defineEmits` is olvasható:** a `defineEmits<{ login: []; save: [id: number] }>()` egy
   sorban is megadja az emit-listát (`--format api`).
 - **Nincs téves hívás a Vue-attribútumok template literaljából:** a kötött attribútum template literaljában lévő
@@ -302,9 +304,8 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   szerepel a listán, az útvonala ismeretlen/dinamikus jelölést kap; ha a cél olyan URL vagy route-név, amely nincs a
   route-táblában (pl. egy csomag vagy az auth-scaffolding route-ja), az űrlap `? nincs a route-táblában` jelöléssel
   szerepel; a mégis kihagyott űrlapokat a nézet végén összesíti, az okkal, fájllal és sorral
-  (`? 2 kihagyva: <ok> (a.vue L3, b.vue L9)`). A több sorra tördelt láncolt küldést (`form` / `.transform(…)` /
-  `.post(…)`) is beolvassa, és a `useForm({…})` objektumban lévő template string vagy `#` már nem rontja el a mezők
-  olvasását.
+  (`? 2 kihagyva: <ok> (a.vue L3, b.vue L9)`). A `useForm({…})` objektumban lévő template string vagy `#` már nem
+  rontja el a mezők olvasását.
 - **Az opcionális read-guard hook nem tekinti olvasásnak az írást:** a kimeneti átirányítás és a heredoc már nem
   olvasás, így a `cat >> f`, `cat > f <<EOF` vagy `2>f` nagy forrásfájlon nincs letiltva; a `cat f` és a `cat < f`
   továbbra is olvasásnak számít.
@@ -314,15 +315,11 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 - **A `--grep useX --depth N` kihagyja a destrukturált értékeket:** a `useX()`-ből destrukturált érték használatai
   már nem szerepelnek a `useX` hívásaiként.
 - **A `callgraph.sh rename` működik:** a wrapper szkript már továbbítja (a súgó eddig is hirdette).
-- **A `gen --at L<n>` az osztálytörzsön kívül azonnal hibát ad:** pl. a `{` során; az üzenet megadja a törzs
-  sortartományát.
-- **A `gen … --into fájl.vue::#id` / `::.class` sablon-markupként olvas:** a kifejezést alapból markupként elemzi.
-- **A `gen --into … --upsert --expect …` elfogadott:** az elvárást akkor ellenőrzi, ha a tag már létezik.
 - **A `laravel:` preset követi a projektet és a migrációt:** TypeScript-projektben `<script setup lang="ts">`
   fejlécet és típusos propokat ír akkor is, ha még nincs `.vue` fájl, és olvassa a migráció oszloptípusát: a
   `text` oszlop nem kap `max:255`-öt, a `string('x', 100)` pedig `max:100`-at.
-- **A `locate` hívószámai a nyelvcsaládon belül maradnak:** egy Vue-függvény már nem számolja az azonos nevű PHP-metódus
-  hívóit.
+- **A `locate` hívószámai a nyelvcsaládon belül maradnak:** egy Vue-függvény már nem számolja az azonos nevű
+  PHP-metódus hívóit.
 - **Swift: az `Extensions` mappa saját kód:** a Swift-fájlokat tartalmazó `Extensions` mappát korábban vendorként
   kezelte.
 
@@ -1090,7 +1087,8 @@ Első kiadás.
 - Beépített frissítés: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Előre fordított csomagok macOS-re (arm64, x86_64), Linuxra (x86_64, ARM64, statikus musl) és Windowsra.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v1.0.2...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v1.1.0...develop
+[1.1.0]: https://github.com/GeRiY/callgraph/releases/tag/v1.1.0
 [1.0.2]: https://github.com/GeRiY/callgraph/releases/tag/v1.0.2
 [1.0.1]: https://github.com/GeRiY/callgraph/releases/tag/v1.0.1
 [1.0.0]: https://github.com/GeRiY/callgraph/releases/tag/v1.0.0

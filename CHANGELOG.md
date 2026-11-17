@@ -5,6 +5,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-11-17
+
 ### Added
 
 - **Blade templates (`.blade.php`) are analysed as their own language** (before, the result was empty): one view per
@@ -16,8 +18,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   a "rendered by" line lists the `view('…')` calls in controllers.
 - **MCP `undo` tool:** restores the last change made by `generate` or `rename` — one file when a file is given,
   otherwise the whole last group of changes. The history is multi-step: each call steps one change further back
-  (before, two undos in a row toggled the last change). Like `generate` and `rename`, it only exists when the server runs with
-  `--generate` / `CALLGRAPH_GENERATE=1`, and it is marked `readOnlyHint: false`.
+  (before, two undos in a row toggled the last change). Like `generate` and `rename`, it only exists when the server
+  runs with `--generate` / `CALLGRAPH_GENERATE=1`, and it is marked `readOnlyHint: false`.
 - **`rename term <old> <new>`: rename a whole concept in every spelling:** `rename term post article` changes the
   word in PHP, JS, TS and Vue code wherever it appears as a whole word, keeping the case and plural: `Post` / `post` /
   `posts`, `post_id`, `StorePostRequest`, `/posts/{post}`, `admin.posts.index`, `Posts/Index.vue`. Plurals with
@@ -28,28 +30,28 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   `node_modules`. A quoted word in value position that may be an HTTP verb (`'method' => 'post'`) is only flagged,
   not changed. `--dry` shows the whole plan (files moved, changes per file, flagged strings, the migration), and one
   `undo` reverts everything, including the new migration. Over MCP it is the `term` kind of the `rename` tool.
-- **`gen --dry` shows where the code would go:** with `--into` / `--replace`, the dry run first prints the placement,
-  e.g. `→ app/Pay.php::Pay after charge (L41)` or `→ f.vue: script L12-14`.
-- **`gen --diff` and more placement options:** `--diff` shows a `--replace` as a short unified diff without writing
-  anything. For PHP `--into`, `--before <method>` and `--at L<n>` place the code before a method or at a line, and
-  `--upsert` turns an `--into` of an existing method into a replace. Vue `--into file.vue::template#id` (or `::#id`,
-  `::.class`) appends inside that template element, and `--replace file.vue::script` / `::template` / `::style`
-  replaces the whole content of that section (the tags stay), with no line range that can go stale. Components named
-  in `.callgraph/gen.toml` are also found behind tsconfig / Vite aliases. The MCP `generate` tool got `before`, `at`,
-  `upsert` and `diff`.
+- **`gen` previews and more placement options:** with `--into` / `--replace`, `--dry` first prints where the code
+  would go, e.g. `→ app/Pay.php::Pay after charge (L41)` or `→ f.vue: script L12-14`, and `--diff` shows a
+  `--replace` as a short unified diff without writing anything. For PHP `--into`, `--before <method>` and `--at L<n>`
+  place the code before a method or at a line (an `--at` outside the class body, e.g. on the `{` line, is rejected
+  upfront with the body's line range), and `--upsert` turns an `--into` of an existing method into a replace (with
+  `--expect`, the expectation is checked when the member already exists). Vue `--into file.vue::template#id` (or
+  `::#id`, `::.class`) appends inside that template element, the expression being read as template markup, and
+  `--replace file.vue::script` / `::template` / `::style` replaces the whole content of that section (the tags stay),
+  with no line range that can go stale. The MCP `generate` tool got `before`, `at`, `upsert` and `diff`.
 - **`gen` PHP: traits, anonymous classes and Laravel class names:** `use:HasFactory,Notifiable` under a type writes
   `use HasFactory, Notifiable;` inside the class body (`c:Post<Model> > use:HasFactory + +comments():HasMany{…}`).
   `a:<Migration> > +up():void{…}` writes an anonymous class, `return new class extends Migration { … };`, as in
   Laravel migrations. In a Laravel project (`laravel/framework` in `composer.json`) common framework classes such as
   `Model`, `Schema`, `Blueprint`, `Route`, `Request`, `Rule`, `Builder`, `HasMany` or `RefreshDatabase` are imported
   without `use:`; names that exist in several packages (e.g. `Response`) still need `use:`.
-- **`gen` PHP statements outside a class: `php{ … }` and `raw{ … }`:** `php{ Route::get('/posts', [PostController::class,
-  'index']); }` writes plain PHP code. With `--write routes/x.php` it creates the file (adding `<?php` and the
-  imports), with `--into routes/web.php` it appends to the end of the file or goes to `--at L<n>` / `--after L<n>`, and
-  with `--replace bootstrap/app.php:L14-L16` it replaces that line range or a method. The code takes the indentation
-  of the line it goes at or replaces, and an empty `php{}` with `--replace file:La-Lb` deletes the lines. `raw{ … }`
-  writes the text exactly as given, e.g. a Blade view with `--write resources/views/app.blade.php`; Blade files are
-  not PHP-syntax-checked.
+- **`gen` PHP statements outside a class: `php{ … }` and `raw{ … }`:** `php{ Route::get('/posts',
+  [PostController::class, 'index']); }` writes plain PHP code. With `--write routes/x.php` it creates the file (adding
+  `<?php` and the imports), with `--into routes/web.php` it appends to the end of the file or goes to `--at L<n>` /
+  `--after L<n>`, and with `--replace bootstrap/app.php:L14-L16` it replaces that line range or a method. The code
+  takes the indentation of the line it goes at or replaces, and an empty `php{}` with `--replace file:La-Lb` deletes
+  the lines. `raw{ … }` writes the text exactly as given, e.g. a Blade view with `--write
+  resources/views/app.blade.php`; Blade files are not PHP-syntax-checked.
 - **Vue props from interfaces, defaults and `defineModel`:** `defineProps<Props>()` now resolves a local `interface`
   or type alias (including `extends` and `A & B`); `withDefaults` defaults are shown as `type $name = default` and the
   prop is not marked required; `defineModel` appears as `model:` in the outline and as a `model` section in
@@ -61,39 +63,37 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   `*.gradle.kts` files are marked as Gradle build scripts. `hiltViewModel()`, `viewModel()` and `by viewModels()` are
   injection edges, and calls on the view model resolve to its type. Hilt `@Inject constructor`, `@Provides` and
   `@Binds` show what is injected and which method provides a type. `NavHost` `composable("route") { Screen() }` and
-  `navController.navigate("…")` are navigation edges (type-safe routes too, `navigate(Detail(…))` / `composable<Detail>`), also when the `NavHost`
-  is in another file. Callers of an interface method and of
-  its implementations see each other. Android projects get a profile (ui / view model / data / domain / di layers;
+  `navController.navigate("…")` are navigation edges (type-safe routes too, `navigate(Detail(…))` /
+  `composable<Detail>`), also when the `NavHost` is in another file. Callers of an interface method and of its
+  implementations see each other. Android projects get a profile (ui / view model / data / domain / di layers;
   `*.gradle.kts` is not counted as app code), and Kotlin appears in the usage statistics. `!!` does not hide the
   receiver of a call, `*Test.kt` files and `androidTest` folders count as tests in `locate`, and method bodies are
   filtered correctly (comments, raw strings).
-- **Swift callbacks, protocols and navigation:** a method reference passed as a callback argument
-  (`Composer(onSend: vm.send)`) is a call of that method. A closure stored in a callback property
-  (`socket.onFrame = { … }`) is linked to where the property is invoked; with `--depth 2` the invoking method shows
-  as a caller `via <Type>::onFrame`. Callers of a protocol method and of its implementations see each other (`via`),
-  and a conformance declared in an `extension` counts. `.environment(store)` / `.environmentObject` are injection
-  edges, and views built in `navigationDestination`, `sheet`, `fullScreenCover`, `popover` or `NavigationLink` are
-  navigation edges. Receiver types are taken from `@State`, `@Bindable`, `let x: T`, `@Environment(T.self)` and
-  parameters. A reference passed positionally (`.onChange(of: x, vm.changed)`) or via `#selector(…)` is a reference
-  call; key paths are not calls. SwiftData `@Query var items: [Item]` is a model edge and `modelContext` calls are
-  categorized. Each view in a `navigationDestination { switch … }` is a navigation edge, generic views
-  (`List<Item>(…)`) count as component uses, and actor methods resolve. A call through a property chain that spans
-  files (`self.store.session.user.load()`) resolves to the method of the last property's type. The method that
-  invokes a stored closure (`onFrame?(…)`) is listed as a direct caller of the closure's callees, under "called
-  through a stored closure", as `via <Type>::<property>`. Callers resolved across files (Kotlin routes, Swift property
-  chains, Rust trait bounds) are shown at the first level of the callers list, under "called through a stored closure
-  or resolved across files".
+- **Swift callbacks, protocols and navigation:** a method reference passed as a callback argument (`Composer(onSend:
+  vm.send)`) is a call of that method. A closure stored in a callback property (`socket.onFrame = { … }`) is linked to
+  where the property is invoked. Callers of a protocol method and of its implementations see each other (`via`), and a
+  conformance declared in an `extension` counts. `.environment(store)` / `.environmentObject` are injection edges, and
+  views built in `navigationDestination`, `sheet`, `fullScreenCover`, `popover` or `NavigationLink` are navigation
+  edges. Receiver types are taken from `@State`, `@Bindable`, `let x: T`, `@Environment(T.self)` and parameters. A
+  reference passed positionally (`.onChange(of: x, vm.changed)`) or via `#selector(…)` is a reference call; key paths
+  are not calls. SwiftData `@Query var items: [Item]` is a model edge and `modelContext` calls are categorized. Each
+  view in a `navigationDestination { switch … }` is a navigation edge, generic views (`List<Item>(…)`) count as
+  component uses, and actor methods resolve. A call through a property chain that spans files
+  (`self.store.session.user.load()`) resolves to the method of the last property's type. The method that invokes a
+  stored closure (`onFrame?(…)`) is listed as a direct caller of the closure's callees, as `via <Type>::<property>`;
+  these callers and callers resolved across files (Kotlin routes, Swift property chains, Rust trait bounds) are shown
+  at the first level of the callers list, under "called through a stored closure or resolved across files".
 - **`callgraph mcp --allow <dir>`:** lets the MCP server read an extra folder, e.g. a sibling `../android`. Repeat
   the flag or set `CALLGRAPH_MCP_ALLOW`; by default the server stays restricted to the project root.
 - **Rust: function references and more receiver types:** a function or method passed as a value (`.map(Self::parse)`,
   `.and_then(Foo::new)`, `.map(helper)`) is a call. Receivers typed by a generic bound (`T: Trait`, `where`) or by a
   method's return type (`self.make()?`, `Type::open().unwrap()`) are resolved. Loop variables (`for b in self.bars`),
-  `if let Some(x)` / `while let` / `match Some(x)` bindings and iterator-closure parameters
-  (`items.iter().map(|x| x.name())`) get their element type, so their method calls resolve; with `T: A + B` the trait
-  that declares the method is used, also when the traits are declared in other files. `#[test]` / `#[tokio::test]` functions and `#[cfg(test)]` modules are marked as
-  tests, `Some` / `Ok` / `Err` / `Box::new` / `Default::default` no longer clutter the call list, and calls of a local
-  closure are marked dynamic. Callers of a trait method and of its implementations see each other in both directions
-  (`via`).
+  `if let Some(x)` / `while let` / `match Some(x)` bindings and iterator-closure parameters (`items.iter().map(|x|
+  x.name())`) get their element type, so their method calls resolve; with `T: A + B` the trait that declares the
+  method is used, also when the traits are declared in other files. `#[test]` / `#[tokio::test]` functions and
+  `#[cfg(test)]` modules are marked as tests, `Some` / `Ok` / `Err` / `Box::new` / `Default::default` no longer
+  clutter the call list, and calls of a local closure are marked dynamic. Callers of a trait method and of its
+  implementations see each other in both directions (`via`).
 - **JS/TS: functions passed as values are callers:** a function handed over as a call or `new` argument, an array
   element or an object property value (also shorthand), e.g. the handler in a route table `guarded(api.listX)`, is a
   reference edge marked `(ref)`. It shows in callers lists, counts for `--depth` / impact, and the function no longer
@@ -120,8 +120,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 - **Full Laravel route table with `--format routes`:** on a Laravel project every route is one row with its method,
   full URI, action, `name=`, `[middleware]` and `file:line`, with the prefix, name and middleware of groups inherited
   through nesting. The same table feeds `--format ziggy`, `inertia` and `forms`. Routes generated in a loop from a
-  literal config array (`foreach (config('catalogue.pages') as $name => $page) Route::get($page['uri'], …)->name($name)`)
-  are expanded into real rows. The stored route data is rebuilt once, quietly.
+  literal config array (`foreach (config('catalogue.pages') as $name => $page) Route::get($page['uri'],
+  …)->name($name)`) are expanded into real rows and are no longer dynamic: `ziggy` knows their names, and `inertia`
+  knows their pages (a page component named in the config that does not exist is flagged). The stored route data is
+  rebuilt once, quietly.
 - **Laravel wiring the framework makes:** calls that only exist through Laravel now link to their target, so the
   callers of the target list them: an Eloquent local scope call (`Product::query()->stocked()`, `Product::stocked()`)
   goes to `scopeStocked`; an event dispatch (`E::dispatch(…)`, `event(new E)`) to its listener (found by
@@ -141,14 +143,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   matching heading, shows `⚠ missing`.
 - **Locked versions in `package.json` / `composer.json`:** the outline shows the locked version next to each
   dependency key.
-- **Translation keys with `--format i18n`:** for a lang file it shows which keys are missing in the other locales
-  and which are unused; for a key (`lang/en.json::board.title`) where it is used and its value per locale; for source
-  code which used keys do not exist (`⚠ missing in hu.json`). Covers lang JSON and PHP files and `$t` / `t` / `trans` /
+- **Translation keys with `--format i18n`:** for a lang file it shows which keys are missing in the other locales and
+  which are unused; for a key (`lang/en.json::board.title`) where it is used and its value per locale; for source code
+  which used keys do not exist (`⚠ missing in hu.json`). Covers lang JSON and PHP files and `$t` / `t` / `trans` /
   `__` / `@lang` / `Lang::get` usages. Dynamic keys (`` `x.${y}` ``, concatenation) are never reported missing, and
-  sentence-style keys (Laravel's "strings as keys") are never reported unused. TS / JS dictionary modules
-  (`export default { … }` in `locales/en.ts`, `i18n/de.ts`) are language files too: missing, unused and unknown keys
-  are reported for them, and their outline shows the key tree. With a project's own `t()` wrapper (a local module
-  over `vue-i18n` or `i18next` that exports `t`), `t('a.b')` calls in scripts count as key uses.
+  sentence-style keys (Laravel's "strings as keys") are never reported unused. TS / JS dictionary modules (`export
+  default { … }` in `locales/en.ts`, `i18n/de.ts`) are language files too: missing, unused and unknown keys are
+  reported for them, and their outline shows the key tree. With a project's own `t()` wrapper (a local module over
+  `vue-i18n` or `i18next` that exports `t`), `t('a.b')` calls in scripts count as key uses. Keys are shown whole, with
+  a shared prefix written once (`a.b.{c, d}`), and the view is fast in projects without translation files.
 - **Stylesheet class usage with `--format classes`:** shows which templates and components use a class, and a lenient
   list of unused classes (dynamic class building and Tailwind utilities are never reported). Lang files, stylesheets
   and `$t(…)` calls also get a short hint in the outline, and the MCP `framework_view` tool got `i18n` and `classes`.
@@ -159,15 +162,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 ### Changed
 
 - **JS/TS/Vue file keys are relative to the project root:** the file part of a key (`ui/src/x.ts::fn`) is relative to
-  the nearest folder with `.git` or `.callgraph` (without one, the topmost folder of the package / workspace), with `/`
-  on every platform. In a monorepo a file has one key, so `--grep 'ui/src/x.ts::fn'` finds its callers in every
+  the nearest folder with `.git` or `.callgraph` (without one, the topmost folder of the package / workspace), with
+  `/` on every platform. In a monorepo a file has one key, so `--grep 'ui/src/x.ts::fn'` finds its callers in every
   package; before, each importing package saw its own relative key. Single-package projects keep their keys. The
   stored graph is rebuilt once, quietly.
-- **Shorter skill, details per language:** the agent skill is now a short English core `SKILL.md` (about 13 KB
-  instead of 30 KB, roughly 3 500 instead of 7 800 tokens) plus detail files in `ref/` (php, blade, js, jsx, vue,
-  css, rust, swift, kotlin, python, go, gen, mcp, reference) that the agent reads only for the languages of the
-  project. Kotlin, Blade and React (`ref/jsx.md`: components, hooks, current limits) are covered in the skill for the
-  first time. `self-update` installs the new layout.
+- **Shorter skill, details per language:** the agent skill is now a much shorter English core `SKILL.md` plus detail
+  files in `ref/` (php, blade, js, jsx, vue, css, rust, swift, kotlin, python, go, gen, mcp, reference) that the agent
+  reads only for the languages of the project. Kotlin, Blade and React (`ref/jsx.md`: components, hooks, current
+  limits) are covered in the skill for the first time. `self-update` installs the new layout.
 - **Less noise in the framework views:** `--format events`, `middleware`, `validation`, `jobs`, `providers` and `di`
   match their patterns only at the right place, so e.g. `config` or `response` no longer show up as events, while
   `X::dispatch` and `Event::listen` are listed. The middleware label is no longer glued to its target, and validation
@@ -177,10 +179,6 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   lines; `jobs` lists the `queued` classes (`ShouldQueue`) and `wired` lines for jobs and notifications, and no longer
   lists event dispatches; `middleware` shows which routes use each middleware; `providers` counts registration calls
   only inside service provider classes, so a model's `boot` or a query's `bind` (e.g. in tests) is not listed.
-- **Full translation keys in the i18n view:** `--format i18n` shows whole keys with the shared prefix written once
-  (`a.b.{c, d}`) instead of cut-off keys, and it is faster in projects without translation files.
-- **CSS/SCSS `var()` shows the property:** a `var(--brand)` call is listed as `var(--brand)` and is found by `--grep`
-  both as `var` and as `--brand`. Functions such as `translateY`, `blur` and `scale` are no longer hidden.
 - **Cleaner rows in the outline and views:** enum and constant reads in PHP show as `const_use` instead of
   `external_call`; `--format routes` rows no longer end in `@ __top__::__top__`, and Vue method index rows no longer
   carry `[private]`.
@@ -190,13 +188,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   in the project profile, not pages.
 - **The Laravel form check follows `form.transform(...)`:** `--format forms`, the `form:` lines and the form ↔ rules
   check of the `laravel:` generator now check the keys the transform returns; with a `...data` spread, the form
-  fields plus the added keys. A form submitted with a chained `form.transform(…).post(…)` is found too.
+  fields plus the added keys. A form submitted with a chained `form.transform(…).post(…)` is found too, also when the
+  chain spans several lines (`form` / `.transform(…)` / `.post(…)`).
 - **The Laravel preset picks form components more carefully:** a component only gets a role if it has the prop that is
   bound (an error-state block is no longer used as the field error). A field wrapper component (label + error + slot,
   e.g. `FormField`) wraps each field, and textarea and checkbox components are used for `text` / `bool` fields; the
   `.callgraph/gen.toml` keys are `field`, `textarea` and `checkbox`. The preset also finds form components behind a
-  tsconfig `paths` / Vite alias (e.g. `@ui` pointing to a separate UI package), preferring components that existing
-  pages already import.
+  tsconfig `paths` / Vite alias (e.g. `@ui` pointing to a separate UI package), including the ones named in
+  `.callgraph/gen.toml`, preferring components that existing pages already import.
 - **Clearer marks in the output (all languages):** reference calls are marked `(ref)` in the outline, `--grep` rows
   and callers. Test functions get `[test]`; a module of only tests gets `[tests]` and is collapsed to a count line.
   Injection, navigation and callback-wiring edges show their kind (`inject`, `nav`, `wire`) in the category column.
@@ -212,9 +211,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   `const props =` only where the script uses it. Ziggy is detected from the `composer.json` / `package.json`
   dependency lists instead of a text search.
 - **Stylesheet calls and JSON keys in the outline:** CSS/SCSS calls (`var()`, `@include`, functions, `@extend`) appear
-  under their rule and are found by `--grep`. A JSON file without methods gets a short key index in the method index
-  (top keys with child counts, runs of scalars collapsed). `--format summary` counts keys, sections or rules instead
-  of "0 methods" for JSON, Markdown/HTML and stylesheets.
+  under their rule and are found by `--grep`; a `var(--brand)` call is listed as `var(--brand)` and is found both as
+  `var` and as `--brand`, and functions such as `translateY`, `blur` and `scale` are no longer hidden. A JSON file
+  without methods gets a short key index in the method index (top keys with child counts, runs of scalars collapsed).
+  `--format summary` counts keys, sections or rules instead of "0 methods" for JSON, Markdown/HTML and stylesheets.
 - **More accurate SCSS outline:** `&--#{$x}` and `.span-#{$i}` keep their full selector name; multi-line selectors and
   mixin parameter lists are read correctly; `@mixin` without parentheses and `@include x;` (a call) work; calls in
   comments and selector headers are no longer reported; a reassigned `$var` in the same scope is a write, not a second
@@ -270,9 +270,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 - **Laravel routes registered in a loop:** a route with an interpolated name (`->name("{$code}.x")`) makes
   `route('en.x')` "dynamic, not verifiable" instead of unknown, and a helper outside `routes/` that registers such
   routes is pointed out. The same applies to groups with a computed prefix or name
-  (`Route::prefix($code)->name($code.'.')->group(…)`, config-driven loops) in `--format ziggy`. A loop over a literal
-  config array is no longer dynamic: `ziggy` knows the names of its routes, and `inertia` knows their pages (a page
-  component named in the config that does not exist is flagged).
+  (`Route::prefix($code)->name($code.'.')->group(…)`, config-driven loops) in `--format ziggy`.
 - **Typed one-line `defineEmits` is read:** `defineEmits<{ login: []; save: [id: number] }>()` on one line now
   produces the emits list (`--format api`).
 - **No false calls from template-literal text in Vue attributes:** text inside a template literal of a bound
@@ -281,8 +279,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   listed with its route marked unknown/dynamic; a form whose target is a URL or route name missing from the route
   table (e.g. a package or auth-scaffolding route) is listed with `? not in the route table`; and the forms that are
   still skipped are summed up at the end with the reason and their file and line (`? 2 skipped: <reason> (a.vue L3,
-  b.vue L9)`). A submit chained over several lines (`form` / `.transform(…)` / `.post(…)`) is read, and a template
-  string or `#` inside the `useForm({…})` object no longer breaks reading the fields.
+  b.vue L9)`). A template string or `#` inside the `useForm({…})` object no longer breaks reading the fields.
 - **Optional read-guard hook ignores writes:** an output redirect or heredoc is not a read any more, so
   `cat >> f`, `cat > f <<EOF` or `2>f` on a large source file is no longer blocked; `cat f` and `cat < f` still count.
 - **Optional callgraph-first hook accepts a folder as `--project`:** a callgraph run with `--project <folder path>`
@@ -291,10 +288,6 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 - **`--grep useX --depth N` skips destructured values:** uses of a value destructured from `useX()` are no longer
   listed as calls of `useX`.
 - **`callgraph.sh rename` works:** the wrapper script now forwards it (the help already advertised it).
-- **`gen --at L<n>` outside the class body is rejected upfront:** e.g. on the `{` line; the message gives the body's
-  line range.
-- **`gen … --into file.vue::#id` / `::.class` reads template markup:** the expression is parsed as markup by default.
-- **`gen --into … --upsert --expect …` is accepted:** the expectation is checked when the member already exists.
 - **The `laravel:` preset follows the project and the migration:** it writes `<script setup lang="ts">` with typed
   props in a TypeScript project even without existing `.vue` files, and reads the migration column type: `text`
   columns get no `max:255`, `string('x', 100)` gets `max:100`.
@@ -1021,7 +1014,8 @@ First release.
 - Built-in update: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Prebuilt packages for macOS (arm64, x86_64), Linux (x86_64, ARM64, static musl) and Windows.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v1.0.2...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v1.1.0...develop
+[1.1.0]: https://github.com/GeRiY/callgraph/releases/tag/v1.1.0
 [1.0.2]: https://github.com/GeRiY/callgraph/releases/tag/v1.0.2
 [1.0.1]: https://github.com/GeRiY/callgraph/releases/tag/v1.0.1
 [1.0.0]: https://github.com/GeRiY/callgraph/releases/tag/v1.0.0
