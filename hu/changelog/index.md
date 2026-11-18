@@ -8,6 +8,30 @@ Minden kiadás dátummal, a legújabb elöl: mi új, mi változott és mi javult
 
 [A legújabb verzió telepítése](https://callgraph.eu/hu/#install)[Legfrissebb kiadás a GitHubon](https://github.com/GeRiY/callgraph/releases/latest)
 
+## v1.1.1 — 2026-11-18
+
+[Kiadási jegyzet és letöltések a GitHubon](https://github.com/GeRiY/callgraph/releases/tag/v1.1.1)
+
+### Új
+
+- **Rövid hatásnézet a `--compact` kapcsolóval:** a `--grep … --depth N --compact` a hívókat szintenként, fájlonként egy sorban listázza (`path: A() L12, B() L40 ← target`, kb. 160 karakternél tördelve), így egy széles hatáselemzés rövid marad. Az útvonal-regisztrációk a tényleges kódjukat mutatják, például `L5 Route::delete('songs', [SongController::class, 'destroy'])->name('songs.destroy')`. Ha egy fájl összes bejegyzése ugyanarra a célra mutat, a `← target` csak egyszer, közvetlenül a fájlnév után áll. MCP-n a `find_callers` `compact: true` paramétere.
+
+- **A `locate` sima mondatot is megért:** a feladatot úgy írhatod le, ahogy kimondanád. A gyakori angol és magyar töltelékszavakat (hol, a, az, hogy, …) figyelmen kívül hagyja, és a fejlécben `ignored: …` alatt kiírja; az idézőjeles kifejezéseket továbbra is kifejezésként keresi. A fordítófájlokban (Laravel lang fájlok, JSON/TS szótárak, `.po` / `.xliff`) talált egyezések sokkal kisebb súlyúak, így a név- vagy szimbólumtalálatos kódfájl előrébb kerül. Ha a szavak többsége csak felületi szövegre illeszkedik, a fejléc az angol kódnév hozzáadását javasolja; ha kódban nincs találat, azt kiírja (`nincs kódtalálat`), és a lista megmarad, ami segít, ha felületi feliratot keresel.
+
+### Változás
+
+- **A `--grep` / `find_callers` pontosan a megadott nevet keresi:** az `execute` már nem találja meg az `executeCommand`-ot, a `store` (metódus) pedig a `Store` osztályt. Az osztálynév továbbra is megtalálja a minősített hívásait (a `SongService` az `App\Services\SongService::x`-et). A régi „tartalmazza” kereséshez regexet használj, pl. `'.*execute.*'`; a regex és a `Type::method` minták továbbra is kis- és nagybetűre nem érzékenyek.
+
+- **Tisztább híváslisták Go-hoz és Rusthoz:** a Go outline a metódus saját objektumán lévő hívást sima metódusnévként mutatja (mint a PHP `$this->x`), a többit `Type::method` alakban. Rustban az egymásba ágyazott mezőkön át történő hívás (`self.a.b.m()`) a `--depth`-ben már nem számít biztos hívónak, csak a `--guess` kapcsolóval jelenik meg.
+
+- **Az `update` / `callgraph.sh update [--dev]` figyelmeztet az MCP újracsatlakoztatására:** sikeres frissítés után kiír egy megjegyzést, hogy a futó MCP-szerver a régi verziót használja, amíg újra nem csatlakoztatod (Claude Code: `/mcp`, majd Reconnect).
+
+### Javítás
+
+- **A `--grep Type::method` és a `--depth N` olyan hívókat is megtalál, amelyeket korábban kihagyott:** a Python `self.` / `cls.` hívásait, Go-ban pedig a metódus saját objektumán, típusos paramétereken, típusos lokális változókon (többértékű értékadásnál is) és metódusláncokon keresztüli hívásokat. Korábban az eredmény azt jelezhette, hogy a metódust senki sem hívja, vagy Pythonban a 2. szintű lista üresen jöhetett vissza.
+
+- **A `--depth` az akció minden útvonalát felsorolja:** egy több `[Controller::class, 'method']` útvonalat tartalmazó routes fájlnál korábban csak az első látszott a 2. szinten, és két, ugyanarra az akcióra mutató útvonalból is csak egy; most mind. A `--grep 'Ctrl::m' --depth N` magára a controller-akcióra az útvonal-regisztrációkat az 1. szinten listázza; korábban azt írta, hogy nincs hívó. Ha egy rövid `Ctrl::method` minta több névtérben is talál azonos nevű osztályt, az 1. szinten minden útvonalsor a teljes nevű célt nevezi meg, a normál és a `--compact` nézetben is.
+
 ## v1.1.0 — 2026-11-17
 
 [Kiadási jegyzet és letöltések a GitHubon](https://github.com/GeRiY/callgraph/releases/tag/v1.1.0)

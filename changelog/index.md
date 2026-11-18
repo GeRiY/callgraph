@@ -8,6 +8,30 @@ Every release with its date, newest first: what was added, changed and fixed. Do
 
 [Install the latest version](https://callgraph.eu/#install)[Latest release on GitHub](https://github.com/GeRiY/callgraph/releases/latest)
 
+## v1.1.1 — 2026-11-18
+
+[Release notes and downloads on GitHub](https://github.com/GeRiY/callgraph/releases/tag/v1.1.1)
+
+### Added
+
+- **A short impact view with `--compact`:** `--grep … --depth N --compact` prints the callers level by level, one line per file (`path: A() L12, B() L40 ← target`, wrapped at about 160 characters), so a wide impact analysis stays short. Route registrations show their actual code, for example `L5 Route::delete('songs', [SongController::class, 'destroy'])->name('songs.destroy')`. When all entries of a file point to the same target, `← target` is printed once, right after the file name. Over MCP it is the `find_callers` parameter `compact: true`.
+
+- **`locate` understands a plain sentence:** write the task as you would say it. Common English and Hungarian filler words (hol, a, az, hogy, …) are ignored and listed as `ignored: …` in the header; quoted phrases are still searched as phrases. Matches in translation files (Laravel lang files, JSON/TS dictionaries, `.po` / `.xliff`) count much less, so a code file whose name or symbol matches ranks above them. When most words match only UI text, the header suggests adding the English code name; when nothing matches in code, it says so (`no code match`) and keeps the list, which helps if you are looking for a UI label.
+
+### Changed
+
+- **`--grep` / `find_callers` finds exactly the name you give:** `execute` no longer matches `executeCommand`, and `store` (a method) no longer matches the class `Store`. A class name still finds its qualified calls (`SongService` matches `App\Services\SongService::x`). For the old "contains" search use a regex, for example `'.*execute.*'`; regex and `Type::method` patterns stay case-insensitive.
+
+- **Cleaner call lists for Go and Rust:** in Go outlines a call on the method's own object shows as a plain method name (like PHP `$this->x`), and other calls as `Type::method`. In Rust, a call through nested fields (`self.a.b.m()`) is no longer listed as a certain caller in `--depth`; it appears only with `--guess`.
+
+- **`update` / `callgraph.sh update [--dev]` reminds you to reconnect MCP:** after a successful update it prints a note that a running MCP server keeps the old version until you reconnect it (Claude Code: `/mcp`, then Reconnect).
+
+### Fixed
+
+- **`--grep Type::method` and `--depth N` find callers that were missed:** Python calls through `self.` / `cls.` and Go calls on the method's own object, typed parameters, typed local variables (also multi-value assignments) and method chains. Before, the result could say that nothing calls the method, or the level-2 list in Python could come back empty.
+
+- **`--depth` lists every route to an action:** a routes file with several `[Controller::class, 'method']` routes showed only the first at level 2, and two routes to the same action showed only one; now each is listed. `--grep 'Ctrl::m' --depth N` on the controller action itself lists its route registrations at level 1; before, it said there were no callers. When a short `Ctrl::method` pattern matches same-named classes in several namespaces, each level-1 route row names its fully-qualified target, in the normal and `--compact` views.
+
 ## v1.1.0 — 2026-11-17
 
 [Release notes and downloads on GitHub](https://github.com/GeRiY/callgraph/releases/tag/v1.1.0)
