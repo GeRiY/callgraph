@@ -20,6 +20,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 - **`--grep` / `find_callers` with a plain name matches whole names:** `execute` no longer matches `executeCommand`.
   A class name still matches its qualified calls (`SongService` matches `App\Services\SongService::x`). For the old
   substring search use a regex, for example `'.*execute.*'`.
+  A plain name is case-sensitive: `store` (a method) no longer matches the class `Store` (`Store::get`), and `Store`
+  matches only the class; regex and `Type::method` patterns stay case-insensitive.
 - **Go outlines show calls on the method's own receiver as plain method names** (like PHP `$this->x`); other resolved
   calls appear as `Type::method`.
 - **A Rust field-chain receiver (`self.a.b.m()`) is no longer a resolved caller at `--depth`:** it is name-only and

@@ -21,6 +21,8 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 - **A `--grep` / `find_callers` sima névvel egész nevekre illeszkedik:** az `execute` már nem találja meg az
   `executeCommand`-ot. Az osztálynév továbbra is megtalálja a minősített hívásait (a `SongService` az
   `App\Services\SongService::x`-et). A régi részsztringes kereséshez regexet kell használni, pl. `'.*execute.*'`.
+  A sima név kis- és nagybetűre érzékeny: a `store` (metódus) már nem találja meg a `Store` osztályt (`Store::get`), a
+  `Store` pedig csak az osztályt; a regex és a `Type::method` minták továbbra is nem érzékenyek.
 - **A Go outline a metódus saját receiverén lévő hívásokat sima metódusnévként mutatja** (mint a PHP `$this->x`),
   a többi feloldott hívást `Type::method` alakban.
 - **A Rust mezőlánc-receiver (`self.a.b.m()`) a `--depth`-nél már nem számít feloldott hívónak:** csak név alapú, és a

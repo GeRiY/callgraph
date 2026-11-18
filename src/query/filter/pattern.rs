@@ -27,7 +27,10 @@ pub(crate) fn namespace_pattern(pattern: &str) -> Cow<'_, str> {
         // whole-word match: the name is a separate segment of the target (`x.name`, `T::name`, `?::name`,
         // `App\Name::m`, `name()`), never a substring of a longer name. `.*name.*` keeps the substring search.
         let escaped = pattern.replace('$', "\\$");
-        return Cow::Owned(format!("(?:^|[^A-Za-z0-9_$]){escaped}(?:$|[^A-Za-z0-9_$])"));
+        // case-sensitive (`(?-i:…)`): `store` is a method name, `Store` a class — they must not match each other
+        return Cow::Owned(format!(
+            "(?-i:(?:^|[^A-Za-z0-9_$]){escaped}(?:$|[^A-Za-z0-9_$]))"
+        ));
     }
     if !pattern.contains('\\') {
         return Cow::Borrowed(pattern);
@@ -146,7 +149,6 @@ mod tests {
             "x.execute",
             "?::execute",
             "Type::execute",
-            "cmd.go::Execute",
             "App\\Svc::execute",
             "a->execute",
         ] {
@@ -168,6 +170,12 @@ mod tests {
         ));
         assert!(matches("Repo", "Repo::find"));
         assert!(!matches("Repo", "RepoFactory::make"));
+        // the case decides between a method name and a class name
+        assert!(matches("store", "Cache::store"));
+        assert!(!matches("store", "Store::get"));
+        assert!(!matches("execute", "cmd.go::Execute"));
+        assert!(matches("Store", "Store::get"));
+        assert!(!matches("Store", "Cache::store"));
         assert!(matches("$el", "this.$el"));
         assert!(!matches("$el", "this.$elx"));
     }

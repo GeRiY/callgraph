@@ -23,7 +23,7 @@ Használat:
                                                 (bármelyik --format-tal kombinálható)
   bash ~/.claude/skills/callgraph/callgraph.sh <fájl|mappa> --grep <minta>       csak a mintára illeszkedő célú hívások
                                                 (sima azonosító, pl. "execute" = a teljes név, az x.execute / Típus::execute is,
-                                                az executeCommand nem; regex-karakter, "." vagy "::" = mint eddig, részlet-egyezés;
+                                                az executeCommand nem, kis-/nagybetű-érzékeny (store ≠ Store); regex-karakter, "." vagy "::" = mint eddig, részlet-egyezés;
                                                 minden részlet-egyezés: '.*execute.*')
                                                 (csak az illeszkedő hívást tartalmazó metódusok/fájlok — "hol hívják");
                                                 minden hívás a forrássorával: "L25 │ $this->repo->find($id)";

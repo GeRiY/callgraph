@@ -23,7 +23,7 @@ Usage:
                                                 (combinable with any --format)
   bash ~/.claude/skills/callgraph/callgraph.sh <file|dir> --grep <pattern>       only calls whose target matches the pattern
                                                 (a plain identifier like "execute" = the whole name, also x.execute / Type::execute,
-                                                not executeCommand; any regex char, "." or "::" = regex substring as before;
+                                                not executeCommand, case-sensitive (store ≠ Store); any regex char, "." or "::" = regex substring as before;
                                                 all substring matches: '.*execute.*')
                                                 (only the methods/files containing a matching call — "where is it called");
                                                 each call with its source line: "L25 │ $this->repo->find($id)";
