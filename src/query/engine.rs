@@ -1,5 +1,6 @@
 //! A query facade: projektútvonalakból elemzett vagy cache-elt gráfokat ad.
 
+mod grep_compact;
 mod grep_depth;
 mod grep_flat;
 mod grep_text;
@@ -118,6 +119,8 @@ pub struct QueryEngine {
     slim: bool,
     /// A réteg-kapcsolók (`with_layers`: `--layer`, `--layers`, `--by-layer`); `None` = nincs (alapértelmezés).
     layers: Option<crate::profile::LayerScope>,
+    /// `--compact`: the depth view as a file-grouped list without call-site code (`with_compact`).
+    compact: bool,
     /// A lekérdezés során beolvasott, szintaktikai hibás fájlok (gyökérhez relatív út, az első hiba sora), a
     /// beolvasás sorrendjében — a szűrés (`--grep`) előtt gyűjtve, a kimenet záró `⚠` sorához (`parse_issues`).
     parse_issues: std::sync::Mutex<Vec<(String, u32)>>,
@@ -149,6 +152,7 @@ impl QueryEngine {
             graph: false,
             slim: false,
             layers: None,
+            compact: false,
             parse_issues: std::sync::Mutex::new(Vec::new()),
             scope_catalog: std::sync::Mutex::new(None),
         }
@@ -156,6 +160,11 @@ impl QueryEngine {
     /// A sorok a projekt-gráf szűkített tényeiből jöjjenek (`facts.bin`: egyetlen fájl a teljes hatókörre) — a
     /// `--grep` / `--depth` / `--strings` / `--const` csak ezek mezőit olvassa (`FileFacts::slim`); az egyfájlos
     /// nézetek (outline, `--body` …) a teljes rekordot kapják.
+    /// `--compact`: the `--grep --depth N` output as a token-cheap, file-grouped list (default off).
+    pub fn with_compact(mut self, on: bool) -> Self {
+        self.compact = on;
+        self
+    }
     pub fn use_slim_rows(mut self, on: bool) -> Self {
         self.slim = on;
         self

@@ -10,12 +10,25 @@ fn is_ident(c: char) -> bool {
     c.is_ascii_alphanumeric() || c == '_'
 }
 
+/// A plain identifier pattern: only `[A-Za-z0-9_]` (a leading `$` is allowed, as in JS `$el` / PHP names); no regex
+/// metacharacter, no `::`, no `.`. Such a pattern matches whole names (see `namespace_pattern`).
+pub(crate) fn is_plain_identifier(pattern: &str) -> bool {
+    let name = pattern.strip_prefix('$').unwrap_or(pattern);
+    !name.is_empty() && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
 /// A névtér-elválasztó alakú `\`-ek kétszerezése: egy `\`, amelyet azonosító-karakter előz meg és NAGYBETŰ követ
 /// (`App\Svc`, `o\B`, `p\S`), literális `\\` lesz. Változatlan marad a már kétszerezett `\\`, a szándékos
 /// escape (`\.`, `\d`, `\w`, `\s`, `\b`; kisbetű után kisbetű: `a\d`), a nem azonosító-karakter utáni `\S`
 /// (`\s\S`, `[\S]`, `^\S`), és az olyan nagybetűs osztály, amelyet kvantor követ (`foo\S+`, `\P{L}`) — az nem
 /// névtér-szegmens. Idempotens.
 pub(crate) fn namespace_pattern(pattern: &str) -> Cow<'_, str> {
+    if is_plain_identifier(pattern) {
+        // whole-word match: the name is a separate segment of the target (`x.name`, `T::name`, `?::name`,
+        // `App\Name::m`, `name()`), never a substring of a longer name. `.*name.*` keeps the substring search.
+        let escaped = pattern.replace('$', "\\$");
+        return Cow::Owned(format!("(?:^|[^A-Za-z0-9_$]){escaped}(?:$|[^A-Za-z0-9_$])"));
+    }
     if !pattern.contains('\\') {
         return Cow::Borrowed(pattern);
     }
@@ -116,6 +129,66 @@ mod tests {
         assert!(re.is_match(r"App\Svc\Real::m"));
         assert!(!re.is_match("AppSvcReal::m"));
         assert!(!re.is_match("App Svc Real::m"));
+    }
+
+    fn matches(pattern: &str, target: &str) -> bool {
+        regex::RegexBuilder::new(&namespace_pattern(pattern))
+            .case_insensitive(true)
+            .build()
+            .unwrap()
+            .is_match(target)
+    }
+
+    #[test]
+    fn plain_identifier_matches_whole_names_not_substrings() {
+        for hit in [
+            "execute",
+            "x.execute",
+            "?::execute",
+            "Type::execute",
+            "cmd.go::Execute",
+            "App\\Svc::execute",
+            "a->execute",
+        ] {
+            assert!(matches("execute", hit), "{hit}");
+        }
+        for miss in [
+            "executeCommand",
+            "executeC",
+            "myexecute",
+            "execute_all",
+            "x.executeC",
+        ] {
+            assert!(!matches("execute", miss), "{miss}");
+        }
+        // a class name still finds its qualified static calls and instantiations
+        assert!(matches(
+            "SongService",
+            "App\\Services\\SongService::deleteSongs"
+        ));
+        assert!(matches("Repo", "Repo::find"));
+        assert!(!matches("Repo", "RepoFactory::make"));
+        assert!(matches("$el", "this.$el"));
+        assert!(!matches("$el", "this.$elx"));
+    }
+
+    #[test]
+    fn explicit_regex_keeps_the_substring_behaviour() {
+        assert!(matches(".*execute.*", "executeCommand"));
+        assert!(matches("execute.*", "executeCommand"));
+        assert!(matches("exec|run", "runner"));
+        assert!(matches("execut[e]", "executeCommand"));
+        assert!(matches("^execute", "executeCommand"));
+    }
+
+    #[test]
+    fn scoped_and_dotted_patterns_are_unchanged() {
+        for same in ["Store::fetch", "a.b", "Store::fetch$", "route::orders.show"] {
+            assert!(!is_plain_identifier(same), "{same}");
+            assert_eq!(namespace_pattern(same), same, "{same}");
+        }
+        assert!(matches("Store::fetch", "Store::fetch_all"));
+        assert!(matches("a.b", "xa.bx"));
     }
 
     #[test]

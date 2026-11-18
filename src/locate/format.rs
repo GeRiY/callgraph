@@ -24,6 +24,8 @@ pub(crate) struct Report<'a> {
     pub notes: &'a HashMap<String, usize>,
     /// A projekt gyökere (a `protect` minták ellenőrzéséhez; védett fájl során `  🔒`).
     pub root: &'a std::path::Path,
+    /// A figyelmen kívül hagyott töltelékszavak (a fejlécben; üresen nem jelenik meg).
+    pub ignored: &'a [String],
 }
 
 impl Report<'_> {
@@ -42,6 +44,14 @@ impl Report<'_> {
             out.push_str(&crate::tf!(
                 "locate: {n} terms · {m} matches in {k} files · start here ↓\n",
                 "locate: {n} kifejezés · {m} találat {k} fájlban · innen indulj ↓\n"
+            ));
+        }
+        if !self.ignored.is_empty() {
+            let list = self.ignored.join(", ");
+            out.pop();
+            out.push_str(&crate::tf!(
+                " (ignored: {list})\n",
+                " (figyelmen kívül: {list})\n"
             ));
         }
         let shown = if self.all { k } else { k.min(DEFAULT_FILES) };

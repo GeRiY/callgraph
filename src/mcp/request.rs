@@ -121,6 +121,9 @@ impl ShowQuery {
         if p.by_layer {
             query.flags.push("--by-layer".into());
         }
+        if p.compact {
+            query.flags.push("--compact".into());
+        }
         Ok(query.layer(p.layer))
     }
 
@@ -329,6 +332,21 @@ mod tests {
         assert_eq!(
             q.to_args(&root()).unwrap(),
             s(&["--body", "--raw", "Cargo.toml::a"])
+        );
+    }
+
+    #[test]
+    fn find_callers_compact_becomes_the_compact_flag() {
+        let q = ShowQuery::find_callers(FindCallersParams {
+            pattern: "execute".into(),
+            depth: Some(2),
+            compact: true,
+            ..FindCallersParams::default()
+        })
+        .unwrap();
+        assert_eq!(
+            q.to_args(&root()).unwrap(),
+            s(&["--grep", "execute", "--depth", "2", "--compact", "."])
         );
     }
 

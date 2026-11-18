@@ -38,8 +38,8 @@ fn callers_usage() -> &'static str {
 
 fn show_usage() -> &'static str {
     crate::t!(
-        "callgraph show [--project <root>] [--label <name>] [--format <f>] [--body [--doc|--raw]|--lines <n>-<m>|--strings <pattern>|--const <pattern>] [--grep <pattern>] [--category <cat,...>] [--depth N] [--guess] [--notes <pattern>] [--layer <name,...>] [--layers] [--by-layer] [--full] <path[::m]>...",
-        "callgraph show [--project <gyökér>] [--label <név>] [--format <f>] [--body [--doc|--raw]|--lines <n>-<m>|--strings <minta>|--const <minta>] [--grep <minta>] [--category <kat,...>] [--depth N] [--guess] [--notes <minta>] [--layer <név,...>] [--layers] [--by-layer] [--full] <út[::m]>..."
+        "callgraph show [--project <root>] [--label <name>] [--format <f>] [--body [--doc|--raw]|--lines <n>-<m>|--strings <pattern>|--const <pattern>] [--grep <pattern>] [--category <cat,...>] [--depth N] [--guess] [--compact] [--notes <pattern>] [--layer <name,...>] [--layers] [--by-layer] [--full] <path[::m]>...",
+        "callgraph show [--project <gyökér>] [--label <név>] [--format <f>] [--body [--doc|--raw]|--lines <n>-<m>|--strings <minta>|--const <minta>] [--grep <minta>] [--category <kat,...>] [--depth N] [--guess] [--compact] [--notes <minta>] [--layer <név,...>] [--layers] [--by-layer] [--full] <út[::m]>..."
     )
 }
 
@@ -161,6 +161,8 @@ pub enum CliArgs {
         notes: Option<String>,
         /// A réteg-kapcsolók (`--layer`, `--layers`, `--by-layer`; `profile_args.rs`).
         layers: LayerArgs,
+        /// `--compact`: the `--grep --depth N` output as a file-grouped list without call-site code.
+        compact: bool,
     },
     /// `profile [--project <alias|mappa>] [--full] [--with-vendor] [--packages]`: a projekt-profil (architektúra,
     /// rétegek, minták); `with_vendor`: a beágyazott külső kód is számít; `packages`: a közvetlen függőségek listája.
@@ -372,6 +374,7 @@ impl CliArgs {
         let mut guess = false;
         let mut notes = None;
         let mut layers = LayerArgs::default();
+        let mut compact = false;
         let mut i = 0;
         while i < args.len() {
             if let Some(used) = layers.take(&args[i..])? {
@@ -379,6 +382,10 @@ impl CliArgs {
                 continue;
             }
             match args[i].as_str() {
+                "--compact" => {
+                    compact = true;
+                    i += 1;
+                }
                 x if x.starts_with("CALLGRAPH_OUT_LIMIT=") => {
                     limit = x.split_once('=').and_then(|(_, v)| v.parse().ok());
                     i += 1;
@@ -523,6 +530,7 @@ impl CliArgs {
             guess,
             notes,
             layers,
+            compact,
         })
     }
 
@@ -923,6 +931,24 @@ mod tests {
             }
         );
         assert!(parse(&["prune", "--bogus"]).is_err());
+    }
+
+    #[test]
+    fn parses_the_compact_switch() {
+        let compact = |a: &[&str]| match parse(a).unwrap() {
+            CliArgs::Show { compact, .. } => compact,
+            other => panic!("{other:?}"),
+        };
+        assert!(!compact(&["show", "--grep", "x", "--depth", "2", "src"]));
+        assert!(compact(&[
+            "show",
+            "--grep",
+            "x",
+            "--depth",
+            "2",
+            "--compact",
+            "src"
+        ]));
     }
 
     #[test]

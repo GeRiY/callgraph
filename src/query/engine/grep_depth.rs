@@ -33,10 +33,12 @@ pub(super) struct DepthView<'a> {
     pub(super) full: bool,
     /// A kimenet sor-korlátja (`--full` nélkül; fölötte levágva, a teljes sorszámmal).
     pub(super) max: usize,
+    /// `--compact`: the token-cheap file-grouped view (`grep_compact`) instead of the call-line view.
+    pub(super) compact: bool,
 }
 
 /// Teszt- vagy story-fájl-e az út (a mélységi nézetben ezek egy összesítő sorba vonódnak).
-fn is_test_or_story(path: &str) -> bool {
+pub(super) fn is_test_or_story(path: &str) -> bool {
     let lower = path.replace('\\', "/").to_ascii_lowercase();
     crate::locate::rank::is_test_path(path)
         || lower.contains(".story.")
@@ -47,6 +49,9 @@ fn is_test_or_story(path: &str) -> bool {
 /// A szintenkénti nézet: 1. szint = a találatok metódusai a hívás-soraikkal, 2+. szint = hívónként egy sor
 /// (`← cél`, a hívás sora), a kihagyott név szerinti egyezések száma, a végén a tipp.
 pub(super) fn render_depth(view: DepthView<'_>) -> String {
+    if view.compact {
+        return super::grep_compact::render_compact(&view);
+    }
     let DepthView {
         rows,
         pattern,
@@ -62,6 +67,7 @@ pub(super) fn render_depth(view: DepthView<'_>) -> String {
         no_caller,
         full,
         max,
+        compact: _,
     } = view;
     let mut output = String::new();
     for level in 1..=depth {
@@ -135,8 +141,15 @@ pub(super) fn render_depth(view: DepthView<'_>) -> String {
                 b.line,
             ))
         });
-        level_callers.dedup_by(|b, a| {
-            a.file == b.file && a.container == b.container && a.caller == b.caller
+        // egy hívó több különböző célja (egy fájl `__top__` útvonal-hivatkozásai) külön sor
+        let mut listed = std::collections::HashSet::new();
+        level_callers.retain(|row| {
+            listed.insert((
+                row.file.clone(),
+                row.container.clone(),
+                row.caller.clone(),
+                row.target.clone(),
+            ))
         });
         if let Some(scope) = layers {
             level_callers.sort_by_key(|row| scope.order_key(&row.file));

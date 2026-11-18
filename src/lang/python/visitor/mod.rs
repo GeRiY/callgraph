@@ -95,4 +95,6 @@ pub(super) fn visibility(name: &str) -> &'static str {
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
+mod tests_callers;
+#[cfg(test)]
 mod tests_dynamic;

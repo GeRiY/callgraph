@@ -29,7 +29,7 @@ use callers::CallerCounts;
 use format::Report;
 use matcher::Matcher;
 use rank::{FileMatch, rank};
-use terms::Term;
+use terms::{Term, TermKind, drop_stopwords};
 
 // a projekt fájljainak forrása: a `uses` csomag-használat is ezen át járja be a projekt-gráfot
 pub(crate) use source::ProjectSource;
@@ -52,7 +52,7 @@ impl Locator {
     /// A kifejezésekre adott válasz szövege és a szintaktikai hibás fájlok száma (`--strict`); `all`: minden egyező
     /// fájl (alapból az első 5). Kifejezés nélkül használati hiba.
     pub fn run<S: AsRef<str>>(&self, inputs: &[S], all: bool) -> Result<(String, usize)> {
-        let terms = Term::parse_all(inputs);
+        let (terms, mut ignored) = drop_stopwords(Term::parse_all(inputs));
         if terms.is_empty() {
             return Err(CallgraphError::Usage(usage().into()));
         }
@@ -66,7 +66,7 @@ impl Locator {
             Inertia::detect(&self.root, packages, &crate::packages::DiskProjectFiles)
         });
         let mut notes: HashMap<String, usize> = HashMap::new();
-        let (ranked, issues) =
+        let (terms, ranked, issues) =
             ProjectSource::new(&self.root, &self.analyzer).with_files(|files| {
                 if let Some(inertia) = inertia.as_mut() {
                     let code = files
@@ -84,37 +84,67 @@ impl Locator {
                     })
                     .collect();
                 let callers = CallerCounts::build(files.iter().map(|file| file.graph));
-                let matcher = Matcher::new(&terms, &callers).with_packages(packages);
-                let matched: Vec<FileMatch> = files
-                    .iter()
-                    .filter_map(|file| {
-                        let rel = self.relative(file.path);
-                        let mut hits = matcher.file_hits(&rel, file.graph, file.code);
-                        if file.code {
-                            matcher.package_hits(file.path, file.graph, &mut hits);
-                            if let Some(inertia) = inertia {
-                                matcher.page_hits(&rel, inertia, &mut hits);
+                let mut match_all = |terms: &[Term]| -> Vec<FileMatch> {
+                    let matcher = Matcher::new(terms, &callers).with_packages(packages);
+                    let matched: Vec<FileMatch> = files
+                        .iter()
+                        .filter_map(|file| {
+                            let rel = self.relative(file.path);
+                            let mut hits = matcher.file_hits(&rel, file.graph, file.code);
+                            if file.code {
+                                matcher.package_hits(file.path, file.graph, &mut hits);
+                                if let Some(inertia) = inertia {
+                                    matcher.page_hits(&rel, inertia, &mut hits);
+                                }
                             }
-                        }
-                        if !hits.is_empty() && !marks.is_empty() {
-                            // az árva (a fájlban már nem létező metódusra szóló) jegyzetek nem számítanak
-                            let methods = file.graph.methods.iter();
-                            let n = crate::notes::live_count(
-                                marks.of(&rel),
-                                methods.map(|m| (m.container.as_deref(), m.name.as_str())),
-                            );
-                            if n > 0 {
-                                notes.insert(rel.clone(), n);
+                            if !hits.is_empty() && !marks.is_empty() {
+                                // az árva (a fájlban már nem létező metódusra szóló) jegyzetek nem számítanak
+                                let methods = file.graph.methods.iter();
+                                let n = crate::notes::live_count(
+                                    marks.of(&rel),
+                                    methods.map(|m| (m.container.as_deref(), m.name.as_str())),
+                                );
+                                if n > 0 {
+                                    notes.insert(rel.clone(), n);
+                                }
                             }
+                            // a több kifejezést egyesítő azonosító (erős jel a rangsorban)
+                            let multi = matcher.multi_terms(&hits);
+                            FileMatch::new(rel, hits).map(|file| file.with_multi(multi))
+                        })
+                        .collect();
+                    // a teszt-felismerés a gyökérhez relatív úton (a gyökér útja maga ne számítson)
+                    rank(matched, rank::is_test_path)
+                };
+                let mut terms = terms.clone();
+                let mut ranked = match_all(&terms);
+                // egy mondatként átadott (idézetlen) kifejezés, ami egészében sehol sem szerepel: szavaira bontva
+                // újra keresünk (a felirat-keresés megmarad, ha van találata)
+                let hit: Vec<usize> = ranked.iter().flat_map(FileMatch::terms).collect();
+                let unmatched = |i: usize, t: &Term| {
+                    t.kind == TermKind::Phrase && !t.quoted && !hit.contains(&i)
+                };
+                if terms.iter().enumerate().any(|(i, t)| unmatched(i, t)) {
+                    let mut next: Vec<Term> = Vec::new();
+                    for (i, term) in terms.iter().enumerate() {
+                        if unmatched(i, term) {
+                            next.extend(term.split_into_words());
+                        } else {
+                            next.push(term.clone());
                         }
-                        // a több kifejezést egyesítő azonosító (erős jel a rangsorban)
-                        let multi = matcher.multi_terms(&hits);
-                        FileMatch::new(rel, hits).map(|file| file.with_multi(multi))
-                    })
-                    .collect();
-                // a teszt-felismerés a gyökérhez relatív úton (a gyökér útja maga ne számítson)
-                let ranked = rank(matched, rank::is_test_path);
-                (ranked, issues)
+                    }
+                    let mut seen: Vec<String> = Vec::new();
+                    next.retain(|t| {
+                        let fresh = !seen.contains(&t.lower);
+                        seen.push(t.lower.clone());
+                        fresh
+                    });
+                    let (next, dropped) = drop_stopwords(next);
+                    ignored.extend(dropped);
+                    terms = next;
+                    ranked = match_all(&terms);
+                }
+                (terms, ranked, issues)
             })?;
         // mindig a `root:` sorral és a gyökérhez relatív utakkal (egyetlen találatnál is), a többi lekérdezéssel
         // azonos alakban
@@ -128,6 +158,7 @@ impl Locator {
             all,
             notes: &notes,
             root: &self.root,
+            ignored: &ignored,
         };
         text.push_str(&report.render());
         text.push_str(&crate::query::format::parse_trailer(

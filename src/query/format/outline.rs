@@ -512,11 +512,32 @@ fn factor_paths(items: &[String]) -> String {
     format!("{prefix}/{{{}}}", rest.join(", "))
 }
 
+/// Go: a feloldott `csomag\Típus::metódus` cél rövid alakja a kimenetben — a csomag-előtag nélkül (`Command::Flags`),
+/// és a hívó saját típusának metódusa (`internal_helper`) csak a metódus neve (`Flags`), mint a PHP `$this->x`-nél.
+/// A kulcs (a hívó-keresés) a gráfban a teljes marad.
+fn short_go_target(row: &QueryResult, call: &Call) -> Option<String> {
+    if !row.graph.file.ends_with(".go") {
+        return None;
+    }
+    let resolved = call.resolved.as_deref()?;
+    let rest = match row.graph.namespace.as_deref() {
+        Some(ns) if !ns.is_empty() => resolved.strip_prefix(&format!("{ns}\\"))?,
+        _ => resolved,
+    };
+    let (owner, method) = rest.split_once("::")?;
+    if call.category == "internal_helper" && call.container.as_deref() == Some(owner) {
+        return Some(method.to_owned());
+    }
+    Some(rest.to_owned())
+}
+
 /// A hívás kiírt célja: a feloldott (különben a nyers) cél; Inertia render-hívásnál utána a page-fájl rövid alakja
 /// (`Inertia\Inertia::render → Pages/Board.vue`, nem létező fájlnál `(missing)`); Ziggy `route('név')` hívásnál a
 /// route linkje (`route::register → POST /register · RegisteredUserController@store`). Kötések nélkül a régi.
 pub(super) fn shown_target(row: &QueryResult, call: &Call, lang: Lang) -> String {
-    let target = call.resolved.as_deref().unwrap_or(&call.target);
+    let target = short_go_target(row, call)
+        .unwrap_or_else(|| call.resolved.as_deref().unwrap_or(&call.target).to_owned());
+    let target = target.as_str();
     // Ziggy `route('név')` hívásnál a Laravel route-tábla linkje (` → POST /uri · X@m`, vagy ` ⚠ no route`)
     if let Some(link) = row.route_link(call, lang) {
         return format!("{target}{link}");

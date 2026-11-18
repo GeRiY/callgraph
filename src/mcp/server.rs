@@ -113,7 +113,7 @@ impl CallgraphServer {
             idempotent_hint = true,
             open_world_hint = false
         ),
-        description = "Where to start with a task: the task's names and domain terms in ONE call → a ranked file list from the project map (no file reading; top 5, `all: true` = all), each with reasons (exact definition, file name, name part, string literal, call, `callers: N`). Example: {\"terms\": [\"RefundController\", \"refund\", \"payment_status\"]}. Pitfall: code names, not a sentence; translate non-English domain words (visszatérítés → refund); one call with all terms. Use `locate` to find WHERE to start; once you know the file use `outline`; string literal / constant: `search`; other exact text (log message, config value): Grep."
+        description = "Where to start with a task: the task's names and domain terms in ONE call → a ranked file list from the project map (no file reading; top 5, `all: true` = all), each with reasons (exact definition, file name, name part, string literal, call, `callers: N`). Example: {\"terms\": [\"RefundController\", \"refund\", \"payment_status\"]}. Prefer code names; a plain sentence also works (filler words are ignored); translate non-English domain words (visszatérítés → refund); one call with all terms. Use `locate` to find WHERE to start; once you know the file use `outline`; string literal / constant: `search`; other exact text (log message, config value): Grep."
     )]
     async fn locate(&self, Parameters(p): Parameters<LocateParams>) -> CallToolResult {
         self.execute(CommandKind::Locate, ShowQuery::locate(p))
@@ -155,7 +155,7 @@ impl CallgraphServer {
             idempotent_hint = true,
             open_world_hint = false
         ),
-        description = "Who calls it: each caller's file, method, line range and call line (`L25 │ code`); paths relative to the `root:` line. Start with the name regex `(^|::|\\.|->)cancel$`: every call, also with an unknown/inherited receiver. `Order::cancel` = only calls resolved to that type (`via <Type>` = through interface/parent/trait), so it can miss callers; `?::name` = name-only match. `depth` 2–5 = impact analysis (callers of callers); `guess` adds name-only matches (?). Example: {\"pattern\": \"(^|::|\\\\.|->)cancel$\", \"path\": \"app\"}."
+        description = "Who calls it: each caller's file, method, line range and call line (`L25 │ code`); paths relative to the `root:` line. A plain word (`cancel`) matches the whole name (`x.cancel`, `T::cancel`), not `cancelAll`; regex chars, `.` or `::` keep regex substring matching (`.*cancel.*` = substring). Name regex `(^|::|\\.|->)cancel$`: every call, also with an unknown/inherited receiver. `Order::cancel` = only calls resolved to that type (`via <Type>` = through interface/parent/trait), so it can miss callers; `?::name` = name-only match. `depth` 2–5 = impact analysis (callers of callers), `compact: true` = file-grouped names + lines, no code; `guess` adds name-only matches (?). Example: {\"pattern\": \"(^|::|\\\\.|->)cancel$\", \"path\": \"app\"}."
     )]
     async fn find_callers(&self, Parameters(p): Parameters<FindCallersParams>) -> CallToolResult {
         self.execute(CommandKind::FindCallers, ShowQuery::find_callers(p))

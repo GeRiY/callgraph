@@ -4,7 +4,7 @@ use super::callers::{CallerCounts, Callers};
 use super::matcher::{Hit, Kind, Matcher, Symbol};
 use super::rank::{FileMatch, rank, score};
 use super::reasons::{group, pick};
-use super::terms::{Term, TermKind, same_word, split_member, words};
+use super::terms::{Term, TermKind, drop_stopwords, same_word, split_member, words};
 use crate::model::{Call, Container, FileGraph, Method, Property, StringLit};
 
 fn w(text: &str) -> Vec<String> {
@@ -997,4 +997,57 @@ fn caller_counts_stay_within_the_language_family() {
     assert_eq!(js.sample, ["Menu::pick"]);
     let on_php = counts.of(None, "setLocale", "app/Services/Locale.php");
     assert_eq!(on_php.count, 2, "{on_php:?}");
+}
+
+fn raws(terms: &[Term]) -> Vec<&str> {
+    terms.iter().map(|t| t.raw.as_str()).collect()
+}
+
+#[test]
+fn a_sentence_phrase_splits_into_content_words() {
+    let phrase = Term::new("where are blueprint routes registered on the application").unwrap();
+    assert_eq!(phrase.kind, TermKind::Phrase);
+    assert!(!phrase.quoted);
+    let split = phrase.split_into_words();
+    assert_eq!(
+        raws(&split),
+        ["blueprint", "routes", "registered", "application"]
+    );
+    assert!(split.iter().all(|t| t.kind == TermKind::Name));
+    // only noise words: nothing is lost
+    let noise = Term::new("where is it").unwrap().split_into_words();
+    assert_eq!(raws(&noise), ["where", "is", "it"]);
+}
+
+#[test]
+fn stopwords_are_dropped_and_reported() {
+    let terms = Term::parse_all(&["the", "blueprint", "for", "routes", "From"]);
+    let (kept, dropped) = drop_stopwords(terms);
+    assert_eq!(raws(&kept), ["blueprint", "routes"]);
+    assert_eq!(dropped, ["the", "for", "From"]);
+}
+
+#[test]
+fn a_lone_stopword_is_still_searched() {
+    let (kept, dropped) = drop_stopwords(Term::parse_all(&["for"]));
+    assert_eq!(raws(&kept), ["for"]);
+    assert!(dropped.is_empty());
+    let (kept, dropped) = drop_stopwords(Term::parse_all(&["the", "where"]));
+    assert_eq!(kept.len(), 2);
+    assert!(dropped.is_empty());
+}
+
+#[test]
+fn an_explicitly_quoted_phrase_is_kept() {
+    let whole = Term::parse_all(&["\"delete the song\""]);
+    assert_eq!(whole.len(), 1);
+    assert_eq!(whole[0].kind, TermKind::Phrase);
+    assert!(whole[0].quoted);
+    assert_eq!(whole[0].raw, "delete the song");
+    // a quoted segment inside a sentence stays a phrase; the rest becomes words
+    let mixed = Term::parse_all(&["find \"Sign in now\" button"]);
+    assert_eq!(raws(&mixed), ["find", "Sign in now", "button"]);
+    assert_eq!(mixed[1].kind, TermKind::Phrase);
+    assert!(mixed[1].quoted);
+    assert_eq!(mixed[0].kind, TermKind::Name);
 }

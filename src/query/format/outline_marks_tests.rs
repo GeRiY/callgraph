@@ -139,3 +139,34 @@ fn test_functions_and_test_modules_are_marked() {
     assert!(text.contains("  helper()  L6-8\n"), "{text}");
     assert!(text.contains("module tests  L1-10\n"), "{text}");
 }
+
+#[test]
+fn go_resolved_targets_are_shown_short_in_the_outline() {
+    let go_call = |target: &str, resolved: &str, category: &str, container: &str| {
+        let mut c = call("method_call", target, category, 5, None);
+        c.container = Some(container.to_owned());
+        c.resolved = Some(resolved.to_owned());
+        c
+    };
+    let mut b = FileGraphBuilder::new("src/command.go");
+    b.namespace_if_unset(Some("cobra".to_owned()));
+    b.container(container("class", "Command", 1, 30));
+    b.method(method("Command", "body", 3, None));
+    // the own receiver: just the method name; a typed local / param of another type: `Type::method`
+    b.call(go_call(
+        "c.Flags",
+        "cobra\\Command::Flags",
+        "internal_helper",
+        "Command",
+    ));
+    b.call(go_call(
+        "d.Name",
+        "cobra\\Other::Name",
+        "external_call",
+        "Command",
+    ));
+    let text = plain(&[QueryResult::new(b.build(), None)]);
+    assert!(text.contains("internal_helper   Flags\n"), "{text}");
+    assert!(text.contains("external_call     Other::Name\n"), "{text}");
+    assert!(!text.contains("cobra\\"), "{text}");
+}

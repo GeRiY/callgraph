@@ -189,6 +189,7 @@ impl QueryEngine {
                 no_caller: &no_caller,
                 full,
                 max: limit.unwrap_or_else(|| crate::query::OutputLimit::from_env(full).limit),
+                compact: self.compact,
             }));
         }
         // gráf nélkül: a lekérdezés teljes hatókörének minden fájlja (nem csak az 1. szint fájljainak mappái)
@@ -219,6 +220,7 @@ impl QueryEngine {
             no_caller: &no_caller,
             full,
             max: limit.unwrap_or_else(|| crate::query::OutputLimit::from_env(full).limit),
+            compact: self.compact,
         }))
     }
 }

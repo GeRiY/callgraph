@@ -29,6 +29,8 @@ pub(crate) struct Term {
     pub member: Option<(String, String)>,
     /// A kifejezés fajtája.
     pub kind: TermKind,
+    /// Az agent idézőjelek közé tette (`"felirat"`): egy `Phrase` ilyenkor sosem bontódik szavakra.
+    pub quoted: bool,
 }
 
 /// Az útvonalnév-kifejezés előtagja.
@@ -38,6 +40,7 @@ impl Term {
     /// Egy kifejezés előkészítése; a körülötte álló idézőjelek / backtickek lekerülnek. Üres kifejezés: `None`.
     /// Szóközzel: `Phrase`; `route::név`: `Route`; különben `Name`.
     pub(crate) fn new(raw: &str) -> Option<Self> {
+        let quoted = raw.trim().len() > 1 && raw.trim().starts_with(['"', '`']);
         let raw = raw.trim().trim_matches(['"', '\'', '`']).trim();
         if raw.is_empty() {
             return None;
@@ -50,6 +53,7 @@ impl Term {
                 words: Vec::new(),
                 member: None,
                 kind: TermKind::Phrase,
+                quoted,
             });
         }
         let lower = raw.to_lowercase();
@@ -61,6 +65,7 @@ impl Term {
                 words: Vec::new(),
                 member: None,
                 kind: TermKind::Route(route),
+                quoted: false,
             });
         }
         let member = match split_member(&lower) {
@@ -76,6 +81,7 @@ impl Term {
             lower,
             member,
             kind: TermKind::Name,
+            quoted: false,
         })
     }
 
@@ -86,13 +92,13 @@ impl Term {
         let mut out: Vec<Self> = Vec::new();
         for input in inputs {
             let input = input.as_ref().trim();
-            let parts: Vec<&str> = if input.contains(char::is_whitespace) {
-                vec![input]
+            let parts: Vec<String> = if input.contains(char::is_whitespace) {
+                inner_quote_parts(input)
             } else {
-                input.split(',').collect()
+                input.split(',').map(str::to_owned).collect()
             };
             for part in parts {
-                let Some(term) = Self::new(part) else {
+                let Some(term) = Self::new(&part) else {
                     continue;
                 };
                 if !out.iter().any(|t| t.lower == term.lower) {
@@ -101,6 +107,19 @@ impl Term {
             }
         }
         out
+    }
+
+    /// A kifejezés szavaira bontva (a mondatként átadott kifejezés tartaléka, ha egészében nem illeszkedett): a
+    /// zajszavak (<= 2 betű, töltelékszó) nélkül; ha csak zaj maradna, az összes szó.
+    pub(crate) fn split_into_words(&self) -> Vec<Self> {
+        let all: Vec<&str> = self.raw.split_whitespace().collect();
+        let keep: Vec<&str> = all
+            .iter()
+            .copied()
+            .filter(|w| w.chars().count() > 2 && !is_stopword(w))
+            .collect();
+        let chosen = if keep.is_empty() { all } else { keep };
+        chosen.into_iter().filter_map(Self::new).collect()
     }
 
     /// Név / fogalom kifejezés-e (a `Phrase` és a `Route` csak a saját egyezéseit adja).
@@ -134,6 +153,50 @@ impl Term {
                 .iter()
                 .all(|w| ident_words.iter().any(|x| same_word(x, w)))
     }
+}
+
+/// Gyakori angol töltelékszavak: a mondatként átadott feladatban csak zajt adnak a rangsorba.
+const STOPWORDS: &[&str] = &[
+    "the", "a", "an", "and", "or", "of", "to", "in", "on", "for", "from", "with", "by", "at", "is",
+    "are", "be", "where", "what", "how", "which", "that", "this", "it", "its", "as", "into",
+    "their", "them", "then", "when", "all", "any", "some",
+];
+
+/// Töltelékszó-e (kis-/nagybetűtől függetlenül).
+pub(crate) fn is_stopword(word: &str) -> bool {
+    let lower = word.to_lowercase();
+    STOPWORDS.contains(&lower.as_str())
+}
+
+/// A töltelékszó-`Name` kifejezések elhagyása: (a megmaradók, az elhagyott szavak). Ha minden kifejezés töltelék
+/// volna, semmi sem marad el: egy önmagában kért szót megkeresünk.
+pub(crate) fn drop_stopwords(terms: Vec<Term>) -> (Vec<Term>, Vec<String>) {
+    let noise = |t: &Term| t.is_plain() && t.member.is_none() && is_stopword(&t.raw);
+    if terms.iter().all(noise) {
+        return (terms, Vec::new());
+    }
+    let (dropped, kept): (Vec<Term>, Vec<Term>) = terms.into_iter().partition(noise);
+    (kept, dropped.into_iter().map(|t| t.raw).collect())
+}
+
+/// Egy szóközös bemenet kifejezés-darabjai: a belső `"..."` szakaszok idézett kifejezések maradnak, a többi
+/// szavakra bomlik; az egészében idézett (vagy idézőjel nélküli) elem egyetlen darab.
+fn inner_quote_parts(input: &str) -> Vec<String> {
+    let inner = input.trim_matches('"');
+    if !inner.contains('"') {
+        return vec![input.to_owned()];
+    }
+    let mut parts = Vec::new();
+    for (i, seg) in input.split('"').enumerate() {
+        if i % 2 == 1 {
+            if !seg.trim().is_empty() {
+                parts.push(format!("\"{}\"", seg.trim()));
+            }
+        } else {
+            parts.extend(seg.split_whitespace().map(str::to_owned));
+        }
+    }
+    parts
 }
 
 /// Egy azonosító (vagy kifejezés) szavai kisbetűvel. Határ: minden nem betű / számjegy karakter (`_`, `-`, `.`,

@@ -310,6 +310,7 @@ impl<'s> GoVisitor<'_, 's> {
 
     /// A csomag-szintű `const` / `var` inicializálók hívásai a `__module__` pszeudo-metódus alatt.
     fn pending_statements(&mut self, pending: &[Node<'_>], b: &mut FileGraphBuilder) {
+        self.locals.clear();
         let (Some(first), Some(last)) = (pending.first(), pending.last()) else {
             return;
         };

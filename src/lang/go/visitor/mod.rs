@@ -5,6 +5,7 @@ mod body;
 mod decls;
 mod members;
 mod scan;
+mod types;
 
 use std::collections::HashSet;
 
@@ -33,6 +34,12 @@ pub(crate) struct GoVisitor<'p, 's> {
     symbols: FileSymbols,
     /// Már felvett (container, név) párok: a többszörös `init` egyedi nevet kap (`init@L12`).
     taken: HashSet<(String, String)>,
+    /// The package name (the namespace of the graph): the prefix of a resolved `pkg\Type::method` key.
+    package: Option<String>,
+    /// Result and field types declared in this file.
+    types: types::TypeIndex,
+    /// Local variable → project type, for the function body being walked.
+    locals: std::collections::HashMap<String, String>,
 }
 
 impl<'p, 's> GoVisitor<'p, 's> {
@@ -47,6 +54,9 @@ impl<'p, 's> GoVisitor<'p, 's> {
             file_name: file_name.to_string(),
             symbols: FileSymbols::default(),
             taken: HashSet::new(),
+            package: None,
+            types: types::TypeIndex::default(),
+            locals: std::collections::HashMap::new(),
         }
     }
 
@@ -66,7 +76,9 @@ impl<'p, 's> GoVisitor<'p, 's> {
             }
         }
         b.framework(Some(framework.to_string()));
+        self.package = scanned.package.clone();
         b.namespace_if_unset(scanned.package);
+        self.collect_types(root);
         self.module(root, b);
         b.sort_methods_by_line();
     }
@@ -90,3 +102,5 @@ pub(super) fn visibility(name: &str) -> &'static str {
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_callers;

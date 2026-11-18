@@ -26,8 +26,15 @@ pub struct ShowCommand {
     notes: Option<String>,
     /// A réteg-kapcsolók (`--layer`, `--layers`, `--by-layer`; `crate::profile`); alapból mind ki.
     layers: crate::cli::LayerArgs,
+    /// `--compact`: the `--grep --depth N` output without call-site code, grouped by file.
+    compact: bool,
 }
 impl ShowCommand {
+    /// The `--compact` switch (default off: the output is unchanged).
+    pub fn compact(mut self, on: bool) -> Self {
+        self.compact = on;
+        self
+    }
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         paths: Vec<PathBuf>,
@@ -66,6 +73,7 @@ impl ShowCommand {
             guess,
             notes,
             layers,
+            compact: false,
         }
     }
 }
@@ -85,7 +93,8 @@ impl Command for ShowCommand {
         // minden lekérdezés a perzisztens projekt-gráfból olvas (crate::graph: a pack a fájlonkénti cache is)
         let engine = QueryEngine::new(self.project.as_deref(), self.label.clone())
             .use_project_graph(true)
-            .use_slim_rows(self.slim_rows());
+            .use_slim_rows(self.slim_rows())
+            .with_compact(self.compact);
         // réteg-kapcsolók nélkül nincs osztályozó: a kimenet bájtra azonos
         let engine = if self.layers.any() {
             match engine.with_layers(self.layers.layer.as_deref(), self.layers.by_layer) {

@@ -119,7 +119,7 @@ pub(crate) struct MethodBodyParams {
 // `find_callers`: hívók / hatáselemzés.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, JsonSchema)]
 pub(crate) struct FindCallersParams {
-    /// Regex on the callee: `(^|::|\.|->)cancel$` (every call), `Order::cancel` (resolved to that type); JS keys:
+    /// Callee: a plain word `cancel` = the whole name; regex `(^|::|\.|->)cancel$`, `.*cancel.*` (substring); `Order::cancel` (resolved to that type); JS keys:
     /// `useForm.js::submit`, `route::orders.show`.
     pub pattern: String,
     /// Search scope (file or directory) relative to the project root; default: the whole root.
@@ -140,6 +140,9 @@ pub(crate) struct FindCallersParams {
     /// Group callers by layer (closest to the callee first).
     #[serde(default)]
     pub by_layer: bool,
+    /// With `depth` 2–5: file-grouped `Type::name()  L<start>` lines without code (far fewer tokens).
+    #[serde(default)]
+    pub compact: bool,
     /// Disable the 400-line output cap.
     #[serde(default)]
     pub full: bool,

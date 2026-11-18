@@ -2,6 +2,8 @@
 
 mod hierarchy;
 mod query;
+#[cfg(test)]
+mod tests_depth;
 mod uncertain;
 mod wiring;
 

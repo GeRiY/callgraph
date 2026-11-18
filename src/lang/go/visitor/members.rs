@@ -86,6 +86,7 @@ impl GoVisitor<'_, '_> {
         let Some(body) = def.child_by_field_name("body") else {
             return;
         };
+        self.bind_signature(def, receiver.as_deref().map(|name| (name, container)));
         let scope = Scope {
             container: Some(container.to_string()),
             caller: name,

@@ -95,11 +95,24 @@ impl CallerIndex {
                             .then(|| wiring.scope_target(path, call))
                             .flatten()
                     });
+                // Python: `self.m()` / `cls.m()` a saját osztály `m` metódusa (örökölt is lehet: a hierarchia köti)
+                let own_python = (chained.is_none() && call.resolved.is_none())
+                    .then(|| python_own_method(path, call))
+                    .flatten();
+                // Rust: a mezőláncon át hívott (`ig.0.matcher.matched()`) metódus fogadó-típusa ismeretlen; ha a
+                // frontend a név egyediségéből a hívó saját típusára oldotta, az nem tény: név szerinti (`?::név`) hívás
+                let demoted = chained
+                    .is_none()
+                    .then(|| rust_field_chain_guess(path, call))
+                    .flatten();
                 let target = chained
                     .clone()
+                    .or_else(|| demoted.clone())
                     .or_else(|| call.resolved.clone())
                     .unwrap_or_else(|| call.target.clone());
-                let lookup = if chained.is_none()
+                let lookup = if let Some(method) = own_python {
+                    symbol_key(namespace, call.container.as_deref(), method)
+                } else if chained.is_none()
                     && call.resolved.is_none()
                     && call.category == "internal_helper"
                 {
@@ -129,7 +142,9 @@ impl CallerIndex {
                     caller_key,
                     caller_type,
                     guessable: chained.is_none()
-                        && ((call.resolved.is_none() && call.category == "external_call")
+                        && ((call.resolved.is_none()
+                            && call.category == "external_call"
+                            && own_python.is_none())
                             || uncertain),
                     rewritten: chained.is_some(),
                     wire: (call.kind == "wire")
@@ -508,23 +523,34 @@ impl CallerIndex {
             }
             // Hívónként a legkisebb sorú hívás marad (a régi: fájlon belül hívás-sorrend).
             next.sort_by(|a, b| (&a.row.file, a.row.line).cmp(&(&b.row.file, b.row.line)));
-            front = next
-                .into_iter()
-                .filter(|edge| {
-                    let key = format!(
-                        "{}:{}:{}",
-                        edge.row.file,
-                        edge.row.container.as_deref().unwrap_or("__top__"),
-                        edge.row.caller
-                    );
-                    (edge.guessable && !initial_seen.contains(&key)) || seen.insert(key)
-                })
-                .map(|mut edge| {
-                    edge.row.guessed = edge.guessable;
-                    edge
-                })
-                .collect();
-            for edge in &front {
+            // A hívó egyszer lép tovább a következő szintre, de minden különböző célja sor marad (egy fájl
+            // `__top__` hívójának több útvonal-hivatkozása — `Route::get(.., [A::class, 'x'])` — mind látszik).
+            let mut extra: Vec<Edge> = Vec::new();
+            let mut row_targets: HashSet<(String, String)> = HashSet::new();
+            let mut level_keys: HashSet<String> = HashSet::new();
+            front = Vec::new();
+            for mut edge in next {
+                let key = format!(
+                    "{}:{}:{}",
+                    edge.row.file,
+                    edge.row.container.as_deref().unwrap_or("__top__"),
+                    edge.row.caller
+                );
+                let first =
+                    (edge.guessable && !initial_seen.contains(&key)) || seen.insert(key.clone());
+                edge.row.guessed = edge.guessable;
+                if first {
+                    level_keys.insert(key.clone());
+                    row_targets.insert((key, edge.row.target.clone()));
+                    front.push(edge);
+                } else if !edge.guessable
+                    && level_keys.contains(&key)
+                    && row_targets.insert((key, edge.row.target.clone()))
+                {
+                    extra.push(edge);
+                }
+            }
+            for edge in front.iter().chain(&extra) {
                 let mut row = edge.row.clone();
                 row.level = level;
                 result.push(row);
@@ -598,6 +624,35 @@ fn link_callbacks(edges: &[Edge], hierarchy: &TypeHierarchy) -> HashMap<String, 
         }
     }
     out
+}
+
+/// Python: a `self.m()` / `cls.m()` hívás `m` metódusa, ha a hívás osztályban van és a fogadó pontosan
+/// `self` / `cls` (`self.repo.save()` nem az: a fogadó egy attribútum).
+fn python_own_method<'a>(path: &str, call: &'a crate::model::Call) -> Option<&'a str> {
+    if !path.ends_with(".py") || call.container.is_none() || call.kind != "method_call" {
+        return None;
+    }
+    let method = call
+        .target
+        .strip_prefix("self.")
+        .or_else(|| call.target.strip_prefix("cls."))?;
+    (!method.is_empty() && method.chars().all(|c| c.is_alphanumeric() || c == '_'))
+        .then_some(method)
+}
+
+/// Rust: a mezőláncú fogadójú (`on` = `ig.0.matcher`) hívás, amelyet a frontend a hívó saját típusára oldott
+/// (`Ignore::matched`) — a fogadó valódi típusa ismeretlen, ezért `?::név`.
+fn rust_field_chain_guess(path: &str, call: &crate::model::Call) -> Option<String> {
+    if !path.ends_with(".rs") {
+        return None;
+    }
+    let resolved = call.resolved.as_deref()?;
+    let (owner, name) = resolved.rsplit_once("::")?;
+    let container = call.container.as_deref()?;
+    let on = call.on.as_deref()?;
+    let chain = on.contains('.') && !on.starts_with('?') && !on.starts_with("Self");
+    (chain && !is_uncertain(resolved) && owner.rsplit("::").next() == Some(container))
+        .then(|| format!("{}{name}", super::uncertain::UNKNOWN_RECEIVER))
 }
 
 /// A saját példányon át hívott (`$this->m()`, feloldatlan belső) él célja a hívó típusán: a `lookup`

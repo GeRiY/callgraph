@@ -95,3 +95,36 @@ fn generic_with_two_traits_from_other_files_resolves_each_call_to_its_trait() {
     assert_eq!(callers("A::ping"), vec!["run".to_owned()]);
     assert_eq!(callers("B::pong"), vec!["run".to_owned()]);
 }
+
+#[test]
+fn field_chain_receiver_is_not_a_resolved_caller_of_the_own_type_at_depth() {
+    // `self.inner.overrides.matched(p)` has an unknown receiver type: the unique-name fallback must not turn it
+    // into a resolved caller of `Ignore::matched` on the second level
+    let ignore = graph_of(
+        "/p/src/dir.rs",
+        r#"pub struct Ignore {
+    inner: Inner,
+}
+
+impl Ignore {
+    pub fn matched(&self, p: &str) -> bool {
+        self.matched_ignore(p)
+    }
+
+    pub fn matched_ignore(&self, p: &str) -> bool {
+        self.inner.overrides.matched(p)
+    }
+}
+"#,
+    );
+    let index = CallerIndex::build([("/p/src/dir.rs", &ignore)]);
+    let first = index.callers("Ignore::matched_ignore", 1).unwrap();
+    assert!(first.iter().any(|row| row.caller == "matched"));
+    let (rows, _) = index.parents_of_with_skips(&first, 2, false);
+    assert!(
+        !rows
+            .iter()
+            .any(|row| row.level == 2 && row.caller == "matched_ignore"),
+        "{rows:?}"
+    );
+}

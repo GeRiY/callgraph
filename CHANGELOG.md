@@ -5,6 +5,32 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+### Added
+
+- **`--compact` for `--grep … --depth N`:** callers are grouped by level and file, one line each, without the call-site
+  code lines, so a wide impact analysis stays short. Over MCP it is the `find_callers` parameter `compact: true`.
+- **`locate` accepts a plain sentence:** the text is split into words and common filler words are ignored (they are
+  listed as `ignored: …` in the header). Quoted phrases are still searched as phrases.
+
+### Changed
+
+- **`--grep` / `find_callers` with a plain name matches whole names:** `execute` no longer matches `executeCommand`.
+  A class name still matches its qualified calls (`SongService` matches `App\Services\SongService::x`). For the old
+  substring search use a regex, for example `'.*execute.*'`.
+- **Go outlines show calls on the method's own receiver as plain method names** (like PHP `$this->x`); other resolved
+  calls appear as `Type::method`.
+- **A Rust field-chain receiver (`self.a.b.m()`) is no longer a resolved caller at `--depth`:** it is name-only and
+  appears under `--guess`.
+
+### Fixed
+
+- **`--grep Type::method` finds more callers:** Python calls through `self.` / `cls.`, and Go calls on the method's
+  receiver, typed parameters, typed locals (also multi-value assignments) and method chains. Before, these could
+  report that nothing calls the method.
+- **`--depth N` follows those calls to the next level:** in Python, a level-2 list could come back empty.
+- **`--depth` lists every target of a top-level file:** a routes file with several `[Controller::class, 'method']`
+  routes showed only the first one at level 2; now each is listed.
+
 ## [1.1.0] — 2026-11-17
 
 ### Added

@@ -33,6 +33,9 @@ impl GoVisitor<'_, '_> {
             }
             // `Map[int](xs)`: a grammar generikus típus-konverziónak olvassa — valójában függvényhívás
             "type_conversion_expression" => self.generic_conversion(node, scope, b),
+            "short_var_declaration" | "assignment_statement" => self.bind_assignment(node),
+            "var_spec" => self.bind_var_spec(node),
+            "func_literal" => self.bind_params(node),
             "composite_literal" => self.literal(node, scope, b),
             "interpreted_string_literal" | "raw_string_literal" => {
                 self.string_literal(node, scope, b)
@@ -80,6 +83,11 @@ impl GoVisitor<'_, '_> {
             (None, true) => format!(".{}", callee.name),
             _ => callee.name.clone(),
         };
+        // a receiver of a known project type: `pkg\Type::method`
+        let resolved = (callee.member && expr.kind() == "selector_expression")
+            .then(|| self.type_of(expr.child_by_field_name("operand")?))
+            .flatten()
+            .map(|owner| self.method_key(&owner, &callee.name));
         let start = line(callee.name_node);
         let end = end_line(node);
         b.call(Call {
@@ -89,7 +97,7 @@ impl GoVisitor<'_, '_> {
             end_line: (end > start).then_some(end),
             kind: kind.to_string(),
             target,
-            resolved: None,
+            resolved,
             on: callee
                 .root
                 .filter(|_| callee.member && !on_self && callee.path.is_some()),

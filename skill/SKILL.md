@@ -27,7 +27,7 @@ that; "where do I start with this task?" → `locate`; definitions, structure, c
 `--body`, `--grep`, `--depth`).
 **The first call of a task:** give `locate` the names and domain terms of the task in ONE call: function, class,
 property and file names, columns, routes, translation keys, and for a non-English domain word its English code name too (e.g.
-visszatérítés → `refund`). It answers from the project map without reading files: the top 5 files (`--all`: every
+visszatérítés → `refund`; a plain sentence works too, filler words are ignored). It answers from the project map without reading files: the top 5 files (`--all`: every
 match), each with its reasons (exact definition, file name, name part, string, call, `callers: N`). Continue on
 those files with the outline / `--body` / `--grep`.
 **Recipes:** bug fix = `locate` → `outline` of the top file → `--body` of the method. "Who calls it / what breaks" =
@@ -73,9 +73,11 @@ bash $CG --project myapp app/Http/Controllers/X.php --lines 30-60    # any range
 bash $CG --project myapp package.json::scripts --body                # one JSON key with its exact lines (dot path: scripts.build, files.0)
 bash $CG --project myapp app --strings 'Order not found'             # where a string literal (error message, key) is
 bash $CG --project myapp app --const STATUS_ACTIVE                   # constant: definition, references, re-exports
+bash $CG --project myapp app --grep cancel                          # a plain word = the whole name (cancel, x.cancel, T::cancel; not cancelAll); '.*cancel.*' = substring
 bash $CG --project myapp app --grep '(^|::|\.|->)cancel$'           # who calls it: EVERY call of the name, with the call line
 bash $CG --project myapp app --grep 'Order::cancel'                  # only calls resolved to Order (+ via interface / parent / trait)
 bash $CG --project myapp app --grep 'Order::cancel' --depth 3        # impact analysis: the callers' callers
+bash $CG --project myapp app --grep 'Order::cancel' --depth 3 --compact # impact as file-grouped names + lines, no code
 bash $CG --project myapp app --grep 'Order::cancel' --depth 3 --guess # + name-only matches ("?")
 bash $CG --project myapp app --grep 'Order::cancel' --body           # source of the caller methods found
 bash $CG --project myapp app --grep 'App\Svc\Order::cancel'        # PHP namespace: a single \ is read as the separator (App\\Svc\\ also works); a bad regex gets a 💡 hint
