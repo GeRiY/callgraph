@@ -128,7 +128,9 @@ impl Locator {
                     let mut next: Vec<Term> = Vec::new();
                     for (i, term) in terms.iter().enumerate() {
                         if unmatched(i, term) {
-                            next.extend(term.split_into_words());
+                            let (words, dropped) = term.split_into_words();
+                            ignored.extend(dropped);
+                            next.extend(words);
                         } else {
                             next.push(term.clone());
                         }

@@ -46,6 +46,24 @@ pub(super) fn is_test_or_story(path: &str) -> bool {
         || lower.contains("/stories/")
 }
 
+/// A fájl legfelső szintű hívásai (`__top__`: útvonal-fájl, szkript), ha nincs hozzájuk metódus-sor: a procedurális
+/// fájl 1. szintű „hívója” maga a fájl (`__top__::__top__()`), hívásonként egy sorral.
+pub(super) fn top_level_calls(row: &QueryResult) -> Vec<&crate::model::Call> {
+    if row
+        .graph
+        .methods
+        .iter()
+        .any(|m| m.container.is_none() && m.name == "__top__")
+    {
+        return Vec::new();
+    }
+    row.graph
+        .calls
+        .iter()
+        .filter(|c| c.container.is_none() && c.caller.as_deref().is_none_or(|n| n == "__top__"))
+        .collect()
+}
+
 /// A szintenkénti nézet: 1. szint = a találatok metódusai a hívás-soraikkal, 2+. szint = hívónként egy sor
 /// (`← cél`, a hívás sora), a kihagyott név szerinti egyezések száma, a végén a tipp.
 pub(super) fn render_depth(view: DepthView<'_>) -> String {
@@ -128,6 +146,26 @@ pub(super) fn render_depth(view: DepthView<'_>) -> String {
                 call_lines(&mut output, row, &calls, source, lang, "    ");
             }
         }
+        let mut has_top = false;
+        if level == 1 {
+            for row in rows {
+                let top = top_level_calls(row);
+                let (Some(first), Some(last)) = (top.first(), top.last()) else {
+                    continue;
+                };
+                has_top = true;
+                writeln!(
+                    output,
+                    "  {}  __top__::__top__()  L{}-{}{}",
+                    row.graph.file,
+                    first.line,
+                    last.end_line.unwrap_or(last.line).max(last.line),
+                    marks.caller_mark(&row.graph.file, None, Some("__top__"))
+                )
+                .unwrap();
+                call_lines(&mut output, row, &top, source, lang, "    ");
+            }
+        }
         let mut level_callers = callers
             .iter()
             .filter(|row| row.level == level && level > 1)
@@ -149,6 +187,8 @@ pub(super) fn render_depth(view: DepthView<'_>) -> String {
                 row.container.clone(),
                 row.caller.clone(),
                 row.target.clone(),
+                // a top-level (`__top__`) caller's calls stay one row per line: two routes, one action
+                if row.caller == "__top__" { row.line } else { 0 },
             ))
         });
         if let Some(scope) = layers {
@@ -223,7 +263,7 @@ pub(super) fn render_depth(view: DepthView<'_>) -> String {
                 files.len()
             ));
         }
-        if (level == 1 && direct.is_empty())
+        if (level == 1 && direct.is_empty() && !has_top)
             || (level > 1 && !callers.iter().any(|row| row.level == level))
         {
             if level == 1 && !no_caller.is_empty() {
@@ -278,4 +318,57 @@ pub(super) fn render_depth(view: DepthView<'_>) -> String {
     }
     output.push_str(guess_legend());
     output
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::{Call, FileGraphBuilder};
+
+    struct NoRanges;
+    impl MethodRanges for NoRanges {
+        fn range(&self, _: &str, _: Option<&str>, _: &str) -> Option<(u32, u32)> {
+            None
+        }
+        fn has_dynamic(&self, _: &str, _: Option<&str>, _: &str) -> bool {
+            false
+        }
+    }
+
+    #[test]
+    fn route_references_are_level_one_callers_of_the_action() {
+        let mut builder = FileGraphBuilder::new("routes/web.php");
+        for line in [5, 6] {
+            builder.call(
+                Call::new("static_call", "SongController::destroy", "external_call")
+                    .at(line)
+                    .within(None, Some("__top__".to_owned()))
+                    .reference(),
+            );
+        }
+        let rows = [QueryResult::new(builder.build(), None)];
+        let (source, marks) = (SourceLines::default(), NoteMarks::default());
+        let text = render_depth(DepthView {
+            rows: &rows,
+            pattern: "SongController::destroy",
+            depth: 1,
+            guess: false,
+            callers: &[],
+            skipped: &[],
+            ranges: &NoRanges,
+            source: &source,
+            lang: Lang::En,
+            layers: None,
+            marks: &marks,
+            no_caller: "",
+            full: false,
+            max: 400,
+            compact: false,
+        });
+        assert!(
+            text.contains("routes/web.php  __top__::__top__()  L5-6\n"),
+            "{text}"
+        );
+        assert!(!text.contains("no more callers"), "{text}");
+    }
 }

@@ -541,11 +541,11 @@ impl CallerIndex {
                 edge.row.guessed = edge.guessable;
                 if first {
                     level_keys.insert(key.clone());
-                    row_targets.insert((key, edge.row.target.clone()));
+                    row_targets.insert((key, target_at(&edge)));
                     front.push(edge);
                 } else if !edge.guessable
                     && level_keys.contains(&key)
-                    && row_targets.insert((key, edge.row.target.clone()))
+                    && row_targets.insert((key, target_at(&edge)))
                 {
                     extra.push(edge);
                 }
@@ -557,6 +557,15 @@ impl CallerIndex {
             }
         }
         (result, skipped)
+    }
+}
+
+/// A sor azonosítója a hívón belül: a cél; a legfelső szintű (`__top__`) hívónál a hívás sora is (két útvonal, egy akció).
+fn target_at(edge: &Edge) -> String {
+    if edge.row.caller == "__top__" {
+        format!("{}@{}", edge.row.target, edge.row.line)
+    } else {
+        edge.row.target.clone()
     }
 }
 

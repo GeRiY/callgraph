@@ -20,6 +20,54 @@ fn call(target: &str, resolved: &str, line: u32, container: Option<&str>, caller
 }
 
 #[test]
+fn two_routes_to_one_action_stay_two_rows() {
+    let songs = graph(
+        "/p/SongController.php",
+        "App\\Http",
+        vec![call(
+            "SongService::deleteSongs",
+            "App\\SongService::deleteSongs",
+            14,
+            Some("SongController"),
+            "destroy",
+        )],
+    );
+    let routes = graph(
+        "/p/routes.php",
+        "",
+        vec![
+            call(
+                "SongController::destroy",
+                "App\\Http\\SongController::destroy",
+                5,
+                None,
+                "__top__",
+            ),
+            call(
+                "SongController::destroy",
+                "App\\Http\\SongController::destroy",
+                6,
+                None,
+                "__top__",
+            ),
+        ],
+    );
+    let index = CallerIndex::build([
+        ("/p/SongController.php", &songs),
+        ("/p/routes.php", &routes),
+    ]);
+    let first = index.callers("SongService::deleteSongs", 1).unwrap();
+    let (rows, _) = index.parents_of_with_skips(&first, 2, false);
+    let mut lines: Vec<u32> = rows
+        .iter()
+        .filter(|row| row.level == 2)
+        .map(|row| row.line)
+        .collect();
+    lines.sort();
+    assert_eq!(lines, vec![5, 6]);
+}
+
+#[test]
 fn top_level_caller_keeps_one_row_per_referenced_target() {
     let blog = graph(
         "/p/BlogController.php",

@@ -1008,15 +1008,23 @@ fn a_sentence_phrase_splits_into_content_words() {
     let phrase = Term::new("where are blueprint routes registered on the application").unwrap();
     assert_eq!(phrase.kind, TermKind::Phrase);
     assert!(!phrase.quoted);
-    let split = phrase.split_into_words();
+    let (split, dropped) = phrase.split_into_words();
+    assert_eq!(dropped, ["where", "are", "on", "the"]);
     assert_eq!(
         raws(&split),
         ["blueprint", "routes", "registered", "application"]
     );
     assert!(split.iter().all(|t| t.kind == TermKind::Name));
     // only noise words: nothing is lost
-    let noise = Term::new("where is it").unwrap().split_into_words();
+    let (noise, dropped) = Term::new("where is it").unwrap().split_into_words();
     assert_eq!(raws(&noise), ["where", "is", "it"]);
+    assert!(dropped.is_empty());
+    // Hungarian filler words
+    let (hu, dropped) = Term::new("hol küldjük ki a jelszó-visszaállító levelet")
+        .unwrap()
+        .split_into_words();
+    assert_eq!(raws(&hu), ["küldjük", "jelszó-visszaállító", "levelet"]);
+    assert_eq!(dropped, ["hol", "ki", "a"]);
 }
 
 #[test]

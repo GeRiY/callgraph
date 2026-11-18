@@ -111,15 +111,18 @@ impl Term {
 
     /// A kifejezés szavaira bontva (a mondatként átadott kifejezés tartaléka, ha egészében nem illeszkedett): a
     /// zajszavak (<= 2 betű, töltelékszó) nélkül; ha csak zaj maradna, az összes szó.
-    pub(crate) fn split_into_words(&self) -> Vec<Self> {
+    /// A második elem az elhagyott zajszavak (a fejléc `ignored:` részéhez).
+    pub(crate) fn split_into_words(&self) -> (Vec<Self>, Vec<String>) {
         let all: Vec<&str> = self.raw.split_whitespace().collect();
-        let keep: Vec<&str> = all
-            .iter()
-            .copied()
-            .filter(|w| w.chars().count() > 2 && !is_stopword(w))
-            .collect();
-        let chosen = if keep.is_empty() { all } else { keep };
-        chosen.into_iter().filter_map(Self::new).collect()
+        let noise = |w: &str| w.chars().count() <= 2 || is_stopword(w);
+        if all.iter().all(|w| noise(w)) {
+            return (all.into_iter().filter_map(Self::new).collect(), Vec::new());
+        }
+        let (dropped, keep): (Vec<&str>, Vec<&str>) = all.into_iter().partition(|w| noise(w));
+        (
+            keep.into_iter().filter_map(Self::new).collect(),
+            dropped.into_iter().map(str::to_owned).collect(),
+        )
     }
 
     /// Név / fogalom kifejezés-e (a `Phrase` és a `Route` csak a saját egyezéseit adja).
@@ -159,7 +162,12 @@ impl Term {
 const STOPWORDS: &[&str] = &[
     "the", "a", "an", "and", "or", "of", "to", "in", "on", "for", "from", "with", "by", "at", "is",
     "are", "be", "where", "what", "how", "which", "that", "this", "it", "its", "as", "into",
-    "their", "them", "then", "when", "all", "any", "some",
+    "their", "them", "then", "when", "all", "any", "some", // Hungarian
+    "az", "egy", "és", "hogy", "hol", "mit", "mik", "ki", "kit", "meg", "van", "vannak", "nincs",
+    "nem", "de", "ha", "kell", "lesz", "volt", "ahol", "amely", "amelyik", "ami", "amit", "melyik",
+    "milyen", "hogyan", "miért", "mikor", "itt", "ott", "ez", "ezt", "azt", "el", "fel", "le",
+    "át", "csak", "már", "még", "minden", "mind", "vagy", "ill", "pedig", "majd", "után", "előtt",
+    "alatt", "között", "szerint", "nálunk", "nekünk", "mi", "mink",
 ];
 
 /// Töltelékszó-e (kis-/nagybetűtől függetlenül).

@@ -174,6 +174,7 @@ impl SelfUpdateCommand {
                     "Telepítve innen: {from} (előtte {current}; {summary})"
                 )
             )?;
+            writeln!(out, "{}", messages::mcp_reconnect_note())?;
             return Ok(());
         }
         if o.dev {
@@ -251,6 +252,7 @@ impl SelfUpdateCommand {
             )
         };
         writeln!(out, "{line} ({summary})")?;
+        writeln!(out, "{}", messages::mcp_reconnect_note())?;
         Ok(())
     }
 
@@ -322,6 +324,7 @@ impl SelfUpdateCommand {
             )
         };
         writeln!(out, "{line} ({summary})")?;
+        writeln!(out, "{}", messages::mcp_reconnect_note())?;
         Ok(())
     }
 

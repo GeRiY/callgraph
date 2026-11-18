@@ -147,3 +147,12 @@ pub(super) fn warn_skipped(name: &str) -> String {
         "figyelem: a(z) {name} ellenőrzőösszege nincs ellenőrizve (--insecure-skip-checksum)"
     )
 }
+
+/// Shown after a successful install: a running MCP server keeps the old binary until it is reconnected.
+pub(super) fn mcp_reconnect_note() -> String {
+    t!(
+        "A running MCP server keeps the old version until reconnected (Claude Code: /mcp, then Reconnect).",
+        "A futó MCP-szerver a régi verzióval megy tovább, amíg újra nem csatlakozol (Claude Code: /mcp, majd Reconnect)."
+    )
+    .to_owned()
+}

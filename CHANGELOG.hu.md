@@ -8,11 +8,13 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ### Új
 
-- **`--compact` a `--grep … --depth N` mellé:** a hívók szintenként és fájlonként csoportosítva, soronként egy sorral
-  jelennek meg, a hívás helyének kódsorai nélkül, így egy széles hatáselemzés rövid marad. MCP-n a `find_callers`
-  `compact: true` paramétere.
-- **A `locate` sima mondatot is elfogad:** a szöveget szavakra bontja, és a gyakori töltelékszavakat figyelmen kívül
-  hagyja (a fejlécben `ignored: …` alatt látszanak). Az idézőjeles kifejezéseket továbbra is kifejezésként keresi.
+- **`--compact` a `--grep … --depth N` mellé:** a hívók szintenként csoportosítva, fájlonként egy sorban jelennek meg
+  (`path: A()  L12, B()  L40 ← target`, kb. 160 karakternél tördelve), így egy széles hatáselemzés rövid marad.
+  A legfelső szintű hívók, például az útvonal-regisztrációk, a `__top__()` helyett a levágott hívási kódot mutatják,
+  pl. `L5 Route::delete('songs', [SongController::class, 'destroy'])->name('songs.destroy')`.
+  MCP-n a `find_callers` `compact: true` paramétere.
+- **A `locate` sima mondatot is elfogad:** a szöveget szavakra bontja, és a gyakori angol és magyar töltelékszavakat
+  (hol, a, az, hogy, …) figyelmen kívül hagyja, és a fejlécben `ignored: …` alatt kiírja őket. Az idézőjeles kifejezéseket továbbra is kifejezésként keresi.
 
 ### Változás
 
@@ -24,14 +26,20 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 - **A Rust mezőlánc-receiver (`self.a.b.m()`) a `--depth`-nél már nem számít feloldott hívónak:** csak név alapú, és a
   `--guess` alatt jelenik meg.
 
+- **Az `update` / `callgraph.sh update [--dev]` figyelmeztet az MCP újracsatlakoztatására:** sikeres frissítés után
+  kiír egy megjegyzést, hogy a futó MCP-szerver a régi verziót használja, amíg újra nem csatlakoztatod (Claude Code:
+  `/mcp`, majd Reconnect).
+
 ### Javítás
 
 - **A `--grep Type::method` több hívót talál:** a Python `self.` / `cls.` hívásait, a Go-ban pedig a metódus
   receiverén, típusos paramétereken, típusos lokális változókon (többértékű értékadásnál is) és metódusláncokon
   keresztüli hívásokat. Korábban ilyenkor azt jelezhette, hogy a metódust senki sem hívja.
 - **A `--depth N` ezeket a hívásokat is követi a következő szintre:** Pythonban a 2. szintű lista üres is lehetett.
-- **A `--depth` a legfelső szintű fájl minden célpontját felsorolja:** egy több `[Controller::class, 'method']`
-  útvonalat tartalmazó routes fájlnál korábban csak az első látszott a 2. szinten, most mind.
+- **A `--depth` az akció minden útvonalát felsorolja:** egy több `[Controller::class, 'method']` útvonalat tartalmazó
+  routes fájlnál korábban csak az első látszott a 2. szinten, és két, ugyanarra az akcióra mutató útvonalból is csak
+  egy; most mind. A `--grep 'Ctrl::m' --depth N` magára a controller-akcióra az útvonal-regisztrációkat az 1. szinten
+  listázza; korábban azt írta, hogy nincs hívó.
 
 ## [1.1.0] — 2026-11-17
 
