@@ -1,7 +1,7 @@
-// Google Analytics (GA4) only after explicit consent; nothing is sent to Google before "Accept".
+// Google Tag Manager (which holds the GA4 tag) loads only after explicit consent; nothing is sent to Google before "Accept".
 // The choice is stored in localStorage ("cg-consent" = "granted" | "denied"); the footer link reopens the banner.
 (function () {
-  var ID = "G-JF41PLPF3K", KEY = "cg-consent";
+  var GTM = "GTM-PK6Z5DDZ", KEY = "cg-consent";
   var hu = (document.documentElement.lang || "").slice(0, 2) === "hu";
   var T = hu ? {
     title: "Segíts jobbá tenni a callgraph-ot",
@@ -19,11 +19,11 @@
     if (loaded) return; loaded = true;
     window.dataLayer = window.dataLayer || [];
     window.gtag = function () { window.dataLayer.push(arguments); };
+    // consent state for every tag in the container: analytics only, never advertising
     gtag("consent", "default", { ad_storage: "denied", ad_user_data: "denied", ad_personalization: "denied", analytics_storage: "granted" });
-    gtag("js", new Date());
-    gtag("config", ID, { allow_google_signals: false, allow_ad_personalization_signals: false });
+    window.dataLayer.push({ "gtm.start": new Date().getTime(), event: "gtm.js" });
     var s = document.createElement("script"); s.async = true;
-    s.src = "https://www.googletagmanager.com/gtag/js?id=" + ID; document.head.appendChild(s);
+    s.src = "https://www.googletagmanager.com/gtm.js?id=" + GTM; document.head.appendChild(s);
   }
   function clearGa() {
     document.cookie.split(";").forEach(function (c) {
