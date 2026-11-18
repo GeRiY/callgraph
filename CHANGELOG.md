@@ -5,48 +5,46 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+## [1.1.1] — 2026-11-18
+
 ### Added
 
-- **`--compact` for `--grep … --depth N`:** callers are grouped by level, one line per file
-  (`path: A()  L12, B()  L40 ← target`, wrapped at about 160 characters), so a wide impact analysis stays short.
-  Top-level callers such as route registrations show their trimmed call-site code, for example
-  `L5 Route::delete('songs', [SongController::class, 'destroy'])->name('songs.destroy')`, instead of `__top__()`.
-  When all entries of a file share one target, `← target` is printed right after the file name, so it visibly covers
-  every entry on the line.
-  Over MCP it is the `find_callers` parameter `compact: true`.
-- **`locate` accepts a plain sentence:** the text is split into words and common English and Hungarian filler
-  words (hol, a, az, hogy, …) are ignored, and they are listed as `ignored: …` in the header. Quoted phrases are still searched as phrases.
-  String matches in translation files (Laravel lang files, JSON/TS dictionaries, `.po` / `.xliff`) weigh much less, so a
-  code file with a name or symbol match ranks above them; when most words only match UI text, the header suggests
-  adding the English code name. When every match is only UI text or translation strings, the header says clearly
-  that there is no code match (`no code match`); the list stays, which helps when you look for a UI label.
+- **A short impact view with `--compact`:** `--grep … --depth N --compact` prints the callers level by level, one line
+  per file (`path: A()  L12, B()  L40 ← target`, wrapped at about 160 characters), so a wide impact analysis stays
+  short. Route registrations show their actual code, for example
+  `L5 Route::delete('songs', [SongController::class, 'destroy'])->name('songs.destroy')`. When all entries of a file
+  point to the same target, `← target` is printed once, right after the file name. Over MCP it is the `find_callers`
+  parameter `compact: true`.
+- **`locate` understands a plain sentence:** write the task as you would say it. Common English and Hungarian filler
+  words (hol, a, az, hogy, …) are ignored and listed as `ignored: …` in the header; quoted phrases are still searched
+  as phrases. Matches in translation files (Laravel lang files, JSON/TS dictionaries, `.po` / `.xliff`) count much
+  less, so a code file whose name or symbol matches ranks above them. When most words match only UI text, the header
+  suggests adding the English code name; when nothing matches in code, it says so (`no code match`) and keeps the
+  list, which helps if you are looking for a UI label.
 
 ### Changed
 
-- **`--grep` / `find_callers` with a plain name matches whole names:** `execute` no longer matches `executeCommand`.
-  A class name still matches its qualified calls (`SongService` matches `App\Services\SongService::x`). For the old
-  substring search use a regex, for example `'.*execute.*'`.
-  A plain name is case-sensitive: `store` (a method) no longer matches the class `Store` (`Store::get`), and `Store`
-  matches only the class; regex and `Type::method` patterns stay case-insensitive.
-- **Go outlines show calls on the method's own receiver as plain method names** (like PHP `$this->x`); other resolved
-  calls appear as `Type::method`.
-- **A Rust field-chain receiver (`self.a.b.m()`) is no longer a resolved caller at `--depth`:** it is name-only and
-  appears under `--guess`.
-
+- **`--grep` / `find_callers` finds exactly the name you give:** `execute` no longer matches `executeCommand`, and
+  `store` (a method) no longer matches the class `Store`. A class name still finds its qualified calls (`SongService`
+  matches `App\Services\SongService::x`). For the old "contains" search use a regex, for example `'.*execute.*'`;
+  regex and `Type::method` patterns stay case-insensitive.
+- **Cleaner call lists for Go and Rust:** in Go outlines a call on the method's own object shows as a plain method
+  name (like PHP `$this->x`), and other calls as `Type::method`. In Rust, a call through nested fields
+  (`self.a.b.m()`) is no longer listed as a certain caller in `--depth`; it appears only with `--guess`.
 - **`update` / `callgraph.sh update [--dev]` reminds you to reconnect MCP:** after a successful update it prints a
-  note that a running MCP server keeps the old version until it is reconnected (Claude Code: `/mcp`, then Reconnect).
+  note that a running MCP server keeps the old version until you reconnect it (Claude Code: `/mcp`, then Reconnect).
 
 ### Fixed
 
-- **`--grep Type::method` finds more callers:** Python calls through `self.` / `cls.`, and Go calls on the method's
-  receiver, typed parameters, typed locals (also multi-value assignments) and method chains. Before, these could
-  report that nothing calls the method.
-- **`--depth N` follows those calls to the next level:** in Python, a level-2 list could come back empty.
+- **`--grep Type::method` and `--depth N` find callers that were missed:** Python calls through `self.` / `cls.`
+  and Go calls on the method's own object, typed parameters, typed local variables (also multi-value assignments)
+  and method chains. Before, the result could say that nothing calls the method, or the level-2 list in Python could
+  come back empty.
 - **`--depth` lists every route to an action:** a routes file with several `[Controller::class, 'method']` routes
-  showed only the first one at level 2, and two routes in one file pointing to the same action showed only one;
-  now each is listed. `--grep 'Ctrl::m' --depth N` on the controller action itself lists the route registrations
-  at level 1; before, it said there were no callers. When a short `Ctrl::method` pattern matches same-named classes in
-  several namespaces, each level-1 route row names its fully-qualified target, in the normal and `--compact` views.
+  showed only the first at level 2, and two routes to the same action showed only one; now each is listed.
+  `--grep 'Ctrl::m' --depth N` on the controller action itself lists its route registrations at level 1; before, it
+  said there were no callers. When a short `Ctrl::method` pattern matches same-named classes in several namespaces,
+  each level-1 route row names its fully-qualified target, in the normal and `--compact` views.
 
 ## [1.1.0] — 2026-11-17
 
@@ -1057,7 +1055,8 @@ First release.
 - Built-in update: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Prebuilt packages for macOS (arm64, x86_64), Linux (x86_64, ARM64, static musl) and Windows.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v1.1.0...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v1.1.1...develop
+[1.1.1]: https://github.com/GeRiY/callgraph/releases/tag/v1.1.1
 [1.1.0]: https://github.com/GeRiY/callgraph/releases/tag/v1.1.0
 [1.0.2]: https://github.com/GeRiY/callgraph/releases/tag/v1.0.2
 [1.0.1]: https://github.com/GeRiY/callgraph/releases/tag/v1.0.1

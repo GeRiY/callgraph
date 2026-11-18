@@ -6,45 +6,44 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ## [Unreleased]
 
+## [1.1.1] — 2026-11-18
+
 ### Új
 
-- **`--compact` a `--grep … --depth N` mellé:** a hívók szintenként csoportosítva, fájlonként egy sorban jelennek meg
-  (`path: A()  L12, B()  L40 ← target`, kb. 160 karakternél tördelve), így egy széles hatáselemzés rövid marad.
-  A legfelső szintű hívók, például az útvonal-regisztrációk, a `__top__()` helyett a levágott hívási kódot mutatják,
-  pl. `L5 Route::delete('songs', [SongController::class, 'destroy'])->name('songs.destroy')`.
-  Ha egy fájl összes bejegyzésének ugyanaz a célja, a `← target` közvetlenül a fájlnév után áll, így láthatóan a sor
-  minden bejegyzésére vonatkozik.
-  MCP-n a `find_callers` `compact: true` paramétere.
-- **A `locate` sima mondatot is elfogad:** a szöveget szavakra bontja, és a gyakori angol és magyar töltelékszavakat
-  (hol, a, az, hogy, …) figyelmen kívül hagyja, és a fejlécben `ignored: …` alatt kiírja őket. Az idézőjeles kifejezéseket továbbra is kifejezésként keresi.
-  A fordítófájlokban (Laravel lang fájlok, JSON/TS szótárak, `.po` / `.xliff`) talált szöveges találatok sokkal kisebb
-  súllyal számítanak, így a név- vagy szimbólumtalálatos kódfájl előrébb kerül; ha a szavak többsége csak felületi
-  szövegre illeszkedik, a fejléc az angol kódnév hozzáadását javasolja. Ha minden találat csak felületi szöveg vagy
-  fordítási sztring, a fejléc egyértelműen kiírja, hogy nincs kódtalálat (`nincs kódtalálat`); a lista megmarad,
-  ami segít, ha felületi feliratot keresel.
+- **Rövid hatásnézet a `--compact` kapcsolóval:** a `--grep … --depth N --compact` a hívókat szintenként, fájlonként
+  egy sorban listázza (`path: A()  L12, B()  L40 ← target`, kb. 160 karakternél tördelve), így egy széles
+  hatáselemzés rövid marad. Az útvonal-regisztrációk a tényleges kódjukat mutatják, például
+  `L5 Route::delete('songs', [SongController::class, 'destroy'])->name('songs.destroy')`. Ha egy fájl összes
+  bejegyzése ugyanarra a célra mutat, a `← target` csak egyszer, közvetlenül a fájlnév után áll. MCP-n a
+  `find_callers` `compact: true` paramétere.
+- **A `locate` sima mondatot is megért:** a feladatot úgy írhatod le, ahogy kimondanád. A gyakori angol és magyar
+  töltelékszavakat (hol, a, az, hogy, …) figyelmen kívül hagyja, és a fejlécben `ignored: …` alatt kiírja; az
+  idézőjeles kifejezéseket továbbra is kifejezésként keresi. A fordítófájlokban (Laravel lang fájlok, JSON/TS
+  szótárak, `.po` / `.xliff`) talált egyezések sokkal kisebb súlyúak, így a név- vagy szimbólumtalálatos kódfájl
+  előrébb kerül. Ha a szavak többsége csak felületi szövegre illeszkedik, a fejléc az angol kódnév hozzáadását
+  javasolja; ha kódban nincs találat, azt kiírja (`nincs kódtalálat`), és a lista megmarad, ami segít, ha felületi
+  feliratot keresel.
 
 ### Változás
 
-- **A `--grep` / `find_callers` sima névvel egész nevekre illeszkedik:** az `execute` már nem találja meg az
-  `executeCommand`-ot. Az osztálynév továbbra is megtalálja a minősített hívásait (a `SongService` az
-  `App\Services\SongService::x`-et). A régi részsztringes kereséshez regexet kell használni, pl. `'.*execute.*'`.
-  A sima név kis- és nagybetűre érzékeny: a `store` (metódus) már nem találja meg a `Store` osztályt (`Store::get`), a
-  `Store` pedig csak az osztályt; a regex és a `Type::method` minták továbbra is nem érzékenyek.
-- **A Go outline a metódus saját receiverén lévő hívásokat sima metódusnévként mutatja** (mint a PHP `$this->x`),
-  a többi feloldott hívást `Type::method` alakban.
-- **A Rust mezőlánc-receiver (`self.a.b.m()`) a `--depth`-nél már nem számít feloldott hívónak:** csak név alapú, és a
-  `--guess` alatt jelenik meg.
-
+- **A `--grep` / `find_callers` pontosan a megadott nevet keresi:** az `execute` már nem találja meg az
+  `executeCommand`-ot, a `store` (metódus) pedig a `Store` osztályt. Az osztálynév továbbra is megtalálja a minősített
+  hívásait (a `SongService` az `App\Services\SongService::x`-et). A régi „tartalmazza” kereséshez regexet használj,
+  pl. `'.*execute.*'`; a regex és a `Type::method` minták továbbra is kis- és nagybetűre nem érzékenyek.
+- **Tisztább híváslisták Go-hoz és Rusthoz:** a Go outline a metódus saját objektumán lévő hívást sima
+  metódusnévként mutatja (mint a PHP `$this->x`), a többit `Type::method` alakban. Rustban az egymásba ágyazott
+  mezőkön át történő hívás (`self.a.b.m()`) a `--depth`-ben már nem számít biztos hívónak, csak a `--guess`
+  kapcsolóval jelenik meg.
 - **Az `update` / `callgraph.sh update [--dev]` figyelmeztet az MCP újracsatlakoztatására:** sikeres frissítés után
   kiír egy megjegyzést, hogy a futó MCP-szerver a régi verziót használja, amíg újra nem csatlakoztatod (Claude Code:
   `/mcp`, majd Reconnect).
 
 ### Javítás
 
-- **A `--grep Type::method` több hívót talál:** a Python `self.` / `cls.` hívásait, a Go-ban pedig a metódus
-  receiverén, típusos paramétereken, típusos lokális változókon (többértékű értékadásnál is) és metódusláncokon
-  keresztüli hívásokat. Korábban ilyenkor azt jelezhette, hogy a metódust senki sem hívja.
-- **A `--depth N` ezeket a hívásokat is követi a következő szintre:** Pythonban a 2. szintű lista üres is lehetett.
+- **A `--grep Type::method` és a `--depth N` olyan hívókat is megtalál, amelyeket korábban kihagyott:** a Python
+  `self.` / `cls.` hívásait, Go-ban pedig a metódus saját objektumán, típusos paramétereken, típusos lokális
+  változókon (többértékű értékadásnál is) és metódusláncokon keresztüli hívásokat. Korábban az eredmény azt jelezhette,
+  hogy a metódust senki sem hívja, vagy Pythonban a 2. szintű lista üresen jöhetett vissza.
 - **A `--depth` az akció minden útvonalát felsorolja:** egy több `[Controller::class, 'method']` útvonalat tartalmazó
   routes fájlnál korábban csak az első látszott a 2. szinten, és két, ugyanarra az akcióra mutató útvonalból is csak
   egy; most mind. A `--grep 'Ctrl::m' --depth N` magára a controller-akcióra az útvonal-regisztrációkat az 1. szinten
@@ -1132,7 +1131,8 @@ Első kiadás.
 - Beépített frissítés: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Előre fordított csomagok macOS-re (arm64, x86_64), Linuxra (x86_64, ARM64, statikus musl) és Windowsra.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v1.1.0...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v1.1.1...develop
+[1.1.1]: https://github.com/GeRiY/callgraph/releases/tag/v1.1.1
 [1.1.0]: https://github.com/GeRiY/callgraph/releases/tag/v1.1.0
 [1.0.2]: https://github.com/GeRiY/callgraph/releases/tag/v1.0.2
 [1.0.1]: https://github.com/GeRiY/callgraph/releases/tag/v1.0.1
