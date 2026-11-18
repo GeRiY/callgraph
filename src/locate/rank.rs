@@ -25,6 +25,9 @@ use super::matcher::{Hit, Kind, Symbol};
 const BONUS_CAP: u64 = 9;
 /// A tesztfájl pontszámának szorzója (ezrelékben).
 const TEST_FACTOR_PERMILLE: u64 = 600;
+/// A fordítási / katalógus-fájl pontszám-szorzója: az ott talált felületi szöveg sokkal gyengébb jel, mint egy
+/// kódnév.
+const TRANSLATION_FACTOR_PERMILLE: u64 = 100;
 /// A több kifejezést egyesítő azonosító pontja kifejezésenként (a ritkaságtól független: a kifejezések együttese
 /// akkor is ritka, ha külön-külön általánosak).
 const MULTI_TERM_WEIGHT: u64 = 1500;
@@ -167,6 +170,34 @@ pub(crate) fn is_test_path(path: &str) -> bool {
         || name.ends_with("_test.go")
 }
 
+/// Fordítási / üzenet-katalógus fájl-e az út: a nyelvfájlok (`lang/hu.json`, `lang/hu/auth.php`, TS / JS szótárak,
+/// ugyanaz a felismerés, mint a fordítási nézetben), `messages.*`, `.po` / `.pot` / `.xlf`, és a JSON a
+/// nyelvi mappákban (`locales/`, `i18n/`, `translations/`).
+pub(crate) fn is_translation_path(path: &str) -> bool {
+    let norm = path.replace('\\', "/");
+    if crate::packages::crossref::is_lang_path(&norm) {
+        return true;
+    }
+    let lower = norm.to_ascii_lowercase();
+    let name = lower.rsplit('/').next().unwrap_or(&lower);
+    let ext = name.rsplit_once('.').map_or("", |(_, ext)| ext);
+    if matches!(ext, "po" | "pot" | "xlf" | "xliff") {
+        return true;
+    }
+    if name.starts_with("messages.")
+        && matches!(ext, "json" | "php" | "yml" | "yaml" | "properties")
+    {
+        return true;
+    }
+    ext == "json"
+        && lower.split('/').rev().skip(1).any(|dir| {
+            matches!(
+                dir,
+                "lang" | "langs" | "locales" | "locale" | "i18n" | "translations"
+            )
+        })
+}
+
 /// Csak típusokat tartalmazó deklarációs fájl-e az út (`*.d.ts`, `*.d.mts`, `*.d.cts`, `*.pyi`).
 pub(crate) fn is_declaration_path(path: &str) -> bool {
     let lower = path.replace('\\', "/").to_ascii_lowercase();
@@ -220,6 +251,9 @@ pub(crate) fn rank(mut files: Vec<FileMatch>, is_test: impl Fn(&str) -> bool) ->
         if is_test(&file.path) {
             score = score * TEST_FACTOR_PERMILLE / 1000;
         }
+        if is_translation_path(&file.path) {
+            score = score * TRANSLATION_FACTOR_PERMILLE / 1000;
+        }
         file.score = score;
     }
     files.sort_by(|a, b| {
@@ -236,6 +270,9 @@ pub(crate) fn rank(mut files: Vec<FileMatch>, is_test: impl Fn(&str) -> bool) ->
 /// egyesít. A típusdeklarációs fájl definíciója és többkifejezéses neve ehhez nem elég (a fájlneve igen), ahogy a
 /// sok fájlban definiált property sem (`rare_property`: a kifejezés property-definíciója ritka-e).
 fn exact(file: &FileMatch, rare_property: &dyn Fn(usize) -> bool) -> bool {
+    if is_translation_path(&file.path) {
+        return false;
+    }
     let declaration = is_declaration_path(&file.path);
     (file.multi >= 2 && !declaration)
         || file.hits.iter().any(|hit| match hit.kind {

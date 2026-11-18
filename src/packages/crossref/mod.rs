@@ -14,6 +14,7 @@
 mod classes;
 mod classes_scan;
 mod i18n;
+pub(crate) use i18n::is_lang_path;
 mod i18n_scan;
 mod i18n_script;
 mod render;

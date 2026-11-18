@@ -1059,3 +1059,52 @@ fn an_explicitly_quoted_phrase_is_kept() {
     assert!(mixed[1].quoted);
     assert_eq!(mixed[0].kind, TermKind::Name);
 }
+
+#[test]
+fn translation_files_rank_below_code_with_a_name_hit() {
+    // Hungarian words match only the catalogue; the mailer class matches one term by name part
+    let lang = FileMatch::new(
+        "lang/hu/passwords.php".into(),
+        vec![
+            hit(0, Kind::StringLit),
+            hit(1, Kind::StringLit),
+            hit(2, Kind::StringLit),
+            hit(3, Kind::StringLit),
+        ],
+    )
+    .unwrap();
+    let json = FileMatch::new(
+        "resources/lang/hu.json".into(),
+        vec![hit(0, Kind::Definition), hit(1, Kind::Definition)],
+    )
+    .unwrap();
+    let mailer = FileMatch::new(
+        "app/Mail/ResetPasswordMail.php".into(),
+        vec![hit(4, Kind::NamePart)],
+    )
+    .unwrap();
+    let ranked = rank(vec![lang, json, mailer], super::rank::is_test_path);
+    assert_eq!(ranked[0].path, "app/Mail/ResetPasswordMail.php");
+}
+
+#[test]
+fn translation_paths_are_recognized() {
+    use super::rank::is_translation_path;
+    for path in [
+        "lang/hu/passwords.php",
+        "resources/lang/hu.json",
+        "resources/js/locales/en.json",
+        "src/i18n/strings/menu.json",
+        "locale/hu/messages.po",
+        "app/messages.en.yml",
+    ] {
+        assert!(is_translation_path(path), "{path}");
+    }
+    for path in [
+        "app/Mail/ResetPasswordMail.php",
+        "package.json",
+        "src/langs.rs",
+    ] {
+        assert!(!is_translation_path(path), "{path}");
+    }
+}

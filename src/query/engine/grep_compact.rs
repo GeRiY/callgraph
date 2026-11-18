@@ -2,9 +2,10 @@
 //! (`path: Type::a()  L12, b()  L40 ← target`), no call-site code lines, except for top-level (`__top__`) callers,
 //! which show their trimmed call-site code (a route registration has no method name).
 
-use super::grep_depth::{DepthView, is_test_or_story};
+use super::grep_depth::{DepthView, call_target, is_ambiguous, is_test_or_story, targets_of};
 use crate::index::CallerRow;
 use crate::model::Call;
+use crate::query::format::method_calls;
 use crate::{t, tf};
 use std::fmt::Write as _;
 
@@ -127,6 +128,8 @@ pub(super) fn render_compact(view: &DepthView<'_>) -> String {
         let mut hidden: Vec<&CallerRow> = Vec::new();
         let mut dynamic = 0usize;
         if level == 1 {
+            // a short pattern matched several fully qualified targets: each entry names its own
+            let ambiguous = is_ambiguous(view.rows);
             let mut direct = view
                 .rows
                 .iter()
@@ -136,6 +139,12 @@ pub(super) fn render_compact(view: &DepthView<'_>) -> String {
                 (&a_row.graph.file, a.line).cmp(&(&b_row.graph.file, b.line))
             });
             for (row, method) in &direct {
+                let detail = if ambiguous {
+                    let calls = method_calls(&row.graph, method);
+                    format!(" ← {}", targets_of(&calls))
+                } else {
+                    String::new()
+                };
                 entries.push(Entry {
                     file: row.graph.file.clone(),
                     line: method.line,
@@ -145,7 +154,7 @@ pub(super) fn render_compact(view: &DepthView<'_>) -> String {
                         method.name,
                         method.line
                     ),
-                    detail: String::new(),
+                    detail,
                     guessed: false,
                 });
                 if view.ranges.has_dynamic(
@@ -168,7 +177,11 @@ pub(super) fn render_compact(view: &DepthView<'_>) -> String {
                         file: row.graph.file.clone(),
                         line: call.line,
                         text: format!("L{} {code}", call.line).trim_end().to_owned(),
-                        detail: String::new(),
+                        detail: if ambiguous {
+                            format!(" ← {}", call_target(call))
+                        } else {
+                            String::new()
+                        },
                         guessed: false,
                     });
                 }

@@ -15,6 +15,9 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   MCP-n a `find_callers` `compact: true` paramétere.
 - **A `locate` sima mondatot is elfogad:** a szöveget szavakra bontja, és a gyakori angol és magyar töltelékszavakat
   (hol, a, az, hogy, …) figyelmen kívül hagyja, és a fejlécben `ignored: …` alatt kiírja őket. Az idézőjeles kifejezéseket továbbra is kifejezésként keresi.
+  A fordítófájlokban (Laravel lang fájlok, JSON/TS szótárak, `.po` / `.xliff`) talált szöveges találatok sokkal kisebb
+  súllyal számítanak, így a név- vagy szimbólumtalálatos kódfájl előrébb kerül; ha a szavak többsége csak felületi
+  szövegre illeszkedik, a fejléc az angol kódnév hozzáadását javasolja.
 
 ### Változás
 
@@ -41,7 +44,8 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 - **A `--depth` az akció minden útvonalát felsorolja:** egy több `[Controller::class, 'method']` útvonalat tartalmazó
   routes fájlnál korábban csak az első látszott a 2. szinten, és két, ugyanarra az akcióra mutató útvonalból is csak
   egy; most mind. A `--grep 'Ctrl::m' --depth N` magára a controller-akcióra az útvonal-regisztrációkat az 1. szinten
-  listázza; korábban azt írta, hogy nincs hívó.
+  listázza; korábban azt írta, hogy nincs hívó. Ha egy rövid `Ctrl::method` minta több névtérben is talál azonos nevű
+  osztályt, az 1. szinten minden útvonalsor a teljes nevű célt nevezi meg, a normál és a `--compact` nézetben is.
 
 ## [1.1.0] — 2026-11-17
 

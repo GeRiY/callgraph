@@ -14,6 +14,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   Over MCP it is the `find_callers` parameter `compact: true`.
 - **`locate` accepts a plain sentence:** the text is split into words and common English and Hungarian filler
   words (hol, a, az, hogy, …) are ignored, and they are listed as `ignored: …` in the header. Quoted phrases are still searched as phrases.
+  String matches in translation files (Laravel lang files, JSON/TS dictionaries, `.po` / `.xliff`) weigh much less, so a
+  code file with a name or symbol match ranks above them; when most words only match UI text, the header suggests
+  adding the English code name.
 
 ### Changed
 
@@ -39,7 +42,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 - **`--depth` lists every route to an action:** a routes file with several `[Controller::class, 'method']` routes
   showed only the first one at level 2, and two routes in one file pointing to the same action showed only one;
   now each is listed. `--grep 'Ctrl::m' --depth N` on the controller action itself lists the route registrations
-  at level 1; before, it said there were no callers.
+  at level 1; before, it said there were no callers. When a short `Ctrl::method` pattern matches same-named classes in
+  several namespaces, each level-1 route row names its fully-qualified target, in the normal and `--compact` views.
 
 ## [1.1.0] — 2026-11-17
 

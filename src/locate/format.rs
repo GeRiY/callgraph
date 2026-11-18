@@ -4,7 +4,8 @@
 
 use std::collections::HashMap;
 
-use super::rank::{FileMatch, stars};
+use super::matcher::Kind;
+use super::rank::{FileMatch, is_translation_path, stars};
 use super::reasons::{describe, group, pick};
 use super::terms::{Term, TermKind};
 
@@ -54,6 +55,12 @@ impl Report<'_> {
                 " (figyelmen kívül: {list})\n"
             ));
         }
+        if self.ui_text_only() {
+            out.push_str(crate::t!(
+                "tip: add the English code name (e.g. the function or class name) — words here only match UI text\n",
+                "tipp: add meg az angol kódnevet is (pl. a függvény vagy osztály neve) — ezek a szavak csak felületi szövegre illeszkednek\n"
+            ));
+        }
         let shown = if self.all { k } else { k.min(DEFAULT_FILES) };
         let top = self.ranked.first().map_or(0, |file| file.score);
         for (rank, file) in self.ranked.iter().take(shown).enumerate() {
@@ -76,6 +83,30 @@ impl Report<'_> {
         }
         self.footer(&mut out, shown);
         out
+    }
+
+    /// A kifejezések többsége csak felületi szövegre (string-literál vagy fordítási fájl) illeszkedik, kódnévre
+    /// nem: az agent valószínűleg a felirat szavait adta, nem a kódnevet.
+    fn ui_text_only(&self) -> bool {
+        let n = self.terms.len();
+        let mut code = vec![false; n];
+        let mut any = vec![false; n];
+        for file in self.ranked {
+            let translation = is_translation_path(&file.path);
+            for hit in &file.hits {
+                if let Some(seen) = any.get_mut(hit.term) {
+                    *seen = true;
+                }
+                if !translation
+                    && hit.kind != Kind::StringLit
+                    && let Some(found) = code.get_mut(hit.term)
+                {
+                    *found = true;
+                }
+            }
+        }
+        let ui_only = (0..n).filter(|&i| any[i] && !code[i]).count();
+        ui_only * 2 > n
     }
 
     /// A záró sorok: találat nélküli és túl általános kifejezések, további fájlok.

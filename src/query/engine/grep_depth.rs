@@ -64,6 +64,30 @@ pub(super) fn top_level_calls(row: &QueryResult) -> Vec<&crate::model::Call> {
         .collect()
 }
 
+/// A hívás kiírt célja: a feloldott (teljesen minősített), különben a nyers cél.
+pub(super) fn call_target(call: &crate::model::Call) -> &str {
+    call.resolved.as_deref().unwrap_or(&call.target)
+}
+
+/// A találatok hívásai több különböző (teljesen minősített) célra oldódtak-e: a rövid `Ctrl::method` minta két
+/// névtérbeli azonos nevű osztályra is illik, ilyenkor az 1. szint sorai kiírják a saját céljukat.
+pub(super) fn is_ambiguous(rows: &[QueryResult]) -> bool {
+    let mut targets = rows
+        .iter()
+        .flat_map(|row| row.graph.calls.iter().map(call_target));
+    targets
+        .next()
+        .is_some_and(|first| targets.any(|target| target != first))
+}
+
+/// A hívások különböző céljai ábécében, vesszővel elválasztva.
+pub(super) fn targets_of(calls: &[&crate::model::Call]) -> String {
+    let mut names: Vec<&str> = calls.iter().map(|c| call_target(c)).collect();
+    names.sort_unstable();
+    names.dedup();
+    names.join(", ")
+}
+
 /// A szintenkénti nézet: 1. szint = a találatok metódusai a hívás-soraikkal, 2+. szint = hívónként egy sor
 /// (`← cél`, a hívás sora), a kihagyott név szerinti egyezések száma, a végén a tipp.
 pub(super) fn render_depth(view: DepthView<'_>) -> String {
@@ -115,6 +139,8 @@ pub(super) fn render_depth(view: DepthView<'_>) -> String {
         if let Some(scope) = layers {
             direct.sort_by_key(|(row, _)| scope.order_key(&row.graph.file));
         }
+        // a short pattern (`Ctrl::method`) matched several fully qualified targets: each row names its own
+        let ambiguous = level == 1 && is_ambiguous(rows);
         if level == 1 {
             let runs = layers.map_or_else(Vec::new, |scope| {
                 scope.runs(direct.iter().map(|(row, _)| row.graph.file.as_str()))
@@ -127,6 +153,7 @@ pub(super) fn render_depth(view: DepthView<'_>) -> String {
                         .sum();
                     output.push_str(&header_line("  ", &run.label, n, Count::Calls, lang));
                 }
+                let calls = method_calls(&row.graph, method);
                 writeln!(
                     output,
                     "  {}  {}::{}()  L{}-{}{}",
@@ -142,7 +169,6 @@ pub(super) fn render_depth(view: DepthView<'_>) -> String {
                     )
                 )
                 .unwrap();
-                let calls = method_calls(&row.graph, method);
                 call_lines(&mut output, row, &calls, source, lang, "    ");
             }
         }
@@ -150,20 +176,47 @@ pub(super) fn render_depth(view: DepthView<'_>) -> String {
         if level == 1 {
             for row in rows {
                 let top = top_level_calls(row);
-                let (Some(first), Some(last)) = (top.first(), top.last()) else {
+                if top.is_empty() {
                     continue;
-                };
+                }
                 has_top = true;
-                writeln!(
-                    output,
-                    "  {}  __top__::__top__()  L{}-{}{}",
-                    row.graph.file,
-                    first.line,
-                    last.end_line.unwrap_or(last.line).max(last.line),
-                    marks.caller_mark(&row.graph.file, None, Some("__top__"))
-                )
-                .unwrap();
-                call_lines(&mut output, row, &top, source, lang, "    ");
+                // one entry per target when the pattern is ambiguous, else one entry for the whole file
+                let groups: Vec<Vec<&crate::model::Call>> = if ambiguous {
+                    let mut names: Vec<&str> = top.iter().map(|c| call_target(c)).collect();
+                    names.sort_unstable();
+                    names.dedup();
+                    names
+                        .into_iter()
+                        .map(|name| {
+                            top.iter()
+                                .copied()
+                                .filter(|c| call_target(c) == name)
+                                .collect()
+                        })
+                        .collect()
+                } else {
+                    vec![top]
+                };
+                for group in groups {
+                    let (Some(first), Some(last)) = (group.first(), group.last()) else {
+                        continue;
+                    };
+                    writeln!(
+                        output,
+                        "  {}  __top__::__top__()  L{}-{}{}{}",
+                        row.graph.file,
+                        first.line,
+                        last.end_line.unwrap_or(last.line).max(last.line),
+                        marks.caller_mark(&row.graph.file, None, Some("__top__")),
+                        if ambiguous {
+                            format!("  ← {}", targets_of(&group))
+                        } else {
+                            String::new()
+                        }
+                    )
+                    .unwrap();
+                    call_lines(&mut output, row, &group, source, lang, "    ");
+                }
             }
         }
         let mut level_callers = callers
@@ -333,6 +386,62 @@ mod tests {
         fn has_dynamic(&self, _: &str, _: Option<&str>, _: &str) -> bool {
             false
         }
+    }
+
+    #[test]
+    fn same_named_classes_in_two_namespaces_name_their_target_on_each_row() {
+        let mut builder = FileGraphBuilder::new("routes/web.php");
+        for (line, target) in [
+            (5, "App\\Http\\Api\\SongController::destroy"),
+            (6, "App\\Http\\Admin\\SongController::destroy"),
+        ] {
+            builder.call(
+                Call::new("static_call", "SongController::destroy", "external_call")
+                    .at(line)
+                    .within(None, Some("__top__".to_owned()))
+                    .resolved(Some(target.to_owned()))
+                    .reference(),
+            );
+        }
+        let rows = [QueryResult::new(builder.build(), None)];
+        let (source, marks) = (SourceLines::default(), NoteMarks::default());
+        let view = |compact: bool| DepthView {
+            rows: &rows,
+            pattern: "SongController::destroy",
+            depth: 1,
+            guess: false,
+            callers: &[],
+            skipped: &[],
+            ranges: &NoRanges,
+            source: &source,
+            lang: Lang::En,
+            layers: None,
+            marks: &marks,
+            no_caller: "",
+            full: false,
+            max: 400,
+            compact,
+        };
+        let text = render_depth(view(false));
+        assert!(
+            text.contains("__top__::__top__()  L5-5  ← App\\Http\\Api\\SongController::destroy\n"),
+            "{text}"
+        );
+        assert!(
+            text.contains(
+                "__top__::__top__()  L6-6  ← App\\Http\\Admin\\SongController::destroy\n"
+            ),
+            "{text}"
+        );
+        let compact = super::super::grep_compact::render_compact(&view(true));
+        assert!(
+            compact.contains("← App\\Http\\Api\\SongController::destroy"),
+            "{compact}"
+        );
+        assert!(
+            compact.contains("← App\\Http\\Admin\\SongController::destroy"),
+            "{compact}"
+        );
     }
 
     #[test]
