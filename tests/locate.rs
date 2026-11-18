@@ -280,3 +280,25 @@ fn usage_errors() {
         assert!(err.contains("callgraph locate <term>"), "{args:?}: {err}");
     }
 }
+
+#[test]
+fn ui_text_only_results_say_there_is_no_code_match() {
+    let project = Project::empty();
+    project.write(
+        "lang/hu/passwords.php",
+        "<?php\nreturn ['sent' => 'Elküldtük a jelszó-visszaállító levelet.'];\n",
+    );
+    project.write(
+        "app/Mail/ResetPasswordMail.php",
+        "<?php\nnamespace App\\Mail;\nclass ResetPasswordMail\n{\n    public function build() {}\n}\n",
+    );
+    let out = project.run(&["levelet"], true);
+    assert!(out.contains("no code match"), "{out}");
+    assert_eq!(
+        ranked(&out).first().map(String::as_str),
+        Some("lang/hu/passwords.php"),
+        "the UI-text list stays: {out}"
+    );
+    let out = project.run(&["ResetPasswordMail", "levelet"], true);
+    assert!(!out.contains("no code match"), "{out}");
+}

@@ -77,7 +77,11 @@ fn write_level(output: &mut String, entries: &[Entry]) {
                     .iter()
                     .all(|e| e.detail.is_empty() || e.detail == *detail)
         });
-        let mut current = format!("{file}: ");
+        // the shared target leads the line, so it visibly covers every entry after it
+        let mut current = match shared {
+            Some(detail) => format!("{file}{detail}: "),
+            None => format!("{file}: "),
+        };
         let mut previous = "";
         for (n, entry) in group.iter().enumerate() {
             let mut piece = entry.text.clone();
@@ -91,9 +95,6 @@ fn write_level(output: &mut String, entries: &[Entry]) {
                 previous = entry.detail.as_str();
             }
             push_piece(output, &mut current, &piece, n == 0);
-        }
-        if let Some(detail) = shared {
-            current.push_str(detail);
         }
         output.push_str(&current);
         output.push('\n');
@@ -411,7 +412,7 @@ mod tests {
         // and no `L1148 │ code` line
         assert_eq!(
             lines[3],
-            "command.go: Command::execute_c()  L1084, Command::run()  L40 ? ← execute"
+            "command.go ← execute: Command::execute_c()  L1084, Command::run()  L40 ?"
         );
         assert!(!text.contains('│'), "{text}");
         assert!(lines.last().unwrap().starts_with("💡"), "{text}");

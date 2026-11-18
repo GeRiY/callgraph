@@ -11,12 +11,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   (`path: A()  L12, B()  L40 ← target`, wrapped at about 160 characters), so a wide impact analysis stays short.
   Top-level callers such as route registrations show their trimmed call-site code, for example
   `L5 Route::delete('songs', [SongController::class, 'destroy'])->name('songs.destroy')`, instead of `__top__()`.
+  When all entries of a file share one target, `← target` is printed right after the file name, so it visibly covers
+  every entry on the line.
   Over MCP it is the `find_callers` parameter `compact: true`.
 - **`locate` accepts a plain sentence:** the text is split into words and common English and Hungarian filler
   words (hol, a, az, hogy, …) are ignored, and they are listed as `ignored: …` in the header. Quoted phrases are still searched as phrases.
   String matches in translation files (Laravel lang files, JSON/TS dictionaries, `.po` / `.xliff`) weigh much less, so a
   code file with a name or symbol match ranks above them; when most words only match UI text, the header suggests
-  adding the English code name.
+  adding the English code name. When every match is only UI text or translation strings, the header says clearly
+  that there is no code match (`no code match`); the list stays, which helps when you look for a UI label.
 
 ### Changed
 

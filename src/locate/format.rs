@@ -55,6 +55,12 @@ impl Report<'_> {
                 " (figyelmen kívül: {list})\n"
             ));
         }
+        if self.no_code_match() {
+            out.push_str(crate::t!(
+                "⚠ no code match: every file below matches only UI text or translation strings\n",
+                "⚠ nincs kódtalálat: az alábbi fájlok csak felületi szövegre vagy fordítási stringre illeszkednek\n"
+            ));
+        }
         if self.ui_text_only() {
             out.push_str(crate::t!(
                 "tip: add the English code name (e.g. the function or class name) — words here only match UI text\n",
@@ -83,6 +89,16 @@ impl Report<'_> {
         }
         self.footer(&mut out, shown);
         out
+    }
+
+    /// Egyetlen találat sem kódtalálat (mind string-literál vagy fordítási fájl): a lista csak felületi szöveg.
+    /// A lista ilyenkor is megmarad — UI-szöveg keresésénél pont ez kell —, de a fejléc jól láthatóan jelzi.
+    fn no_code_match(&self) -> bool {
+        !self.ranked.is_empty()
+            && self.ranked.iter().all(|file| {
+                is_translation_path(&file.path)
+                    || file.hits.iter().all(|hit| hit.kind == Kind::StringLit)
+            })
     }
 
     /// A kifejezések többsége csak felületi szövegre (string-literál vagy fordítási fájl) illeszkedik, kódnévre

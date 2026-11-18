@@ -12,12 +12,16 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   (`path: A()  L12, B()  L40 ← target`, kb. 160 karakternél tördelve), így egy széles hatáselemzés rövid marad.
   A legfelső szintű hívók, például az útvonal-regisztrációk, a `__top__()` helyett a levágott hívási kódot mutatják,
   pl. `L5 Route::delete('songs', [SongController::class, 'destroy'])->name('songs.destroy')`.
+  Ha egy fájl összes bejegyzésének ugyanaz a célja, a `← target` közvetlenül a fájlnév után áll, így láthatóan a sor
+  minden bejegyzésére vonatkozik.
   MCP-n a `find_callers` `compact: true` paramétere.
 - **A `locate` sima mondatot is elfogad:** a szöveget szavakra bontja, és a gyakori angol és magyar töltelékszavakat
   (hol, a, az, hogy, …) figyelmen kívül hagyja, és a fejlécben `ignored: …` alatt kiírja őket. Az idézőjeles kifejezéseket továbbra is kifejezésként keresi.
   A fordítófájlokban (Laravel lang fájlok, JSON/TS szótárak, `.po` / `.xliff`) talált szöveges találatok sokkal kisebb
   súllyal számítanak, így a név- vagy szimbólumtalálatos kódfájl előrébb kerül; ha a szavak többsége csak felületi
-  szövegre illeszkedik, a fejléc az angol kódnév hozzáadását javasolja.
+  szövegre illeszkedik, a fejléc az angol kódnév hozzáadását javasolja. Ha minden találat csak felületi szöveg vagy
+  fordítási sztring, a fejléc egyértelműen kiírja, hogy nincs kódtalálat (`nincs kódtalálat`); a lista megmarad,
+  ami segít, ha felületi feliratot keresel.
 
 ### Változás
 
