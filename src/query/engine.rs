@@ -41,6 +41,9 @@ pub struct QueryResult {
     /// csak az `i18n` / `classes` nézet és az outline (nyelvfájl, `$t()` hívás, stíluslap) előtt töltődik; `None` =
     /// a kimenet a régi.
     pub(crate) crossref: Option<std::sync::Arc<crate::packages::CrossRef>>,
+    /// TS / JS route tables (`crate::packages::webroutes`): vue-router, Hono / Express route tables and the client
+    /// URLs calling them; only the `routes` / `ziggy` view loads it, `None` = nothing found.
+    pub(crate) web_routes: Option<std::sync::Arc<crate::packages::WebRoutes>>,
 }
 
 /// Egy rokon típuson át illesztett hívás: sor + cél (a `resolved` / `target`), és a hívás típusának rövid neve.
@@ -62,6 +65,7 @@ impl QueryResult {
             inertia: None,
             laravel: None,
             crossref: None,
+            web_routes: None,
         }
     }
 
@@ -327,6 +331,7 @@ impl QueryEngine {
             kept.inertia.clone_from(&row.inertia);
             kept.laravel.clone_from(&row.laravel);
             kept.crossref.clone_from(&row.crossref);
+            kept.web_routes.clone_from(&row.web_routes);
             if let Some((regex, matcher)) = &via {
                 kept.via = kept
                     .graph

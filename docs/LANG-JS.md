@@ -102,6 +102,33 @@ Babel `comments` — a `/** */` docblock kimarad; felvétel: `TODO|FIXME|XXX|HAC
   névtér-es név (`<a:b>`), a `this`-gyökerű név és a záró címke. A prop-ok hívásai (`onClick={() => go()}`) a
   szokásos módon hívásként jelennek meg.
 
+## Route-táblák (`--format routes`, `packages/webroutes/`)
+Nem a gráfból, hanem a forrásszövegből (`core::srcscan`: megjegyzés-tisztítás, zárójel-párosítás, argumentum-vágás)
+olvas, egy lekérdezésenként, csak a `routes` / `ziggy` nézetnél, és csak ha a lekérdezett sorok között van JS / TS / Vue
+fájl; az eredmény a Laravel route-sorok után kerül a kimenetbe (a régi sztring-alapú `path "/x"` sorok helyett).
+- **Kliens**: `routes: [` / `const routes: RouteRecordRaw[] = [` / `export default [` tömb `{ path, name, component,
+  redirect, children }` objektumokkal. A gyerek útja a szülőé után fűzve (abszolút gyerek-út önálló); a komponens
+  `() => import('…')` vagy importált azonosító, a fájl a projekt gyökeréhez képest (`@/` / `~/` = a legközelebbi `src`);
+  `redirect '/x'` → `redirect /x`, `{ name }` → `redirect name:x`. Nevek használata: `router|$router|useRouter().push|replace|
+  resolve({ name: 'x' })`, `<RouterLink|router-link :to="{ name: 'x' }">`, `to: { name: 'x' }`; csak literál név,
+  csak ha van route-tábla, és nincs `router.addRoute(` a projektben.
+- **Szerver**: ha a fájl `hono` / `express` / `itty-router` / `fastify` / koa / elysia importot tartalmaz, a
+  `x.get|post|put|patch|delete|options|head|all('/út', …, kezelő)` (az utolsó argumentum a kezelő; szám / sztring /
+  objektum nem kezelő; `).get(` lánc az előző fogadót örökli) és az `x.route|use('/előtag', alRouter)` (az
+  előtag az al-router sztring-útjaira kerül; importált al-routernél a forrásfájl összes útjára). Importtól
+  függetlenül: `név('GET', /regex/ | '/út', kezelő)`. A kezelő: azonosító → importból `fájl::függvény` (névtér-importnál
+  `ns.fn`), fájlon belüli deklaráció → `fájl::név`, `wrapper(kezelő, …)` → az első argumentum, névtelen függvény →
+  `fájl:sor`. Feloldatlan alias-import marad úgy, ahogy írva van.
+- **Kliens-hívás ↔ szerver-route**: `fetch|ofetch|$fetch|useFetch|axios.<ige>|http.<ige>|new WebSocket|new EventSource`
+  első argumentuma, ha literállal kezdődő `/…` út (a `${}` és a nem literál `+` tag `:param`, a query le van vágva);
+  a metódus az `axios.<ige>` / `fetch` `method:` literálja (opciók nélkül GET, nem literál: bármi). Az illesztés a
+  teljes útra és a metódusra szól (a `:param` helyén mintaérték), regex-route-nál a regexre.
+  „Nincs szerver-route” sor: csak ha a lekérdezett fájlokban van szerver-route, és csak az olyan kliens-URL, amelynek
+  első szegmense egyezik valamelyik szerver-route-éval.
+- Ismert hiányok: a route-útra nincs külön `--grep` kulcs (a kliens-literált a sztring-keresés találja, a
+  szerver-route-ot a nézet mutatja); `app.route('/x').get(h)` lánc, `app.on(...)`, `${BASE}/…` kezdetű kliens-URL és tsconfig-alias importú
+  kezelő nincs feloldva; az elemzés idejű (`FileGraph`) tényekké emelés (R4) még nincs meg.
+
 ## Ismert sajátosságok / tesztelendő minták
 - A Rust-portnak a Babel-viselkedést kell reprodukálnia (errorRecovery, `.vue` blokk-sorszámok). `.cjs`: `module.exports` nem ad metódust.
 - `golden/samples/js/`: `types.ts` (interface/enum/generikus/osztály), `Badge.tsx`, `Plain.jsx`, `OptionsApi.vue`, `SetupTs.vue`, `legacy.cjs`, `reexport.mjs` (re-export nem kerül `imports`-ba), `helpers.js`.

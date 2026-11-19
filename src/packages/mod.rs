@@ -31,6 +31,7 @@ mod resolve;
 mod sources;
 mod stack;
 mod usage;
+pub(crate) mod webroutes;
 
 #[cfg(test)]
 mod tests;
@@ -53,6 +54,7 @@ pub(crate) use project::ProjectPackages;
 pub(crate) use resolve::Attribution;
 pub(crate) use stack::Stack;
 pub(crate) use usage::UsageQuery;
+pub(crate) use webroutes::WebRoutes;
 
 #[cfg(test)]
 pub(crate) use model::Ecosystem;

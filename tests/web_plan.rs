@@ -646,3 +646,147 @@ fn docblock_types_resolve_callers_of_a_model_method() {
     assert!(out.contains("show"), "{out}");
     assert!(out.contains("index"), "{out}");
 }
+
+// ---------------------------------------------------------------------------------------------------------------
+// F8: vue-router tables, TS route tables and the client calls to them
+
+fn has_line(out: &str, expected: &str) -> bool {
+    out.lines().any(|line| line == expected)
+}
+
+#[test]
+fn f8_router_table_has_nested_children_lazy_imports_and_redirects() {
+    let out =
+        Fixture::new("webroutes_app").run(&["show", "client/src/router", "--format", "routes"]);
+    for expected in [
+        "/ → client/src/pages/HomePage.vue (home)",
+        "/chats → client/src/layouts/ChatLayout.vue",
+        "/chats → client/src/pages/ChatListPage.vue (chat-list)",
+        "/chats/:id → client/src/pages/ChatPage.vue (chat)",
+        "/old-home → redirect /",
+        "/start → redirect name:home",
+    ] {
+        assert!(has_line(&out, expected), "{expected}\n{out}");
+    }
+}
+
+#[test]
+fn f8_unknown_route_names_are_flagged_and_known_ones_are_not() {
+    let out =
+        Fixture::new("webroutes_app").run(&["show", "client/src/router", "--format", "routes"]);
+    assert!(
+        out.contains("unknown route name 'settings'  client/src/pages/ChatListPage.vue L12"),
+        "{out}"
+    );
+    assert!(
+        out.contains("unknown route name 'archive'  client/src/pages/ChatListPage.vue L19"),
+        "{out}"
+    );
+    for known in ["'home'", "'chat'", "'chat-list'"] {
+        assert!(
+            !out.contains(&format!("unknown route name {known}")),
+            "{out}"
+        );
+    }
+    // the ziggy view is the same check without Laravel
+    let ziggy = Fixture::new("webroutes_app").run(&["show", "client/src", "--format", "ziggy"]);
+    assert!(ziggy.contains("unknown route name 'settings'"), "{ziggy}");
+}
+
+#[test]
+fn f8_server_routes_resolve_named_and_inline_handlers() {
+    let out = Fixture::new("webroutes_app").run(&["show", "server/src", "--format", "routes"]);
+    assert!(
+        out.contains("GET /api/chats → server/src/api.ts::listChats"),
+        "{out}"
+    );
+    assert!(
+        out.contains("GET /api/chats/:id → server/src/api.ts:13"),
+        "{out}"
+    );
+    assert!(
+        out.contains(
+            "POST /api/chats/:id/messages → server/src/handlers/messages.ts::createMessage"
+        ),
+        "{out}"
+    );
+    // a namespace import member, and a sub-router mounted with a prefix
+    assert!(
+        out.contains("DELETE /api/chats/:id → server/src/handlers/admin.ts::removeChat"),
+        "{out}"
+    );
+    assert!(
+        out.contains("GET /api/old/archive → server/src/api.ts::listChats"),
+        "{out}"
+    );
+}
+
+#[test]
+fn f8_regex_route_prints_as_written() {
+    let out = Fixture::new("webroutes_app").run(&["show", "server/src", "--format", "routes"]);
+    assert!(
+        out.contains("GET ^/api/chats/(?<chatId>[^/]+)/ws$ → server/src/sockets.ts::chatSocket"),
+        "{out}"
+    );
+    assert!(
+        out.contains("GET ^/health$ → server/src/sockets.ts:14"),
+        "{out}"
+    );
+}
+
+#[test]
+fn f8_client_urls_are_matched_to_server_routes_and_unmatched_ones_listed() {
+    let out = Fixture::new("webroutes_app").run(&["show", "server/src", "--format", "routes"]);
+    let list = out
+        .lines()
+        .find(|l| l.starts_with("GET /api/chats → "))
+        .unwrap_or_else(|| panic!("{out}"));
+    assert!(
+        list.contains("← client/src/composables/api.ts L2"),
+        "{list}"
+    );
+    // the template literal `/api/chats/${id}` hits `/api/chats/:id`, the POST fetch hits only the POST route
+    let one = out
+        .lines()
+        .find(|l| l.starts_with("GET /api/chats/:id → "))
+        .unwrap_or_else(|| panic!("{out}"));
+    assert!(one.contains("api.ts L6") && !one.contains("L10"), "{one}");
+    let post = out
+        .lines()
+        .find(|l| l.starts_with("POST /api/chats/:id/messages"))
+        .unwrap_or_else(|| panic!("{out}"));
+    assert!(post.contains("api.ts L10"), "{post}");
+    // a literal that matches no server route; an absolute URL is never listed
+    assert!(
+        out.contains("no server route: GET /api/stats (client/src/composables/api.ts L14)"),
+        "{out}"
+    );
+    assert!(!out.contains("example.com"), "{out}");
+}
+
+#[test]
+fn f8_no_server_route_line_without_server_routes() {
+    let out = Fixture::new("webroutes_app").run(&["show", "client/src", "--format", "routes"]);
+    assert!(out.contains("/chats/:id → "), "{out}");
+    assert!(!out.contains("no server route"), "{out}");
+}
+
+#[test]
+fn f8_monorepo_router_and_regex_helper_routes() {
+    let mono = Fixture::monorepo();
+    let client = mono.run(&["show", "ui/src/router", "--format", "routes"]);
+    assert!(
+        has_line(&client, "/beds/:id → ui/src/views/BedView.vue (bed)"),
+        "{client}"
+    );
+    let server = mono.run(&["show", "svc/src/endpoints", "--format", "routes"]);
+    assert!(
+        server.contains("GET ^/beds$ → svc/src/rest.ts::listBeds"),
+        "{server}"
+    );
+    assert!(
+        server.contains("GET ^/beds/(?<bedId>[^/]+)/sensor$ → svc/src/rest.ts::streamSensor"),
+        "{server}"
+    );
+    assert!(!server.contains("no server route"), "{server}");
+}

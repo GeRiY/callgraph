@@ -22,6 +22,15 @@ impl Formatter for ZiggyView {
                 laravel.view_lines(&scope, lang)
             })
             .unwrap_or_default();
+        // without Laravel: the route names the client uses against the vue-router tables
+        let lines = if lines.is_empty() {
+            rows.iter()
+                .find_map(|row| row.web_routes.as_ref())
+                .map(|web| web.unknown_names(lang, true))
+                .unwrap_or_default()
+        } else {
+            lines
+        };
         if lines.is_empty() {
             format!(
                 "{}\n",

@@ -17,11 +17,25 @@ impl Formatter for RoutesView {
             empty: ("(no route matches)", "(nincs route találat)"),
             collect: rules::routes,
         };
-        let Some(laravel) = rows
+        // TS / JS route tables (vue-router, Hono / Express, `route("GET", /re/, h)`) and the client calls to them
+        let web = rows
+            .iter()
+            .find_map(|row| row.web_routes.as_ref())
+            .map(|web| web.lines(lang))
+            .unwrap_or_default();
+        let laravel = rows
             .iter()
             .find_map(|row| row.laravel.as_ref())
-            .filter(|laravel| laravel.has_routes())
-        else {
+            .filter(|laravel| laravel.has_routes());
+        if !web.is_empty() {
+            let mut lines = laravel.map_or_else(Vec::new, |laravel| {
+                let (files, classes) = scope(rows, laravel);
+                laravel.route_lines(&files, &classes)
+            });
+            lines.extend(web);
+            return format!("{}\n", lines.join("\n"));
+        }
+        let Some(laravel) = laravel else {
             return legacy.format(rows, lang);
         };
         let (files, classes) = scope(rows, laravel);

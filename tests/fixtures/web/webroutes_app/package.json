@@ -1,0 +1,5 @@
+{
+    "name": "chat-board",
+    "private": true,
+    "workspaces": ["client", "server"]
+}

@@ -303,7 +303,7 @@ bash ~/.claude/skills/callgraph/callgraph.sh locate route::events.show "Organize
 | `stats` | category statistics |
 | `mermaid` / `dot` | diagrams of inheritance and call edges |
 | `json` / `jsonl` | the raw graph |
-| `routes` `middleware` `validation` `jobs` `events` `providers` `magic` `di` `views` | framework views (run on a directory) |
+| `routes` `middleware` `validation` `jobs` `events` `providers` `magic` `di` `views` | framework views (run on a directory; `routes` also reads vue-router and Hono / Express tables) |
 
 Large results are capped (above 400 lines a directory outline turns into a summary, a single file into a method
 index); `--full` lifts the cap. Full reference: `callgraph.sh --help` and [`skill/SKILL.md`](skill/SKILL.md).
