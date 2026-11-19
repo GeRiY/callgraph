@@ -34,7 +34,8 @@ With `CALLGRAPH_NEXT=1` (or `--next`), a result may end with one line such as
 `↪ r7 possible next: [1] OrderService.php::refund --body  [2] callers of refund  [3] outline OrderService.php`.
 These are read-only navigation steps taken from names in that output, not conclusions. Use one only if it fits your
 task (`bash <skill>/callgraph.sh next r7 1`, several: `next r7 1,3`); otherwise ignore the line. Ids are per project
-and expire after 24 hours.
+and expire after 24 hours. `CALLGRAPH_NEXT_LEARN=1` (extra opt-in, off by default) only re-orders or drops these
+suggestions from your own local log; nothing leaves the machine. `next --eval` checks that log offline (CLI only).
 
 ## New version notice
 

@@ -151,6 +151,10 @@ pub fn build_command(args: CliArgs) -> Result<Box<dyn Command>> {
             project,
             crate::skill::SkillHome::from_env(),
         ))),
+        CliArgs::NextEval { project } => Ok(Box::new(commands::NextEvalCommand::new(
+            project,
+            crate::skill::SkillHome::from_env(),
+        ))),
         CliArgs::Telemetry { action } => Ok(Box::new(commands::TelemetryCommand::new(
             action,
             crate::skill::SkillHome::from_env(),

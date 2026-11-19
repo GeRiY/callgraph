@@ -19,6 +19,8 @@ const FILE: &str = "log.jsonl";
 const ROTATED: &str = "log.1.jsonl";
 /// A napló végéből ennyit olvas a visszalépés-jelhez.
 const TAIL_BYTES: u64 = 8 * 1024;
+/// Fájlonként ennyit olvas a rangsoroló (a forgatás ~1 MB-nál van, ez bőven elég).
+const READ_CAP: u64 = 2 * 1024 * 1024;
 
 /// Egy napló-esemény.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -106,6 +108,14 @@ impl EventLog {
         self.append(&LogEvent::Step { t: now, backtrack });
     }
 
+    /// Az összes esemény időrendben (előbb a forgatott, aztán az aktuális fájl; fájlonként legfeljebb `READ_CAP`
+    /// bájt a végéről, sérült sorok kihagyva) — a rangsoroló és a kiértékelés számára.
+    pub(crate) fn read_all(&self) -> Vec<LogEvent> {
+        let mut events = read_capped(&self.dir.join(ROTATED));
+        events.extend(read_capped(&self.dir.join(FILE)));
+        events
+    }
+
     /// Az utolsó események (a napló vége, sérült sorok nélkül).
     pub(crate) fn tail(&self) -> Vec<LogEvent> {
         let Ok(mut file) = std::fs::File::open(self.dir.join(FILE)) else {
@@ -127,6 +137,25 @@ impl EventLog {
             .filter_map(|line| serde_json::from_str(line).ok())
             .collect()
     }
+}
+
+fn read_capped(path: &Path) -> Vec<LogEvent> {
+    let Ok(mut file) = std::fs::File::open(path) else {
+        return Vec::new();
+    };
+    let len = file.metadata().map_or(0, |m| m.len());
+    let start = len.saturating_sub(READ_CAP);
+    if start > 0 && file.seek(SeekFrom::Start(start)).is_err() {
+        return Vec::new();
+    }
+    let mut bytes = Vec::new();
+    let _ = file.take(READ_CAP).read_to_end(&mut bytes);
+    let text = String::from_utf8_lossy(&bytes);
+    // a levágott első sor töredék lehet
+    text.lines()
+        .skip(usize::from(start > 0))
+        .filter_map(|line| serde_json::from_str(line).ok())
+        .collect()
 }
 
 /// Rövid, nem kriptográfiai hash (FNV-1a 64, hexa): csak összevetésre.

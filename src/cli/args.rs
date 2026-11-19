@@ -222,6 +222,8 @@ pub enum CliArgs {
         choices: Vec<usize>,
         project: Option<String>,
     },
+    /// `next --eval [--project X]`: a helyi napló kiértékelése (a tanuló rangsoroló offline vizsgálata).
+    NextEval { project: Option<String> },
     /// `gen '<kifejezés>' [--dry|--write|--into|--replace …]`: kód-generálás rövid kifejezésből (`crate::generate`).
     Generate {
         request: crate::generate::GenRequest,

@@ -44,7 +44,7 @@ pub use hook::HookCommand;
 pub use lang::LangCommand;
 pub use locate::LocateCommand;
 pub use mcp::McpCommand;
-pub use next::NextCommand;
+pub use next::{NextCommand, NextEvalCommand};
 pub use note::NoteCommand;
 pub use profile::ProfileCommand;
 pub use project::ProjectCommand;

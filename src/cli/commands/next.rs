@@ -40,3 +40,22 @@ impl Command for NextCommand {
         }
     }
 }
+
+/// `callgraph next --eval [--project X]` — a helyi javaslat-napló offline kiértékelése (csak CLI).
+pub struct NextEvalCommand {
+    project: Option<String>,
+    home: SkillHome,
+}
+
+impl NextEvalCommand {
+    pub fn new(project: Option<String>, home: SkillHome) -> Self {
+        Self { project, home }
+    }
+}
+
+impl Command for NextEvalCommand {
+    fn run(&self, out: &mut dyn Write, _err: &mut dyn Write) -> Result<i32> {
+        let root = super::project_root(&self.home, self.project.as_deref())?;
+        crate::next::run_eval(&root, out)
+    }
+}

@@ -7,6 +7,7 @@ use std::path::Path;
 
 use super::invocation::Invocation;
 use super::log::{EventLog, LogEvent, hash, hash_args};
+use super::rank;
 use super::rules;
 use super::store::ResultStore;
 use super::suggestion::Suggestion;
@@ -97,6 +98,11 @@ pub(crate) fn annotate(
     }
     let store = ResultStore::for_root(root);
     let kind = invocation.command_kind();
+    // 2. fázis (alapból KI): csak sorba rendez / szűr; ha semmi nem marad, nincs sor
+    let suggestions = rank::apply_with(rank::learning(), store.dir(), kind.name(), suggestions);
+    if suggestions.is_empty() {
+        return None;
+    }
     let t = now();
     let id = store.save(kind.name(), project, &suggestions, t)?;
     EventLog::new(store.dir()).append(&LogEvent::Shown {

@@ -89,7 +89,7 @@ Támogatott fájlok: PHP, JS, TS, Vue, Rust, Swift, Python (.py, .pyi), Go (.go)
   --signatures (show): paraméter- és visszatérési típusok a metódusok mellett (--format api-ban is; TS/Vue
   visszatérési típus, PHP DocBlock @param / @return, Python annotációk, Go típusok).
   --help / -h / help: ez a szöveg. Környezeti változók: CALLGRAPH_LANG, CALLGRAPH_STATS=0, CALLGRAPH_TELEMETRY=0,
-  CALLGRAPH_UPDATE_CHECK=0, CALLGRAPH_NEXT=1, CALLGRAPH_STRICT=1, CALLGRAPH_GITIGNORE=0, CALLGRAPH_WATCH=0.
+  CALLGRAPH_UPDATE_CHECK=0, CALLGRAPH_NEXT=1, CALLGRAPH_NEXT_LEARN=1, CALLGRAPH_STRICT=1, CALLGRAPH_GITIGNORE=0, CALLGRAPH_WATCH=0.
   bash ~/.claude/skills/callgraph/callgraph.sh --version                       verzió, platform és a bináris helye
 
 Projekt-profil (architektúra, rétegek és minták a mappa- / fájlnevekből, a gráffal ellenőrizve):
@@ -140,6 +140,8 @@ kifejezés nélkül):
 Javasolt következő lépés (opt-in: --next vagy CALLGRAPH_NEXT=1):
   egy eredmény végén "↪ r7 lehetséges következő: [1] …  [2] …" sor állhat (csak olvasó navigáció a kimenet neveiből)
   bash ~/.claude/skills/callgraph/callgraph.sh next r7 1 [--project alias]   az r7 eredmény 1. javaslatát futtatja (több: 1,3)
+  CALLGRAPH_NEXT_LEARN=1 (külön opt-in, csak helyben): a korábbi elfogadásaid alapján átrendezi / elhagyja a javaslatokat
+  bash ~/.claude/skills/callgraph/callgraph.sh next --eval [--project alias]   a helyi napló offline kiértékelése (top-1 találat, MRR, visszalépés)
 
 Előre-frissítés (git pull vagy sok szerkesztés után, hogy a következő lekérdezésnek ne kelljen újraelemeznie):
   bash ~/.claude/skills/callgraph/callgraph.sh refresh [--project alias]     a projekt minden változott / új / törölt fájlja

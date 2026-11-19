@@ -14,6 +14,9 @@ mod command;
 mod invocation;
 mod log;
 mod output;
+mod rank;
+#[cfg(test)]
+mod rank_tests;
 mod rules;
 mod run;
 mod store;
@@ -21,6 +24,8 @@ mod suggestion;
 #[cfg(test)]
 mod tests;
 
+pub use rank::LEARN_ENV;
+pub(crate) use rank::run_eval;
 pub use run::decorate;
 pub(crate) use run::{annotate, parse_choices, parse_id, run_choices};
 pub use suggestion::{Suggestion, SuggestionKind};

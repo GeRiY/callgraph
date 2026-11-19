@@ -89,7 +89,7 @@ Supported files: PHP, JS, TS, Vue, Rust, Swift, Python (.py, .pyi), Go (.go) + C
   --signatures (show): parameter and return types next to each method (also in --format api; TS/Vue return types,
   PHP DocBlock @param / @return, Python annotations, Go types).
   --help / -h / help: this text. Environment: CALLGRAPH_LANG, CALLGRAPH_STATS=0, CALLGRAPH_TELEMETRY=0,
-  CALLGRAPH_UPDATE_CHECK=0, CALLGRAPH_NEXT=1, CALLGRAPH_STRICT=1, CALLGRAPH_GITIGNORE=0, CALLGRAPH_WATCH=0.
+  CALLGRAPH_UPDATE_CHECK=0, CALLGRAPH_NEXT=1, CALLGRAPH_NEXT_LEARN=1, CALLGRAPH_STRICT=1, CALLGRAPH_GITIGNORE=0, CALLGRAPH_WATCH=0.
   bash ~/.claude/skills/callgraph/callgraph.sh --version                       version, platform and the binary's path
 
 Project profile (architecture, layers and patterns from folder / file names, checked against the graph):
@@ -137,6 +137,8 @@ Local usage stats (stays on this computer unless the user turns sending on; no p
 Suggested next step (opt-in: --next or CALLGRAPH_NEXT=1):
   a result may end with "↪ r7 possible next: [1] …  [2] …" (read-only navigation from names in that output)
   bash ~/.claude/skills/callgraph/callgraph.sh next r7 1 [--project alias]   runs suggestion 1 of result r7 (several: 1,3)
+  CALLGRAPH_NEXT_LEARN=1 (extra opt-in, local only): re-orders / drops those suggestions by what you accepted before
+  bash ~/.claude/skills/callgraph/callgraph.sh next --eval [--project alias]   offline check of the local log (top-1 hit rate, MRR, backtracks)
 
 Refresh ahead of time (after a git pull or many edits, so the next query does not have to re-analyse):
   bash ~/.claude/skills/callgraph/callgraph.sh refresh [--project alias]     every changed / new / deleted file of the project

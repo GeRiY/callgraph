@@ -8,8 +8,8 @@ use super::CliArgs;
 
 fn next_usage() -> String {
     crate::t!(
-        "callgraph next <result-id> <choice>[,<choice>] [--project alias]  (e.g. next r7 1 or next r7 1,3: runs suggestion 1 (and 3) of result r7)",
-        "callgraph next <eredmény-id> <választás>[,<választás>] [--project alias]  (pl. next r7 1 vagy next r7 1,3: az r7 eredmény 1. (és 3.) javaslatát futtatja)"
+        "callgraph next <result-id> <choice>[,<choice>] [--project alias]  (e.g. next r7 1 or next r7 1,3: runs suggestion 1 (and 3) of result r7); callgraph next --eval [--project alias]: offline evaluation of the local suggestion log",
+        "callgraph next <eredmény-id> <választás>[,<választás>] [--project alias]  (pl. next r7 1 vagy next r7 1,3: az r7 eredmény 1. (és 3.) javaslatát futtatja); callgraph next --eval [--project alias]: a helyi javaslat-napló offline kiértékelése"
     )
     .to_owned()
 }
@@ -18,9 +18,11 @@ fn next_usage() -> String {
 pub(crate) fn parse_next(args: &[String]) -> Result<CliArgs> {
     let mut positional = Vec::new();
     let mut project = None;
+    let mut eval = false;
     let mut it = args.iter();
     while let Some(a) = it.next() {
         match a.as_str() {
+            "--eval" => eval = true,
             "--project" => {
                 project = Some(
                     it.next()
@@ -30,6 +32,12 @@ pub(crate) fn parse_next(args: &[String]) -> Result<CliArgs> {
             }
             _ => positional.push(a.clone()),
         }
+    }
+    if eval {
+        if !positional.is_empty() {
+            return Err(CallgraphError::Usage(next_usage()));
+        }
+        return Ok(CliArgs::NextEval { project });
     }
     let [id, choice] = positional.as_slice() else {
         return Err(CallgraphError::Usage(next_usage()));
@@ -81,6 +89,13 @@ mod tests {
                 project: Some("sp".into())
             }
         );
+        assert_eq!(
+            parse_next(&s(&["--eval", "--project", "sp"])).unwrap(),
+            CliArgs::NextEval {
+                project: Some("sp".into())
+            }
+        );
+        assert!(parse_next(&s(&["--eval", "r7"])).is_err());
         for bad in [
             &["7", "1"][..],
             &["rx", "1"],

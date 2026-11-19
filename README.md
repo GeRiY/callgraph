@@ -473,7 +473,8 @@ With `CALLGRAPH_NEXT=1` (or `--next`; MCP: `callgraph mcp --next`) a result may 
 `↪ r7 possible next: [1] OrderService.php::refund --body  [2] callers of refund  [3] outline OrderService.php`.
 `bash ~/.claude/skills/callgraph/callgraph.sh next r7 1` (or `next r7 1,3`; MCP: the `next` tool) runs the stored
 command exactly. The suggestions are only read-only navigation built from names in that output; nothing is shown when
-nothing is clear. The agent instructions say: use one only if it fits the task, otherwise ignore the line.
+nothing is clear. `CALLGRAPH_NEXT_LEARN=1` (separate opt-in, local only) re-orders or drops them from your own
+acceptance log, and `callgraph next --eval` reports how that would have done offline. The agent instructions say: use one only if it fits the task, otherwise ignore the line.
 
 ### Feedback from agents
 
