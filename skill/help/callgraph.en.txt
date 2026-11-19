@@ -182,7 +182,8 @@ Update (from GitHub Releases; projects.json, lang, errors.jsonl, feedback.jsonl,
   line. Both only write into the skill dir; CALLGRAPH_UPDATE_CHECK=0 turns off all network access.
   Anonymous daily count: once a day, on first use, the version, platform and three yes/no flags go to
   check.callgraph.eu (no ID, no IP stored). Off: CALLGRAPH_COUNT=0 or DO_NOT_TRACK=1 (also with CALLGRAPH_UPDATE_CHECK=0);
-  DO_NOT_TRACK=1 also stops the opt-in telemetry.
+  DO_NOT_TRACK=1 also stops the opt-in telemetry. CALLGRAPH_COUNT=1 turns the daily count back on despite
+  DO_NOT_TRACK (callgraph only; telemetry stays off).
 
 Code generator (writes files; the MCP `generate`, `rename` and `undo` tools are off unless the server runs with --generate or CALLGRAPH_GENERATE=1):
   bash ~/.claude/skills/callgraph/callgraph.sh gen '<expr>' [--dry] [--write <file> | --into <file>[::Class] [--after <method>] | --replace <file>(:L<a>-L<b> | ::<method>) [--expect <sha256-prefix>]] [--project alias]

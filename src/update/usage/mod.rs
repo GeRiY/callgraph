@@ -72,7 +72,16 @@ pub(crate) fn opted_out(get: impl Fn(&str) -> Option<String>) -> bool {
     ]
     .iter()
     .any(|k| get(k).is_some_and(|v| off(&v)));
-    let dnt = get("DO_NOT_TRACK").is_some_and(|v| !v.trim().is_empty() && v.trim() != "0");
+    // a `CALLGRAPH_COUNT=1` kifejezett opt-in: csak a callgraph napi számlálására felülírja a (más eszközöknek is
+    // szóló) DO_NOT_TRACK-et; a vészkapcsolók (fent) és a CI továbbra is tiltanak, az opt-in telemetriát nem érinti
+    let count_on = get("CALLGRAPH_COUNT").is_some_and(|v| {
+        matches!(
+            v.trim().to_ascii_lowercase().as_str(),
+            "1" | "on" | "true" | "yes"
+        )
+    });
+    let dnt =
+        !count_on && get("DO_NOT_TRACK").is_some_and(|v| !v.trim().is_empty() && v.trim() != "0");
     let ci = get("CI").is_some_and(|v| !v.trim().is_empty());
     count_off || dnt || ci
 }

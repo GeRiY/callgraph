@@ -466,7 +466,8 @@ a CLI-ből vagy az MCP-szerverből jött, és három igen/nem jelző, amit egy h
 a telepítésen, első a héten, első a hónapban). Semmilyen azonosító nincs, a szerver IP-címet nem tárol, csak napi
 összesítőket. A frissítés-ellenőrzés és a frissítés letöltése a `https://update.callgraph.eu`-n át megy (átirányít a
 GitHubra; ha nem elérhető, közvetlenül a GitHub). Kikapcsolás: `CALLGRAPH_COUNT=0`, `DO_NOT_TRACK=1`,
-`CALLGRAPH_UPDATE_CHECK=0` vagy `CALLGRAPH_TELEMETRY=0`; CI-ben soha.
+`CALLGRAPH_UPDATE_CHECK=0` vagy `CALLGRAPH_TELEMETRY=0`; CI-ben soha. A `CALLGRAPH_COUNT=1` a `DO_NOT_TRACK` ellenére
+visszakapcsolja a napi számlálást (csak a callgraph-ét; a telemetria kikapcsolva marad).
 
 ### Javasolt következő lépés (opt-in)
 

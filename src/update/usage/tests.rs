@@ -134,6 +134,22 @@ fn opt_out_switches() {
     assert!(opted_out(env(&[("DO_NOT_TRACK", "1")])));
     assert!(opted_out(env(&[("DO_NOT_TRACK", "true")])));
     assert!(opted_out(env(&[("CI", "true")])));
+    // `CALLGRAPH_COUNT=1` is an explicit opt-in that overrides DO_NOT_TRACK for the daily count only …
+    for on in ["1", "on", "true", "yes", " YES "] {
+        let pairs: &'static [(&str, &str)] =
+            Box::leak(Box::new([("CALLGRAPH_COUNT", on), ("DO_NOT_TRACK", "1")]));
+        assert!(!opted_out(env(pairs)), "{on}");
+    }
+    // … but not the kill switches or CI
+    assert!(opted_out(env(&[
+        ("CALLGRAPH_COUNT", "1"),
+        ("CALLGRAPH_TELEMETRY", "0")
+    ])));
+    assert!(opted_out(env(&[
+        ("CALLGRAPH_COUNT", "1"),
+        ("CALLGRAPH_UPDATE_CHECK", "0")
+    ])));
+    assert!(opted_out(env(&[("CALLGRAPH_COUNT", "1"), ("CI", "true")])));
 }
 
 #[test]

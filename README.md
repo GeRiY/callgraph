@@ -466,6 +466,7 @@ MCP server, and three yes/no flags it works out from a local date file (first us
 first this month). There is no ID of any kind, and the server stores no IP addresses, only daily totals. Update checks
 and update downloads go through `https://update.callgraph.eu` (redirects to GitHub; straight to GitHub if it is down).
 Off: `CALLGRAPH_COUNT=0`, `DO_NOT_TRACK=1`, `CALLGRAPH_UPDATE_CHECK=0` or `CALLGRAPH_TELEMETRY=0`; never in CI.
+`CALLGRAPH_COUNT=1` turns the daily count back on despite `DO_NOT_TRACK` (callgraph only; telemetry stays off).
 
 ### Suggested next step (opt-in)
 
