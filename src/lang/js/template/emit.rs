@@ -1,10 +1,14 @@
 //! A template-fa bejárása: `calls`, `strings`, `controlFlow` a `caller:'template'` sorokhoz.
+//!
+//! A hívásokat a script elemzője adja (`script::ExprAnalyzer`); a regex (`expr_calls`) csak a nem parsolható
+//! kifejezések tartaléka.
 
 use std::collections::HashSet;
 
 use super::entities::decode;
 use super::expr::{expr_calls, expr_strings, pascal};
 use super::node::{Element, Node, Prop};
+use super::script::{ExprAnalyzer, for_parts, is_local_call, pattern_names};
 use crate::core::text::take_chars;
 use crate::model::{Branch, Call, ControlFlow, Imports, StringLit};
 
@@ -33,6 +37,10 @@ pub struct Emitter<'a> {
     pub emit_prefix: &'a str,
     pub methods: &'a HashSet<&'a str>,
     pub imports: &'a Imports,
+    /// The script analyser the expressions go through.
+    pub ast: ExprAnalyzer,
+    /// The names the enclosing `v-for` / slot scopes declare (the innermost last).
+    pub locals: Vec<String>,
     pub out: TemplateOut,
 }
 
@@ -73,6 +81,32 @@ impl Emitter<'_> {
             call.resolved = imp.map(str::to_string);
             self.out.calls.push(call);
         }
+        // the `v-for` item and slot-prop names are in scope for the element's other directives and its children
+        let mark = self.locals.len();
+        for prop in &el.props {
+            match prop {
+                Prop::Dir {
+                    name,
+                    exp: Some(exp),
+                    ..
+                } if name == "for" => {
+                    if let Some((item, _)) = for_parts(exp) {
+                        self.locals.extend(pattern_names(item));
+                    }
+                }
+                Prop::Dir {
+                    name,
+                    exp: Some(exp),
+                    ..
+                } if name == "slot" => self.locals.extend(pattern_names(exp)),
+                Prop::Attr {
+                    name,
+                    value: Some(v),
+                    ..
+                } if name == "slot-scope" => self.locals.extend(pattern_names(v)),
+                _ => {}
+            }
+        }
         // the child's emit key prefix (`CellMenu.vue::emit:`) when the tag is an imported `.vue` component
         let comp = imp
             .filter(|path| path.ends_with(".vue"))
@@ -97,6 +131,7 @@ impl Emitter<'_> {
             }
         }
         self.walk(&el.children);
+        self.locals.truncate(mark);
     }
 
     fn directive(
@@ -110,7 +145,12 @@ impl Emitter<'_> {
     ) {
         let exp = exp.as_deref().filter(|e| !e.is_empty());
         if let Some(exp) = exp {
-            self.expr_calls(exp, line, name == "on");
+            match name {
+                // only the source of `item in list` is an expression; a slot value is a binding pattern
+                "for" => self.expr_calls(for_parts(exp).map_or(exp, |p| p.1), line, false),
+                "slot" => {}
+                _ => self.expr_calls(exp, line, name == "on"),
+            }
             self.expr_strings(exp, line);
         }
         if name == "on"
@@ -148,6 +188,25 @@ impl Emitter<'_> {
         if exp.is_empty() {
             return;
         }
+        let Some(calls) = self.ast.calls(exp, line, handler) else {
+            self.regex_calls(exp, line, handler);
+            return;
+        };
+        let locals = &self.locals;
+        self.out
+            .calls
+            .extend(calls.into_iter().filter(|c| !is_local_call(c, locals)));
+        // a handler that is just a method name (`@click="save"`) is a reference, not a call
+        let trimmed = exp.trim();
+        if handler && is_ident(trimmed) && self.methods.contains(trimmed) {
+            let mut call = self.call(line, "func_call", trimmed.to_string(), "internal_helper");
+            call.handler = Some(true);
+            self.out.calls.push(call);
+        }
+    }
+
+    /// The pre-AST path for an expression that does not parse: calls by regex, categorised by name.
+    fn regex_calls(&mut self, exp: &str, line: u32, handler: bool) {
         let found = expr_calls(exp);
         for m in &found {
             let head = m.name.split('.').next().unwrap_or("");

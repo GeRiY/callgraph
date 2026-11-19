@@ -88,6 +88,21 @@ const VUE_MACROS: &[&str] = &[
     "defineSlots",
 ];
 
+/// Bindings whose value a template sees unwrapped.
+const UNWRAPPED: &[&str] = &[
+    "vue::ref()",
+    "vue::computed()",
+    "vue::reactive()",
+    "vue::shallowRef()",
+    "vue::shallowReactive()",
+    "vue::readonly()",
+    "vue::toRef()",
+    "vue::customRef()",
+    "vue::defineProps()",
+    "vue::withDefaults()",
+    "vue::defineModel()",
+];
+
 pub fn is_native(name: &str) -> bool {
     NATIVE_GLOBALS.contains(&name) || NATIVE_GLOBALS_2.contains(&name) || name == "scrollTo"
 }
@@ -147,6 +162,9 @@ pub struct Scope {
     pub namespaces: HashSet<String>,
     /// A fogadó-típusok feloldásához ismert típusnevek (osztályok, interfészek, importok).
     pub types: TypeNames,
+    /// The scope belongs to a Vue template expression: a bare `emit(…)` is the component's emit even without a
+    /// `defineEmits` binding.
+    pub template: bool,
 }
 
 /// A tagelérési lánc gyökere.
@@ -230,6 +248,15 @@ fn is_fn_name(name: &str) -> bool {
 }
 
 impl Scope {
+    /// Merges the names of another script block (`<script>` + `<script setup>`) into this scope; the other
+    /// block's bindings win.
+    pub fn absorb(&mut self, other: Scope) {
+        self.names.extend(other.names);
+        self.local_fns.extend(other.local_fns);
+        self.bindings.extend(other.bindings);
+        self.namespaces.extend(other.namespaces);
+    }
+
     /// Értékként átadott függvény (`guarded(rest.listBeds)`, `[a, b]`, `{ k: handler }`): a fájl saját függvénye, a
     /// fájlon belüli objektum-literál metódusa, helyi import vagy névtér-import tagja. Más (változó, csomag,
     /// osztály, konstans) nem hivatkozás — a kötés a feloldás nélküli `Callee`-t adja vissza.
@@ -292,7 +319,10 @@ impl Scope {
         }
         match nm {
             "route" => f(Some("ziggy::route".into()), "route_helper"),
-            "t" | "$t" => f(None, "i18n_helper"),
+            "t" | "$t" | "$tc" => f(None, "i18n_helper"),
+            // a template's `$emit(…)` (and a bare `emit(…)` without a `defineEmits` binding)
+            "$emit" => f(None, "vue_emit"),
+            "emit" if self.template => f(None, "vue_emit"),
             _ if is_native(nm) => f(None, "native_js"),
             _ => f(None, "global_helper"),
         }
@@ -307,6 +337,11 @@ impl Scope {
             Root::Ident(nm) => {
                 let tgt = format!("{nm}.{joined}");
                 if let Some(b) = self.bindings.get(nm) {
+                    // a template auto-unwraps refs: `name.trim()` on a `ref()` / `computed()` / props binding is a
+                    // method of the value, not a Vue API call
+                    if self.template && UNWRAPPED.contains(&b.resolved.as_str()) {
+                        return Callee::new(&last, Some(nm), None, "external_call", m);
+                    }
                     // `const x = computed(…)` / `ref(…)`: az `x.value.…` már a saját adat (tömb-, string-metódus),
                     // nem a Vue API
                     if b.category == "vue_api"

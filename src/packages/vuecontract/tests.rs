@@ -187,4 +187,15 @@ fn names_are_normalised() {
     assert_eq!(pascal("MessageActions"), "MessageActions");
     assert!(falls_through("aria-label") && falls_through("data-x") && falls_through("onClick"));
     assert!(!falls_through("colr"));
+    // form-associated and input attributes a wrapper component passes on to its root `<input>` / `<button>`
+    for attr in [
+        "form",
+        "list",
+        "inputmode",
+        "enterkeyhint",
+        "minlength",
+        "formaction",
+    ] {
+        assert!(falls_through(attr), "{attr}");
+    }
 }

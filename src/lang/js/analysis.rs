@@ -28,6 +28,9 @@ pub struct JsAnalysis {
     pub warnings: Vec<String>,
     /// A blokk metódus-indexe: a `MethodsPass` tölti, a `CallsPass` olvassa (a blokkonként újra felülírva).
     pub method_index: Option<super::methods::MethodIndex>,
+    /// The script blocks' names and bindings of a `.vue` file (the `CallsPass` fills it): the template expressions
+    /// are classified in this scope.
+    pub template_scope: Option<super::calls::Scope>,
 }
 
 impl JsAnalysis {
@@ -36,6 +39,7 @@ impl JsAnalysis {
             builder: FileGraphBuilder::new(file),
             warnings: Vec::new(),
             method_index: None,
+            template_scope: None,
         }
     }
 }

@@ -26,7 +26,7 @@ pub struct Walker<'s> {
     docs: &'s Docs<'s>,
     index: &'s MethodIndex,
     resolver: &'s Resolver,
-    scope: Scope,
+    scope: &'s mut Scope,
     caller: String,
     container: String,
     /// A függvény-keretek névtípusai (a legbelső a végén; az alja a program).
@@ -42,7 +42,7 @@ impl<'s> Walker<'s> {
         docs: &'s Docs<'s>,
         index: &'s MethodIndex,
         resolver: &'s Resolver,
-        scope: Scope,
+        scope: &'s mut Scope,
         top: &str,
     ) -> Self {
         Self {
@@ -174,9 +174,19 @@ impl<'s> Walker<'s> {
 
     fn record(&mut self, start: u32, r: Callee, args: &[Argument<'_>]) {
         let mut resolved = r.resolved.clone();
-        if let Some(Argument::StringLiteral(s)) = args.first()
-            && !s.value.is_empty()
-        {
+        // a template expression keys by its first literal argument, a `` `a.${x}` `` template text included
+        let key = match args.first() {
+            Some(Argument::StringLiteral(s)) if !s.value.is_empty() => {
+                Some(s.value.display().to_string())
+            }
+            Some(Argument::TemplateLiteral(t)) if self.scope.template => {
+                let text = self.text(t.span);
+                let inner = text.trim_matches('`');
+                (!inner.is_empty()).then(|| inner.to_string())
+            }
+            _ => None,
+        };
+        if let Some(key) = key {
             let prefix = match r.category {
                 "vue_emit" => Some(crate::lang::js::emit_prefix(self.ctx.path)),
                 "i18n_helper" => Some("i18n::".to_string()),
@@ -184,7 +194,7 @@ impl<'s> Walker<'s> {
                 _ => None,
             };
             if let Some(p) = prefix {
-                resolved = Some(format!("{p}{}", s.value.display()));
+                resolved = Some(format!("{p}{key}"));
             }
         }
         // `provide(key, v)` / `inject(key)`: one `vue::provide:<key>` edge for both sides (a string or the name of a

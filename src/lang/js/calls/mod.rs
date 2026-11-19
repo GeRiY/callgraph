@@ -15,7 +15,8 @@ use super::analysis::{JsAnalysis, JsPass, PassContext};
 use super::imports::import_bindings;
 use super::methods::{Docs, method_index};
 use super::resolve::Resolver;
-use callee::{Binding, Scope};
+pub(super) use callee::{Binding, Scope};
+pub(super) use walk::Walker;
 
 /// A kulcs neve (azonosító vagy string).
 pub(crate) fn key_name(k: &PropertyKey<'_>) -> Option<String> {
@@ -72,10 +73,25 @@ impl JsPass for CallsPass {
             comments: &program.comments,
         };
         let top = if ctx.setup { "setup" } else { "__module__" };
-        let mut w = walk::Walker::new(ctx, &docs, &index, &self.resolver, scope, top);
-        w.run(program);
-        for call in w.calls {
+        let calls = {
+            let mut w = Walker::new(ctx, &docs, &index, &self.resolver, &mut scope, top);
+            w.run(program);
+            w.calls
+        };
+        for call in calls {
             out.builder.call(call);
+        }
+        // the template reads the script's names and bindings (`<script>` and `<script setup>` merged)
+        if ctx
+            .path
+            .extension()
+            .is_some_and(|e| e.eq_ignore_ascii_case("vue"))
+        {
+            if let Some(s) = out.template_scope.as_mut() {
+                s.absorb(scope);
+            } else {
+                out.template_scope = Some(scope);
+            }
         }
     }
 }
@@ -160,6 +176,14 @@ mod tests {
         let inline = resolved("clear").unwrap();
         assert!(bound.ends_with("::useChatStore().send"), "{bound}");
         assert_eq!(inline, bound.replace("send", "clear"));
+    }
+
+    #[test]
+    fn template_names_are_classified_only_in_a_template_scope() {
+        // in a script a bare `emit` is not a Vue emit unless bound; `$emit` always is
+        let c = calls("function f() { emit('a'); $emit('b'); }\n");
+        has(&c, ("f", "emit", "global_helper", None));
+        has(&c, ("f", "$emit", "vue_emit", Some("vue::emit:b")));
     }
 
     fn has(c: &[(String, String, String, Option<String>)], want: (&str, &str, &str, Option<&str>)) {

@@ -156,9 +156,10 @@ impl Language for JsFrontend {
         }
         out.builder.sort_methods_by_line();
         // a template a kész gráf metódusait és importjait olvassa, ezért az utolsó lépés
+        let scope = out.template_scope.take().unwrap_or_default();
         let mut graph = out.builder.build();
         if let Some(sfc) = &sfc {
-            super::template::analyze_template(&mut graph, &text, sfc);
+            super::template::analyze_template(&mut graph, &text, sfc, scope);
         }
         Ok(Analysis {
             graph,

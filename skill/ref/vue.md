@@ -23,7 +23,7 @@ parent's `@save="h"` / `v-on:save` on `<Card>` (resolved through the import) are
 `slots (N): head, default` (the `<slot>` outlets) and `exposes (N): a, b` (`defineExpose`); `defineProps<ImportedProps>()`
 reads the interface from the imported file. A Pinia `defineStore('id', …)` is a `store` block (options style: `actions` /
 `getters` are methods, `state` keys properties; setup style: the returned functions), and `useXStore().act()` /
-`const s = useXStore(); s.act()` are call edges to it. `--format props` (on a folder or file) checks each component tag
+`const s = useXStore(); s.act()` are call edges to it (in a template too: template expressions are classified like the script, so `store.act()` in a handler resolves the same way; `v-for` items and slot props are locals, not calls). `--format props` (on a folder or file) checks each component tag
 against the child: `⚠ missing required prop 'title'  Parent.vue L12 <Card>`, `⚠ unknown prop 'colr'`, `⚠ unknown slot 'foot'`.
 It is lenient: `v-model` / `v-model:x` count as prop + event, kebab-case equals camelCase, no "unknown" when the child
 uses `$attrs` / `useAttrs` / `inheritAttrs` / `mixins` or its props type is imported / composed, no "missing" when the

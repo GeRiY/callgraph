@@ -7,15 +7,20 @@ mod expr;
 mod facts;
 mod node;
 mod parser;
+mod script;
+#[cfg(test)]
+mod tests;
 
 use std::collections::HashSet;
 use std::path::Path;
 
+use super::calls::Scope;
 use super::lines::LineIndex;
 use super::sfc::Sfc;
 use crate::model::{Constant, FileGraph};
 use emit::Emitter;
 pub use facts::{ComponentUse, TemplateFacts};
+use script::ExprAnalyzer;
 
 /// The component-contract facts of a `.vue` template (component tags with what they pass, `<slot>` outlets,
 /// `$attrs` use); `None` without a plain-HTML template.
@@ -31,7 +36,7 @@ pub fn template_facts(text: &str, sfc: &Sfc) -> Option<TemplateFacts> {
 }
 
 /// A `.vue` template elemzése; az eredményt a kész fájlgráfhoz fűzi (a script-passzok után hívandó).
-pub fn analyze_template(graph: &mut FileGraph, text: &str, sfc: &Sfc) {
+pub fn analyze_template(graph: &mut FileGraph, text: &str, sfc: &Sfc, scope: Scope) {
     let Some(block) = sfc.template() else { return };
     let html = block.lang.as_deref().is_none_or(|l| l == "html");
     if !html || text[block.start..block.end].trim().is_empty() {
@@ -50,11 +55,19 @@ pub fn analyze_template(graph: &mut FileGraph, text: &str, sfc: &Sfc) {
         .filter(|m| m.kind.as_deref() != Some("template"))
         .map(|m| m.name.as_str())
         .collect();
+    let ast = ExprAnalyzer::new(
+        Path::new(&graph.file).to_path_buf(),
+        &container,
+        scope,
+        methods.iter().map(|m| m.to_string()),
+    );
     let mut emitter = Emitter {
         container: &container,
         emit_prefix: &emit_prefix,
         methods: &methods,
         imports: &graph.imports,
+        ast,
+        locals: Vec::new(),
         out: Default::default(),
     };
     emitter.walk(&nodes);
