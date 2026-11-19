@@ -201,7 +201,7 @@ impl Laravel {
     }
 
     /// The known Eloquent models (`Shelf(shelves)`) named in a piece of PHP text, in catalogue order.
-    fn models_in(&self, text: &str) -> Vec<String> {
+    pub(crate) fn models_in(&self, text: &str) -> Vec<String> {
         static IDENT: LazyLock<Regex> =
             LazyLock::new(|| Regex::new(r"\b[A-Z][A-Za-z0-9_]*\b").expect("valid regex"));
         let Some(data) = self.models.data.as_ref() else {

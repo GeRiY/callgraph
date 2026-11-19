@@ -41,6 +41,7 @@ pub(crate) fn annotate(rows: &mut [QueryResult], root: &Path, format: &str) {
     crate::packages::crossref::attach(rows, root, format);
     crate::packages::webroutes::attach(rows, root, format);
     crate::packages::vuecontract::attach(rows, root, format);
+    crate::packages::livewire::attach(rows, root, format);
     let first = &rows[0];
     let packages = match &first.packages {
         Some(packages) => Arc::clone(packages),

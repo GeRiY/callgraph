@@ -19,7 +19,7 @@ nem PHP-fájl. A sablon `{{ }}`, `@php` és direktíva-argumentum részei a megl
 | Kategória | Mikor |
 |---|---|
 | `view_use` | `@extends`, `@include` / `@includeIf` / `@includeWhen` / `@includeFirst`, `@each` — a cél fájlra feloldva (`resources/views/layouts/app.blade.php`); `@yield('x')` (`section:x`) és `@stack('x')` (`stack:x`) |
-| `component_use` | `<x-alert>`, `<x-forms.input>` (anonim sablonra: `resources/views/components/forms/input.blade.php`, ha a lemezen az osztályos `app/View/Components/…` létezik, arra), `<livewire:counter>` (`app/Livewire/Counter.php`, ha megvan), `@component` |
+| `component_use` | `<x-alert>`, `<x-forms.input>` (anonim sablonra: `resources/views/components/forms/input.blade.php`, ha a lemezen az osztályos `app/View/Components/…` létezik, arra), `<livewire:counter>` és `@livewire('counter')` (`app/Livewire/Counter.php`, ha megvan), `@component` |
 | `route_helper` | `route('users.store')` — `resolved`: `route::users.store`; az outline a route-táblából írja a linket (`→ POST /users · UserController@store`, hiányzó névnél `⚠ no route`), és a `--format ziggy` ismeretlen nevet jelez |
 | `i18n_helper` | `__('k')`, `trans('k')`, `trans_choice`, `Lang::get`, `@lang('k')`, `@choice('k')` — `resolved`: `i18n::k`; hiányzó kulcsra `⚠ missing in hu.json`; a használat a nyelvfájl „nem használt” számlálójába is beleszámít |
 | `framework_use` | `@csrf`, `@method('PUT')`, `@vite(...)` |
@@ -48,6 +48,8 @@ megjelennek.
   (`directives: @datetime → app/Providers/AppServiceProvider.php L12`); a nem regisztrált `@név` (Alpine `@click`) nem szerepel.
 - **`@vite([...])`**: minden literál belépő `import` / `module_use` él a meglévő fájlra (mint a HTML `<script src>`), így a
   `--grep resources/js/app.ts` a sablont is megtalálja.
+
+- **Livewire**: a `wire:` kötések, a komponens ↔ sablon kapcsolat és az esemény-kulcs (`livewire::event:x`, `framework_use`) leírása a [LIVEWIRE.md](LIVEWIRE.md)-ben; a komponens sablonjának outline-ja fejlécsorokat kap (`livewire: Counter (…)`, `calls:`, `binds:`, `⚠`).
 
 ## Korlátok
 - A direktívák ismert körét ismeri; egyedi (`Blade::directive`) direktíva törzse nem elemződik.

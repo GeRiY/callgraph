@@ -46,6 +46,7 @@ pub(crate) enum FrameworkView {
     I18n,
     Classes,
     Props,
+    Livewire,
 }
 
 // `outline`: egy fájl / mappa szerkezete vagy egy metódus hívás-gráfja.
@@ -198,7 +199,7 @@ pub(crate) struct TraceParams {
 // `guide`: az alap-útmutató, vagy egy téma (referencia-fájl).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, JsonSchema)]
 pub(crate) struct GuideParams {
-    /// One reference file instead of the core manual: php, blade, js, jsx, vue, css, rust, swift, kotlin, python, go, gen, mcp or reference.
+    /// One reference file instead of the core manual: php, blade, livewire, js, jsx, vue, css, rust, swift, kotlin, python, go, gen, mcp or reference.
     #[serde(default)]
     pub topic: Option<String>,
 }
@@ -486,6 +487,7 @@ impl FrameworkView {
             Self::I18n => "i18n",
             Self::Classes => "classes",
             Self::Props => "props",
+            Self::Livewire => "livewire",
         }
     }
 }

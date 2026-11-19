@@ -235,7 +235,7 @@ registering; without it, the current directory is the root.
 | Task | Command |
 |---|---|
 | Where do I start with this task? | `callgraph.sh locate <term>... [--all]` |
-| The whole chain of a route / page (route, middleware, action, rules, models, page + props; ≤ 30 lines) | `callgraph.sh trace <route::name\|Ctrl::method\|/uri\|Pages/X.vue>` |
+| The whole chain of a route / page / Livewire component (route, middleware, action, rules, models, page + props; ≤ 30 lines) | `callgraph.sh trace <route::name\|Ctrl::method\|/uri\|Pages/X.vue\|livewire:x>` |
 | Outline of a file / directory | `callgraph.sh <file\|dir>` |
 | One method only | `callgraph.sh <file>::<method>` (several selectors allowed) |
 | Method source, line-numbered | `callgraph.sh <file>::<method> --body` |
@@ -305,6 +305,7 @@ bash ~/.claude/skills/callgraph/callgraph.sh locate route::events.show "Organize
 | `mermaid` / `dot` | diagrams of inheritance and call edges |
 | `json` / `jsonl` | the raw graph |
 | `props` | Vue and React: props a parent passes vs what the child declares (missing required, unknown, unknown slot) |
+| `livewire` | Livewire components: class, template and uses (`<livewire:x>`, `@livewire`, routes), `wire:click` / `wire:model` names checked against the class, events, validation rules (see [docs/LIVEWIRE.md](docs/LIVEWIRE.md)) |
 | `routes` `middleware` `validation` `jobs` `events` `providers` `magic` `di` `views` | framework views (run on a directory; `routes` also reads vue-router and Hono / Express tables) |
 
 Large results are capped (above 400 lines a directory outline turns into a summary, a single file into a method

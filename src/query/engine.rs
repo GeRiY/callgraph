@@ -46,6 +46,9 @@ pub struct QueryResult {
     pub(crate) web_routes: Option<std::sync::Arc<crate::packages::WebRoutes>>,
     /// The Vue component contract (`crate::packages::vuecontract`): only the `props` view loads it.
     pub(crate) vue_contract: Option<std::sync::Arc<crate::packages::VueContract>>,
+    /// The Livewire components (`crate::packages::livewire`): only the `livewire` view and the outline of a component
+    /// class / template load it.
+    pub(crate) livewire: Option<std::sync::Arc<crate::packages::Livewire>>,
 }
 
 /// Egy rokon típuson át illesztett hívás: sor + cél (a `resolved` / `target`), és a hívás típusának rövid neve.
@@ -69,6 +72,7 @@ impl QueryResult {
             crossref: None,
             web_routes: None,
             vue_contract: None,
+            livewire: None,
         }
     }
 
@@ -89,6 +93,15 @@ impl QueryResult {
     /// .a, .b`); kapcsolatok nélkül vagy ha nincs mit mondani, `None`.
     pub(crate) fn crossref_header(&self, lang: crate::i18n::Lang) -> Option<String> {
         self.crossref.as_ref()?.header(&self.graph.file, lang)
+    }
+
+    /// The Livewire header lines of the outline (a component class: its template and uses; a template: its class,
+    /// the actions it calls, the findings); none without the facts.
+    pub(crate) fn livewire_header(&self, lang: crate::i18n::Lang) -> Vec<String> {
+        self.livewire
+            .as_ref()
+            .map(|livewire| livewire.header(&self.graph.file, lang))
+            .unwrap_or_default()
     }
 
     /// `$t('a.b')` hívásnál a figyelmeztetés az outline-hoz (` ⚠ missing in hu.json` / ` ⚠ no key`); kapcsolatok
@@ -336,6 +349,7 @@ impl QueryEngine {
             kept.crossref.clone_from(&row.crossref);
             kept.web_routes.clone_from(&row.web_routes);
             kept.vue_contract.clone_from(&row.vue_contract);
+            kept.livewire.clone_from(&row.livewire);
             if let Some((regex, matcher)) = &via {
                 kept.via = kept
                     .graph

@@ -75,6 +75,7 @@ const WITH_ARGS: &[&str] = &[
     "each",
     "component",
     "componentfirst",
+    "livewire",
     "slot",
     "props",
     "aware",

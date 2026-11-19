@@ -8,8 +8,8 @@ use super::CliArgs;
 /// The command usage (shared by the CLI and the error message).
 pub(crate) fn trace_usage() -> &'static str {
     crate::t!(
-        "callgraph trace <target> [--project <alias|dir>]  (one compact chain, at most 30 lines: route -> middleware -> controller action -> FormRequest rules -> models -> Inertia page and its props -> child components; target: route::name, route:GET:/uri, a URI, Controller::method or Pages/X.vue)",
-        "callgraph trace <cél> [--project <alias|mappa>]  (egy tömör lánc, legfeljebb 30 sor: route -> middleware -> controller-akció -> FormRequest-szabályok -> modellek -> Inertia-oldal és props-ai -> gyerek-komponensek; cél: route::név, route:GET:/uri, egy URI, Controller::metódus vagy Pages/X.vue)"
+        "callgraph trace <target> [--project <alias|dir>]  (one compact chain, at most 30 lines: route -> middleware -> controller action -> FormRequest rules -> models -> Inertia page and its props -> child components; target: route::name, route:GET:/uri, a URI, Controller::method, Pages/X.vue or livewire:counter)",
+        "callgraph trace <cél> [--project <alias|mappa>]  (egy tömör lánc, legfeljebb 30 sor: route -> middleware -> controller-akció -> FormRequest-szabályok -> modellek -> Inertia-oldal és props-ai -> gyerek-komponensek; cél: route::név, route:GET:/uri, egy URI, Controller::metódus, Pages/X.vue vagy livewire:counter)"
     )
 }
 

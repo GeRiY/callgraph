@@ -1,0 +1,9 @@
+{
+    "name": "fixture/notice-board",
+    "require": {
+        "php": "^8.2",
+        "laravel/framework": "^11.0",
+        "livewire/livewire": "^3.5"
+    },
+    "autoload": {"psr-4": {"App\\": "app/"}}
+}

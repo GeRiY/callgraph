@@ -183,7 +183,7 @@ impl CallgraphServer {
             idempotent_hint = true,
             open_world_hint = false
         ),
-        description = "Framework wiring of the directory (or file) holding the definitions: which route → which controller, which event → which listener; also middleware, validation, jobs, providers, magic, di, views; inertia: page ← render site, props; ziggy: JS route('name') calls checked against the Laravel route table; forms: Inertia useForm fields checked against the controller validation rules; models: Eloquent models with their table columns (from migrations), fillable/casts and relations; i18n: translation keys missing per locale, unused keys, and $t()/__() calls whose key does not exist (a lang file with ::key shows where the key is used); classes: stylesheet classes and which templates use them, plus classes nothing uses; props: Vue component props passed by a parent checked against the child (missing required, unknown, unknown slots). Example: {\"view\": \"routes\", \"path\": \"routes\"}. Structure of a file or folder: `outline`."
+        description = "Framework wiring of the directory (or file) holding the definitions: which route → which controller, which event → which listener; also middleware, validation, jobs, providers, magic, di, views; inertia: page ← render site, props; ziggy: JS route('name') calls checked against the Laravel route table; forms: Inertia useForm fields checked against the controller validation rules; models: Eloquent models with their table columns (from migrations), fillable/casts and relations; i18n: translation keys missing per locale, unused keys, and $t()/__() calls whose key does not exist (a lang file with ::key shows where the key is used); classes: stylesheet classes and which templates use them, plus classes nothing uses; props: Vue component props passed by a parent checked against the child (missing required, unknown, unknown slots); livewire: components with view, uses, props, actions, events, rules; wire:click / wire:model names checked against the class. Example: {\"view\": \"routes\", \"path\": \"routes\"}. Structure of a file or folder: `outline`."
     )]
     async fn framework_view(
         &self,
@@ -200,7 +200,7 @@ impl CallgraphServer {
             idempotent_hint = true,
             open_world_hint = false
         ),
-        description = "Task slice of a route, controller action or page in <= 30 lines: route (verb, URI, name, file:line) -> middleware -> controller action -> FormRequest rules (* = required) -> models with table -> Inertia page, props, child components; a JS server route shows its client callers. Start here for \"work on this route/page\". Example: {\"target\": \"route::shelves.store\"}; also `GET:/shelves`, `ShelfController::store`, `Pages/Shelves/Browse.vue`. Unknown target: the closest names."
+        description = "Task slice of a route, controller action or page in <= 30 lines: route (verb, URI, name, file:line) -> middleware -> controller action -> FormRequest rules (* = required) -> models with table -> Inertia page, props, child components; a JS server route shows its client callers. Start here for \"work on this route/page\". Example: {\"target\": \"route::shelves.store\"}; also `GET:/shelves`, `ShelfController::store`, `Pages/Shelves/Browse.vue`, `livewire:counter`. Unknown target: the closest names."
     )]
     async fn trace(&self, Parameters(p): Parameters<TraceParams>) -> CallToolResult {
         self.execute(CommandKind::FrameworkView, ShowQuery::trace(p))

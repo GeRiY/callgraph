@@ -104,6 +104,18 @@ pub(crate) fn run(root: &Path, target: &str, lang: Lang) -> String {
     if let Some(lines) = chain.lines(target) {
         return render(cap_lines(lines));
     }
+    // a Livewire component (`livewire:counter`, `Counter`): class, route, template, uses, events, rules, models
+    let livewire = crate::packages::Livewire::open(root, &base);
+    let models = |rel: &str| -> Vec<String> {
+        let (Some(laravel), Ok(text)) = (laravel.as_ref(), std::fs::read_to_string(root.join(rel)))
+        else {
+            return Vec::new();
+        };
+        laravel.models_in(&text)
+    };
+    if let Some(lines) = livewire.trace_lines(target, lang, &models) {
+        return render(cap_lines(lines));
+    }
     // a JS / TS project: the server route and the client calls that reach it
     let web = crate::packages::WebRoutes::open(root, &base, HashSet::new());
     let lines = web.trace_lines(target);
@@ -111,6 +123,7 @@ pub(crate) fn run(root: &Path, target: &str, lang: Lang) -> String {
         return render(cap_lines(lines));
     }
     let mut candidates = chain.candidates();
+    candidates.extend(livewire.trace_candidates());
     candidates.extend(web.trace_candidates());
     render(vec![unknown_line(target, &candidates, lang)])
 }

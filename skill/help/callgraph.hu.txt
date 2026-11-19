@@ -101,7 +101,7 @@ Projekt-profil (architektúra, rétegek és minták a mappa- / fájlnevekből, a
                                                 számít); PHP-ben és JS-ben is meglévő szerep: controller (php) / (js);
                                                 --packages: minden közvetlen composer / npm függőség (telepített, deklarált)
   bash ~/.claude/skills/callgraph/callgraph.sh uses <csomag> [--calls] [--project alias]   hol használja a kód egy függőségét (guzzle, @vueuse/core): API-szimbólumonként a darabszám, az első fájl, +N; (típus) = import hívás nélkül; --calls: fájlonként minden hívás-sor
-  bash ~/.claude/skills/callgraph/callgraph.sh trace <cél> [--project alias]   feladat-szelet <= 30 sorban: route -> middleware -> controller-akció -> FormRequest-szabályok -> modellek -> Inertia-oldal + props -> gyerek-komponensek; cél: route::név, route:GET:/uri, URI, Controller::metódus, Pages/X.vue (JS-projekt: GET /api/x a kliens-hívóival); ismeretlen cél: a legközelebbi nevek
+  bash ~/.claude/skills/callgraph/callgraph.sh trace <cél> [--project alias]   feladat-szelet <= 30 sorban: route -> middleware -> controller-akció -> FormRequest-szabályok -> modellek -> Inertia-oldal + props -> gyerek-komponensek; cél: route::név, route:GET:/uri, URI, Controller::metódus, Pages/X.vue, livewire:counter (JS-projekt: GET /api/x a kliens-hívóival); ismeretlen cél: a legközelebbi nevek
   bash ~/.claude/skills/callgraph/callgraph.sh deps [--project alias]   valószínűleg fölösleges / hiányzó / csak dev composer / npm függőségek (soronként egy; .callgraphignore: deps-ignore <név>)
   Laravel / Inertia projekt-nézetek (a projekt gyökerén, pl. `. --format ziggy`; az outline-ok is megkapják a rövid linkeket):
     --format ziggy     ismeretlen route('x') nevek (JS / Vue / PHP), sehonnan be nem töltött route-fájlok; outline: route::x → POST /x · Ctrl@m
@@ -111,6 +111,7 @@ Projekt-profil (architektúra, rétegek és minták a mappa- / fájlnevekből, a
   Fájltípusok közti nézetek (bármely projekt; mappára vagy fájlra; a nyelvfájl és a stíluslap outline-ja is kap egy összegző sort):
     --format i18n      nyelvenként hiányzó / nem használt fordítási kulcsok, $t('a.b') / __('x') hiányzó kulccsal; lang/en.json::board.title: hol használják a kulcsot
     --format classes   stíluslap-osztályok: mely sablonok használják, sehol nem használt osztályok (engedékeny: a dinamikus osztálynevet és a Tailwind-utility-t sosem jelzi)
+    --format livewire  Livewire-komponensek: osztály <-> sablon <-> használat (<livewire:x>, @livewire, route), a wire:click / wire:model nevek az osztállyal (publikus metódus / property; engedékeny: a varázs-akciókat ($refresh, $dispatch), a trait-es osztályt és a futásidejű nevet sosem jelzi), események (livewire::event:x), validációs szabályok
     --format props     Vue / React komponensek: amit a szülő átad, és amit a gyerek deklarál (hiányzó kötelező prop, ismeretlen prop, ismeretlen slot; engedékeny: a v-model-t, a $attrs-t, a {...spread}-et, a ...rest-et és a szabványos HTML-attribútumot sosem jelzi)
   bash ~/.claude/skills/callgraph/callgraph.sh <mappa> --layer service         csak az adott réteg fájljai (név,név...;
                                                 egy ökoszisztéma: controller:php, controller:js, …:swift, …:rust)

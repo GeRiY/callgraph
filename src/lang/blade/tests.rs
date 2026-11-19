@@ -336,3 +336,37 @@ fn vite_entries_are_import_edges() {
     // the plain `@vite` marker call stays
     assert!(graph.calls.iter().any(|c| c.target == "@vite"));
 }
+
+#[test]
+fn livewire_directive_is_a_component_use_and_events_get_the_key() {
+    let graph = analyze(
+        "resources/views/page.blade.php",
+        "<div>\n@livewire('counter', ['start' => 1])\n@livewire($dynamic)\n<button wire:click=\"$dispatch('saved')\">x</button>\n<script>Livewire.on('refresh-list', () => {})</script>\n</div>\n",
+    );
+    let uses: Vec<(&str, &str)> = graph
+        .calls
+        .iter()
+        .filter(|c| c.category == "component_use")
+        .map(|c| (c.target.as_str(), c.kind.as_str()))
+        .collect();
+    assert_eq!(uses, [("livewire:counter", "component")]);
+    let keys: Vec<(&str, u32)> = graph
+        .calls
+        .iter()
+        .filter(|c| c.kind == "event")
+        .map(|c| (c.target.as_str(), c.line))
+        .collect();
+    assert_eq!(
+        keys,
+        [
+            ("livewire::event:saved", 4),
+            ("livewire::event:refresh-list", 5)
+        ]
+    );
+    // plain Alpine `$dispatch` in a template that never mentions Livewire is no Livewire event
+    let alpine = analyze(
+        "resources/views/plain.blade.php",
+        "<button x-on:click=\"$dispatch('saved')\">x</button>\n",
+    );
+    assert!(alpine.calls.iter().all(|c| c.kind != "event"));
+}

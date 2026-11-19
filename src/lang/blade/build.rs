@@ -382,13 +382,18 @@ pub(super) fn build(path: &str, text: &str) -> FileGraph {
                 }
                 let line = line_of(*start);
                 let who = owner(&blocks, line);
-                let mut c = call(&name, &who, line, "component", tag, "component_use");
-                c.resolved = if tag.starts_with("livewire:") {
-                    view::livewire_file(tag, path)
-                } else {
-                    view::component_file(tag, path)
-                };
-                calls.push(c);
+                // `<livewire:is :component="$x">` / `<livewire:dynamic-component>`: the component is a run-time value,
+                // not a tag name — no `component_use` (its bound attributes are still read below)
+                let dynamic = matches!(tag.as_str(), "livewire:is" | "livewire:dynamic-component");
+                if !dynamic {
+                    let mut c = call(&name, &who, line, "component", tag, "component_use");
+                    c.resolved = if tag.starts_with("livewire:") {
+                        view::livewire_file(tag, path)
+                    } else {
+                        view::component_file(tag, path)
+                    };
+                    calls.push(c);
+                }
                 for attr in attrs.iter().filter(|a| a.bound() && !a.value.is_empty()) {
                     chunks.push(Chunk {
                         line: line_of(attr.at),
@@ -463,6 +468,16 @@ pub(super) fn build(path: &str, text: &str) -> FileGraph {
                     "component" | "componentfirst" => {
                         if let Some(v) = lit(0) {
                             calls.push(view_call("component", &v, "component_use"));
+                        }
+                        part_chunk(1, &mut chunks);
+                    }
+                    "livewire" => {
+                        // `@livewire('counter', [...])`: the same edge as the `<livewire:counter>` tag
+                        if let Some(v) = lit(0) {
+                            let tag = format!("livewire:{v}");
+                            let mut c = call(&name, &who, line, "component", &tag, "component_use");
+                            c.resolved = view::livewire_file(&tag, path);
+                            calls.push(c);
                         }
                         part_chunk(1, &mut chunks);
                     }
@@ -610,6 +625,12 @@ pub(super) fn build(path: &str, text: &str) -> FileGraph {
         flows.extend(flow.finish(&name, total + 1));
     }
 
+    // Livewire events (`$dispatch('x')`, `Livewire.on('x')`): the `livewire::event:x` key, as in the component class
+    calls.extend(crate::packages::livewire::blade_event_calls(
+        text,
+        &name,
+        &|line| owner(&blocks, line),
+    ));
     for mut c in php::calls(&chunks) {
         c.container = Some(name.clone());
         c.caller = Some(owner(&blocks, c.line));

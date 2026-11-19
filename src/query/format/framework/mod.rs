@@ -7,6 +7,7 @@
 mod crossref;
 mod forms;
 mod inertia;
+mod livewire;
 mod models;
 mod props;
 mod route_table;
@@ -141,6 +142,7 @@ pub(super) fn register(registry: &mut FormatterRegistry) {
     registry.register("i18n", Box::new(crossref::I18nView));
     registry.register("classes", Box::new(crossref::ClassesView));
     registry.register("props", Box::new(props::PropsView));
+    registry.register("livewire", Box::new(livewire::LivewireView));
 }
 
 /// `<ns><container|__top__>::<caller>` — a hívás helye.

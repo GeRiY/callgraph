@@ -24,6 +24,7 @@ pub(crate) mod crossref;
 mod deps;
 mod files;
 pub(crate) mod frameworks;
+pub(crate) mod livewire;
 mod model;
 mod project;
 mod registry;
@@ -50,6 +51,7 @@ pub(crate) use deps::{DepsQuery, user_ignores};
 pub(crate) use frameworks::{
     DiskProjectFiles, Inertia, Laravel, PageLink, annotate as annotate_frameworks,
 };
+pub(crate) use livewire::Livewire;
 pub(crate) use model::Package;
 pub(crate) use project::ProjectPackages;
 pub(crate) use resolve::Attribution;

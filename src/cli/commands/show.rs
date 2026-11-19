@@ -183,6 +183,7 @@ impl Command for ShowCommand {
                     | "i18n"
                     | "classes"
                     | "props"
+                    | "livewire"
             )
             && self.lines.is_none()
             && self.strings.is_none()

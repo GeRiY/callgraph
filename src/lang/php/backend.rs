@@ -51,8 +51,12 @@ impl<P: PhpParser> PhpBackend<P> {
             }
             let mut graph = builder.build();
             // framework-tények (Inertia render-helyek): az elemzéskor, hogy a nézetek ne olvassák újra a forrást
-            graph.facts =
-                crate::packages::frameworks::facts_of(&graph, &crate::io::decode_source(source));
+            let decoded = crate::io::decode_source(source);
+            graph.facts = crate::packages::frameworks::facts_of(&graph, &decoded);
+            // Livewire: the `livewire::event:x` key of the component's dispatch sites and listeners
+            graph
+                .calls
+                .extend(crate::packages::livewire::php_event_calls(path, &decoded));
             Analysis {
                 graph,
                 warnings: ctx.warnings,

@@ -53,7 +53,7 @@ pub trait Formatter: Send + Sync {
 }
 
 /// A callgraph hibaüzenetében felsorolt formátumok (paritás miatt fix szöveg).
-const KNOWN: &str = "outline|api|stats|mermaid|dot|json|hotspots|flow|summary|coverage|events|routes|middleware|validation|jobs|providers|magic|di|views|inertia|ziggy|forms|models|i18n|classes";
+const KNOWN: &str = "outline|api|stats|mermaid|dot|json|hotspots|flow|summary|coverage|events|routes|middleware|validation|jobs|providers|magic|di|views|inertia|ziggy|forms|models|i18n|classes|props|livewire";
 
 pub struct FormatterRegistry {
     formatters: Vec<(&'static str, Box<dyn Formatter>)>,

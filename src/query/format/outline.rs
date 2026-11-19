@@ -94,6 +94,10 @@ fn outline(
     if let Some(text) = row.crossref_header(lang) {
         writeln!(s, "{text}").unwrap();
     }
+    // Livewire: a component class's template and uses, a template's class and `wire:` findings
+    for text in row.livewire_header(lang) {
+        writeln!(s, "{text}").unwrap();
+    }
     // jegyzetek (PILOT): fájl-jegyzetek, és a nem listázott (konténer nélküli) függvényeiké
     crate::notes::file_lines(&mut s, &row.notes);
     crate::notes::unlisted_lines(&mut s, &row.notes, g);
