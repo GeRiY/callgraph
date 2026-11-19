@@ -116,6 +116,19 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 - **Több nézet is megmondja, mit hagyott ki:** a `--format forms` mintájára a `routes`, az `inertia` és a `props`
   nézet is okonként egy sorral zárul, például futásidőben épített route-név, nem literál oldalnév vagy `v-bind`
   objektum esetén (`? 2 kihagyva: <ok> (a.vue L3, b.vue L9, +N)`), ahelyett hogy csendben kihagyná az elemet.
+- **A `next` javaslatai tanulhatnak a saját döntéseidből (opt-in, csak helyben):** a `CALLGRAPH_NEXT_LEARN=1` a
+  `CALLGRAPH_NEXT=1` vagy a `--next` mellett a javaslatokat abból az elfogadás / visszalépés naplóból rendezi át,
+  amelyet a callgraph a projekt `.callgraph/results/` mappájában vezet; semmi nem hagyja el a gépet. Csak a
+  szabályokból származó javaslatokat rendezi át vagy hagyja el, újat soha nem talál ki. Kevés adatnál a sorrend
+  pontosan a szabályok szerinti; az a javaslatfajta, amelyet gyakran visszalépés követ, hátrébb kerül vagy kimarad,
+  és ha egyik sem elég biztos, nem jelenik meg `next` sor. Alapból ki van kapcsolva; a változó törlésével
+  kikapcsolható. Az új `callgraph next --eval` visszajátssza a helyi naplót, és megmutatja, hogyan teljesített volna
+  a tanult sorrend a szabályok sorrendjéhez képest (top-1 találati arány, átlagos reciprok rang, visszalépési
+  arány); kevés adatnál ezt jelzi is.
+- **A `CALLGRAPH_COUNT=1` a `DO_NOT_TRACK` ellenére visszakapcsolja a névtelen napi számlálást:** a `DO_NOT_TRACK`-et
+  más eszközök is figyelik, ezzel a kifejezett opt-innel a callgraph napi számlálása mégis futhat. A
+  `CALLGRAPH_TELEMETRY=0`, a `CALLGRAPH_UPDATE_CHECK=0` és a CI továbbra is kikapcsolja, a `CALLGRAPH_COUNT=0`
+  kikapcsolva tartja, az opt-in telemetriát pedig nem érinti (`DO_NOT_TRACK` mellett az ki marad).
 
 ### Változás
 

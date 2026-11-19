@@ -106,6 +106,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 - **More views say what they skipped:** like `--format forms`, the `routes`, `inertia` and `props` views end with a
   line per reason, such as a route name built at run time, a page name that is not a literal or a `v-bind` object
   (`? 2 skipped: <reason> (a.vue L3, b.vue L9, +N)`), instead of silently leaving the item out.
+- **`next` suggestions can learn from your own choices (opt-in, local only):** with `CALLGRAPH_NEXT_LEARN=1`, on top
+  of `CALLGRAPH_NEXT=1` or `--next`, the suggestions are re-ordered from the accept / backtrack log that callgraph
+  keeps in the project's `.callgraph/results/` folder; nothing leaves the machine. Only the rule-based suggestions are
+  re-ordered or dropped, never new ones invented. With little data the order is exactly the rule order; a kind of
+  suggestion that is often followed by a backtrack moves down or is dropped, and when none is confident enough no
+  `next` line is printed. Off by default; unset the variable to turn it off. The new `callgraph next --eval` replays
+  the local log and reports how the learned order would have done against the rule order (top-1 hit rate, mean
+  reciprocal rank, backtrack rate), with a note when there is too little data.
+- **`CALLGRAPH_COUNT=1` turns the anonymous daily count back on despite `DO_NOT_TRACK`:** `DO_NOT_TRACK` is shared
+  with other tools, so this explicit opt-in lets callgraph's daily count run anyway. `CALLGRAPH_TELEMETRY=0`,
+  `CALLGRAPH_UPDATE_CHECK=0` and CI still turn it off, `CALLGRAPH_COUNT=0` keeps it off, and the opt-in telemetry is
+  not affected (it stays off under `DO_NOT_TRACK`).
 
 ### Changed
 
