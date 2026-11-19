@@ -27,6 +27,7 @@ impl WebRoutes {
             lines.push(client_line(route));
         }
         lines.extend(self.unknown_names(lang, !client.is_empty()));
+        lines.extend(self.unknown_links(lang, !client.is_empty()));
         let mut server: Vec<&ServerRoute> = self
             .server
             .iter()
@@ -82,6 +83,38 @@ impl WebRoutes {
                     usage.name,
                     usage.file,
                     usage.line
+                )
+            })
+            .collect();
+        capped(unknown, MAX_WARNINGS)
+    }
+
+    /// `⚠ unknown route path '/x'  file L12` lines: literal `<Link to>` / `navigate('/x')` paths that no route table
+    /// path matches (`:param` segments match any one segment, `*` the rest). Only when a table was found, it holds
+    /// only literal paths and no route is added at run time.
+    pub(crate) fn unknown_links(&self, lang: Lang, whole_project: bool) -> Vec<String> {
+        if self.links.is_empty() || self.incomplete || self.dynamic_routes {
+            return Vec::new();
+        }
+        let mut patterns: Vec<&str> = self.paths.iter().map(String::as_str).collect();
+        patterns.extend(self.client.iter().map(|route| route.path.as_str()));
+        if patterns.is_empty() {
+            return Vec::new();
+        }
+        let mut seen = HashSet::new();
+        let unknown: Vec<String> = self
+            .links
+            .iter()
+            .filter(|link| whole_project || self.scope.contains(&link.file))
+            .filter(|link| !patterns.iter().any(|p| path_matches(p, &link.path)))
+            .filter(|link| seen.insert((link.file.clone(), link.line, link.path.clone())))
+            .map(|link| {
+                format!(
+                    "⚠ {} '{}'  {} L{}",
+                    lang.pick("unknown route path", "ismeretlen route-útvonal"),
+                    link.path,
+                    link.file,
+                    link.line
                 )
             })
             .collect();
@@ -217,6 +250,33 @@ impl WebRoutes {
         out.dedup();
         out
     }
+}
+
+/// Does a route-table path (`/events/:id`, `/files/*`) match a literal client path.
+fn path_matches(pattern: &str, path: &str) -> bool {
+    // a pattern syntax this does not model: never a finding
+    if pattern.contains(['(', '{', '[', '\\']) {
+        return true;
+    }
+    let pat: Vec<&str> = pattern.split('/').filter(|s| !s.is_empty()).collect();
+    let got: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
+    segments_match(&pat, &got)
+}
+
+fn segments_match(pat: &[&str], got: &[&str]) -> bool {
+    let Some((first, rest)) = pat.split_first() else {
+        return got.is_empty();
+    };
+    if first.starts_with('*') {
+        return true;
+    }
+    if first.starts_with(':') {
+        if first.ends_with('?') && segments_match(rest, got) {
+            return true;
+        }
+        return !got.is_empty() && segments_match(rest, &got[1..]);
+    }
+    got.first().is_some_and(|g| g.eq_ignore_ascii_case(first)) && segments_match(rest, &got[1..])
 }
 
 fn capped(mut lines: Vec<String>, max: usize) -> Vec<String> {

@@ -13,6 +13,7 @@ mod meta;
 mod methods;
 mod parse;
 mod props;
+pub mod react;
 mod resolve;
 mod scope;
 mod sfc;

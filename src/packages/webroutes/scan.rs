@@ -1,5 +1,6 @@
 //! Source-text extraction of the route facts of one file (see the parent module).
 
+use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 use std::sync::LazyLock;
 
@@ -58,9 +59,13 @@ pub(super) fn scan_file(rel: &str, raw: &str, known: &HashSet<String>) -> FileFa
         return facts;
     }
     let stem = rel.rsplit('/').next().unwrap_or(rel);
+    let react_router = text.contains("react-router")
+        || text.contains("createBrowserRouter")
+        || text.contains("createHashRouter");
     if text.contains("vue-router")
         || text.contains("createRouter")
         || text.contains("RouteRecordRaw")
+        || react_router
         || stem.starts_with("routes.")
     {
         let ctx = Ctx {
@@ -68,8 +73,15 @@ pub(super) fn scan_file(rel: &str, raw: &str, known: &HashSet<String>) -> FileFa
             imports: &imports,
             known,
             lines: &lines,
+            incomplete: Cell::new(false),
+            paths: RefCell::new(Vec::new()),
         };
         scan_client_routes(&text, &ctx, &mut facts.client);
+        if react_router {
+            react_router::scan(raw, &ctx, &mut facts);
+        }
+        facts.incomplete = ctx.incomplete.get();
+        facts.paths = ctx.paths.into_inner();
     }
     scan_server(&text, rel, &imports, &lines, &mut facts);
     facts
@@ -80,7 +92,13 @@ struct Ctx<'a> {
     imports: &'a Imports,
     known: &'a HashSet<String>,
     lines: &'a LineIndex,
+    /// A route path that is not a literal was seen: the table is not fully known.
+    incomplete: Cell<bool>,
+    /// Every route path (joined with the parents'), also of the routes that name no component.
+    paths: RefCell<Vec<String>>,
 }
+
+mod react_router;
 
 // ---------------------------------------------------------------------------------------------------------------
 // imports and module resolution
@@ -255,10 +273,11 @@ fn regex_lit(value: &str) -> Option<String> {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-// client: vue-router tables
+// client: vue-router / react-router tables
 
 fn scan_client_routes(text: &str, ctx: &Ctx<'_>, out: &mut Vec<ClientRoute>) {
     let starts = [
+        re!(r"\b(?:createBrowserRouter|createHashRouter|createMemoryRouter|useRoutes)\s*\(\s*\["),
         re!(r"\broutes\s*(?::\s*[\w<>\[\] ]+?)?\s*[:=]\s*\["),
         re!(r"\bexport\s+default\s*\["),
         re!(r"\bexport\s+const\s+\w+\s*(?::\s*[\w<>\[\] ]+?)?\s*=\s*\["),
@@ -316,15 +335,26 @@ fn parse_route_object(
         let value_at = key.get(0).map_or(0, |m| m.end());
         let value = &entry[value_at..];
         match key_name {
-            "path" => path = string_lit(value),
+            "path" => {
+                path = string_lit(value);
+                if path.is_none() {
+                    ctx.incomplete.set(true);
+                }
+            }
             "name" => name = string_lit(value),
-            "component" => target = component_text(value, ctx),
+            "component" | "Component" | "lazy" => target = component_text(value, ctx),
+            "element" => target = element_text(value, ctx),
             "redirect" => target = Some(redirect_text(value)),
             "children" if value.starts_with('[') => children = Some(a + value_at),
             _ => {}
         }
     }
     let full = join_child(parent, path.as_deref().unwrap_or(""));
+    ctx.paths.borrow_mut().push(if full.is_empty() {
+        "/".to_owned()
+    } else {
+        full.clone()
+    });
     if target.is_some() || name.is_some() {
         out.push(ClientRoute {
             file: ctx.rel.to_owned(),
@@ -373,6 +403,12 @@ fn component_text(value: &str, ctx: &Ctx<'_>) -> Option<String> {
         return Some(shown);
     }
     None
+}
+
+/// `<Home />` / `<Layout><Outlet /></Layout>` (react-router `element`): the component the tag names.
+fn element_text(value: &str, ctx: &Ctx<'_>) -> Option<String> {
+    let caps = re!(r"^\(?\s*<\s*([A-Z]\w*)").captures(value.trim())?;
+    component_text(&caps[1], ctx)
 }
 
 fn redirect_text(value: &str) -> String {

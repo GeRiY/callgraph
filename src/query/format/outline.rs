@@ -174,6 +174,14 @@ fn outline(
         }
         for m in methods {
             method_line(&mut s, m);
+            // React: a custom hook is marked, a function component lists its props
+            if super::outline_members::is_react_hook(g, m) {
+                s.pop();
+                s.push_str(" [hook]\n");
+            }
+            if let Some(props) = super::outline_members::component_props(g, m) {
+                writeln!(s, "    {props}").unwrap();
+            }
             if !notes.is_empty() {
                 let n = crate::notes::method_count(notes, m.container.as_deref(), &m.name);
                 if n > 0 {

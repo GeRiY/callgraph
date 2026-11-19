@@ -3,6 +3,8 @@
 //!
 //! - client: `createRouter({ routes: [...] })` (vue-router; nested `children`, lazy `import()`, `redirect`) and the
 //!   route names used by `router.push({ name })` / `<RouterLink :to="{ name }">` (unknown literal names are flagged);
+//!   and react-router (`createBrowserRouter([...])`, `<Route path element>` trees, `useRoutes`), whose literal
+//!   `<Link to>` / `<Navigate to>` / `navigate('/x')` paths are checked against the defined paths;
 //! - server: Hono / Express / itty style `app.get('/x', handler)`, `app.route('/p', sub)` mounts and the plain
 //!   `route("GET", /regex/, handler)` helper pattern; the handler is resolved to `file::function` through the
 //!   file's imports, an inline function prints as `file:line`;
@@ -76,6 +78,14 @@ pub(crate) struct UrlUse {
     pub(crate) path: String,
 }
 
+/// A literal path the client links or navigates to (`<Link to="/x">`, `navigate("/x")`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct PathUse {
+    pub(crate) file: String,
+    pub(crate) line: u32,
+    pub(crate) path: String,
+}
+
 /// `app.route('/prefix', sub)` / `app.use('/prefix', router)`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Mount {
@@ -96,6 +106,12 @@ pub(crate) struct FileFacts {
     pub(crate) urls: Vec<UrlUse>,
     /// `router.addRoute(...)` is used: route names can be added at run time.
     pub(crate) dynamic_routes: bool,
+    /// Every client route path (also of routes without a component).
+    pub(crate) paths: Vec<String>,
+    /// The client route table holds a path that is not a literal.
+    pub(crate) incomplete: bool,
+    /// Literal client links / navigations (react-router).
+    pub(crate) links: Vec<PathUse>,
 }
 
 /// The project-level route facts of the queried scope.
@@ -108,6 +124,9 @@ pub(crate) struct WebRoutes {
     names: Vec<NameUse>,
     urls: Vec<UrlUse>,
     dynamic_routes: bool,
+    paths: Vec<String>,
+    incomplete: bool,
+    links: Vec<PathUse>,
 }
 
 impl WebRoutes {
@@ -136,6 +155,9 @@ impl WebRoutes {
             out.names.extend(facts.names);
             out.urls.extend(facts.urls);
             out.dynamic_routes |= facts.dynamic_routes;
+            out.paths.extend(facts.paths);
+            out.incomplete |= facts.incomplete;
+            out.links.extend(facts.links);
             mounts.extend(facts.mounts);
         }
         out.apply_mounts(&mounts);

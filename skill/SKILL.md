@@ -164,7 +164,7 @@ file(s) from this skill's `ref/` directory:
 - [ref/blade.md](ref/blade.md): Blade (`*.blade.php`)
 - [ref/js.md](ref/js.md): JS / TS (`--grep` keys, TS receiver types)
 - [ref/vue.md](ref/vue.md): Vue (`setup`, `template`, emits, component usage)
-- [ref/jsx.md](ref/jsx.md): React (`.jsx` / `.tsx`: components, hooks)
+- [ref/jsx.md](ref/jsx.md): React (`.jsx` / `.tsx`: components and their props, hooks, context, react-router, Inertia)
 - [ref/css.md](ref/css.md): CSS / SCSS / HTML
 - [ref/rust.md](ref/rust.md): Rust
 - [ref/swift.md](ref/swift.md): Swift / SwiftUI

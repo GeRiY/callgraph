@@ -40,6 +40,7 @@ impl JsFrontend {
             .with_pass(Box::new(super::container_doc::ContainerDocPass))
             .with_pass(Box::new(super::methods::MethodsPass))
             .with_pass(Box::new(super::props::PropsPass::new(resolver.clone())))
+            .with_pass(Box::new(super::react::ReactPass::new(resolver.clone())))
             .with_pass(Box::new(super::constants::ConstantsPass))
             .with_pass(Box::new(super::strings::StringsPass))
             .with_pass(Box::new(super::comments::CommentsPass))

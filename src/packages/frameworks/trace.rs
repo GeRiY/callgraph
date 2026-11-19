@@ -71,14 +71,20 @@ pub(crate) fn run(root: &Path, target: &str, lang: Lang) -> String {
                             );
                         }
                     }
-                } else if rel.ends_with(".vue") {
+                } else if rel.ends_with(".vue") || rel.ends_with(".tsx") || rel.ends_with(".jsx") {
+                    // a Vue page: the imported `.vue` files; a React page: the capitalised `.tsx` / `.jsx` imports
                     let used: Vec<String> = file
                         .graph
                         .imports
                         .parts()
                         .0
                         .iter()
-                        .filter(|(_, full)| full.ends_with(".vue"))
+                        .filter(|(alias, full)| {
+                            let file = full.split("::").next().unwrap_or(full);
+                            full.ends_with(".vue")
+                                || (alias.starts_with(|c: char| c.is_ascii_uppercase())
+                                    && (file.ends_with(".tsx") || file.ends_with(".jsx")))
+                        })
                         .map(|(alias, _)| alias.clone())
                         .collect();
                     if !used.is_empty() {
@@ -224,7 +230,7 @@ struct Chain<'a> {
     inertia: Option<&'a Inertia>,
     /// Class (full name) → project-relative file, from the project graph.
     classes: HashMap<String, String>,
-    /// Page file → the `.vue` components it imports.
+    /// Page file → the components it imports (`.vue`, or capitalised `.tsx` / `.jsx`).
     components: HashMap<String, Vec<String>>,
     lang: Lang,
 }

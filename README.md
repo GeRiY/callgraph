@@ -96,7 +96,7 @@ Per-language guides with examples: [PHP](https://callgraph.eu/php/) · [Rust](ht
 | PHP | `.php` | classes, traits, enums, methods, properties, constants, calls with type tracking, framework detection (Laravel, Yii) |
 | Blade | `.blade.php` | one `view` per template named like Laravel (`admin.users.index`); `@section` / `@push` / `@slot` blocks as methods with line ranges; `@extends` / `@include` / `<x-alert>` / `<livewire:x>` as `view_use` / `component_use` calls resolved to the template file; PHP in `{{ }}`, `@php` and directives; `@if` / `@foreach` / `@auth` as control flow; `@props`; `route('x')` linked to the route table, `__('k')` / `@lang` to the language files; `rendered by:` / `used by:` lines |
 | Rust | `.rs` | modules, structs, enums, traits, `impl` blocks, functions with visibility / `async`, fields, consts, `use` trees, path / method / macro calls, `if` / `match` flow, framework detection from `Cargo.toml` (axum, actix-web, tokio, serde, …) |
-| JavaScript / TypeScript | `.js` `.mjs` `.cjs` `.jsx` `.ts` `.tsx` | modules, functions, classes, imports with alias resolution (`jsconfig` / `tsconfig`) |
+| JavaScript / TypeScript | `.js` `.mjs` `.cjs` `.jsx` `.ts` `.tsx` | modules, functions, classes, imports with alias resolution (`jsconfig` / `tsconfig`); React: function components with their props (destructuring, TS types, `propTypes`), hooks, context, react-router tables |
 | Vue | `.vue` | props, emits, `setup`, template components and event handlers, `computed`, `watch`, lifecycle hooks, Options API |
 | Swift / SwiftUI | `.swift` | classes, structs, enums, protocols, actors, extensions; `View` types as components; `func` / `init` / computed properties (`body`); property wrappers (`@State`, `@Binding`, `@Published`, …); SwiftUI views and modifiers as their own call categories |
 | Kotlin / Android | `.kt` `.kts` | classes, objects, interfaces, data / sealed / enum classes, companions, extension functions; `@Composable` functions as components; Compose views and modifiers, coroutines / Flow and Android APIs as their own call categories; Hilt / Dagger `inject` and `provide` edges, Compose Navigation `nav` edges, `ViewModel` factories, method references (`::`) as `(ref)` calls; `*.gradle.kts` build scripts marked |
@@ -304,7 +304,7 @@ bash ~/.claude/skills/callgraph/callgraph.sh locate route::events.show "Organize
 | `stats` | category statistics |
 | `mermaid` / `dot` | diagrams of inheritance and call edges |
 | `json` / `jsonl` | the raw graph |
-| `props` | Vue: props a parent passes vs what the child declares (missing required, unknown, unknown slot) |
+| `props` | Vue and React: props a parent passes vs what the child declares (missing required, unknown, unknown slot) |
 | `routes` `middleware` `validation` `jobs` `events` `providers` `magic` `di` `views` | framework views (run on a directory; `routes` also reads vue-router and Hono / Express tables) |
 
 Large results are capped (above 400 lines a directory outline turns into a summary, a single file into a method

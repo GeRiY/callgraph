@@ -33,6 +33,8 @@ pub struct Walker<'s> {
     frames: Vec<Frame>,
     /// A körülvevő osztályok; `None`: egy nem-metódus `function`, amelyben a `this` nem az osztály.
     classes: Vec<Option<ClassFrame>>,
+    /// `const X = createContext(…)` being walked: the call's start and the variable name.
+    context_decl: Option<(u32, String)>,
     pub calls: Vec<Call>,
 }
 
@@ -55,6 +57,7 @@ impl<'s> Walker<'s> {
             container: index.main.clone(),
             frames: Vec::new(),
             classes: Vec::new(),
+            context_decl: None,
             calls: Vec::new(),
         }
     }
@@ -155,6 +158,14 @@ impl<'s> Walker<'s> {
         } else {
             (None, "component_use", None)
         };
+        // `<XContext.Provider>` / `<XContext.Consumer>`: the context's key (shared with `useContext(XContext)`)
+        let resolved = if matches!(rest.as_slice(), [last] if last == "Provider" || last == "Consumer")
+            && category == "component_use"
+        {
+            Some(self.context_key(&root))
+        } else {
+            resolved
+        };
         Some(Callee {
             on: (!rest.is_empty()).then(|| root.clone()),
             target,
@@ -163,6 +174,18 @@ impl<'s> Walker<'s> {
             kind: "component",
             from,
         })
+    }
+
+    /// The key of a React context: `react::context:<defining file>::<name>`, so the provider, the consumers and
+    /// the `createContext` call meet in one key (an imported context is keyed by the file it comes from).
+    fn context_key(&self, name: &str) -> String {
+        match self.scope.bindings.get(name) {
+            Some(b) if !b.resolved.ends_with(')') => format!("react::context:{}", b.resolved),
+            _ => format!(
+                "react::context:{}::{name}",
+                self.resolver.module_path(self.ctx.path)
+            ),
+        }
     }
 
     fn src(&self, a: &Argument<'_>) -> String {
@@ -209,6 +232,24 @@ impl<'s> Walker<'s> {
             }
         {
             resolved = Some(format!("vue::provide:{key}"));
+        }
+        // `useContext(XContext)` / `const XContext = createContext(…)`: one `react::context:<file>::<name>` key
+        if r.from.as_deref() == Some("react") {
+            match r.target.rsplit('.').next() {
+                Some("useContext") => {
+                    if let Some(Argument::Identifier(id)) = args.first() {
+                        resolved = Some(self.context_key(id.name.as_str()));
+                    }
+                }
+                Some("createContext") => {
+                    if let Some((at, name)) = &self.context_decl
+                        && *at == start
+                    {
+                        resolved = Some(self.context_key(name));
+                    }
+                }
+                _ => {}
+            }
         }
         let args = (!args.is_empty()).then(|| args.iter().take(4).map(|a| self.src(a)).collect());
         self.calls.push(
@@ -426,7 +467,13 @@ impl<'a> Visit<'a> for Walker<'_> {
 
     fn visit_variable_declarator(&mut self, it: &VariableDeclarator<'a>) {
         self.bind_declarator(it);
+        if let (BindingPattern::BindingIdentifier(id), Some(init)) = (&it.id, &it.init)
+            && let Expression::CallExpression(c) = init.without_parentheses()
+        {
+            self.context_decl = Some((c.span.start, id.name.to_string()));
+        }
         walk::walk_variable_declarator(self, it);
+        self.context_decl = None;
     }
 
     fn visit_call_expression(&mut self, it: &CallExpression<'a>) {

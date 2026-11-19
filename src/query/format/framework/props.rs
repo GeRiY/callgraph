@@ -19,8 +19,8 @@ impl Formatter for PropsView {
             format!(
                 "{}\n",
                 lang.pick(
-                    "(no Vue component usages found)",
-                    "(nincs Vue komponens-használat találat)"
+                    "(no component usages found)",
+                    "(nincs komponens-használat találat)"
                 )
             )
         } else {

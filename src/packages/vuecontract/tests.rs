@@ -36,7 +36,11 @@ fn comp(rel: &str, props: &[(&str, bool)], template: &str, imports: &[(&str, &st
 }
 
 fn check(comps: Vec<Comp>, auto: bool, parent: &str) -> Vec<(Kind, String)> {
-    let project = Project { comps, auto };
+    let project = Project {
+        comps,
+        auto,
+        react: Vec::new(),
+    };
     let scope: HashSet<String> = HashSet::from([parent.to_string()]);
     project
         .check(&scope)
@@ -215,6 +219,7 @@ fn unchecked_uses_land_in_the_footer_and_clean_ones_do_not() {
     let project = Project {
         comps: vec![card, page],
         auto: false,
+        react: Vec::new(),
     };
     let footer = project.check(&scope).diagnostics.footer(&[], Lang::En);
     assert_eq!(footer.len(), 2, "{footer:?}");
@@ -226,6 +231,7 @@ fn unchecked_uses_land_in_the_footer_and_clean_ones_do_not() {
     let project = Project {
         comps: vec![card, page],
         auto: false,
+        react: Vec::new(),
     };
     assert!(
         project

@@ -1,5 +1,5 @@
-//! The Vue component contract (`--format props`): what a parent passes to a child component against what the child
-//! declares.
+//! The component contract (`--format props`): what a parent passes to a child component against what the child
+//! declares; Vue components here, React function components in `react.rs`.
 //!
 //! - missing required props (`required: true`, or a non-optional member of `defineProps<{ … }>()` without a
 //!   `withDefaults` value) and unknown props (an attribute the child's statically known prop set does not hold);
@@ -13,6 +13,7 @@
 //! "missing" when the parent spreads `v-bind="obj"`, and standard HTML attributes fall through to the child's root
 //! element, so they are never "unknown".
 
+mod react;
 mod render;
 mod script;
 #[cfg(test)]
@@ -91,7 +92,8 @@ pub(crate) struct VueContract {
 impl VueContract {
     /// Scan the project below `root`; only the uses inside the `scope` files are checked.
     pub(crate) fn open(root: &Path, base: &Path, scope: &HashSet<String>) -> Self {
-        let walker = FileWalker::for_extensions(vec!["vue", "json", "ts"]);
+        let walker =
+            FileWalker::for_extensions(vec!["vue", "json", "ts", "tsx", "jsx", "js", "mjs"]);
         let files: Vec<(String, PathBuf)> = walker
             .collect(&[root.to_path_buf()], &mut |_| {})
             .into_iter()
@@ -104,7 +106,12 @@ impl VueContract {
             .filter(|(rel, _)| rel.ends_with(".vue"))
             .filter_map(|(rel, path)| read_comp(&analyzer, rel, path))
             .collect();
-        let project = Project { comps, auto };
+        let react: Vec<react::ReactFile> = files
+            .par_iter()
+            .filter(|(rel, _)| react::is_react_path(rel))
+            .filter_map(|(rel, path)| react::read_file(&analyzer, rel, path, scope.contains(rel)))
+            .collect();
+        let project = Project { comps, auto, react };
         project.check(scope)
     }
 }
@@ -113,6 +120,7 @@ impl VueContract {
 struct Project {
     comps: Vec<Comp>,
     auto: bool,
+    react: Vec<react::ReactFile>,
 }
 
 impl Project {
@@ -192,6 +200,7 @@ impl Project {
                 }
             }
         }
+        react::check(&self.react, scope, &mut out);
         out
     }
 
@@ -501,7 +510,7 @@ pub(crate) fn attach(rows: &mut [QueryResult], root: &Path, format: &str) {
     let scope: HashSet<String> = rows
         .iter()
         .filter_map(|row| relative(Path::new(&row.graph.file), root, &base))
-        .filter(|rel| rel.ends_with(".vue"))
+        .filter(|rel| rel.ends_with(".vue") || react::is_react_path(rel))
         .collect();
     if scope.is_empty() {
         return;

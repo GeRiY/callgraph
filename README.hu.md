@@ -95,7 +95,7 @@ Nyelvenkénti útmutatók példákkal: [PHP](https://callgraph.eu/hu/php/) · [R
 |---|---|---|
 | PHP | `.php` | osztályok, traitek, enumok, metódusok, property-k, konstansok, hívások típuskövetéssel, framework-felismerés (Laravel, Yii) |
 | Rust | `.rs` | modulok, structok, enumok, traitek, `impl`-blokkok, függvények láthatósággal / `async`-kal, mezők, konstansok, `use`-fák, útvonal- / metódus- / makróhívások, `if` / `match` ágak, framework-felismerés a `Cargo.toml`-ból (axum, actix-web, tokio, serde, …) |
-| JavaScript / TypeScript | `.js` `.mjs` `.cjs` `.jsx` `.ts` `.tsx` | modulok, függvények, osztályok, importok alias-feloldással (`jsconfig` / `tsconfig`) |
+| JavaScript / TypeScript | `.js` `.mjs` `.cjs` `.jsx` `.ts` `.tsx` | modulok, függvények, osztályok, importok alias-feloldással (`jsconfig` / `tsconfig`); React: függvény-komponensek props-szal (destrukturálás, TS típus, `propTypes`), hookok, context, react-router táblák |
 | Vue | `.vue` | props, emits, `setup`, template-komponensek és eseménykezelők, `computed`, `watch`, életciklus-hookok, Options API |
 | Swift / SwiftUI | `.swift` | osztályok, structok, enumok, protokollok, actorok, extensionök; a `View` típusok komponensként; `func` / `init` / computed property-k (`body`); property wrapperek (`@State`, `@Binding`, `@Published`, …); a SwiftUI view-k és modifierek saját hívás-kategóriával |
 | Python | `.py` `.pyi` | osztályok (ősök, dekorátorok), függvények / metódusok (`async`, `@staticmethod`, `@classmethod`, `@property`) szignatúrával, konstansok, `__all__`, docstringek, importok, hívások (`native_python`, `internal_helper`, `static_call`, …), Django / Flask / FastAPI felismerés |
@@ -304,7 +304,7 @@ bash ~/.claude/skills/callgraph/callgraph.sh locate route::events.show "Szervez�
 | `stats` | kategória-statisztika |
 | `mermaid` / `dot` | öröklési és hívási élek diagramként |
 | `json` / `jsonl` | a nyers gráf |
-| `props` | Vue: amit a szülő átad, és amit a gyerek deklarál (hiányzó kötelező prop, ismeretlen prop, ismeretlen slot) |
+| `props` | Vue és React: amit a szülő átad, és amit a gyerek deklarál (hiányzó kötelező prop, ismeretlen prop, ismeretlen slot) |
 | `routes` `middleware` `validation` `jobs` `events` `providers` `magic` `di` `views` | framework-nézetek (mappára futtasd) |
 
 A nagy eredmények korlátosak (400 sor fölött a mappás outline summary-ra, az egyfájlos metódus-indexre vált);

@@ -1,7 +1,7 @@
 //! Az `outline` konténer-tagjai: konstansok, Vue `emits` / `models`, tulajdonságok (props); a kompakt alakban
 //! a hosszú listák egy tördelt sorba vonva.
 
-use crate::model::{Constant, Container, FileGraph, Property};
+use crate::model::{Constant, Container, FileGraph, Method, Property};
 use crate::query::QueryResult;
 use std::fmt::Write as _;
 
@@ -78,7 +78,12 @@ pub(super) fn constants(
     let rest: Vec<&Constant> = all
         .iter()
         .copied()
-        .filter(|x| !matches!(x.kind.as_str(), "emit" | "model" | "slot" | "expose"))
+        .filter(|x| {
+            !matches!(
+                x.kind.as_str(),
+                "emit" | "model" | "slot" | "expose" | "react_comp" | "react_prop"
+            )
+        })
         .collect();
     if !rest.is_empty() {
         let items: Vec<String> = rest
@@ -142,7 +147,62 @@ pub(super) fn constants(
     }
 }
 
-/// Egy tulajdonság sora (behúzás nélkül): `típus $név = alapérték [readonly] [static]`; ha a sor `LONG_LINE`-nál
+/// The props shown under a React component.
+const MAX_COMPONENT_PROPS: usize = 12;
+
+/// `props (3): title*, size, …` under a React function component (`*` = required, `…` = more may be passed): the
+/// `react_prop` facts of the file; nothing for a method that is no component.
+pub(super) fn component_props(g: &FileGraph, m: &Method) -> Option<String> {
+    let prefix = format!("{}.", m.name);
+    let mut open = false;
+    let mut comp = false;
+    let mut names: Vec<String> = Vec::new();
+    for c in g.constants.iter().filter(|c| c.container == m.container) {
+        if c.kind == "react_comp" && c.name == m.name {
+            comp = true;
+            open = c.value.as_deref().is_some_and(|v| v.contains("open"));
+        } else if c.kind == "react_prop"
+            && let Some(name) = c.name.strip_prefix(&prefix)
+        {
+            names.push(format!(
+                "{name}{}",
+                if c.value.is_some() { "*" } else { "" }
+            ));
+        }
+    }
+    if !comp || (names.is_empty() && !open) {
+        return None;
+    }
+    let total = names.len();
+    let mut shown: Vec<String> = names.into_iter().take(MAX_COMPONENT_PROPS).collect();
+    if total > MAX_COMPONENT_PROPS {
+        shown.push(format!("+{}", total - MAX_COMPONENT_PROPS));
+    }
+    if open {
+        shown.push("…".to_owned());
+    }
+    Some(format!("props ({total}): {}", shown.join(", ")))
+}
+
+/// A custom React hook: `useX` that runs a React hook itself.
+pub(super) fn is_react_hook(g: &FileGraph, m: &Method) -> bool {
+    let named = m
+        .name
+        .strip_prefix("use")
+        .and_then(|rest| rest.chars().next())
+        .is_some_and(|c| c.is_ascii_uppercase());
+    named
+        && g.calls.iter().any(|c| {
+            c.caller.as_deref() == Some(&m.name)
+                && c.container.as_deref() == m.container.as_deref()
+                && c.category == "composable_use"
+                && c.resolved.as_deref().is_some_and(|r| {
+                    r.starts_with("react::use") || r.starts_with("react::context:")
+                })
+        })
+}
+
+/// Egy tulajdonság sora (behúzás nélkül):`típus $név = alapérték [readonly] [static]`; ha a sor `LONG_LINE`-nál
 /// hosszabb, az alapérték rövidítve (`…`).
 fn property_text(p: &Property) -> String {
     let flags = format!(

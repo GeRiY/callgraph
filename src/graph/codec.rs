@@ -24,7 +24,7 @@ use crate::model::{
 };
 
 /// A tárolt szerkezet verziója; ha változik, a régi tároló csendben újraépül.
-pub(crate) const FORMAT_VERSION: u32 = 13; // 13: Vue emit-kulcs a komponenshez kötve (`X.vue::emit:`), Pinia store konténer, slot / expose konstansok; 12: a PHP-fájl framework-tényei (`facts`: Inertia render-helyek, megosztott props); 11: a JS-kulcsok (`module`, import-célok) a projekt-gyökérhez relatívak, nem a csomaghoz; 10: JS-függvényhivatkozás (`handler`) és PHP `X::class` (`class_ref`) élek; 9: a Kotlin nav-hívás útvonala (`args`) a szűkített tényekben; 8: a Vue-prop alapértéke külön mező (`default`); 7: a szűkített tények importjai (`uses`: a csak típus-hivatkozás)
+pub(crate) const FORMAT_VERSION: u32 = 14; // 14: React-komponens props (`react_comp` / `react_prop` konstansok), context-kulcs a hívásokban; 13: Vue emit-kulcs a komponenshez kötve (`X.vue::emit:`), Pinia store konténer, slot / expose konstansok; 12: a PHP-fájl framework-tényei (`facts`: Inertia render-helyek, megosztott props); 11: a JS-kulcsok (`module`, import-célok) a projekt-gyökérhez relatívak, nem a csomaghoz; 10: JS-függvényhivatkozás (`handler`) és PHP `X::class` (`class_ref`) élek; 9: a Kotlin nav-hívás útvonala (`args`) a szűkített tényekben; 8: a Vue-prop alapértéke külön mező (`default`); 7: a szűkített tények importjai (`uses`: a csak típus-hivatkozás)
 
 /// A keretezett fájlok eleje.
 const MAGIC: &[u8; 4] = b"CGB1";

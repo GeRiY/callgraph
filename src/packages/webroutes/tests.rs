@@ -238,3 +238,52 @@ fn no_missing_line_without_server_routes_in_scope() {
     let found = web(Vec::new(), vec![url(Some("GET"), "/api/x", 1)], "s/api.ts");
     assert!(found.lines(Lang::En).is_empty());
 }
+
+fn link(path: &str, line: u32) -> super::PathUse {
+    super::PathUse {
+        file: "c/Nav.tsx".into(),
+        line,
+        path: path.into(),
+    }
+}
+
+fn with_table(paths: &[&str], links: Vec<super::PathUse>) -> WebRoutes {
+    WebRoutes {
+        scope: HashSet::from(["c/Nav.tsx".to_owned()]),
+        paths: paths.iter().map(|p| (*p).to_owned()).collect(),
+        links,
+        ..WebRoutes::default()
+    }
+}
+
+#[test]
+fn links_are_checked_against_the_table_paths_with_params_and_splats() {
+    let found = with_table(
+        &["/", "/events", "/events/:id", "/files/*", "/u/:name?"],
+        vec![
+            link("/events/7", 1),
+            link("/files/a/b", 2),
+            link("/u", 3),
+            link("/Events", 4),
+            link("/missing", 5),
+            link("/events/7/edit", 6),
+        ],
+    );
+    let lines = found.unknown_links(Lang::En, false);
+    assert_eq!(
+        lines,
+        [
+            "⚠ unknown route path '/missing'  c/Nav.tsx L5",
+            "⚠ unknown route path '/events/7/edit'  c/Nav.tsx L6"
+        ]
+    );
+}
+
+#[test]
+fn no_link_warning_without_a_table_or_with_an_incomplete_one() {
+    let none = with_table(&[], vec![link("/x", 1)]);
+    assert!(none.unknown_links(Lang::En, true).is_empty());
+    let mut open = with_table(&["/a"], vec![link("/x", 1)]);
+    open.incomplete = true;
+    assert!(open.unknown_links(Lang::En, true).is_empty());
+}

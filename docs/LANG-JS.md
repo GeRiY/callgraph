@@ -101,6 +101,30 @@ Babel `comments` — a `/** */` docblock kimarad; felvétel: `TODO|FIXME|XXX|HAC
   (globális) nagybetűs név feloldatlan `component_use`. Nem hívás: a kisbetűs elem (`<div>`), a fragment (`<>`), a
   névtér-es név (`<a:b>`), a `this`-gyökerű név és a záró címke. A prop-ok hívásai (`onClick={() => go()}`) a
   szokásos módon hívásként jelennek meg.
+- Függvény-komponens props (`lang/js/react/`, `ReactPass`): a `.jsx` / `.tsx` / `.js` / `.mjs` fájl nagybetűs, JSX-et
+  tartalmazó top-level függvénye (`function X`, `const X = () =>`, `memo(…)` / `forwardRef(…)` / `observer(…)` burkoló,
+  `export default`). A props az első paraméterből: destrukturálás (alapérték = nem kötelező, `...rest` = nyitott),
+  TS típus (inline, helyi vagy importált `interface` / `type`, `extends`, `A & B`, `PropsWithChildren<T>`; a
+  `props: Props`, a `FC<Props>` változó-annotáció és a `forwardRef<El, Props>` / `memo<Props>` típus-argumentum),
+  `X.propTypes = { a: PropTypes.string.isRequired }`, `X.defaultProps`, és típus nélküli `props` objektumnál a
+  `props.x` olvasások (ilyenkor nyitott). A nem feloldható típus (`Omit<…>`, `*HTMLAttributes`, `ComponentProps`,
+  csomagból jövő, unió) nyitottá teszi a halmazt. A tények a fő container konstansai: `react_comp` (`X`, érték:
+  `default`, `export:<név>`, `open`) és `react_prop` (`X.title`, érték `*` = kötelező); az outline a komponens alatt
+  `props (N): title*, size, …` sorban mutatja, a `--format props` (`packages/vuecontract/react.rs`) a JSX-használatokat
+  veti össze velük (hiányzó kötelező, ismeretlen; `{...spread}` a „hiányzó”-t, a nyitott halmaz az „ismeretlen”-t
+  némítja; `key` / `ref` / `children` / `className` / `style` / `data-*` / `aria-*` sosem ismeretlen). Csak a
+  statikusan kötött komponens (fájlon belüli, vagy projekt-fájl importja, amelynek exportja maga a komponens) számít.
+- Hook és context: a `use[A-Z]…` import `composable_use` (a projekt hookja a fájlra oldódik: `src/hooks/useCart.ts::useCart`);
+  az outline a saját React-hookot `[hook]`-kal jelöli. A `createContext`, a `<X.Provider>` / `<X.Consumer>` és a
+  `useContext(X)` egy kulcson áll: `react::context:<definiáló fájl>::X`.
+- react-router (`webroutes`): `<Route path element|Component index>` fa, `createBrowserRouter` / `createHashRouter` /
+  `createMemoryRouter` / `useRoutes` tömb (`element`, `Component`, `lazy`, `children`); a literális `<Link to>` /
+  `<NavLink>` / `<Navigate>` / `navigate('/x')` útvonal a táblához illesztve (`:param` egy szegmens, `*` a maradék),
+  találat nélkül `⚠ unknown route path`; tábla nélkül, nem literális route-útvonalnál vagy `addRoute` mellett nincs
+  figyelmeztetés.
+- Inertia + React: a page-fájl `.tsx` / `.jsx` is lehet; a page props-ai az alapértelmezetten exportált komponens
+  props-ai (a „never passed” ellenőrzés a kötelezőkre), a `trace` a page `.tsx` / `.jsx` importjait (nagybetűs alias)
+  `uses` sorban adja. A cache formátum-verziója 14.
 
 ## Route-táblák (`--format routes`, `packages/webroutes/`)
 Nem a gráfból, hanem a forrásszövegből (`core::srcscan`: megjegyzés-tisztítás, zárójel-párosítás, argumentum-vágás)

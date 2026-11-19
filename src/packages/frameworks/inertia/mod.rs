@@ -54,6 +54,31 @@ pub(crate) struct Inertia {
     shared: SharedProps,
 }
 
+/// The (declared, required) props of a React page: its default-exported function component.
+fn react_page_props(graph: &FileGraph) -> (Vec<String>, Vec<String>) {
+    use crate::lang::js::react::{COMP_KIND, FLAG_DEFAULT, PROP_KIND};
+    let Some(comp) = graph.constants.iter().find(|c| {
+        c.kind == COMP_KIND
+            && c.value
+                .as_deref()
+                .is_some_and(|v| v.split(',').any(|f| f == FLAG_DEFAULT))
+    }) else {
+        return (Vec::new(), Vec::new());
+    };
+    let prefix = format!("{}.", comp.name);
+    let mut declared = Vec::new();
+    let mut required = Vec::new();
+    for c in graph.constants.iter().filter(|c| c.kind == PROP_KIND) {
+        if let Some(name) = c.name.strip_prefix(&prefix) {
+            declared.push(name.to_string());
+            if c.value.is_some() {
+                required.push(name.to_string());
+            }
+        }
+    }
+    (declared, required)
+}
+
 /// A megosztott props: a kulcsok és hogy a `share` végig statikusan olvasható volt-e.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct SharedProps {
@@ -156,16 +181,22 @@ impl Inertia {
 
     /// Egy page-fájl deklarált és kötelező props-ai.
     fn add_page(&mut self, rel: String, graph: &FileGraph) {
-        let props: Vec<String> = graph.properties.iter().map(|p| p.name.clone()).collect();
-        if props.is_empty() {
-            return;
-        }
-        let required: Vec<String> = graph
+        let mut props: Vec<String> = graph.properties.iter().map(|p| p.name.clone()).collect();
+        let mut required: Vec<String> = graph
             .properties
             .iter()
             .filter(|p| p.js && p.readonly)
             .map(|p| p.name.clone())
             .collect();
+        // a React page: the props of its default-exported function component (a TSX props interface also
+        // shows up as properties, without the required flags)
+        let (react, react_required) = react_page_props(graph);
+        if !react.is_empty() {
+            (props, required) = (react, react_required);
+        }
+        if props.is_empty() {
+            return;
+        }
         if !required.is_empty() {
             self.required.insert(rel.clone(), required);
         }
