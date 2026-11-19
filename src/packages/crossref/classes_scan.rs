@@ -20,6 +20,10 @@ pub(crate) struct Uses {
     pub(crate) words: HashMap<String, Vec<(u32, u32)>>,
     pub(crate) prefixes: HashSet<String>,
     pub(crate) suffixes: HashSet<String>,
+    /// Probe heads of the theme-token utilities (`text-brand-`); empty without `@theme` tokens.
+    pub(crate) heads: HashSet<String>,
+    /// Words starting with a probe head that are not defined classes (candidates for the unknown-token check).
+    pub(crate) probes: HashMap<String, Vec<(u32, u32)>>,
 }
 
 fn re(cell: &'static LazyLock<Regex>) -> &'static Regex {
@@ -201,6 +205,17 @@ pub(super) fn definitions(text: &str) -> Vec<(String, u32)> {
                         .take_while(|ch| ch.is_ascii_alphanumeric() || *ch == '-')
                         .collect();
                     match name.as_str() {
+                        // Tailwind 4 `@utility name { ... }`: a class definition (functional `name-*` utilities skip)
+                        "utility" => {
+                            let utility = at_rule[name.len()..].trim();
+                            if utility_name_ok(utility) {
+                                out.push((utility.to_owned(), pre_line));
+                            }
+                            Frame {
+                                classes: Vec::new(),
+                                skip: true,
+                            }
+                        }
                         "media" | "supports" | "layer" | "container" | "document" | "scope"
                         | "starting-style" | "include" | "at-root" => Frame {
                             classes: parent_classes,
@@ -291,17 +306,45 @@ fn selector_classes(selector: &str, parents: &[String]) -> Vec<String> {
     found
 }
 
-/// A stíluslap `@apply` / `@extend` szavai (felhasznált osztályok).
+/// A valid Tailwind `@utility` name: a plain class name (no `*` functional utility).
+fn utility_name_ok(name: &str) -> bool {
+    name.chars()
+        .next()
+        .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'))
+}
+
+/// The `@utility name {` names of a stylesheet (the class definitions made by Tailwind 4 utilities).
+pub(super) fn utility_names(text: &str) -> HashSet<String> {
+    static RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?m)^\s*@utility\s+([A-Za-z_][\w-]*)\s*\{").expect("érvényes regex")
+    });
+    re(&RE)
+        .captures_iter(text)
+        .filter_map(|caps| caps.get(1).map(|m| m.as_str().to_owned()))
+        .collect()
+}
+
+/// A stíluslap `@apply` / `@extend` szavai (felhasznált osztályok). A Tailwind-variáns (`hover:bg-x`) és a `!`
+/// (important) levágva; a SCSS `@extend .a:hover` szelektor marad.
 pub(super) fn applied_words(text: &str) -> Vec<String> {
     let mut out = Vec::new();
     for caps in apply_re().captures_iter(text) {
         if let Some(list) = caps.get(1) {
             for word in list.as_str().split_whitespace() {
-                out.push(
-                    word.trim_start_matches(['.', '%'])
-                        .trim_end_matches("!important")
-                        .to_owned(),
-                );
+                let selector = word.starts_with(['.', '%']);
+                let word = word
+                    .trim_start_matches(['.', '%'])
+                    .trim_end_matches("!important")
+                    .trim_end_matches('!');
+                let word = if selector {
+                    word
+                } else {
+                    word.rsplit(':').next().unwrap_or(word)
+                };
+                out.push(word.trim_start_matches('!').to_owned());
             }
         }
     }
@@ -354,6 +397,21 @@ pub(super) fn scan_uses(text: &str, file: u32, defined: &HashSet<String>, uses: 
     }
 }
 
+/// Whether the word starts with a probe head (`text-brand-` + something).
+pub(super) fn probe_head(word: &str, heads: &HashSet<String>) -> bool {
+    !heads.is_empty()
+        && word
+            .match_indices('-')
+            .any(|(at, _)| at + 1 < word.len() && heads.contains(&word[..=at]))
+}
+
+pub(super) fn record_probe(uses: &mut Uses, word: &str, file: u32, line: u32) {
+    let places = uses.probes.entry(word.to_owned()).or_default();
+    if places.len() < MAX_LOCATIONS && places.last() != Some(&(file, line)) {
+        places.push((file, line));
+    }
+}
+
 fn record(uses: &mut Uses, word: &str, file: u32, line: u32) {
     let places = uses.words.entry(word.to_owned()).or_default();
     if places.len() < MAX_LOCATIONS && places.last() != Some(&(file, line)) {
@@ -393,6 +451,8 @@ fn scan_value(
         }
         if defined.contains(text) {
             record(uses, text, file, line);
+        } else if probe_head(text, &uses.heads) {
+            record_probe(uses, text, file, line);
         }
         // `'btn-' + x` / `x + '-active'`: a literál széle dinamikus
         if text.len() >= 2 {

@@ -113,6 +113,22 @@ változó pedig `variable` call.
 Mind a `// ...`, mind a `/* ... */` komment bekerül; az utóbbihoz a komment
 szövege kerül, nem a határoló.
 
+## Tailwind 4 (`--format classes`)
+
+- `@utility név { … }` osztály-definíció (a `classes` nézetben és a `locate`-ben is); a `név-*` funkcionális
+  utility kimarad. A projekt saját utility-je, ezért a Tailwind-maghoz hasonló nevű (`container-page`) sem rejtőzik
+  el a „nem használt” jelzés elől.
+- `@theme { --color-brand-500: …; }` tokenek az ismert névterek utility-jeit definiálják: `--color-X` →
+  `text|bg|border|ring|outline|fill|stroke|divide|from|via|to|decoration|accent|caret-X`, `--spacing-X` →
+  `p|m|gap|w|h|size|inset…-X`, `--radius-X` → `rounded…-X`, továbbá `--font-X`, `--font-weight-X`, `--text-X`,
+  `--leading-X`, `--tracking-X`, `--shadow-X`, `--container-X`, `--ease-X`, `--animate-X`, `--blur-X`, `--aspect-X`.
+  A token-utility-k nem számítanak a `classes: N defined` számba; külön sor: `app.css  @theme 5 tokens · used 3: …`.
+- Az `@apply a hover:b c` osztályai (a variáns levágva) használatnak számítanak.
+- Ismeretlen token: ha a sablon `text-brand-450`-et használ, és a projekt `@theme`-je azonos előtagú és első
+  névszegmensű (`brand-…`) tokent definiál, de ezt nem, a nézet `theme: no such token text-brand-450 A.vue:9
+  (like text-brand-500, …)` sort ad (a stíluslap outline-ja is). Szándékosan szűk: a Tailwind magnevei (`text-lg`,
+  `text-red-400`), a @theme nélküli projekt és az azonos névszegmens nélküli osztályok soha nem kerülnek jelzésre.
+
 ## Rövid példa
 
 ```scss

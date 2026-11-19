@@ -109,6 +109,22 @@ Táblázatok, listák, inline-kód, HTML-kommentek és szabad szöveg nem kerül
 maradnak; `controlFlow` nem készül. Linkek és képek kódblokkon belül viszont
 nem számítanak Markdown-hivatkozásnak.
 
+## HTML
+
+Az `.html` / `.htm` a Markdown mintájára épül (`<title>` és `<h1>`–`<h6>` szakaszok, látható szövegek
+string-ként, `<a href>` / `<img src>` link). A belépő-hivatkozások importnak számítanak (F12):
+
+- `<script src="…">` (a `type="module"` is) és `<link rel="stylesheet" href="…">` → egy `method`, `kind: "import"`,
+  `name` a hivatkozás (az outline-ban `import /src/main.ts  L12-12`), és egy `call`, `type: "import"`,
+  `category: "module_use"`, `target` a hivatkozás, `resolved` a fájl a projekt-gyökérhez (workspace) viszonyítva;
+- feloldás: a `/`-előtagú (Vite-stílus, `/src/main.ts`) a csomag-gyökértől (a legközelebbi `package.json` /
+  `tsconfig`), majd a HTML mappájától és a workspace-től; a többi a HTML-fájlhoz képest; a `?query` / `#fragment`
+  elmarad. Nem létező fájlnál nincs `resolved`;
+- a külső URL (`https://…`, `//cdn…`, `data:`) nem él, nem is jelenik meg. A `<link rel="icon">` stb. nem import.
+
+A hívó-keresés (`--grep src/main.ts$`) így az `index.html`-t is megtalálja. A `<script>` / `<style>` tartalma továbbra
+sem kerül elemzésre.
+
 ## Golden ellenőrzés
 
 `golden/ref-json.jsonl` és `golden/ref-md.jsonl` egy-egy sort tartalmaz

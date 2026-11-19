@@ -51,6 +51,10 @@ impl Fixture {
         Self::new("monorepo")
     }
 
+    fn tailwind() -> Self {
+        Self::new("tailwind_app")
+    }
+
     fn command(&self, args: &[&str], project_flag: bool) -> Command {
         let mut command = Command::new(env!("CARGO_BIN_EXE_callgraph"));
         command.args(args);
@@ -376,10 +380,81 @@ fn h14_locate_finds_the_custom_property_use() {
 }
 
 #[test]
-#[ignore = "web-plan H15: Tailwind 4 @utility is not a class definition; enabled in phase 7 (F9)"]
 fn h15_tailwind_utility_is_a_class_definition() {
     let out = Fixture::laravel().run(&["show", ".", "--format", "classes"]);
     assert!(out.contains("classes: 2 defined"), "{out}");
+}
+
+#[test]
+fn f9_utility_and_theme_tokens_are_listed_in_the_classes_view() {
+    let out = Fixture::tailwind().run(&["show", ".", "--format", "classes"]);
+    assert!(out.contains("classes: 3 defined · 1 unused"), "{out}");
+    // `@utility` classes: the files using them
+    assert!(out.contains("@utility 1 used: container-page ×2"), "{out}");
+    assert!(out.contains("stack-gap"), "{out}");
+    // `@theme` tokens: the utility classes that templates (and `@apply`) use
+    let theme = out
+        .lines()
+        .find(|l| l.contains("@theme 5 tokens"))
+        .unwrap_or_else(|| panic!("no @theme line:\n{out}"));
+    // the sample is the most used first (7 classes in use, the top 5 shown)
+    assert!(
+        theme.contains("used 7") && theme.contains("bg-brand-500 ×2"),
+        "{theme}"
+    );
+    for used in ["gap-gutter", "px-gutter"] {
+        assert!(theme.contains(used), "{used}: {theme}");
+    }
+    assert!(!out.contains("no tokens"), "{out}");
+}
+
+#[test]
+fn f9_unknown_theme_token_is_flagged_but_core_classes_are_not() {
+    let out = Fixture::tailwind().run(&["show", ".", "--format", "classes"]);
+    let unknown = out
+        .lines()
+        .find(|l| l.starts_with("theme: no such token"))
+        .unwrap_or_else(|| panic!("no unknown-token line:\n{out}"));
+    assert!(
+        unknown.contains("text-brand-450") && unknown.contains("text-brand-500"),
+        "{unknown}"
+    );
+    for core in [
+        "text-lg",
+        "text-red-400",
+        "p-4",
+        "font-display",
+        "rounded-card",
+    ] {
+        assert!(!unknown.contains(core), "{core}: {unknown}");
+    }
+}
+
+#[test]
+fn f9_stylesheet_outline_mentions_the_unknown_token_and_apply_counts_as_use() {
+    let out = Fixture::tailwind().run(&["show", "src/styles/app.css"]);
+    assert!(out.contains("text-brand-450"), "{out}");
+    // `@apply … hover:text-brand-100` uses the token class (variant stripped)
+    // 7 classes in use only when `bg-brand-500`, `px-gutter` (and `text-brand-100`) come from the `@apply`
+    let view = Fixture::tailwind().run(&["show", ".", "--format", "classes"]);
+    assert!(view.contains("used 7"), "{view}");
+}
+
+#[test]
+fn f12_html_entry_points_are_import_lines() {
+    let out = Fixture::tailwind().run(&["show", "index.html"]);
+    assert!(out.contains("import /src/main.ts"), "{out}");
+    assert!(out.contains("import /src/styles/app.css"), "{out}");
+    assert!(out.contains("import src/legacy.js"), "{out}");
+    // external URLs are not edges
+    assert!(!out.contains("cdn.example.test"), "{out}");
+    assert!(!out.contains("favicon"), "{out}");
+}
+
+#[test]
+fn f12_html_entry_is_a_caller_of_the_module() {
+    let out = Fixture::tailwind().run(&["show", ".", "--grep", "src/main\\.ts$"]);
+    assert!(out.contains("index.html"), "{out}");
 }
 
 // ---------------------------------------------------------------------------------------------------------------

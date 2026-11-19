@@ -6,6 +6,7 @@
 //!
 //! - `i18n.rs` / `i18n_scan.rs`: a nyelvi halmazok, a hívás-olvasó, a PHP nyelvi tömb olvasója;
 //! - `classes.rs` / `classes_scan.rs`: a definiált osztályok és a (lenient) használat-gyűjtés;
+//! - `theme.rs`: a Tailwind 4 `@theme` tokenek és az általuk definiált utility-osztályok;
 //! - `render.rs`: a nézetek és az outline sorai.
 //!
 //! Minden hibatűrő: ami nem olvasható / nem ismerhető fel, az kimarad, soha nem hiba. A dinamikus kulcs / osztály
@@ -18,6 +19,7 @@ pub(crate) use i18n::is_lang_path;
 mod i18n_scan;
 mod i18n_script;
 mod render;
+mod theme;
 mod views;
 
 #[cfg(test)]
@@ -161,7 +163,7 @@ impl CrossRef {
         });
         // nyelvfájl nélkül nincs mit használatnak minősíteni: a forrás-olvasás kimarad
         let scan_i18n = need.i18n == I18nNeed::Full && i18n.as_ref().is_some_and(I18n::has_sets);
-        let scan_classes = classes.as_ref().is_some_and(|c| c.defined_count() > 0);
+        let scan_classes = classes.as_ref().is_some_and(Classes::has_targets);
         if scan_i18n || scan_classes {
             let defined = classes.as_ref().map(Classes::defined).unwrap_or_default();
             for (rel, ext, path) in &files {

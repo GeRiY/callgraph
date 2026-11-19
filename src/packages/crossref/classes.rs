@@ -10,6 +10,10 @@ use std::sync::LazyLock;
 use regex::Regex;
 
 use super::classes_scan::{self, Uses};
+use super::theme::Theme;
+
+/// (class, places `(file, line)`, defined sibling classes) — see `Classes::unknown_theme_uses`.
+pub(crate) type UnknownThemeUse<'a> = (&'a str, Vec<(&'a str, u32)>, Vec<String>);
 
 /// A Tailwind-utility-szerű osztálynevek (csak Tailwind-projektben számít).
 fn utility_re() -> &'static Regex {
@@ -33,19 +37,30 @@ pub(crate) struct Classes {
     pub(crate) by_sheet: BTreeMap<String, Vec<(String, u32)>>,
     pub(crate) uses: Uses,
     pub(crate) tailwind: bool,
+    /// Tailwind 4 `@theme` tokens (their utility classes are not in `defs`: they are counted separately).
+    pub(crate) theme: Theme,
+    /// The classes defined by Tailwind 4 `@utility` (project-defined, so never treated as core utility names).
+    pub(crate) utilities: HashSet<String>,
     applied: Vec<(u32, String)>,
 }
 
 impl Classes {
     /// Egy stíluslap felvétele; a harmadik féltől származó / minifikált kimarad.
     pub(super) fn add_stylesheet(&mut self, rel: &str, text: &str) {
-        if text.contains("tailwindcss") || text.contains("@tailwind") || text.contains("@apply") {
+        if text.contains("tailwindcss")
+            || text.contains("@tailwind")
+            || text.contains("@apply")
+            || text.contains("@theme")
+            || text.contains("@utility")
+        {
             self.tailwind = true;
         }
         if classes_scan::looks_vendor(rel, text) {
             return;
         }
         let sheet = self.file_index(rel);
+        self.theme.add_sheet(rel, text);
+        self.utilities.extend(classes_scan::utility_names(text));
         for word in classes_scan::applied_words(text) {
             self.applied.push((sheet, word));
         }
@@ -75,24 +90,44 @@ impl Classes {
 
     /// A definiált osztályok neve (a használat-olvasó csak ezeket jegyzi).
     pub(super) fn defined(&self) -> HashSet<String> {
-        self.defs.keys().cloned().collect()
+        self.defs
+            .keys()
+            .map(String::clone)
+            .chain(self.theme.class_names().map(str::to_owned))
+            .collect()
+    }
+
+    /// Whether there is anything to look for in the sources (a defined class or a theme token).
+    pub(super) fn has_targets(&self) -> bool {
+        self.defined_count() > 0 || !self.theme.is_empty()
+    }
+
+    /// A class a stylesheet defines: a selector, an `@utility`, or a `@theme` token utility.
+    fn is_defined(&self, class: &str) -> bool {
+        self.defs.contains_key(class) || self.theme.defines(class)
     }
 
     /// Egy sablon / szkript használatai.
     pub(super) fn add_source(&mut self, rel: &str, text: &str, defined: &HashSet<String>) {
         let file = self.file_index(rel);
+        if self.uses.heads.is_empty() && !self.theme.is_empty() {
+            self.uses.heads = self.theme.heads();
+        }
         classes_scan::scan_uses(text, file, defined, &mut self.uses);
     }
 
     /// A gyűjtés vége: a stíluslapok `@apply` / `@extend` szavai használatnak számítanak.
     pub(super) fn finish(&mut self) {
         let applied = std::mem::take(&mut self.applied);
+        let heads = self.theme.heads();
         for (sheet, word) in applied {
-            if self.defs.contains_key(&word) {
+            if self.is_defined(&word) {
                 let places = self.uses.words.entry(word).or_default();
                 if !places.contains(&(sheet, 0)) {
                     places.push((sheet, 0));
                 }
+            } else if classes_scan::probe_head(&word, &heads) {
+                classes_scan::record_probe(&mut self.uses, &word, sheet, 0);
             }
         }
     }
@@ -115,7 +150,7 @@ impl Classes {
 
     /// Tailwind-projektben az utility-nevű osztály nem jelölt.
     fn utility_like(&self, class: &str) -> bool {
-        self.tailwind && utility_re().is_match(class)
+        self.tailwind && !self.utilities.contains(class) && utility_re().is_match(class)
     }
 
     /// Biztosan nem használt-e az osztály (engedékeny: bizonytalannál `false`).
@@ -176,5 +211,72 @@ impl Classes {
     /// A projekt definiált osztályainak száma.
     pub(crate) fn defined_count(&self) -> usize {
         self.defs.len()
+    }
+
+    /// The utility classes of a stylesheet's `@theme` tokens that templates use: (class, number of files).
+    pub(crate) fn theme_used_in(&self, sheet: &str) -> Vec<(String, usize)> {
+        let mut out: Vec<(String, usize)> = self
+            .theme
+            .in_sheet(sheet)
+            .flat_map(|token| token.classes.iter())
+            .filter_map(|class| {
+                let files: HashSet<&str> =
+                    self.used_by(class).iter().map(|(file, _)| *file).collect();
+                (!files.is_empty()).then(|| (class.clone(), files.len()))
+            })
+            .collect();
+        out.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+        out
+    }
+
+    /// The number of `@theme` tokens in a stylesheet.
+    pub(crate) fn theme_count_in(&self, sheet: &str) -> usize {
+        self.theme.in_sheet(sheet).count()
+    }
+
+    /// `@utility` classes of a stylesheet that templates use: (class, number of files), most used first.
+    pub(crate) fn utilities_used_in(&self, sheet: &str) -> Vec<(String, usize)> {
+        let mut out: Vec<(String, usize)> = self
+            .by_sheet
+            .get(sheet)
+            .into_iter()
+            .flatten()
+            .filter(|(name, _)| self.utilities.contains(name))
+            .filter_map(|(name, _)| {
+                let files: HashSet<&str> =
+                    self.used_by(name).iter().map(|(file, _)| *file).collect();
+                (!files.is_empty()).then(|| (name.clone(), files.len()))
+            })
+            .collect();
+        out.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+        out
+    }
+
+    /// Used classes that look like a theme-token utility whose token does not exist (`text-brand-450` when only
+    /// `brand-500` is defined): (class, places, defined siblings). Conservative: needs `@theme` tokens with the
+    /// same prefix and first name segment; core Tailwind names never match.
+    pub(crate) fn unknown_theme_uses(&self) -> Vec<UnknownThemeUse<'_>> {
+        if self.theme.is_empty() {
+            return Vec::new();
+        }
+        let heads = self.theme.heads();
+        let mut out: Vec<UnknownThemeUse<'_>> = self
+            .uses
+            .probes
+            .iter()
+            .filter(|(word, _)| !self.is_defined(word))
+            .filter_map(|(word, places)| {
+                let siblings = self.theme.unknown(&heads, word)?;
+                let at = places
+                    .iter()
+                    .filter_map(|(file, line)| {
+                        Some((self.files.get(*file as usize)?.as_str(), *line))
+                    })
+                    .collect();
+                Some((word.as_str(), at, siblings))
+            })
+            .collect();
+        out.sort_by(|a, b| a.0.cmp(b.0));
+        out
     }
 }

@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-500: #a4452c;
+  --color-brand-100: #f6e4dd;
+  --spacing-gutter: 1.5rem;
+  --radius-card: 0.75rem;
+  --font-display: "Georgia", serif;
+}
+
+@utility container-page {
+  max-width: 64rem;
+  margin-inline: auto;
+}
+
+@utility stack-gap {
+  display: grid;
+  gap: 1rem;
+}
+
+.hero {
+  @apply bg-brand-500 px-gutter hover:text-brand-100;
+}

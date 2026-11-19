@@ -169,6 +169,11 @@ impl CrossRef {
         if let Some(classes) = &self.classes
             && is_sheet(&rel)
         {
+            if classes.theme_count_in(&rel) > 0
+                && let Some(line) = unknown_theme_line(classes, lang)
+            {
+                lines.push(line);
+            }
             let unused = classes.unused_in(&rel);
             if !unused.is_empty() {
                 let names: Vec<String> = unused
@@ -296,18 +301,19 @@ impl CrossRef {
 
     /// A `classes` nézet sorai a hatókörre; üres: nincs stíluslap-osztály vagy nincs mit mondani.
     pub(crate) fn classes_view(&self, scope: &[Scope], lang: Lang) -> Vec<String> {
-        let Some(classes) = self.classes.as_ref().filter(|c| c.defined_count() > 0) else {
+        let Some(classes) = self.classes.as_ref().filter(|c| c.has_targets()) else {
             return Vec::new();
         };
         let mut body = Vec::new();
         let mut unused_total = 0;
         let mut sheets = 0;
         for item in scope {
-            if classes.by_sheet.contains_key(&item.rel) {
+            if classes.by_sheet.contains_key(&item.rel) || classes.theme_count_in(&item.rel) > 0 {
                 sheets += 1;
                 match &item.names {
                     Some(names) => class_lines(classes, &item.rel, names, lang, &mut body),
                     None => {
+                        body.extend(tailwind_lines(classes, &item.rel, lang));
                         let unused = classes.unused_in(&item.rel);
                         unused_total += unused.len();
                         if !unused.is_empty() {
@@ -338,6 +344,7 @@ impl CrossRef {
         }
         let mut out = Vec::new();
         if sheets > 0 {
+            body.extend(unknown_theme_line(classes, lang));
             out.push(format!(
                 "classes: {} {} · {} {}",
                 classes.defined_count(),
@@ -451,7 +458,17 @@ fn class_lines(
         LazyLock::new(|| Regex::new(r"\.(-?[_a-zA-Z][\w-]*)").expect("érvényes regex"));
     let mut seen = BTreeSet::new();
     for name in names {
-        for caps in CLASS.captures_iter(name) {
+        // `@utility name` is a class definition; `@theme` the token summary of the sheet
+        if name.trim_start().starts_with("@theme") {
+            out.extend(theme_line(classes, sheet, lang));
+            continue;
+        }
+        let utility = name
+            .trim()
+            .strip_prefix("@utility ")
+            .map(|class| format!(".{}", class.trim()));
+        let text = utility.as_deref().unwrap_or(name);
+        for caps in CLASS.captures_iter(text) {
             let Some(class) = caps.get(1).map(|m| m.as_str()) else {
                 continue;
             };
@@ -504,4 +521,85 @@ fn styles_text(styles: &[(&str, &str)]) -> String {
         })
         .collect::<Vec<_>>()
         .join("; ")
+}
+
+/// The Tailwind 4 definitions of a stylesheet and where templates use them: the `@utility` and the `@theme` line.
+fn tailwind_lines(classes: &super::classes::Classes, sheet: &str, lang: Lang) -> Vec<String> {
+    let mut out = Vec::new();
+    let utilities = classes.utilities_used_in(sheet);
+    if !utilities.is_empty() {
+        let shown: Vec<String> = utilities
+            .iter()
+            .take(SAMPLE)
+            .map(|(name, files)| format!("{name} ×{files}"))
+            .collect();
+        out.push(format!(
+            "{sheet}  @utility {} {}: {}",
+            utilities.len(),
+            lang.pick("used", "használt"),
+            list(utilities.len(), &shown)
+        ));
+    }
+    out.extend(theme_line(classes, sheet, lang));
+    out
+}
+
+/// `app.css  @theme 6 tokens · used 2: bg-brand-500 ×3, …` (`×N`: files using it); no tokens: `None`.
+fn theme_line(classes: &super::classes::Classes, sheet: &str, lang: Lang) -> Option<String> {
+    let tokens = classes.theme_count_in(sheet);
+    if tokens == 0 {
+        return None;
+    }
+    let used = classes.theme_used_in(sheet);
+    let shown: Vec<String> = used
+        .iter()
+        .take(SAMPLE)
+        .map(|(name, files)| format!("{name} ×{files}"))
+        .collect();
+    let tail = if used.is_empty() {
+        lang.pick("none used", "egyik sem használt").to_owned()
+    } else {
+        format!(
+            "{} {}: {}",
+            lang.pick("used", "használt"),
+            used.len(),
+            list(used.len(), &shown)
+        )
+    };
+    Some(format!(
+        "{sheet}  @theme {tokens} {} · {tail}",
+        lang.pick("tokens", "token")
+    ))
+}
+
+/// `theme: unknown token in use: text-brand-450 A.vue:9 (like text-brand-500) +N`; no unknown use: `None`.
+fn unknown_theme_line(classes: &super::classes::Classes, lang: Lang) -> Option<String> {
+    let unknown = classes.unknown_theme_uses();
+    if unknown.is_empty() {
+        return None;
+    }
+    // never cut inside a class name: whole items, the rest counted
+    let shown: Vec<String> = unknown
+        .iter()
+        .take(3)
+        .map(|(class, at, siblings)| {
+            format!(
+                "{class} {} ({} {})",
+                places(at),
+                lang.pick("like", "mint"),
+                siblings.join(", ")
+            )
+        })
+        .collect();
+    let more = unknown.len().saturating_sub(shown.len());
+    let tail = if more > 0 {
+        format!(" +{more}")
+    } else {
+        String::new()
+    };
+    Some(format!(
+        "theme: {} {}{tail}",
+        lang.pick("no such token", "nincs ilyen token"),
+        shown.join("; ")
+    ))
 }

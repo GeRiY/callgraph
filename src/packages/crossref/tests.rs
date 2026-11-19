@@ -331,6 +331,134 @@ fn tailwind_utilities_and_vendor_stylesheets_are_skipped() {
     assert!(!classes.defs.contains_key("col-md-6"));
 }
 
+const TAILWIND_CSS: &str = "@import \"tailwindcss\";
+@theme {
+  --color-brand-500: #a00; /* --color-ghost-1: red; */
+  --color-brand-100: #fee;
+  --spacing-gutter: 1rem;
+  --text-hero--line-height: 1.1;
+}
+@utility container-page { max-width: 60rem; }
+@utility tab-* { tab-size: --value(integer); }
+@utility stack-gap { display: grid; }
+.hero { @apply hover:bg-brand-500 px-gutter container-page; }
+";
+
+#[test]
+fn tailwind_utility_is_a_class_definition() {
+    let mut names: Vec<(String, u32)> = definitions(TAILWIND_CSS);
+    names.sort();
+    assert_eq!(
+        names,
+        [
+            ("container-page".to_owned(), 8),
+            ("hero".to_owned(), 11),
+            ("stack-gap".to_owned(), 10)
+        ]
+    );
+}
+
+#[test]
+fn theme_tokens_define_utility_classes_of_their_namespace() {
+    let mut classes = Classes::default();
+    classes.add_stylesheet("app.css", TAILWIND_CSS);
+    assert!(classes.tailwind);
+    let defined = classes.defined();
+    for class in [
+        "bg-brand-500",
+        "text-brand-500",
+        "border-brand-100",
+        "px-gutter",
+        "gap-gutter",
+        "container-page",
+    ] {
+        assert!(defined.contains(class), "{class}");
+    }
+    // comments, modifiers (`--text-hero--line-height`) and unmapped namespaces define nothing
+    assert!(!defined.contains("bg-ghost-1") && !defined.contains("text-hero--line-height"));
+    assert_eq!(classes.theme_count_in("app.css"), 3);
+    // the theme utilities are not counted as stylesheet classes
+    assert_eq!(classes.defined_count(), 3);
+}
+
+#[test]
+fn apply_counts_as_use_and_stylesheet_utility_is_judged_precisely() {
+    let mut classes = Classes::default();
+    classes.add_stylesheet("app.css", TAILWIND_CSS);
+    let defined = classes.defined();
+    classes.add_source(
+        "A.vue",
+        "<div class=\"container-page text-brand-100\"></div>",
+        &defined,
+    );
+    classes.finish();
+    assert_eq!(classes.used_by("container-page").len(), 2);
+    assert_eq!(classes.used_by("bg-brand-500"), [("app.css", 0)]);
+    assert_eq!(classes.used_by("px-gutter"), [("app.css", 0)]);
+    assert_eq!(
+        classes.utilities_used_in("app.css"),
+        [("container-page".to_owned(), 2)]
+    );
+    // `stack-gap` is project-defined: the Tailwind core names do not hide it
+    assert!(classes.is_unused("stack-gap"));
+    let unused: Vec<String> = classes
+        .unused_in("app.css")
+        .into_iter()
+        .map(|(name, _)| name)
+        .collect();
+    assert_eq!(unused, ["hero", "stack-gap"]);
+}
+
+#[test]
+fn unknown_theme_token_is_flagged_conservatively() {
+    let mut classes = Classes::default();
+    classes.add_stylesheet("app.css", TAILWIND_CSS);
+    let defined = classes.defined();
+    classes.add_source(
+        "A.vue",
+        "<p class=\"text-brand-450 hover:bg-brand-500 text-red-400 text-lg p-4 text-accent-450 border-brand-500/50\"></p>",
+        &defined,
+    );
+    classes.finish();
+    let unknown = classes.unknown_theme_uses();
+    assert_eq!(unknown.len(), 1, "{unknown:?}");
+    let (class, places, siblings) = &unknown[0];
+    assert_eq!(*class, "text-brand-450");
+    assert_eq!(places, &[("A.vue", 1)]);
+    assert_eq!(siblings, &["text-brand-500", "text-brand-100"]);
+}
+
+#[test]
+fn project_without_theme_tokens_flags_nothing() {
+    let mut classes = Classes::default();
+    classes.add_stylesheet(
+        "app.css",
+        "@import \"tailwindcss\";\n.hero { @apply p-4 text-brand-450; }\n",
+    );
+    let defined = classes.defined();
+    classes.add_source(
+        "A.vue",
+        "<p class=\"text-brand-450 bg-brand-100\"></p>",
+        &defined,
+    );
+    classes.finish();
+    assert!(classes.unknown_theme_uses().is_empty());
+    // core palette names are never reported, even when the project overrides one of its steps
+    let mut classes = Classes::default();
+    classes.add_stylesheet(
+        "app.css",
+        "@theme { --color-red-450: #f00; --color-brand-500: #a00; }\n",
+    );
+    let defined = classes.defined();
+    classes.add_source(
+        "A.vue",
+        "<p class=\"text-red-400 text-red-450\"></p>",
+        &defined,
+    );
+    classes.finish();
+    assert!(classes.unknown_theme_uses().is_empty());
+}
+
 fn project(files: &[(&str, &str)]) -> PathBuf {
     static COUNTER: AtomicUsize = AtomicUsize::new(0);
     let dir = std::env::temp_dir().join(format!(

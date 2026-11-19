@@ -33,6 +33,13 @@ pub(crate) struct Link {
     pub target: String,
 }
 
+/// Egy belépő-hivatkozás: `<script src>` vagy `<link rel="stylesheet" href>`, a tag kezdő pozíciójával.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Import {
+    pub start: usize,
+    pub target: String,
+}
+
 /// A szkennelés eredménye, dokumentum-sorrendben.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub(crate) struct Scan {
@@ -40,6 +47,7 @@ pub(crate) struct Scan {
     pub headings: Vec<Heading>,
     pub texts: Vec<Text>,
     pub links: Vec<Link>,
+    pub imports: Vec<Import>,
 }
 
 /// A látható szöveget hordozó attribútumok (a `--strings` ezekben is keres).
@@ -187,7 +195,29 @@ impl<'s> Scanner<'s> {
                 }
             }
         }
+        self.collect_import(start, &tag);
         tag
+    }
+
+    /// `<script src>` / `<link rel="stylesheet" href>`: belépő-hivatkozás (külső URL-t a hívó szűri).
+    fn collect_import(&mut self, start: usize, tag: &Tag<'s>) {
+        let attr = |name: &str| tag.attrs.iter().find(|a| a.name == name).map(|a| a.value);
+        let value = match tag.name.as_str() {
+            "script" => attr("src"),
+            "link"
+                if attr("rel").is_some_and(|rel| {
+                    rel.split_ascii_whitespace()
+                        .any(|word| word.eq_ignore_ascii_case("stylesheet"))
+                }) =>
+            {
+                attr("href")
+            }
+            _ => None,
+        };
+        let target = value.map(|v| decode(v.trim())).unwrap_or_default();
+        if !target.is_empty() {
+            self.out.imports.push(Import { start, target });
+        }
     }
 
     /// A tag utáni pozíció: a `<script>` / `<style>` tartalma átugorva, a `<title>` szövege a címként felvéve.
@@ -323,6 +353,14 @@ mod tests {
             .map(|l| (l.image, l.target.as_str()))
             .collect();
         assert_eq!(links, [(true, "a.png"), (false, "#top")]);
+    }
+
+    #[test]
+    fn collects_script_and_stylesheet_imports() {
+        let src = "<link rel=\"stylesheet\" href=\"/a.css\"><link rel=\"icon\" href=\"x.png\">\n<script type=\"module\" src=\"/src/main.ts\"></script><script>var x = 1;</script><link REL=\"preload stylesheet\" href=b.css>";
+        let scan = scan(src);
+        let found: Vec<&str> = scan.imports.iter().map(|i| i.target.as_str()).collect();
+        assert_eq!(found, ["/a.css", "/src/main.ts", "b.css"]);
     }
 
     #[test]

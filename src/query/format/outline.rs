@@ -279,13 +279,25 @@ fn heading_level(m: &Method) -> Option<usize> {
 pub(crate) fn parens(m: &Method) -> &'static str {
     let plain = matches!(
         m.kind.as_deref(),
-        Some("rule" | "at-rule" | "key" | "title")
+        Some("rule" | "at-rule" | "key" | "title" | "import")
     ) || m.kind.as_deref() == Some(crate::lang::blade::BLOCK_KIND)
         || heading_level(m).is_some();
     if plain { "" } else { "()" }
 }
 
 pub(super) fn method_line(s: &mut String, m: &Method) {
+    // HTML belépő-import (`<script src>`, `<link href>`): `import /src/main.ts  L5-5`
+    if m.kind.as_deref() == Some(crate::lang::html::IMPORT_KIND) {
+        writeln!(
+            s,
+            "  import {}  L{}-{}",
+            m.name,
+            m.line,
+            m.end_line.unwrap_or(m.line)
+        )
+        .unwrap();
+        return;
+    }
     // a HTML `<title>`: a címsorok előtt, saját jelöléssel (`<title> Tervdokumentum  L4-4`)
     if m.kind.as_deref() == Some(crate::lang::html::TITLE_KIND) {
         let end = m.end_line.unwrap_or(m.line);
@@ -411,6 +423,8 @@ pub(super) fn categories(row: &QueryResult, m: &Method, lang: Lang) -> Vec<(Stri
         .iter()
         .filter(|c| c.caller.as_deref() == Some(&m.name))
         .filter(|c| c.container.as_deref() == m.container.as_deref())
+        // a HTML belépő-import sora már a metódus-sor (`import /src/main.ts`)
+        .filter(|c| c.kind != crate::lang::html::IMPORT_KIND)
     {
         // wire / inject / nav: a hívás-fajta a kategória-oszlopban (`wire   RealtimeSocket::onFrame`)
         let column = if matches!(c.kind.as_str(), "wire" | "inject" | "nav") {

@@ -1,7 +1,8 @@
 //! HTML dokumentum-indexelő (`.html`, `.htm`): a Markdown-dokumentum mintájára — a `<title>` és a `<h1>`–`<h6>`
 //! címsorok szakaszként (sortartománnyal), a látható szövegek és a szöveges attribútumok string-literálként (a
 //! `--strings`-hez), a linkek (`<a href>`, `<img src>`) hívásként. A `<script>` / `<style>` tartalma kimarad (nincs
-//! JS-elemzés). Nem teljes HTML-parser: a hibatűrő tag-szkenner (`scanner`) dolgozik.
+//! JS-elemzés), de a `<script src>` és a `<link rel="stylesheet" href>` belépő-import (a JS-importhoz hasonló
+//! `import` sor és `module_use` hívás-él; a külső URL nem él). Nem teljes HTML-parser: a hibatűrő tag-szkenner (`scanner`) dolgozik.
 
 mod scanner;
 
@@ -10,9 +11,10 @@ use crate::error::Result;
 use crate::lang::document::{
     container, file_name, link_category, resolve_relative, section_ends, section_method,
 };
+use crate::lang::js::Resolver;
 use crate::lang::{Analysis, Language, LanguageDocument, LanguageRole};
 use crate::model::{Call, FileGraphBuilder, StringLit};
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 pub use crate::lang::document::TITLE_KIND;
 
@@ -74,6 +76,24 @@ impl Language for HtmlDocument {
         {
             b.method(section_method(&name, title, first, section_end, level));
         }
+        let resolver = Resolver::new();
+        for import in &scan.imports {
+            if is_external_ref(&import.target) {
+                continue;
+            }
+            let at = line(import.start);
+            // az outline `import <hivatkozás>  L<n>` sora (mint a CSS `@import`)
+            let mut method = section_method(&name, &import.target, at, at, 0);
+            method.kind = Some(IMPORT_KIND.to_owned());
+            b.method(method);
+            let resolved = resolve_entry(&resolver, &import.target, &file.path);
+            b.call(
+                Call::new(IMPORT_KIND, import.target.clone(), "module_use")
+                    .at(at)
+                    .within(Some(name.clone()), Some(import.target.clone()))
+                    .resolved(resolved),
+            );
+        }
         for t in &scan.texts {
             let first = line(t.start);
             let last = line(t.end);
@@ -108,6 +128,60 @@ impl Language for HtmlDocument {
     }
 }
 
+/// A `Method.kind` / `Call.kind` a `<script src>` / `<link href>` belépő-importnak.
+pub const IMPORT_KIND: &str = "import";
+
+/// Külső (séma-, protokoll-relatív, `data:`) hivatkozás: nem él a projektben.
+fn is_external_ref(target: &str) -> bool {
+    target.starts_with("//")
+        || target.contains("://")
+        || target.starts_with("data:")
+        || target.starts_with("mailto:")
+        || target.starts_with('#')
+}
+
+/// A belépő-hivatkozás fájlja a workspace-hez relatív úton, ha létezik: a `/`-előtagú (Vite) a csomag-gyökérhez
+/// (majd a HTML mappájához és a workspace-hez), a többi a HTML-fájlhoz képest. A `?query` / `#fragment` elmarad.
+fn resolve_entry(resolver: &Resolver, target: &str, from: &Path) -> Option<String> {
+    let clean = target.split(['?', '#']).next().unwrap_or_default();
+    let cfg = resolver.config(from);
+    let dir = from.parent()?;
+    let dir = if dir.as_os_str().is_empty() {
+        PathBuf::from(".")
+    } else {
+        dir.to_path_buf()
+    };
+    let candidates: Vec<PathBuf> = match clean.strip_prefix('/') {
+        Some(rest) => [cfg.root.clone(), dir, cfg.workspace.clone()]
+            .into_iter()
+            .map(|base| base.join(rest))
+            .collect(),
+        None => vec![dir.join(clean)],
+    };
+    let file = candidates
+        .into_iter()
+        .map(|path| normalize_path(&path))
+        .find(|path| path.is_file())?;
+    Some(resolver.module_path(&file))
+}
+
+/// `.` / `..` lexikális feloldása (nem követi a symlinket).
+fn normalize_path(path: &Path) -> PathBuf {
+    let mut out = PathBuf::new();
+    for part in path.components() {
+        match part {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                if !out.pop() {
+                    out.push("..");
+                }
+            }
+            other => out.push(other.as_os_str()),
+        }
+    }
+    out
+}
+
 impl LanguageDocument for HtmlDocument {
     fn resolve_reference(&self, reference: &str, from: &Path) -> Option<PathBuf> {
         resolve_relative(reference, from)
@@ -117,6 +191,7 @@ impl LanguageDocument for HtmlDocument {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
 
     const PAGE: &str = "<!DOCTYPE html>
 <html>
@@ -198,5 +273,60 @@ mod tests {
         let graph = HtmlDocument.analyze(&file).unwrap().graph;
         assert_eq!(graph.methods[0].name, "Open");
         assert_eq!(graph.methods[0].end_line, Some(3));
+    }
+
+    #[test]
+    fn script_and_stylesheet_links_become_import_edges() {
+        let root = std::env::temp_dir().join(format!("cg_html_entry_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("client/src")).unwrap();
+        fs::create_dir_all(root.join("client/styles")).unwrap();
+        fs::write(root.join("client/package.json"), "{}").unwrap();
+        fs::write(root.join("client/src/main.ts"), "export {}").unwrap();
+        fs::write(root.join("client/styles/site.css"), "a{}").unwrap();
+        let page = "<html><head><title>App</title>
+<link rel=\"stylesheet\" href=\"styles/site.css?v=2\">
+<link rel=\"stylesheet\" href=\"https://cdn.example.test/x.css\">
+<script src=\"//cdn.example.test/y.js\"></script>
+</head><body><script type=\"module\" src=\"/src/main.ts\"></script>
+<script src=\"gone.js\"></script></body></html>
+";
+        let path = root.join("client/index.html");
+        let file = SourceFile::new(path, page.as_bytes().to_vec(), None);
+        let graph = HtmlDocument.analyze(&file).unwrap().graph;
+        let imports: Vec<(&str, u32)> = graph
+            .methods
+            .iter()
+            .filter(|m| m.kind.as_deref() == Some(IMPORT_KIND))
+            .map(|m| (m.name.as_str(), m.line))
+            .collect();
+        assert_eq!(
+            imports,
+            [
+                ("styles/site.css?v=2", 2),
+                ("/src/main.ts", 5),
+                ("gone.js", 6)
+            ]
+        );
+        let edges: Vec<(&str, Option<&str>, &str)> = graph
+            .calls
+            .iter()
+            .filter(|c| c.kind == IMPORT_KIND)
+            .map(|c| {
+                (
+                    c.target.as_str(),
+                    c.resolved.as_deref(),
+                    c.category.as_str(),
+                )
+            })
+            .collect();
+        assert_eq!(edges.len(), 3, "{edges:?}");
+        // the display path is relative to the project root (the package folder, or a parent marker)
+        let ends = |at: usize, suffix: &str| edges[at].1.is_some_and(|r| r.ends_with(suffix));
+        assert!(ends(0, "styles/site.css"), "{edges:?}");
+        assert!(ends(1, "src/main.ts"), "{edges:?}");
+        assert_eq!(edges[2].1, None, "a missing file has no resolved target");
+        assert!(edges.iter().all(|e| e.2 == "module_use"));
+        let _ = fs::remove_dir_all(&root);
     }
 }
