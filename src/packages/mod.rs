@@ -22,6 +22,7 @@ mod builder;
 mod cache;
 pub(crate) mod crossref;
 mod deps;
+pub(crate) mod filament;
 mod files;
 pub(crate) mod frameworks;
 pub(crate) mod livewire;
@@ -48,6 +49,7 @@ use crate::query::QueryResult;
 
 pub(crate) use crossref::CrossRef;
 pub(crate) use deps::{DepsQuery, user_ignores};
+pub(crate) use filament::Filament;
 pub(crate) use frameworks::{
     DiskProjectFiles, Inertia, Laravel, PageLink, annotate as annotate_frameworks,
 };

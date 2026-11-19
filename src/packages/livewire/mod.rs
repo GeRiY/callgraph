@@ -18,7 +18,7 @@
 
 mod events;
 mod render;
-mod scan;
+pub(crate) mod scan;
 #[cfg(test)]
 mod tests;
 

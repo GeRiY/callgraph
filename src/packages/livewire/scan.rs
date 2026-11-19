@@ -136,7 +136,7 @@ pub(super) struct RouteUse {
 // ------------------------------------------------------------------------------------------------ text helpers
 
 /// The text with the contents of the string literals blanked (the quotes and the length stay).
-fn mask_strings(text: &str) -> String {
+pub(crate) fn mask_strings(text: &str) -> String {
     let mut out = text.as_bytes().to_vec();
     let mut quote: Option<u8> = None;
     let mut escaped = false;
@@ -181,7 +181,7 @@ fn depth_map(mask: &str) -> Vec<u32> {
 }
 
 /// The value of a plain string literal (`'saved'`, `"saved"` without interpolation); anything else is `None`.
-pub(super) fn single_literal(text: &str) -> Option<String> {
+pub(crate) fn single_literal(text: &str) -> Option<String> {
     let text = text.trim();
     let (inner, quote) = if let Some(rest) = text
         .strip_prefix('\'')
@@ -201,7 +201,7 @@ pub(super) fn single_literal(text: &str) -> Option<String> {
 }
 
 /// Every plain string literal in the text.
-pub(super) fn string_lits(text: &str) -> Vec<String> {
+pub(crate) fn string_lits(text: &str) -> Vec<String> {
     re!(r#"'((?:[^'\\]|\\.)*)'|"((?:[^"\\]|\\.)*)""#)
         .captures_iter(text)
         .filter_map(|caps| {
@@ -214,7 +214,7 @@ pub(super) fn string_lits(text: &str) -> Vec<String> {
 }
 
 /// `Counter2` -> `counter2`, `UserTable` -> `user-table` (Laravel's `Str::kebab`).
-pub(super) fn kebab(name: &str) -> String {
+pub(crate) fn kebab(name: &str) -> String {
     let mut out = String::with_capacity(name.len() + 4);
     for (i, ch) in name.chars().enumerate() {
         if ch.is_uppercase() {
@@ -276,7 +276,7 @@ fn attrs_of(clean: &str, span: (usize, usize)) -> Vec<Attr> {
 
 /// The braces of a body: from the `(` of a parameter list to the matching `{` .. `}`; `None` for an abstract
 /// method (`;`).
-fn body_of(mask: &str, paren_open: usize, limit: usize) -> Option<(usize, usize)> {
+pub(crate) fn body_of(mask: &str, paren_open: usize, limit: usize) -> Option<(usize, usize)> {
     let paren_close = matching(mask, paren_open, limit, Dialect::Php)?;
     let rest = mask.get(paren_close + 1..limit)?;
     let at = rest.find(['{', ';'])?;
@@ -290,18 +290,18 @@ fn body_of(mask: &str, paren_open: usize, limit: usize) -> Option<(usize, usize)
 
 /// One item of an array literal.
 #[derive(Debug)]
-pub(super) struct Item {
+pub(crate) struct Item {
     /// The key when it is a plain string literal.
-    pub(super) key: Option<String>,
+    pub(crate) key: Option<String>,
     /// There is a `=>`.
-    pub(super) keyed: bool,
-    pub(super) val: String,
-    pub(super) spread: bool,
-    pub(super) at: usize,
+    pub(crate) keyed: bool,
+    pub(crate) val: String,
+    pub(crate) spread: bool,
+    pub(crate) at: usize,
 }
 
 /// The top-level items of the array literal opening at `open` (`[` or the `(` of `array(`).
-pub(super) fn array_items(clean: &str, open: usize) -> Option<Vec<Item>> {
+pub(crate) fn array_items(clean: &str, open: usize) -> Option<Vec<Item>> {
     let close = matching(clean, open, clean.len(), Dialect::Php)?;
     let mut out = Vec::new();
     for (a, b) in split_args(clean, open + 1, close, Dialect::Php) {

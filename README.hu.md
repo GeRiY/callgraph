@@ -235,7 +235,7 @@ relatív) regisztráció nélkül is működik; nélküle az aktuális mappa a g
 | Feladat | Parancs |
 |---|---|
 | Honnan induljak ezzel a feladattal? | `callgraph.sh locate <kifejezés>... [--all]` |
-| Egy route / oldal / Livewire-komponens teljes lánca (route, middleware, akció, szabályok, modellek, oldal + props; ≤ 30 sor) | `callgraph.sh trace <route::név\|Ctrl::metódus\|/uri\|Pages/X.vue\|livewire:x>` |
+| Egy route / oldal / Livewire-komponens teljes lánca (route, middleware, akció, szabályok, modellek, oldal + props; ≤ 30 sor) | `callgraph.sh trace <route::név\|Ctrl::metódus\|/uri\|Pages/X.vue\|livewire:x\|filament:posts>` |
 | Fájl / mappa outline-ja | `callgraph.sh <fájl\|mappa>` |
 | Csak egy metódus | `callgraph.sh <fájl>::<metódus>` (több szelektor is mehet) |
 | Metódus forrása sorszámozva | `callgraph.sh <fájl>::<metódus> --body` |
@@ -306,6 +306,7 @@ bash ~/.claude/skills/callgraph/callgraph.sh locate route::events.show "Szervez�
 | `json` / `jsonl` | a nyers gráf |
 | `props` | Vue és React: amit a szülő átad, és amit a gyerek deklarál (hiányzó kötelező prop, ismeretlen prop, ismeretlen slot) |
 | `livewire` | Livewire-komponensek: osztály, sablon és használat (`<livewire:x>`, `@livewire`, route), a `wire:click` / `wire:model` nevek az osztállyal egyeztetve, események, validációs szabályok (lásd [docs/LIVEWIRE.md](docs/LIVEWIRE.md)) |
+| `filament` | Filament admin panelek: resource-ok modellel, oldalakkal (URI a panel útvonala alatt), űrlapmezőkkel, tábla-oszlopokkal, szűrőkkel, akciókkal, relation managerekkel, valamint oldalak, widgetek és panel-providerek; a mező- / oszlop- / kapcsolatnevek a modellel és a migrációjával egyeztetve (lásd [docs/FILAMENT.md](docs/FILAMENT.md)) |
 | `routes` `middleware` `validation` `jobs` `events` `providers` `magic` `di` `views` | framework-nézetek (mappára futtasd) |
 
 A nagy eredmények korlátosak (400 sor fölött a mappás outline summary-ra, az egyfájlos metódus-indexre vált);

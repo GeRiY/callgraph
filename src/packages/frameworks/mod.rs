@@ -42,6 +42,7 @@ pub(crate) fn annotate(rows: &mut [QueryResult], root: &Path, format: &str) {
     crate::packages::webroutes::attach(rows, root, format);
     crate::packages::vuecontract::attach(rows, root, format);
     crate::packages::livewire::attach(rows, root, format);
+    crate::packages::filament::attach(rows, root, format);
     let first = &rows[0];
     let packages = match &first.packages {
         Some(packages) => Arc::clone(packages),
@@ -70,14 +71,16 @@ pub(crate) fn annotate(rows: &mut [QueryResult], root: &Path, format: &str) {
             || (matches!(format, "outline" | "json" | "jsonl") && rows.iter().any(needs_routes)));
     // az Eloquent-modell összefoglaló (modellek + migrációk) csak modell-fájlnál és a `models` nézetnél
     let scan_models = laravel.is_some()
-        && (format == "models"
+        && (matches!(format, "models" | "filament")
             || (matches!(format, "outline" | "json" | "jsonl") && rows.iter().any(needs_models)));
     if scan_inertia || scan_laravel || scan_models {
         let analyzer = Analyzer::with_defaults();
         // a projekt-szintű nézetek (és a közvetett modell-öröklés) a teljes projekt-gráfot kérik; az egy-fájlos
         // outline / json csak a szükséges fájlokat tölti (`targeted`)
-        let project_wide = matches!(format, "ziggy" | "forms" | "models" | "inertia")
-            || (scan_models && rows.iter().any(targeted::maybe_indirect_model));
+        let project_wide = matches!(
+            format,
+            "ziggy" | "forms" | "models" | "inertia" | "filament"
+        ) || (scan_models && rows.iter().any(targeted::maybe_indirect_model));
         if project_wide {
             // a projekt-gráf hibája csak a render-helyeket / route-táblát hagyja üresen
             let _ = ProjectSource::new(root, &analyzer).with_files(|files| {

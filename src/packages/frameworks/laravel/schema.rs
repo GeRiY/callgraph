@@ -48,7 +48,7 @@ pub(super) fn build<'a>(migrations: impl IntoIterator<Item = &'a str>) -> Schema
 }
 
 /// Egy `PascalCase` osztálynév `snake_case` alakja (a Laravel `Str::snake`-je: minden nagybetű elé `_`).
-pub(super) fn snake(name: &str) -> String {
+pub(crate) fn snake(name: &str) -> String {
     let mut out = String::with_capacity(name.len() + 4);
     for (i, ch) in name.chars().enumerate() {
         if ch.is_uppercase() {
@@ -65,7 +65,7 @@ pub(super) fn snake(name: &str) -> String {
 
 /// Többes szám (kicsi szabályrendszer): szabálytalanok, megszámlálhatatlanok, `y` → `ies` mássalhangzó után,
 /// `s` / `x` / `z` / `ch` / `sh` → `es`, különben `s`.
-pub(super) fn plural(word: &str) -> String {
+pub(crate) fn plural(word: &str) -> String {
     const UNCOUNTABLE: [&str; 9] = [
         "equipment",
         "information",

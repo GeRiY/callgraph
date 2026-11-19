@@ -184,6 +184,7 @@ impl Command for ShowCommand {
                     | "classes"
                     | "props"
                     | "livewire"
+                    | "filament"
             )
             && self.lines.is_none()
             && self.strings.is_none()

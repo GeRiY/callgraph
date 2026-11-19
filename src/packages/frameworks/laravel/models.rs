@@ -766,6 +766,39 @@ impl Laravel {
         lines
     }
 
+    /// The catalogue entry of a model by its short class name (Filament checks); `None`: no such model, or the
+    /// name is ambiguous.
+    pub(crate) fn model_info(&self, short: &str) -> Option<crate::packages::filament::ModelInfo> {
+        let data = self.models.data.as_ref()?;
+        let mut hits = data
+            .models
+            .iter()
+            .filter(|model| short_class(&model.class) == short);
+        let model = hits.next()?;
+        if hits.next().is_some() {
+            return None;
+        }
+        Some(crate::packages::filament::ModelInfo {
+            class: short.to_owned(),
+            table: model.table.clone(),
+            file: model.file.clone(),
+            columns: data
+                .schema
+                .get(&model.table)
+                .filter(|columns| !columns.is_empty())
+                .map(|columns| columns.iter().map(|column| column.name.clone()).collect()),
+            fillable: model.fillable.clone(),
+            casts: model.casts.iter().map(|(name, _)| name.clone()).collect(),
+            relations: model
+                .relations
+                .iter()
+                .map(|relation| (relation.method.clone(), relation.target.clone()))
+                .collect(),
+            members: None,
+            opaque: false,
+        })
+    }
+
     /// A modellek (teszthez).
     #[cfg(test)]
     pub(crate) fn models(&self) -> &[Model] {

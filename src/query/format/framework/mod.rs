@@ -5,6 +5,7 @@
 //! `ziggy` nézet (`ziggy.rs`: JS `route('név')` ↔ a Laravel route-tábla) és a `forms` nézet (`forms.rs`: `useForm` ↔ validáció).
 
 mod crossref;
+mod filament;
 mod forms;
 mod inertia;
 mod livewire;
@@ -143,6 +144,7 @@ pub(super) fn register(registry: &mut FormatterRegistry) {
     registry.register("classes", Box::new(crossref::ClassesView));
     registry.register("props", Box::new(props::PropsView));
     registry.register("livewire", Box::new(livewire::LivewireView));
+    registry.register("filament", Box::new(filament::FilamentView));
 }
 
 /// `<ns><container|__top__>::<caller>` — a hívás helye.

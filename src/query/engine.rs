@@ -49,6 +49,8 @@ pub struct QueryResult {
     /// The Livewire components (`crate::packages::livewire`): only the `livewire` view and the outline of a component
     /// class / template load it.
     pub(crate) livewire: Option<std::sync::Arc<crate::packages::Livewire>>,
+    /// The Filament resources, pages, widgets and panels (`crate::packages::filament`): only the `filament` view loads it.
+    pub(crate) filament: Option<std::sync::Arc<crate::packages::Filament>>,
 }
 
 /// Egy rokon típuson át illesztett hívás: sor + cél (a `resolved` / `target`), és a hívás típusának rövid neve.
@@ -73,6 +75,7 @@ impl QueryResult {
             web_routes: None,
             vue_contract: None,
             livewire: None,
+            filament: None,
         }
     }
 
@@ -350,6 +353,7 @@ impl QueryEngine {
             kept.web_routes.clone_from(&row.web_routes);
             kept.vue_contract.clone_from(&row.vue_contract);
             kept.livewire.clone_from(&row.livewire);
+            kept.filament.clone_from(&row.filament);
             if let Some((regex, matcher)) = &via {
                 kept.via = kept
                     .graph

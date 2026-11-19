@@ -43,6 +43,7 @@ use crate::packages::Packages;
 pub(crate) use models::extends_model_base;
 use parts::{FormContracts, ModelCatalog, RouteRefs, RouteTable};
 pub(crate) use routes::{Action, Route, short_class};
+pub(crate) use schema::{plural, snake};
 
 /// A framework neve a `FRAMEWORKS` regiszterben (`laravel/framework`): ez kapcsolja be a stratégiát.
 pub(crate) const NAME: &str = "laravel";

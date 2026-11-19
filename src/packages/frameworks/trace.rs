@@ -116,6 +116,16 @@ pub(crate) fn run(root: &Path, target: &str, lang: Lang) -> String {
     if let Some(lines) = livewire.trace_lines(target, lang, &models) {
         return render(cap_lines(lines));
     }
+    // a Filament resource (`filament:posts`, `PostResource`): model, pages with URIs, form, table, relation managers
+    let filament = crate::packages::Filament::open(root, &base);
+    let model_info = |short: &str| {
+        laravel
+            .as_ref()
+            .and_then(|laravel| laravel.model_info(short))
+    };
+    if let Some(lines) = filament.trace_lines(target, lang, &model_info) {
+        return render(cap_lines(lines));
+    }
     // a JS / TS project: the server route and the client calls that reach it
     let web = crate::packages::WebRoutes::open(root, &base, HashSet::new());
     let lines = web.trace_lines(target);
@@ -124,6 +134,7 @@ pub(crate) fn run(root: &Path, target: &str, lang: Lang) -> String {
     }
     let mut candidates = chain.candidates();
     candidates.extend(livewire.trace_candidates());
+    candidates.extend(filament.trace_candidates());
     candidates.extend(web.trace_candidates());
     render(vec![unknown_line(target, &candidates, lang)])
 }

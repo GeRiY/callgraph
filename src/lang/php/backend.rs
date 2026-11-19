@@ -57,6 +57,10 @@ impl<P: PhpParser> PhpBackend<P> {
             graph
                 .calls
                 .extend(crate::packages::livewire::php_event_calls(path, &decoded));
+            // Filament: the `filament::resource:Model` key of a resource class
+            graph
+                .calls
+                .extend(crate::packages::filament::php_calls(path, &decoded));
             Analysis {
                 graph,
                 warnings: ctx.warnings,
