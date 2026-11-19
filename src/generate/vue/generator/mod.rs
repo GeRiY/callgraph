@@ -7,6 +7,7 @@
 //! `replace` a `--replace`; `sfc` a `.vue` szakaszok szerkesztése; `script_edit` a `.ts` / `.js` fájlok szerkesztése.
 
 mod insert;
+mod react;
 mod render;
 mod replace;
 mod script_edit;
@@ -25,17 +26,25 @@ pub(super) use sfc::parse_line_ref;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum FileKind {
     Vue,
-    Script { ts: bool },
+    Script {
+        ts: bool,
+    },
+    /// `.tsx` / `.jsx`: a React component.
+    React {
+        ts: bool,
+    },
 }
 
 fn file_kind(rel: &str) -> GenResult<FileKind> {
     match rel.rsplit('.').next().unwrap_or("") {
         "vue" => Ok(FileKind::Vue),
+        "tsx" => Ok(FileKind::React { ts: true }),
+        "jsx" => Ok(FileKind::React { ts: false }),
         "ts" | "mts" | "cts" => Ok(FileKind::Script { ts: true }),
         "js" | "mjs" | "cjs" => Ok(FileKind::Script { ts: false }),
         _ => Err(GenError::new(crate::tf!(
-            "{} should end in .vue, .ts or .js",
-            "{} kiterjesztése .vue, .ts vagy .js legyen",
+            "{} should end in .vue, .ts, .tsx, .js or .jsx",
+            "{} kiterjesztése .vue, .ts, .tsx, .js vagy .jsx legyen",
             rel
         ))),
     }
@@ -51,6 +60,9 @@ pub fn wants_vue(request: &GenRequest) -> bool {
         Target::Preview => {
             let e = request.expr.trim_start();
             return e.starts_with("vue:")
+                || e.starts_with("react:")
+                || e.starts_with("hook:")
+                || e.starts_with("jsx>")
                 || e.starts_with("comp:")
                 || e.starts_with("mod:")
                 || e.starts_with("class:")
@@ -93,6 +105,10 @@ fn template_markup_expr(request: &GenRequest) -> String {
     } else {
         format!("template > {expr}")
     }
+}
+
+fn is_react_file(file: &str) -> bool {
+    matches!(file_kind(file), Ok(FileKind::React { .. }))
 }
 
 fn is_script_file(file: &str) -> bool {
@@ -173,6 +189,16 @@ impl<'a> VueGenerator<'a> {
         match &request.target {
             Target::Preview => self.preview(&program),
             Target::Write { file } => self.write(&program, file, request.mode),
+            Target::Into { file, place, .. } if is_react_file(file) => {
+                self.insert_react(&program, file, place.after_name(), request.mode)
+            }
+            Target::Replace { file, .. } if is_react_file(file) => Err(GenError::new(
+                crate::t!(
+                    "--replace is not available for .tsx / .jsx: use --into to add, or edit the component",
+                    "a --replace .tsx / .jsx fájlra nincs: hozzáadáshoz --into, különben szerkeszd a komponenst"
+                )
+                .to_owned(),
+            )),
             Target::Into {
                 file, class, place, ..
             } => self.insert_vue_or_script(
@@ -206,10 +232,14 @@ impl<'a> VueGenerator<'a> {
 
     /// A meglévő fájl kódstílusa: a fájlból, ami hiányzik, azt a projektből.
     fn style_of(&self, kind: FileKind, text: &str) -> CodeStyle {
-        let project = self.project().code_style();
+        let project = match kind {
+            FileKind::React { .. } => self.project().jsx_code_style(),
+            _ => self.project().code_style(),
+        };
         let semi = uses_semicolons(text).unwrap_or(project.semi);
         let ts = match kind {
             FileKind::Script { ts } => ts,
+            FileKind::React { ts } => ts,
             FileKind::Vue if text.contains("<script") => script_is_ts(text),
             FileKind::Vue => project.ts,
         };

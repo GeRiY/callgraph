@@ -109,7 +109,7 @@ pub enum Checker {
     Vue,
     /// `.html` / `.htm`: tag-egyensúly, inline style / script.
     Html,
-    /// `.ts` / `.js` (és `.mts` / `.cts` / `.mjs` / `.cjs`): oxc.
+    /// `.ts` / `.tsx` / `.js` / `.jsx` (és `.mts` / `.cts` / `.mjs` / `.cjs`): oxc.
     Script(String),
     /// Ismeretlen kiterjesztés: nincs ellenőrzés.
     Skip,
@@ -123,7 +123,9 @@ impl Checker {
         match rel.rsplit('.').next().unwrap_or("") {
             "php" => Self::Php(rel.to_owned()),
             "vue" => Self::Vue,
-            "ts" | "mts" | "cts" | "js" | "mjs" | "cjs" => Self::Script(rel.to_owned()),
+            "ts" | "tsx" | "mts" | "cts" | "js" | "jsx" | "mjs" | "cjs" => {
+                Self::Script(rel.to_owned())
+            }
             _ => Self::Skip,
         }
     }

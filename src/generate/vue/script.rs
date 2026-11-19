@@ -79,7 +79,7 @@ impl ScriptEmitter {
         out
     }
 
-    fn member(&self, m: &Member) -> Vec<String> {
+    pub(super) fn member(&self, m: &Member) -> Vec<String> {
         match m {
             Member::Props(props) => self.props(props),
             Member::Emits(emits) => self.emits(emits),

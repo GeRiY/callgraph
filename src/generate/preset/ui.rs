@@ -22,7 +22,7 @@ use crate::generate::vue::{self, VueProject};
 const CONFIG: &str = ".callgraph/gen.toml";
 
 /// A komponens-mappák, ahol a heurisztika keres.
-const COMPONENT_DIRS: [&str; 4] = [
+pub(super) const COMPONENT_DIRS: [&str; 4] = [
     "resources/js/Components",
     "resources/js/components",
     "src/components",
@@ -30,7 +30,7 @@ const COMPONENT_DIRS: [&str; 4] = [
 ];
 
 /// A layout-mappák.
-const LAYOUT_DIRS: [&str; 4] = [
+pub(super) const LAYOUT_DIRS: [&str; 4] = [
     "resources/js/Layouts",
     "resources/js/layouts",
     "src/layouts",
@@ -51,7 +51,7 @@ const LANG_JSON_DIRS: [&str; 6] = [
 const LANG_PHP_DIRS: [&str; 2] = ["lang", "resources/lang"];
 
 /// Hány fájlt / komponenst vizsgálunk legfeljebb.
-const MAX_FILES: usize = 60;
+pub(super) const MAX_FILES: usize = 60;
 
 /// A `.callgraph/gen.toml` tartalma (csak, amit a preset használ).
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -121,7 +121,7 @@ impl Config {
 
 /// A komponens szerepe az űrlapon.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Role {
+pub(super) enum Role {
     /// Címke + hiba + slot-os beviteli elem körüli burkoló (`FormField`).
     Field,
     Label,
@@ -133,14 +133,14 @@ enum Role {
 }
 
 /// Az alapszerepek: ezek hiánya indítja a heurisztikát (a többi mellékesen kerül elő).
-fn is_core(role: Role) -> bool {
+pub(super) fn is_core(role: Role) -> bool {
     matches!(role, Role::Label | Role::Input | Role::Error | Role::Button)
 }
 
 /// Az ilyen nevű komponens nem űrlap-elem (állapot-blokk, oldal, sablon, modál, kártya).
-const NOT_FORM: [&str; 5] = ["state", "page", "template", "modal", "card"];
+pub(super) const NOT_FORM: [&str; 5] = ["state", "page", "template", "modal", "card"];
 
-fn is_ident(c: char) -> bool {
+pub(super) fn is_ident(c: char) -> bool {
     c.is_alphanumeric() || matches!(c, '_' | '$')
 }
 
@@ -235,7 +235,7 @@ fn classify(stem: &str, text: &str) -> Option<Role> {
 }
 
 /// A találatok rangsora egy szerepen belül: a megszokott név, majd a jellemző szó, majd a névsor.
-fn rank(stem: &str, role: Role) -> (u8, String) {
+pub(super) fn rank(stem: &str, role: Role) -> (u8, String) {
     let default = match role {
         Role::Field => "FormField",
         Role::Label => "InputLabel",
@@ -578,6 +578,10 @@ pub fn discover(
             button,
             ziggy,
             i18n,
+            react: false,
+            i18n_hook: None,
+            named: BTreeSet::new(),
+            layout_header: false,
         },
         php_i18n,
         notes,
@@ -595,7 +599,7 @@ fn calls(text: &str, name: &str) -> bool {
     })
 }
 
-fn translates(text: &str) -> bool {
+pub(super) fn translates(text: &str) -> bool {
     ["$t", "trans", "__"].iter().any(|f| calls(text, f))
 }
 
@@ -619,15 +623,19 @@ fn detect_i18n(
     if !vue {
         return (false, false);
     }
+    (true, php_side_i18n(env))
+}
+
+/// A PHP-oldali fordítás: van `lang/` mappa, vagy a Blade-nézetek fordítanak.
+pub(super) fn php_side_i18n(env: Env<'_>) -> bool {
     let lang_dir = LANG_PHP_DIRS
         .iter()
         .any(|d| env.fs.list(&env.root.join(d)).is_ok());
-    let php = lang_dir
+    lang_dir
         || walk_php(env.fs, env.root.join("resources/views"))
             .take(20)
             .filter_map(|p| env.fs.read(&p).ok())
-            .any(|text| translates(&text) || text.contains("@lang("));
-    (true, php)
+            .any(|text| translates(&text) || text.contains("@lang("))
 }
 
 /// Egy nyelvi forrás: út és a kulcs-keresés.

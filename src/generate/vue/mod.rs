@@ -79,6 +79,22 @@
 //! `return {` elé teszi és a visszaadott objektumot bővíti. `--replace f.vue:L10-L20` / `f.vue::név` mint a PHP-nál.
 //! Írás előtt a teljes szöveget ellenőrizzük (script / composable: oxc; template: tag-egyensúly; style: CSS-parser).
 //!
+//! # React (`react:`, `hook:`, `.tsx` / `.jsx`)
+//! `react:Card>props(title:str,size?:'sm'|'md'='md',children?)+ref:count:int=0+fn:inc():void{ setCount(count + 1) }+jsx>div.card>h1{{ title }}+button[@click=inc]{+1}`
+//! → függvény-komponens: TS-ben `interface CardProps { … }` + destrukturált paraméter alapértékekkel (`{ title, size = 'md' }: CardProps`),
+//! JS-ben JSDoc `@param`; a `props(…)` / `emits(save:int)` (→ `onSave?: (payload: number) => void` prop) / `ref:` (→
+//! `const [count, setCount] = useState<number>(0)`) / `computed:` (származtatott `const`) / `on:mounted{…}` (→ `useEffect(…, [])`) /
+//! `form(…)` (Inertia `useForm`, `@inertiajs/react`) / `fn:` / `const:` / `type:` / `raw{…}` tagok a Vue-os szintaxissal; a `children`
+//! nevű prop `ReactNode`. A `jsx>…` (vagy `template>…`) ugyanaz az Emmet-fa, JSX-be fordítva (`jsx`): `class` → `className`,
+//! `for` → `htmlFor`, `:x=v` → `x={v}`, `@click=f` → `onClick={f}`, `v-if="c"` → `{c && (…)}`, `v-for="x in xs"` → `{xs.map((x) => (…))}`,
+//! a `{{ expr }}` szöveg → `{expr}`; `v-model` / szlot / eseménymódosító nincs (hiba). A komponens-importot a projekt `.tsx` / `.jsx`
+//! fájljai adják (`@/Components/Név`, névvel exportáltnál `{ Név }`); `Link` / `Head` az `@inertiajs/react`-ból; ismeretlen név az `unresolved`.
+//! A stílus a meglévő komponensekből: TS / JS (a fájl kiterjesztése dönt; előnézetben a `tsconfig.json` / `.tsx` minta), pontosvessző,
+//! behúzás-egység, `export default` vagy névvel exportált komponens (`react_project`).
+//! `hook:useCart>ref:items:list<Item>=[]+fn:add(item:Item):void{…}` (`--write x.ts` / `.js`) → `export function useCart() { …; return { items, setItems, add } }`.
+//! `--into x.tsx`: a tagok a végső `return (` elé (vagy `--after <név>` után), a `jsx>…` elemek a gyökérelem záró tagje elé (vagy `--after L<n>` után),
+//! a `props(…)` a szignatúra destrukturálásába és a `…Props` interfészbe; a kész szöveget a közös ellenőrző (oxc) vizsgálja. `--replace` .tsx-re nincs.
+//!
 //! # HTML (`html:`, `.html` / `.htm`)
 //! `html:Cím[lang=hu]>(head>…)+(body>…)` → teljes dokumentum (`<!doctype html>`, `<html lang>`, `charset`, `viewport`,
 //! `<title>`, a head-gyerekek, a body-fa); `head>` / `body>` nélkül a gyerekek a body-ba kerülnek (a cím szóközhöz
@@ -108,15 +124,20 @@ mod html;
 mod html_gen;
 mod html_scan;
 mod imports;
+mod jsx;
 mod locate;
 pub(crate) mod model;
 mod parse;
 mod project;
+mod react;
+mod react_project;
 mod script;
 mod style;
 mod template;
 pub(crate) mod types;
 
+#[cfg(test)]
+mod react_tests;
 #[cfg(test)]
 mod tests;
 
@@ -142,6 +163,16 @@ pub fn project_facts(project: &VueProject<'_>) -> ProjectFacts {
         ts: style.ts,
         semi: style.semi,
         unit: project.indent(),
+    }
+}
+
+/// A projekt React-stílusa (a `.tsx` / `.jsx` fájlokból) a preset számára: TypeScript-e, pontosvesszős-e, behúzás.
+pub fn react_facts(project: &VueProject<'_>) -> ProjectFacts {
+    let style = project.jsx_code_style();
+    ProjectFacts {
+        ts: style.ts,
+        semi: style.semi,
+        unit: project.jsx_indent(),
     }
 }
 

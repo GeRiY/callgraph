@@ -94,6 +94,24 @@ fn top(
         for child in &node.children {
             section(child, program).map_err(|e| located(child, &e))?;
         }
+    } else if let Some(name) = head.strip_prefix("react:") {
+        program.kind = Kind::React;
+        program.name = Some(ident(name)?);
+        for child in &node.children {
+            if matches!(child.head.as_str(), "jsx" | "template") {
+                section(child, program).map_err(|e| located(child, &e))?;
+            } else {
+                let script = program.script.get_or_insert_with(Script::default);
+                script_item(child, script).map_err(|e| located(child, &e))?;
+            }
+        }
+    } else if let Some(name) = head.strip_prefix("hook:") {
+        program.kind = Kind::Hook;
+        program.name = Some(ident(name)?);
+        let script = program.script.get_or_insert_with(Script::default);
+        for child in &node.children {
+            script_item(child, script).map_err(|e| located(child, &e))?;
+        }
     } else if let Some(name) = head.strip_prefix("mod:") {
         program.kind = Kind::Module;
         program.name = Some(name.trim().to_owned());
@@ -108,7 +126,10 @@ fn top(
         for child in &node.children {
             script_item(child, script).map_err(|e| located(child, &e))?;
         }
-    } else if head == "script" || head == "template" || is_style_head(head) {
+    } else if matches!(head, "script" | "template" | "jsx") || is_style_head(head) {
+        if head == "jsx" {
+            program.kind = Kind::React;
+        }
         section(node, program)?;
     } else {
         script_item(node, loose)?;
@@ -135,7 +156,7 @@ fn section(node: &Expanded, program: &mut Program) -> GenResult<()> {
                 script_item(child, script).map_err(|e| located(child, &e))?;
             }
         }
-        "template" => {
+        "template" | "jsx" => {
             let mut elements = program.template.take().unwrap_or_default();
             for child in &node.children {
                 elements.push(element(child).map_err(|e| located(child, &e))?);
@@ -715,7 +736,7 @@ fn parse_params(text: &str) -> GenResult<Vec<VParam>> {
                 None => (piece, None),
             };
             let (name, ty) = match split_once_top(lhs, ':') {
-                Some((n, t)) => (n.trim(), Some(parse_type(t)?)),
+                Some((n, t)) => (n.trim(), Some(alias_type(t)?)),
                 None => (lhs.trim(), None),
             };
             let (name, optional) = match name.strip_suffix('?') {
@@ -747,7 +768,7 @@ fn parse_props(inner: &str) -> GenResult<Vec<Prop>> {
                 None => (piece.as_str(), None),
             };
             let (name, ty) = match split_once_top(lhs, ':') {
-                Some((n, t)) => (n.trim(), Some(parse_type(t)?)),
+                Some((n, t)) => (n.trim(), Some(alias_type(t)?)),
                 None => (lhs.trim(), None),
             };
             let (name, optional) = match name.strip_suffix('?') {

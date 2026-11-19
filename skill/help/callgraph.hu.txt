@@ -204,6 +204,10 @@ Kódgenerátor (fájlt ír; az MCP `generate`, `rename` és `undo` eszköz alapb
         type:Flag{flag:str,on?:bool} (interface; inline list<{a:str}>) raw{ const {a} = useX() } const:{a,b}=useX()
       template: Emmet div.card#id[attr=v @click=f :key=x.id]{szöveg} {{ kifejezés }} *3; a komponens importja magától; style: .a{decl;decl}
       gen 'script>ref:loading:bool=false+fn:reset(){ form.reset() }' --into resources/js/Pages/Auth/Register.vue
+    React (.tsx típusok, .jsx sima JS; export default / névvel, pontosvessző, behúzás a projekt komponensei szerint):
+      react:Card>props(title:str,size?:'sm'|'md'='md',children?)+ref:n:int=0+fn:inc():void{…}+on:mounted{…}+jsx>div.card>h1{{ title }}+button[@click=inc]{+1}
+      emits(save:int) = onSave prop; form(a,b) = Inertia useForm; v-for / v-if / :x=v / @click=f a jsx-ben; --write src/Card.tsx; --into src/Card.tsx (props, tagok, jsx>…)
+      hook:useCart>ref:items:list<Item>=[]+fn:add(i:Item):void{…} --write src/hooks/useCart.ts (saját hook); a laravel: preset .tsx / .jsx oldalakat ír @inertiajs/react projektben
     JS / TS modul (a fájl kiterjesztése szerint: .ts típusok, .js JSDoc): mod:util>type:Opts{sep?:str}+fn:join(p:list<str>):str{…}+const:MAX:int=10+-fn:helper(){…}
       alapból exportált; -fn privát; !fn / !class export default; type:Id=str|int alias; class:Svc<Ős>[Iface]>$n:int=0+ctor(-repo:Repo)+ +run():void{…}
       tagok: + public - private # protected, majd :: static ~ abstract % readonly; --into x.ts[::Osztály [--after tag]]  --replace x.ts::fn | x.ts::Osztály::metódus

@@ -24,6 +24,12 @@
 //! - `resources/js/Pages/<Ms>/{Create,Edit,Index,Show}.vue`: `useForm` pontosan a kérés mezőivel, `InputLabel` /
 //!   `TextInput` / `InputError` / `PrimaryButton`, ahol a projektben van (különben sima HTML), `AuthenticatedLayout`.
 //!
+//! Inertia + React projektben (`@inertiajs/react` a `package.json`-ban, `@inertiajs/vue3` nélkül) ugyanez `.tsx` / `.jsx` oldalakat
+//! ír (`ui_react`, `page` React-ága): `useForm` + `form.data.x` / `form.setData` (kontrollált `value` + `onChange`), `Link`, `router`,
+//! `route()`; a komponenseket a React-elemzés (`lang::js::react`: prop-ok a paraméterből / típusból / `propTypes`-ból) és a név
+//! szerint találja (`value` + `onChange` → input, `message` / `error` → hiba, `htmlFor` / `value` → címke, `*Button` → gomb,
+//! `*Layout` → layout), vagy a `gen.toml` `[components]`; fordítás csak akkor, ha egy meglévő oldal `const { t } = useXxx()`-t hív.
+//!
 //! # Tranzakció és undo
 //! Előbb minden fájl teljes új szövege elkészül és ellenőrződik (PHP: mago, Vue: oxc / tag-egyensúly), és csak ezután
 //! íródik ki mind — egyetlen hiba esetén semmi. A meglévő fájlok előtt mentés készül, és egy napló (`.callgraph/
@@ -43,7 +49,10 @@ mod php;
 mod plan;
 mod spec;
 mod ui;
+mod ui_react;
 
+#[cfg(test)]
+mod react_tests;
 #[cfg(test)]
 mod tests;
 

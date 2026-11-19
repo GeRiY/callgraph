@@ -6,8 +6,8 @@ use super::model::Import;
 /// A `vue` az első, utána az Inertia, a többi ábécében.
 fn rank(source: &str) -> (u8, String) {
     let group = match source {
-        "vue" => 0,
-        "@inertiajs/vue3" => 1,
+        "vue" | "react" => 0,
+        "@inertiajs/vue3" | "@inertiajs/react" => 1,
         _ => 2,
     };
     (group, source.to_ascii_lowercase())

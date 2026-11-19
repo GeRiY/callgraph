@@ -15,9 +15,9 @@ use crate::generate::edit::split_lines;
 use crate::generate::fs::{FileSystem, MemoWalk};
 
 /// Hány `.vue` fájlt mintázunk a stílushoz.
-const SAMPLE: usize = 30;
+pub(super) const SAMPLE: usize = 30;
 /// A komponens-keresés gyökerei (az `@/` alias célja).
-const ROOTS: [&str; 2] = ["resources/js", "src"];
+pub(super) const ROOTS: [&str; 2] = ["resources/js", "src"];
 /// Az alias-mappákból ennyi `.vue` fájlt vizsgál a komponens-keresés (aliasonként).
 const ALIAS_SCAN_LIMIT: usize = 400;
 
@@ -41,12 +41,15 @@ pub struct CodeStyle {
 /// A projekt-ismeret forrása. A bejárásokat és a beolvasott fájlokat memoizálja: egy példány (egy kérés) minden mappát
 /// legfeljebb egyszer listáz, és minden fájlt legfeljebb egyszer olvas, akárhány kérdés érkezik.
 pub struct VueProject<'a> {
-    fs: &'a dyn FileSystem,
-    root: &'a Path,
+    pub(super) fs: &'a dyn FileSystem,
+    pub(super) root: &'a Path,
     walks: RefCell<HashMap<PathBuf, Rc<MemoWalk<'a>>>>,
+    /// A `.tsx` / `.jsx` bejárások (a React-oldal; mappánként egy).
+    pub(super) jsx_walks: RefCell<HashMap<PathBuf, Rc<MemoWalk<'a>>>>,
     texts: RefCell<HashMap<PathBuf, Option<Rc<String>>>>,
     sample_roots: OnceCell<Vec<PathBuf>>,
     sample: OnceCell<Vec<PathBuf>>,
+    pub(super) jsx_sample: OnceCell<Vec<PathBuf>>,
     aliases: OnceCell<Vec<(String, PathBuf)>>,
 }
 
@@ -115,6 +118,15 @@ fn skipped_dir(name: &str) -> bool {
 
 /// A mappa `.vue` fájljai lustán (mélységi bejárás, mappánként rendezve).
 fn walk_vue<'a>(fs: &'a dyn FileSystem, dir: PathBuf) -> impl Iterator<Item = PathBuf> + 'a {
+    walk_ext(fs, dir, &["vue"])
+}
+
+/// A mappa adott kiterjesztésű fájljai lustán (mélységi bejárás, mappánként rendezve).
+pub(super) fn walk_ext<'a>(
+    fs: &'a dyn FileSystem,
+    dir: PathBuf,
+    exts: &'static [&'static str],
+) -> impl Iterator<Item = PathBuf> + 'a {
     let mut stack = vec![dir];
     let mut pending: std::vec::IntoIter<PathBuf> = Vec::new().into_iter();
     std::iter::from_fn(move || {
@@ -139,7 +151,10 @@ fn walk_vue<'a>(fs: &'a dyn FileSystem, dir: PathBuf) -> impl Iterator<Item = Pa
                     if !skipped_dir(&name) {
                         stack.push(entry.path);
                     }
-                } else if name.ends_with(".vue") {
+                } else if exts
+                    .iter()
+                    .any(|e| name.strip_suffix(e).is_some_and(|r| r.ends_with('.')))
+                {
                     files.push(entry.path);
                 }
             }
@@ -182,9 +197,11 @@ impl<'a> VueProject<'a> {
             fs,
             root,
             walks: RefCell::default(),
+            jsx_walks: RefCell::default(),
             texts: RefCell::default(),
             sample_roots: OnceCell::new(),
             sample: OnceCell::new(),
+            jsx_sample: OnceCell::new(),
             aliases: OnceCell::new(),
         }
     }
@@ -286,7 +303,7 @@ impl<'a> VueProject<'a> {
             .any(|file| self.text(file).is_some_and(|text| pred(&text)))
     }
 
-    fn sample_roots(&self) -> &[PathBuf] {
+    pub(super) fn sample_roots(&self) -> &[PathBuf] {
         self.sample_roots.get_or_init(|| {
             let mut roots: Vec<PathBuf> = ROOTS
                 .iter()

@@ -66,4 +66,14 @@ bash $CG --project myapp src --grep 'src/api.js::fetchBeds$' --depth 2   # who r
 Limits: class components, `useState` setter / state flow and hook dependency arrays are not analyzed; a props type
 from a package, a union or a mapped type makes the set open (no "unknown" findings); a context re-exported through
 a barrel file keeps the key of the barrel's import; `<Link to>` with a template or variable path is not checked.
-React code generation is not available; read the component file for those details.
+
+## Generate
+
+`gen` writes React too (see [gen.md](gen.md)): `react:Card>props(title:str,size?:'sm'|'md'='md')+ref:count:int=0+fn:inc():void{ setCount(count + 1) }+jsx>div.card>h1{{ title }}+button[@click=inc]{+1}`
+with `--write src/components/Card.tsx` (`.jsx`: plain JS + JSDoc). It makes a function component with a typed `interface CardProps`,
+destructured props with defaults, `useState`, handlers and JSX (`class` -> `className`, `:x=v` -> `x={v}`, `@click=f` -> `onClick={f}`,
+`v-for="x in xs"` -> `xs.map`, `v-if=c` -> `c && (…)`; `emits(save:int)` -> an `onSave` callback prop; `on:mounted{…}` -> `useEffect`).
+Semicolons, indent, TS / JS and `export default` vs named export follow the project's components; components found in the
+project are imported (`Link` / `Head` from `@inertiajs/react`). `--into x.tsx` adds props / state / handlers / elements to a component;
+`hook:useCart>ref:items:list<Item>=[]+fn:add(…){…}` with `--write src/hooks/useCart.ts` writes a custom hook; in an Inertia + React Laravel
+project `laravel:Fee>create(…)+index` writes `Pages/<Models>/*.tsx` (`useForm`, `route()`, your own input / label / error / button components).

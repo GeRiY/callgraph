@@ -10,6 +10,7 @@ use super::page::{Kind, Page};
 use super::php::{self, ControllerCtx};
 use super::spec::{Action, Field, FieldType, Names, Op, Spec};
 use super::ui;
+use super::ui_react;
 use crate::generate::ast::TypeKind;
 use crate::generate::edit::{add_imports, insert_at_end, join_lines, split_lines};
 use crate::generate::emitter::Emitter;
@@ -435,15 +436,25 @@ pub fn build(env: Env<'_>, spec: &Spec) -> GenResult<Plan> {
 
     // a projekt-ismeret az oldalaknak és a kéréseknek: a bejárások és a mintafájlok egyszer olvasódnak
     let vue_project = vue::VueProject::new(env.fs, env.root);
-    let facts = vue::project_facts(&vue_project);
+    // Inertia + React (`@inertiajs/react`, no `@inertiajs/vue3`): `.tsx` / `.jsx` pages
+    let react = npm.contains("@inertiajs/react") && !npm.contains("@inertiajs/vue3");
+    let facts = if react {
+        vue::react_facts(&vue_project)
+    } else {
+        vue::project_facts(&vue_project)
+    };
     let config = ui::Config::load(env);
-    let found = ui::discover(
-        env,
-        &vue_project,
-        &config,
-        &npm,
-        has_ziggy(composer.as_deref(), &npm),
-    );
+    let ziggy = has_ziggy(composer.as_deref(), &npm);
+    let found = if react {
+        ui_react::discover(env, &vue_project, &config, &npm, ziggy)
+    } else {
+        ui::discover(env, &vue_project, &config, &npm, ziggy)
+    };
+    let page_ext = match (react, facts.ts) {
+        (false, _) => "vue",
+        (true, true) => "tsx",
+        (true, false) => "jsx",
+    };
     let parts = found.parts;
     // a használt fordítási kulcsok: a kérések mezőnevei és az oldalak feliratai
     let mut keys: BTreeSet<String> = BTreeSet::new();
@@ -543,7 +554,7 @@ pub fn build(env: Env<'_>, spec: &Spec) -> GenResult<Plan> {
             Action::Create | Action::Edit => spec.fields_of(action).unwrap_or_default().to_vec(),
             _ => spec.display_fields(action),
         };
-        let rel = format!("{dir}/{}/{}.vue", names.pages, kind.file_stem());
+        let rel = format!("{dir}/{}/{}.{page_ext}", names.pages, kind.file_stem());
         ensure_new(env, &rel)?;
         let page = Page {
             kind,
@@ -554,7 +565,7 @@ pub fn build(env: Env<'_>, spec: &Spec) -> GenResult<Plan> {
             routes: &plan.route_names,
             used: RefCell::default(),
         };
-        let text = page.render(&sfc);
+        let text = page.render(&sfc)?;
         keys.extend(page.used.take());
         if let Some((_, request)) = request_texts.iter().find(|(a, _)| *a == action) {
             plan.forms.push((text.clone(), request.clone()));

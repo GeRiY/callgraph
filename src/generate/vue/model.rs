@@ -290,6 +290,10 @@ pub enum Kind {
     Sfc,
     /// `comp:useCart > tagok`.
     Composable,
+    /// `react:Név > props(…) + ref:… + jsx > …`: React függvény-komponens (`.tsx` / `.jsx`).
+    React,
+    /// `hook:useCart > tagok`: React custom hook (`.ts` / `.js`).
+    Hook,
     /// `mod:név > tagok`: általános JS / TS modul (exportált függvények, konstansok, típusok, osztályok).
     Module,
     /// Fej nélküli szakaszok (`script>…`, `template>…`) vagy csupasz tagok (`--into` célra).

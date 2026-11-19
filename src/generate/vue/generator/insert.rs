@@ -123,7 +123,9 @@ impl VueGenerator<'_> {
             FileKind::Script { .. } if module_target(program, &doc.lines) => {
                 insert_module(&mut doc, program, &rendered, style, after)?
             }
-            FileKind::Script { .. } => insert_script(&mut doc, program, &rendered, style, after)?,
+            FileKind::Script { .. } | FileKind::React { .. } => {
+                insert_script(&mut doc, program, &rendered, style, after)?
+            }
         };
         self.commit_insert(rel, &doc, eol, block, rendered.unresolved, mode)
     }

@@ -9,9 +9,9 @@ use crate::generate::generator::{GenRequest, Generator, Mode, Place, Target};
 use crate::generate::php::PhpEmitter;
 use crate::generate::testing::{FixedClock, MemFs, ROOT};
 
-const T0: u64 = 1_700_000_000;
+pub(super) const T0: u64 = 1_700_000_000;
 
-fn env<'a>(fs: &'a MemFs, clock: &'a FixedClock) -> Env<'a> {
+pub(super) fn env<'a>(fs: &'a MemFs, clock: &'a FixedClock) -> Env<'a> {
     Env {
         root: Path::new(ROOT),
         fs,
@@ -19,10 +19,10 @@ fn env<'a>(fs: &'a MemFs, clock: &'a FixedClock) -> Env<'a> {
     }
 }
 
-const COMPOSER: &str =
+pub(super) const COMPOSER: &str =
     r#"{"require":{"tightenco/ziggy":"^2.0"},"autoload":{"psr-4":{"App\\":"app/"}}}"#;
 
-const WEB: &str = "<?php
+pub(super) const WEB: &str = "<?php
 
 use Illuminate\\Support\\Facades\\Route;
 
@@ -31,7 +31,7 @@ Route::get('/', function () {
 });
 ";
 
-const MODEL: &str = "<?php
+pub(super) const MODEL: &str = "<?php
 
 namespace App\\Models;
 
@@ -43,7 +43,7 @@ class Fee extends Model
 }
 ";
 
-const MIGRATION: &str = "<?php
+pub(super) const MIGRATION: &str = "<?php
 
 use Illuminate\\Database\\Migrations\\Migration;
 use Illuminate\\Database\\Schema\\Blueprint;
@@ -102,7 +102,7 @@ fn request(expr: &str, dry: bool) -> GenRequest {
     }
 }
 
-fn run(fs: &MemFs, clock: &FixedClock, expr: &str, dry: bool) -> Result<String, String> {
+pub(super) fn run(fs: &MemFs, clock: &FixedClock, expr: &str, dry: bool) -> Result<String, String> {
     PresetGenerator::new(env(fs, clock))
         .run(&request(expr, dry))
         .map(|o| o.lines.join("\n"))

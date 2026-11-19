@@ -28,7 +28,7 @@ code; with `--into` / `--replace` a first `→ file::Class after method (L41)` l
 Placement: `--into <file>::Class` takes `--after <method>`, `--before <method>` or `--at L<n>`; `--into x.vue::template#id` appends to that element; `--upsert` replaces the member if it already exists. `--replace x.vue::template` / `::script` / `::style` swaps a whole section (tags stay); `--diff` (with `--replace`) prints only the old / new lines of the change instead of the new code (nothing is written).
 MCP `generate` parameters: `expr`, `dry`, `write`, `into`, `after`, `before`, `at`, `upsert`, `diff`, `replace`, `expect`, `project`.
 
-Also Vue / JS / TS / HTML (by the file extension) and `laravel:Fee>create(name:str)+index` (a whole feature, one undo).
+Also Vue / React / JS / TS / HTML (by the file extension; React: `react:Card>props(title:str)+ref:n:int=0+jsx>h1{{ title }}` with `--write x.tsx|.jsx`, `hook:useCart>…` with `--write x.ts`, `--into x.tsx` adds props / members / elements; see [jsx.md](jsx.md)) and `laravel:Fee>create(name:str)+index` (a whole feature, one undo).
 PHP: `use:HasFactory,Notifiable` under a type = trait use inside the class (`c:Post<Model> > use:HasFactory + +comments():HasMany{…}`);
 `a:<Migration> > +up():void{…}` = anonymous class (`return new class extends Migration {…};`, Laravel migrations); in a Laravel project
 (`laravel/framework` in composer.json) unknown short names (`Model`, `Schema`, `Blueprint`, `Route`, `HasMany`, `Request`, `Rule`, `RefreshDatabase`, …) are imported without `use:`.

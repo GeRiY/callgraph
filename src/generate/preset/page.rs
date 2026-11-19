@@ -9,6 +9,7 @@ use std::collections::BTreeSet;
 
 use super::spec::{Field, FieldType, Names, Op, humanize, humanize_model};
 use crate::generate::ast::TypeRef;
+use crate::generate::error::GenResult;
 use crate::generate::vue::model::{
     Attr, Element, FormField, Import, Kind as ProgramKind, Member, Program, Prop, Script,
     TypeField, VParam,
@@ -69,6 +70,14 @@ pub struct Parts {
     pub i18n: bool,
     /// Van-e Ziggy (`tightenco/ziggy` / `ziggy-js`): `route('név')`; különben sima URL-ek (`'/fees'`).
     pub ziggy: bool,
+    /// Inertia + React projekt: `.tsx` / `.jsx` oldalak (`useForm` az `@inertiajs/react`-ból), JSX.
+    pub react: bool,
+    /// React: a fordító hook `(név, forrás)`, pl. `("useTranslation", "react-i18next")`; a `t` függvényt adja.
+    pub i18n_hook: Option<(String, String)>,
+    /// React: a névvel (`import { TextInput }`) exportált komponensek nevei (a többi `default` import).
+    pub named: BTreeSet<String>,
+    /// React: a layout `header` propot fogad (a cím ide kerül, mint a Vue `#header` slot).
+    pub layout_header: bool,
 }
 
 /// Egy oldal bemenete.
@@ -179,6 +188,53 @@ impl Page<'_> {
         if self.facts.semi { ";" } else { "" }
     }
 
+    /// A fordító függvény neve a kifejezésben: Vue `$t`, React `t`.
+    fn tr(&self) -> &'static str {
+        if self.parts.react { "t" } else { "$t" }
+    }
+
+    /// Az Inertia csomag: `@inertiajs/vue3` / `@inertiajs/react`.
+    fn inertia_source(&self) -> &'static str {
+        if self.parts.react {
+            "@inertiajs/react"
+        } else {
+            "@inertiajs/vue3"
+        }
+    }
+
+    /// A bejövő prop elérése a script-ben: Vue `props.fee`, React `fee` (destrukturált).
+    fn prop_path(&self, var: &str) -> String {
+        if self.parts.react {
+            var.to_owned()
+        } else {
+            format!("props.{var}")
+        }
+    }
+
+    /// A mező kétirányú kötése: Vue `v-model`, React `value` + `onChange` (kontrollált elem).
+    fn model(&self, element: Element, field: &Field) -> Element {
+        let name = &field.name;
+        if !self.parts.react {
+            return element.attr("v-model", format!("form.{name}"));
+        }
+        let (read, write) = match field.ty {
+            FieldType::Bool => (format!("form.data.{name}"), "e.target.checked".to_owned()),
+            FieldType::Int | FieldType::Float => (
+                format!("form.data.{name} ?? ''"),
+                "e.target.value === '' ? null : Number(e.target.value)".to_owned(),
+            ),
+            _ => (format!("form.data.{name}"), "e.target.value".to_owned()),
+        };
+        let bound = if field.ty == FieldType::Bool {
+            "checked"
+        } else {
+            "value"
+        };
+        element
+            .attr(&format!(":{bound}"), read)
+            .attr("@change", format!("(e) => form.setData('{name}', {write})"))
+    }
+
     /// A fordítási kulcs teljes alakja (`fees.save`); a használtak közé kerül.
     fn key(&self, key: &str) -> String {
         let full = format!("{}.{key}", self.names.vars);
@@ -189,7 +245,7 @@ impl Page<'_> {
     /// Elem-szöveg: fordításkor `{{ $t('kulcs') }}`, különben a felirat.
     fn text_of(&self, key: &str, literal: impl Into<String>) -> String {
         if self.parts.i18n {
-            format!("{{{{ $t('{}') }}}}", self.key(key))
+            format!("{{{{ {}('{}') }}}}", self.tr(), self.key(key))
         } else {
             literal.into()
         }
@@ -198,7 +254,10 @@ impl Page<'_> {
     /// Attribútum: fordításkor `:név="$t('kulcs')"`, különben `név="felirat"`.
     fn bind(&self, element: Element, name: &str, key: &str, literal: impl Into<String>) -> Element {
         if self.parts.i18n {
-            element.attr(&format!(":{name}"), format!("$t('{}')", self.key(key)))
+            element.attr(
+                &format!(":{name}"),
+                format!("{}('{}')", self.tr(), self.key(key)),
+            )
         } else {
             element.attr(name, literal)
         }
@@ -309,13 +368,13 @@ impl Page<'_> {
     }
 
     fn script(&self) -> Script {
-        let members = match self.kind {
+        let mut members = match self.kind {
             Kind::Create => vec![
                 self.form_member(None),
                 self.submit_member("post", Op::Store, None),
             ],
             Kind::Edit => {
-                let id = format!("props.{}.id", self.names.var);
+                let id = format!("{}.id", self.prop_path(&self.names.var));
                 vec![
                     self.props_member(),
                     self.form_member(Some(self.names.var.as_str())),
@@ -331,20 +390,52 @@ impl Page<'_> {
             }
             Kind::Show => vec![self.props_member()],
         };
+        if self.parts.react
+            && let Some((hook, _)) = &self.parts.i18n_hook
+        {
+            let line = format!("const {{ t }} = {hook}(){}", self.semi());
+            members.insert(0, Member::Raw(line));
+        }
         let mut imports: Vec<Import> = self
             .components()
             .into_iter()
-            .map(|(name, source)| Import {
-                source,
-                default: Some(name),
-                named: Vec::new(),
+            .map(|(name, source)| {
+                if self.parts.named.contains(&name) {
+                    Import {
+                        source,
+                        default: None,
+                        named: vec![name],
+                    }
+                } else {
+                    Import {
+                        source,
+                        default: Some(name),
+                        named: Vec::new(),
+                    }
+                }
             })
             .collect();
         imports.push(Import {
-            source: "@inertiajs/vue3".to_owned(),
+            source: self.inertia_source().to_owned(),
             default: None,
             named: self.inertia_names(),
         });
+        if self.parts.react {
+            if let Some((hook, source)) = &self.parts.i18n_hook {
+                imports.push(Import {
+                    source: source.clone(),
+                    default: None,
+                    named: vec![hook.clone()],
+                });
+            }
+            if self.is_form() && self.facts.ts {
+                imports.push(Import {
+                    source: "react".to_owned(),
+                    default: None,
+                    named: vec!["type FormEvent".to_owned()],
+                });
+            }
+        }
         Script {
             members,
             imports,
@@ -361,7 +452,7 @@ impl Page<'_> {
                 name: field.name.clone(),
                 ty: None,
                 default: Some(match prop {
-                    Some(var) => format!("props.{var}.{}", field.name),
+                    Some(var) => format!("{}.{}", self.prop_path(var), field.name),
                     None => default_value(field, self.facts.ts),
                 }),
             })
@@ -383,8 +474,20 @@ impl Page<'_> {
     }
 
     fn submit_member(&self, verb: &str, op: Op, id: Option<&str>) -> Member {
-        let body = format!("form.{verb}({}){}", self.href(op, id), self.semi());
-        Self::func("submit", Vec::new(), body)
+        let call = format!("form.{verb}({}){}", self.href(op, id), self.semi());
+        if !self.parts.react {
+            return Self::func("submit", Vec::new(), call);
+        }
+        // a React `<form onSubmit>` az eseményt kapja: a böngésző alapértelmezett küldését le kell tiltani
+        let body = format!("e.preventDefault(){}\n{call}", self.semi());
+        let event = VParam {
+            name: "e".to_owned(),
+            ty: Some(TypeRef::Named("FormEvent".to_owned())),
+            default: None,
+            optional: false,
+            rest: false,
+        };
+        Self::func("submit", vec![event], body)
     }
 
     fn destroy_member(&self) -> Member {
@@ -482,7 +585,6 @@ impl Page<'_> {
     /// Egy mező blokkja: címke, beviteli elem, hibaüzenet.
     fn field_block(&self, field: &Field) -> Element {
         let name = &field.name;
-        let model = format!("form.{name}");
         let required = !(field.optional || field.ty == FieldType::Bool);
         let mark = |element: Element| {
             if required {
@@ -504,7 +606,7 @@ impl Page<'_> {
                 .kid(
                     el("label")
                         .attr("class", "flex items-center gap-2 text-sm text-gray-700")
-                        .kid(check.attr("v-model", &model))
+                        .kid(self.model(check, field))
                         .kid(
                             el("span")
                                 .text(self.text_of(&format!("fields.{name}"), humanize(name))),
@@ -518,18 +620,18 @@ impl Page<'_> {
                     Some(comp) => (comp.name.as_str(), "mt-1 block w-full"),
                     None => ("textarea", INPUT_CLASS),
                 };
-                el(tag)
+                let textarea = el(tag)
                     .attr("id", name)
                     .attr("rows", "4")
-                    .attr("class", class)
-                    .attr("v-model", &model)
+                    .attr("class", class);
+                self.model(textarea, field)
             }
             FieldType::Int | FieldType::Float => {
                 let mut input = el("input").attr("id", name).attr("type", "number");
                 if field.ty == FieldType::Float {
                     input = input.attr("step", "any");
                 }
-                input.attr("class", INPUT_CLASS).attr("v-model", &model)
+                self.model(input.attr("class", INPUT_CLASS), field)
             }
             _ => {
                 let kind = match field.ty {
@@ -542,11 +644,11 @@ impl Page<'_> {
                     Some(comp) => (comp.name.as_str(), "mt-1 block w-full"),
                     None => ("input", INPUT_CLASS),
                 };
-                el(tag)
+                let input = el(tag)
                     .attr("id", name)
                     .attr("type", kind)
-                    .attr("class", class)
-                    .attr("v-model", &model)
+                    .attr("class", class);
+                self.model(input, field)
             }
         };
         let control = mark(control);
@@ -582,7 +684,14 @@ impl Page<'_> {
                 .text(save)
         };
         el("form")
-            .attr("@submit.prevent", "submit")
+            .attr(
+                if self.parts.react {
+                    "@submit"
+                } else {
+                    "@submit.prevent"
+                },
+                "submit",
+            )
             .attr("class", "space-y-6 bg-white p-6 shadow sm:rounded-lg")
             .kids(self.fields.iter().map(|f| self.field_block(f)).collect())
             .kid(
@@ -596,10 +705,11 @@ impl Page<'_> {
     fn cell(&self, item: &str, field: &Field) -> String {
         if field.ty == FieldType::Bool && self.parts.i18n {
             format!(
-                "{{{{ {item}.{} ? $t('{}') : $t('{}') }}}}",
+                "{{{{ {item}.{} ? {t}('{}') : {t}('{}') }}}}",
                 field.name,
                 self.key("yes"),
-                self.key("no")
+                self.key("no"),
+                t = self.tr()
             )
         } else if field.ty == FieldType::Bool {
             format!("{{{{ {item}.{} ? 'Yes' : 'No' }}}}", field.name)
@@ -672,9 +782,19 @@ impl Page<'_> {
             }
             if destroy.is_some() {
                 let click = if self.parts.i18n {
-                    format!("destroy(item.id, $t('{}'))", self.key("delete_confirm"))
+                    format!(
+                        "destroy(item.id, {}('{}'))",
+                        self.tr(),
+                        self.key("delete_confirm")
+                    )
                 } else {
                     "destroy(item.id)".to_owned()
+                };
+                // JSX: a kezelő függvény (nem a hívás eredménye)
+                let click = if self.parts.react {
+                    format!("() => {click}")
+                } else {
+                    click
                 };
                 cell = cell.kid(
                     el("button")
@@ -735,11 +855,14 @@ impl Page<'_> {
     fn template(&self) -> Vec<Element> {
         let title = self.title();
         let title_key = self.title_key();
-        let header_slot = self
-            .parts
-            .layout
-            .as_ref()
-            .is_some_and(|(name, _)| name == "AuthenticatedLayout");
+        let header_slot = if self.parts.react {
+            self.parts.layout.is_some() && self.parts.layout_header
+        } else {
+            self.parts
+                .layout
+                .as_ref()
+                .is_some_and(|(name, _)| name == "AuthenticatedLayout")
+        };
         let mut body = Vec::new();
         if !header_slot {
             body.push(
@@ -763,6 +886,21 @@ impl Page<'_> {
             return vec![head, page];
         };
         let mut layout = el(name);
+        if header_slot && self.parts.react {
+            // React: a cím a layout `header` propja (a Vue `#header` slotja helyett), a `Head` a layoutban
+            let text = if self.parts.i18n {
+                format!("{{{}('{}')}}", self.tr(), self.key(title_key))
+            } else {
+                title.clone()
+            };
+            let header = format!(
+                "<h2 className=\"text-xl font-semibold leading-tight text-gray-800\">{text}</h2>"
+            );
+            return vec![layout.attr(":header", header).kid(head).kid(page)];
+        }
+        if self.parts.react {
+            return vec![layout.kid(head).kid(page)];
+        }
         if header_slot {
             layout = layout.kid(
                 el("template").flag("#header").kid(
@@ -775,8 +913,26 @@ impl Page<'_> {
         vec![head, layout.kid(page)]
     }
 
-    /// A teljes `.vue` fájl, záró újsorral: a modell a Vue-generátor SFC-útján, a projekt behúzás-egységében.
-    pub fn render(&self, sfc: &VueGenerator<'_>) -> String {
+    /// A teljes oldal-fájl, záró újsorral: a modell a Vue-generátor SFC-útján (`.vue`) vagy a React-útján (`.tsx` /
+    /// `.jsx`), a projekt behúzás-egységében.
+    pub fn render(&self, sfc: &VueGenerator<'_>) -> GenResult<String> {
+        let style = CodeStyle {
+            ts: self.facts.ts,
+            semi: self.facts.semi,
+        };
+        if self.parts.react {
+            let program = Program {
+                kind: ProgramKind::React,
+                name: Some(self.kind.file_stem().to_owned()),
+                script: Some(self.script()),
+                template: Some(self.template()),
+                style: None,
+            };
+            let name = self.kind.file_stem();
+            return sfc
+                .react_text(&program, name, style, self.facts.unit, true)
+                .map(|(text, _)| text);
+        }
         let program = Program {
             kind: ProgramKind::Sfc,
             name: None,
@@ -784,17 +940,13 @@ impl Page<'_> {
             template: Some(self.template()),
             style: None,
         };
-        let style = CodeStyle {
-            ts: self.facts.ts,
-            semi: self.facts.semi,
-        };
         let text = sfc.sfc_page(&program, style, self.facts.unit);
         // a `const props =` kötés csak ott marad, ahol a script használja (`props.<var>.id`): máshol a
         // `noUnusedLocals` (vue-tsc) „declared but never read” hibát adna
-        if text.contains("props.") {
+        Ok(if text.contains("props.") {
             text
         } else {
             text.replacen("const props = ", "", 1)
-        }
+        })
     }
 }

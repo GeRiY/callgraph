@@ -160,7 +160,7 @@ impl VueGenerator<'_> {
                     put_imports(&mut doc, &rendered.imports, style)?;
                 }
             }
-            FileKind::Script { .. } => {
+            FileKind::Script { .. } | FileKind::React { .. } => {
                 let end = doc.lines.len();
                 for e in plan(&doc.lines, 0, end, &rendered.imports, style.semi) {
                     doc.splice(e.start, e.end, e.lines);
@@ -308,7 +308,7 @@ pub(super) fn replace_range(
                         })?;
                     (tag + 1, close)
                 }
-                FileKind::Script { .. } => (0, doc.lines.len()),
+                FileKind::Script { .. } | FileKind::React { .. } => (0, doc.lines.len()),
             };
             let (start, end) = find_statement(&doc.lines, name, lo, hi).ok_or_else(|| {
                 GenError::new(crate::tf!(

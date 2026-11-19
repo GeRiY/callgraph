@@ -10,6 +10,9 @@ use crate::generate::generator::{Mode, Output};
 
 impl VueGenerator<'_> {
     pub(super) fn preview(&self, program: &Program) -> GenResult<Output> {
+        if matches!(program.kind, Kind::React | Kind::Hook) {
+            return self.preview_react(program);
+        }
         let style = self.project().code_style();
         let as_module = program.module_like();
         let (text, unresolved) = match program.kind {
@@ -19,6 +22,7 @@ impl VueGenerator<'_> {
                 Vec::new(),
             ),
             Kind::Sfc => self.sfc_file(program, style),
+            Kind::React | Kind::Hook => unreachable!("handled above"),
             Kind::Parts => {
                 if as_module {
                     (self.module_text(program, style)?, Vec::new())
@@ -64,6 +68,22 @@ impl VueGenerator<'_> {
     pub(super) fn write(&self, program: &Program, file: &str, mode: Mode) -> GenResult<Output> {
         let rel = self.rel(file)?;
         let kind = file_kind(&rel)?;
+        match kind {
+            FileKind::React { ts } => return self.write_react(program, rel, ts, mode),
+            FileKind::Script { ts } if program.kind == Kind::Hook => {
+                return self.write_react(program, rel, ts, mode);
+            }
+            _ if matches!(program.kind, Kind::React | Kind::Hook) => {
+                return Err(GenError::new(
+                    crate::t!(
+                        "`react:` writes a .tsx / .jsx component, `hook:` a .ts / .js hook",
+                        "a `react:` .tsx / .jsx komponenst, a `hook:` .ts / .js hookot ír"
+                    )
+                    .to_owned(),
+                ));
+            }
+            _ => {}
+        }
         let project = self.project().code_style();
         let (text, unresolved) = match kind {
             FileKind::Vue => {
@@ -87,6 +107,7 @@ impl VueGenerator<'_> {
                 }
                 self.sfc_file(program, project)
             }
+            FileKind::React { .. } => unreachable!("handled above"),
             FileKind::Script { ts } => {
                 if program.kind == Kind::Sfc {
                     return Err(GenError::new(

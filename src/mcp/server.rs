@@ -332,7 +332,7 @@ impl CallgraphServer {
             idempotent_hint = false,
             open_world_hint = false
         ),
-        description = "Generate PHP or Vue from a short expression and write it (no overwrite; backup and syntax check first). E.g. {\"expr\": \"c!:Pay<Base> > ctor(-Client $http)\", \"write\": \"app/Pay.php\"}. Also vue: comp: laravel:Fee>create(name:str); into, replace, dry."
+        description = "Generate PHP, Vue or React code from a short expression and write it (no overwrite; backup and syntax check first). E.g. {\"expr\": \"c:Pay > ctor(-Client $http)\", \"write\": \"app/Pay.php\"}. Also vue: react: hook: laravel:."
     )]
     async fn generate(&self, Parameters(p): Parameters<GenerateParams>) -> CallToolResult {
         let started = Instant::now();
