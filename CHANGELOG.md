@@ -82,6 +82,27 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   project's own input, label, error and button components (found by name and props, or set in `.callgraph/gen.toml`
   `[components]`). Translation calls are added only when existing pages already use a translation hook such as
   `useTranslation()`.
+- **Livewire components: class, view and uses linked, `wire:` names checked:** a component class is tied to its
+  Blade view (from `render()` or the default naming) and to where it is used (`<livewire:counter>`,
+  `@livewire('counter')`, a full-page `Route::get(…, Counter::class)`). In the view, `wire:model` properties and
+  `wire:click` / `wire:submit` methods are checked against the class and its Form objects, with `⚠` for a missing
+  public method or property (static names only; the magic `$refresh`, `$set`, `$toggle` and `$dispatch` are never
+  flagged). `$this->dispatch('x')`, Blade `$dispatch('x')`, `#[On('x')]` and v2 `$listeners` share the key
+  `livewire::event:x`, so `--grep` finds both sender and listener. The new `--format livewire` view (also an MCP
+  framework view) lists per component its view, uses, route, properties, actions, events, the validation rules from
+  `#[Validate]` / `rules()` and the warnings, and ends with a line for names built at run time;
+  `<livewire:is :component="$x">` is noted there, not counted as a use. `trace Counter` and `trace livewire:counter`
+  show the component's chain. Volt components are not supported yet.
+- **Filament admin panels:** a resource is shown with its `$model`, the `getPages()` pages with their URIs under the
+  panel path, the `form()` fields (also inside `Section`, `Grid` and `Tabs`), the `table()` columns, filters, actions
+  and bulk actions, and the `getRelations()` relation managers; standalone pages, widgets (with the models they
+  query) and panel providers (id, path, resources) are listed too. The checks are conservative: a form field or
+  table column that is not a column, fillable, cast, accessor or relation of the model is flagged only when the
+  model's migration was found, and a relation manager or `->relationship('x')` naming a relation the model lacks is
+  flagged. The new `--format filament` view (also an MCP framework view) ends with a line for names built at run
+  time; `trace PostResource`, `trace filament:posts` or the model name show the chain, and
+  `--grep filament::resource:Post` finds the resource. Filament 4 Schema classes are not supported yet. The cache
+  format changed again for Livewire and Filament; existing caches are rebuilt automatically.
 - **More views say what they skipped:** like `--format forms`, the `routes`, `inertia` and `props` views end with a
   line per reason, such as a route name built at run time, a page name that is not a literal or a `v-bind` object
   (`? 2 skipped: <reason> (a.vue L3, b.vue L9, +N)`), instead of silently leaving the item out.

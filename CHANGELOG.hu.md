@@ -90,6 +90,29 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   projekt saját input-, label-, hiba- és gombkomponenseivel (név és props alapján megtalálva, vagy a
   `.callgraph/gen.toml` `[components]` szakaszában megadva). Fordítás-hívás csak akkor kerül bele, ha a meglévő
   oldalak már használnak fordító hookot, például `useTranslation()`-t.
+- **Livewire-komponensek: osztály, nézet és használat összekötve, a `wire:` nevek ellenőrizve:** a
+  komponensosztály a Blade-nézetéhez (a `render()` alapján vagy az alapértelmezett elnevezéssel) és a használati
+  helyeihez kötődik (`<livewire:counter>`, `@livewire('counter')`, teljes oldalas `Route::get(…, Counter::class)`).
+  A nézetben a `wire:model` tulajdonságokat és a `wire:click` / `wire:submit` metódusokat az osztályhoz és a Form
+  objektumaihoz méri, a hiányzó publikus metódust vagy tulajdonságot `⚠` jelzi (csak statikus névnél; a mágikus
+  `$refresh`, `$set`, `$toggle` és `$dispatch` sosem kap jelzést). A `$this->dispatch('x')`, a Blade
+  `$dispatch('x')`, az `#[On('x')]` és a v2-es `$listeners` egy kulcson osztozik (`livewire::event:x`), így a
+  `--grep` a küldőt és a figyelőt is megtalálja. Az új `--format livewire` nézet (MCP-n framework-nézetként is)
+  komponensenként listázza a nézetet, a használatokat, a route-ot, a tulajdonságokat, az akciókat, az eseményeket, az
+  `#[Validate]` / `rules()` validációs szabályait és a figyelmeztetéseket, a végén egy sorral a futásidőben épített
+  nevekről; a `<livewire:is :component="$x">` itt jelenik meg, nem számít használatnak. A `trace Counter` és a
+  `trace livewire:counter` a komponens láncát mutatja. A Volt-komponenseket még nem támogatja.
+- **Filament admin panelek:** a resource a `$model` modelljével, a `getPages()` oldalaival (a panel útja alatti
+  URI-kkal), a `form()` mezőivel (a `Section`, `Grid` és `Tabs` belsejében is), a `table()` oszlopaival,
+  szűrőivel, akcióival és tömeges akcióival, valamint a `getRelations()` relation managereivel jelenik meg; az
+  önálló oldalak, a widgetek (a lekérdezett modellekkel) és a panel providerek (id, út, resource-ok) is
+  szerepelnek. Az ellenőrzés óvatos: azt az űrlapmezőt vagy táblaoszlopot, amely nem oszlopa, fillable-je, castja,
+  accessora vagy relációja a modellnek, csak akkor jelzi, ha a modell migrációja megvan, és jelzi azt a relation
+  managert vagy `->relationship('x')` hívást, amelynek relációja hiányzik a modellből. Az új `--format filament`
+  nézet (MCP-n framework-nézetként is) egy sorral zárul a futásidőben épített nevekről; a `trace PostResource`, a
+  `trace filament:posts` vagy a modell neve a láncot mutatja, a `--grep filament::resource:Post` pedig megtalálja a
+  resource-ot. A Filament 4 Schema osztályait még nem támogatja. A cache formátuma a Livewire és a Filament miatt
+  ismét változott; a meglévő cache magától újraépül.
 - **Több nézet is megmondja, mit hagyott ki:** a `--format forms` mintájára a `routes`, az `inertia` és a `props`
   nézet is okonként egy sorral zárul, például futásidőben épített route-név, nem literál oldalnév vagy `v-bind`
   objektum esetén (`? 2 kihagyva: <ok> (a.vue L3, b.vue L9, +N)`), ahelyett hogy csendben kihagyná az elemet.
