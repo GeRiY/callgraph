@@ -940,3 +940,195 @@ fn f7_auto_imported_components_bind_only_with_the_plugin() {
         "{without}"
     );
 }
+
+// ---------------------------------------------------------------------------------------------------------------
+// F15: `trace` — the task slice of a route, controller action or page
+
+#[test]
+fn f15_trace_follows_a_route_to_rules_and_models() {
+    let store = Fixture::laravel().run(&["trace", "route::shelves.store"]);
+    assert!(store.lines().count() <= 30, "{store}");
+    assert!(
+        store.contains("route POST /shelves  name=shelves.store  routes/web.php:"),
+        "{store}"
+    );
+    assert!(
+        store.contains("action ShelfController@store  app/Http/Controllers/ShelfController.php:"),
+        "{store}"
+    );
+    assert!(
+        store.contains("rules StoreShelfRequest: stocked_at, title*"),
+        "{store}"
+    );
+    assert!(store.contains("models Shelf("), "{store}");
+}
+
+#[test]
+fn f15_trace_lists_the_middleware_of_the_route() {
+    let out = Fixture::laravel().run(&["trace", "route::catalogue.show"]);
+    assert!(out.contains("mw EnsureReaderCard"), "{out}");
+    assert!(out.contains("action CatalogueController@__invoke"), "{out}");
+}
+
+#[test]
+fn f15_trace_reaches_the_page_its_props_and_child_components() {
+    let fixture = Fixture::laravel();
+    for target in [
+        "route::shelves.index",
+        "ShelfController::index",
+        "Pages/Shelves/Browse.vue",
+    ] {
+        let out = fixture.run(&["trace", target]);
+        assert!(out.lines().count() <= 30, "{target}: {out}");
+        assert!(
+            out.contains("route GET /shelves  name=shelves.index"),
+            "{target}: {out}"
+        );
+        assert!(out.contains("ShelfController@index"), "{target}: {out}");
+        assert!(out.contains("Shelves/Browse.vue"), "{target}: {out}");
+        assert!(out.contains("props: shelves, closed"), "{target}: {out}");
+        assert!(out.contains("uses Stamp"), "{target}: {out}");
+    }
+}
+
+#[test]
+fn f15_trace_takes_a_verb_and_uri_or_a_bare_uri() {
+    let fixture = Fixture::laravel();
+    let post = fixture.run(&["trace", "route:POST:/shelves"]);
+    assert!(post.contains("route POST /shelves"), "{post}");
+    assert!(!post.contains("route GET /shelves"), "{post}");
+    let both = fixture.run(&["trace", "/shelves"]);
+    assert!(both.contains("route GET /shelves"), "{both}");
+    assert!(both.contains("route POST /shelves"), "{both}");
+    assert!(both.lines().count() <= 30, "{both}");
+}
+
+#[test]
+fn f15_unknown_trace_target_is_one_hint_line_with_the_closest_names() {
+    let out = Fixture::laravel().run(&["trace", "route::shelf.store"]);
+    assert_eq!(out.lines().count(), 1, "{out}");
+    assert!(out.contains("unknown target 'route::shelf.store'"), "{out}");
+    assert!(out.contains("closest: "), "{out}");
+    assert!(out.contains("route::shelves.store"), "{out}");
+    let hint = out.split("closest: ").nth(1).unwrap_or_default();
+    assert!(hint.split(", ").count() <= 5, "{out}");
+    let none = Fixture::laravel().run(&["trace", "zzzzzz"]);
+    assert_eq!(none.lines().count(), 1, "{none}");
+    assert!(!none.contains("closest"), "{none}");
+}
+
+#[test]
+fn f15_trace_of_a_js_server_route_shows_its_client_callers() {
+    let out = Fixture::new("webroutes_app").run(&["trace", "GET:/api/chats"]);
+    assert!(
+        out.contains("GET /api/chats → server/src/api.ts::listChats"),
+        "{out}"
+    );
+    assert!(out.contains("← client/src/composables/api.ts L2"), "{out}");
+    assert!(out.lines().count() <= 30, "{out}");
+}
+
+#[test]
+fn f15_trace_of_a_path_reaches_a_regex_server_route() {
+    // `route("GET", /^\/health$/, …)`: the plain request path finds the regex route
+    let out = Fixture::new("webroutes_app").run(&["trace", "GET:/health"]);
+    assert!(
+        out.contains("GET ^/health$ → server/src/sockets.ts"),
+        "{out}"
+    );
+    assert!(!out.contains("unknown target"), "{out}");
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// F14: diagnostics in the view footers
+
+#[test]
+fn f14_footer_names_what_a_view_skipped() {
+    let fixture = Fixture::new("diag_app");
+    let inertia = fixture.run(&["show", "app", "--format", "inertia"]);
+    assert!(
+        inertia.contains("? 1 skipped: page name is not a literal"),
+        "{inertia}"
+    );
+    assert!(inertia.contains("PageController.php L"), "{inertia}");
+    let routes = fixture.run(&["show", "routes", "--format", "routes"]);
+    assert!(
+        routes.contains("skipped: route name built at run time"),
+        "{routes}"
+    );
+    assert!(routes.contains("routes/web.php L"), "{routes}");
+    let props = Fixture::vuecontract().run(&["show", "src", "--format", "props"]);
+    assert!(props.contains("skipped: v-bind object"), "{props}");
+    assert!(props.contains("ChatView.vue L"), "{props}");
+}
+
+#[test]
+fn f14_no_footer_when_nothing_was_skipped() {
+    let fixture = Fixture::laravel();
+    for view in ["inertia", "routes", "forms", "props", "ziggy"] {
+        let out = fixture.run(&["show", ".", "--format", view]);
+        assert!(!out.contains("skipped:"), "{view}: {out}");
+        assert!(!out.contains("kihagyva:"), "{view}: {out}");
+    }
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// F11: Blade extras
+
+#[test]
+fn f11_missing_include_and_component_are_flagged_namespaced_ones_are_not() {
+    let out = Fixture::new("blade_app").run(&["show", "resources/views/page.blade.php"]);
+    assert!(
+        out.contains("⚠ missing view: partials.gone (@include L4), components.ghost (<x-…> L8)"),
+        "{out}"
+    );
+    // a package-namespaced view, an existing include / component / layout: never missing
+    let flagged: Vec<&str> = out.lines().filter(|l| l.contains("missing view")).collect();
+    for fine in [
+        "mail::message",
+        "partials.row",
+        "components.card",
+        "layouts.app",
+    ] {
+        assert!(!flagged.iter().any(|l| l.contains(fine)), "{fine}: {out}");
+    }
+}
+
+#[test]
+fn f11_dynamic_component_is_noted_not_flagged() {
+    let out = Fixture::new("blade_app").run(&["show", "resources/views/page.blade.php"]);
+    assert!(
+        out.contains("<x-dynamic-component>, target is a run-time value: L9"),
+        "{out}"
+    );
+    assert!(!out.contains("components.dynamic-component"), "{out}");
+}
+
+#[test]
+fn f11_custom_directive_is_listed_at_the_provider_and_linked_from_the_template() {
+    let fixture = Fixture::new("blade_app");
+    let page = fixture.run(&["show", "resources/views/page.blade.php"]);
+    assert!(
+        page.contains("directives: @datetime → app/Providers/AppServiceProvider.php L12"),
+        "{page}"
+    );
+    // Alpine's `@click` is not a registered directive
+    assert!(!page.contains("@click →"), "{page}");
+    let provider = fixture.run(&["show", "app/Providers/AppServiceProvider.php"]);
+    assert!(
+        provider.contains("blade directives: @datetime L12 → page"),
+        "{provider}"
+    );
+}
+
+#[test]
+fn f11_vite_entries_are_import_edges_to_the_js_entry() {
+    let fixture = Fixture::new("blade_app");
+    let js = fixture.run(&["show", ".", "--grep", "resources/js/app.ts"]);
+    assert!(
+        js.contains("layouts/app.blade.php") || js.contains("layouts\\app.blade.php"),
+        "{js}"
+    );
+    let css = fixture.run(&["show", ".", "--grep", "resources/css/app.css"]);
+    assert!(css.contains("app.blade.php"), "{css}");
+}

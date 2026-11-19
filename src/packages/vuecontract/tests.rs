@@ -199,3 +199,39 @@ fn names_are_normalised() {
         assert!(falls_through(attr), "{attr}");
     }
 }
+
+#[test]
+fn unchecked_uses_land_in_the_footer_and_clean_ones_do_not() {
+    use crate::i18n::Lang;
+    let scope: HashSet<String> = HashSet::from(["src/Page.vue".to_string()]);
+    let imports = [("Card", "src/Card.vue"), ("Gone", "src/Gone.vue")];
+    let card = comp(CARD, &[("title", true)], "<div/>", &[]);
+    let page = comp(
+        "src/Page.vue",
+        &[],
+        "<Card v-bind=\"bag\" />\n<Gone />",
+        &imports,
+    );
+    let project = Project {
+        comps: vec![card, page],
+        auto: false,
+    };
+    let footer = project.check(&scope).diagnostics.footer(&[], Lang::En);
+    assert_eq!(footer.len(), 2, "{footer:?}");
+    assert!(footer[0].starts_with("? 1 skipped: child component file not found"));
+    assert!(footer[1].starts_with("? 1 skipped: v-bind object"));
+
+    let card = comp(CARD, &[("title", true)], "<div/>", &[]);
+    let page = comp("src/Page.vue", &[], "<Card title=\"t\" />", &IMPORT);
+    let project = Project {
+        comps: vec![card, page],
+        auto: false,
+    };
+    assert!(
+        project
+            .check(&scope)
+            .diagnostics
+            .footer(&[], Lang::En)
+            .is_empty()
+    );
+}

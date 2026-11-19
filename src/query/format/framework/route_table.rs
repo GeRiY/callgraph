@@ -33,6 +33,9 @@ impl Formatter for RoutesView {
                 laravel.route_lines(&files, &classes)
             });
             lines.extend(web);
+            lines.extend(laravel.map_or_else(Vec::new, |laravel| {
+                laravel.route_footer(&scope(rows, laravel).0, lang)
+            }));
             return format!("{}\n", lines.join("\n"));
         }
         let Some(laravel) = laravel else {
@@ -60,6 +63,7 @@ impl Formatter for RoutesView {
                 .unwrap_or_default();
             rules::routes(&graph, &ns, &mut lines);
         }
+        lines.extend(laravel.route_footer(&files, lang));
         format!("{}\n", lines.join("\n"))
     }
 }

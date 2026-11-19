@@ -5,7 +5,7 @@
 use super::guard::ProjectRoot;
 use super::params::{
     FindCallersParams, FrameworkViewParams, LocateParams, MethodBodyParams, NotesParams,
-    OutlineParams, SearchKind, SearchParams,
+    OutlineParams, SearchKind, SearchParams, TraceParams,
 };
 
 /// A `find_callers` megengedett mélysége.
@@ -18,6 +18,8 @@ enum Subcommand {
     Show,
     /// `locate`: a kifejezések a cél helyett.
     Locate,
+    /// `trace`: a cél egy route / controller-akció / oldal neve, nem út.
+    Trace,
 }
 
 /// Egy `show`- (vagy `locate`-) hívás leírása, a gyökér feloldása előtt.
@@ -176,6 +178,22 @@ impl ShowQuery {
         Ok(query)
     }
 
+    /// `trace`: `<cél>` (route-név, `Ctrl::metódus`, oldal); a cél nem út, nem kell a gyökérre ellenőrizni.
+    pub(crate) fn trace(p: TraceParams) -> Result<Self, String> {
+        let target = p.target.trim().to_owned();
+        if target.is_empty() || target.starts_with('-') {
+            return Err(crate::t!(
+                "'target' needs a route name, a controller action or a page.",
+                "A 'target' egy route-nevet, controller-akciót vagy oldalt vár."
+            )
+            .into());
+        }
+        let mut query = Self::new(p.project, String::new(), false);
+        query.command = Subcommand::Trace;
+        query.flags.push(target);
+        Ok(query)
+    }
+
     /// A cél (fájl vagy mappa) a gyökérhez képest, ahogy a kérésben állt (a `locate`-nél üres). Csak a memóriában
     /// élő `locate`-követés használja (`stats::McpStats`), nem tárolódik.
     pub(crate) fn path(&self) -> &str {
@@ -213,6 +231,7 @@ impl ShowQuery {
             match self.command {
                 Subcommand::Show => "show",
                 Subcommand::Locate => "locate",
+                Subcommand::Trace => "trace",
             }
             .to_owned(),
             "--project".to_owned(),
@@ -227,7 +246,7 @@ impl ShowQuery {
     /// A `show` argumentumai (`show` és `--project`/`--label` nélkül): kapcsolók, majd a gyökéren belülre
     /// ellenőrzött cél(ok). A `locate`-nél csak a kapcsolók és a kifejezések.
     pub(crate) fn to_args(&self, root: &ProjectRoot) -> Result<Vec<String>, String> {
-        if self.command == Subcommand::Locate {
+        if matches!(self.command, Subcommand::Locate | Subcommand::Trace) {
             return Ok(self.flags.clone());
         }
         let target = root.resolve(&self.path)?;

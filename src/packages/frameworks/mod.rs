@@ -13,6 +13,7 @@ mod files;
 mod inertia;
 pub(crate) mod laravel;
 mod targeted;
+pub(crate) mod trace;
 
 use std::path::Path;
 use std::sync::Arc;

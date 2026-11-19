@@ -10,7 +10,7 @@ impl VueContract {
     /// The header with the counts and one line per finding; empty when no component use was checked.
     pub(crate) fn lines(&self, lang: Lang) -> Vec<String> {
         if self.checked == 0 {
-            return Vec::new();
+            return self.diagnostics.footer(&[], lang);
         }
         let count = |kind: Kind| self.findings.iter().filter(|f| f.kind == kind).count();
         let mut parts = Vec::new();
@@ -59,6 +59,7 @@ impl VueContract {
         if found.len() > MAX_FINDINGS {
             lines.push(format!("+{} more", found.len() - MAX_FINDINGS));
         }
+        lines.extend(self.diagnostics.footer(&[], lang));
         lines
     }
 }

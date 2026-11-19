@@ -16,7 +16,7 @@ use rmcp::{ServerHandler, tool, tool_handler, tool_router};
 use super::params::{
     FindCallersParams, FrameworkViewParams, GenerateParams, GuideParams, LocateParams,
     MethodBodyParams, NextParams, NotesParams, OutlineParams, PackageUsageParams, ProfileParams,
-    RenameParams, SearchParams, UndoParams,
+    RenameParams, SearchParams, TraceParams, UndoParams,
 };
 use super::request::ShowQuery;
 use super::runner::QueryRunner;
@@ -190,6 +190,20 @@ impl CallgraphServer {
         Parameters(p): Parameters<FrameworkViewParams>,
     ) -> CallToolResult {
         self.execute(CommandKind::FrameworkView, ShowQuery::framework_view(p))
+            .await
+    }
+
+    #[tool(
+        annotations(
+            read_only_hint = true,
+            destructive_hint = false,
+            idempotent_hint = true,
+            open_world_hint = false
+        ),
+        description = "Task slice of a route, controller action or page in <= 30 lines: route (verb, URI, name, file:line) -> middleware -> controller action -> FormRequest rules (* = required) -> models with table -> Inertia page, props, child components; a JS server route shows its client callers. Start here for \"work on this route/page\". Example: {\"target\": \"route::shelves.store\"}; also `GET:/shelves`, `ShelfController::store`, `Pages/Shelves/Browse.vue`. Unknown target: the closest names."
+    )]
+    async fn trace(&self, Parameters(p): Parameters<TraceParams>) -> CallToolResult {
+        self.execute(CommandKind::FrameworkView, ShowQuery::trace(p))
             .await
     }
 

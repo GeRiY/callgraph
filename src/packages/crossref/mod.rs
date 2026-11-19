@@ -254,7 +254,9 @@ fn need_for(rows: &[QueryResult], format: &str) -> Need {
                 if (file.ends_with(".css") || file.ends_with(".scss")) && rows.len() <= 20 {
                     need.classes = true;
                 }
-                if file.ends_with(".blade.php") && rows.len() <= 20 {
+                // a provider registers `Blade::directive(..)`: its outline lists them
+                if (file.ends_with(".blade.php") || file.contains("Providers/")) && rows.len() <= 20
+                {
                     need.views = true;
                 }
             }

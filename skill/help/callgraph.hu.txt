@@ -101,6 +101,7 @@ Projekt-profil (architektúra, rétegek és minták a mappa- / fájlnevekből, a
                                                 számít); PHP-ben és JS-ben is meglévő szerep: controller (php) / (js);
                                                 --packages: minden közvetlen composer / npm függőség (telepített, deklarált)
   bash ~/.claude/skills/callgraph/callgraph.sh uses <csomag> [--calls] [--project alias]   hol használja a kód egy függőségét (guzzle, @vueuse/core): API-szimbólumonként a darabszám, az első fájl, +N; (típus) = import hívás nélkül; --calls: fájlonként minden hívás-sor
+  bash ~/.claude/skills/callgraph/callgraph.sh trace <cél> [--project alias]   feladat-szelet <= 30 sorban: route -> middleware -> controller-akció -> FormRequest-szabályok -> modellek -> Inertia-oldal + props -> gyerek-komponensek; cél: route::név, route:GET:/uri, URI, Controller::metódus, Pages/X.vue (JS-projekt: GET /api/x a kliens-hívóival); ismeretlen cél: a legközelebbi nevek
   bash ~/.claude/skills/callgraph/callgraph.sh deps [--project alias]   valószínűleg fölösleges / hiányzó / csak dev composer / npm függőségek (soronként egy; .callgraphignore: deps-ignore <név>)
   Laravel / Inertia projekt-nézetek (a projekt gyökerén, pl. `. --format ziggy`; az outline-ok is megkapják a rövid linkeket):
     --format ziggy     ismeretlen route('x') nevek (JS / Vue / PHP), sehonnan be nem töltött route-fájlok; outline: route::x → POST /x · Ctrl@m

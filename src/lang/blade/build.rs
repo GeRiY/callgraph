@@ -516,14 +516,33 @@ pub(super) fn build(path: &str, text: &str) -> FileGraph {
                             "framework_use",
                         ));
                     }
-                    "vite" => calls.push(call(
-                        &name,
-                        &who,
-                        line,
-                        "directive",
-                        "@vite",
-                        "framework_use",
-                    )),
+                    "vite" => {
+                        calls.push(call(
+                            &name,
+                            &who,
+                            line,
+                            "directive",
+                            "@vite",
+                            "framework_use",
+                        ));
+                        // `@vite(['resources/css/app.css', 'resources/js/app.ts'])`: every literal entry is an
+                        // import edge to the file (like the HTML `<script src>`)
+                        if let Some((first, _)) = parts.first() {
+                            let list = first.trim();
+                            let inner = list
+                                .strip_prefix('[')
+                                .and_then(|rest| rest.strip_suffix(']'))
+                                .unwrap_or(list);
+                            for (entry, _) in split_top(inner, b',') {
+                                if let Some(entry) = literal(&entry) {
+                                    let mut edge =
+                                        call(&name, &who, line, "import", &entry, "module_use");
+                                    edge.resolved = view::vite_entry(&entry, path);
+                                    calls.push(edge);
+                                }
+                            }
+                        }
+                    }
                     "props" => {
                         if let Some(list) = args.as_deref() {
                             let lead = list.len() - list.trim_start().len();

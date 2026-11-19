@@ -235,6 +235,7 @@ relatív) regisztráció nélkül is működik; nélküle az aktuális mappa a g
 | Feladat | Parancs |
 |---|---|
 | Honnan induljak ezzel a feladattal? | `callgraph.sh locate <kifejezés>... [--all]` |
+| Egy route / oldal teljes lánca (route, middleware, akció, szabályok, modellek, oldal + props; ≤ 30 sor) | `callgraph.sh trace <route::név\|Ctrl::metódus\|/uri\|Pages/X.vue>` |
 | Fájl / mappa outline-ja | `callgraph.sh <fájl\|mappa>` |
 | Csak egy metódus | `callgraph.sh <fájl>::<metódus>` (több szelektor is mehet) |
 | Metódus forrása sorszámozva | `callgraph.sh <fájl>::<metódus> --body` |
@@ -373,7 +374,7 @@ Lépésről lépésre, kliensenként (Claude Code, Claude Desktop, Cursor, VS Co
 
 A Claude Code-skill mellett (változatlan, teljes értékűen támogatott) ugyanaz a bináris
 [MCP](https://modelcontextprotocol.io)-szerver is stdio-n, így bármely MCP-kliens használhatja: `callgraph mcp`.
-Eszközök: `locate`, `outline`, `method_body`, `find_callers`, `search`, `framework_view`, `notes`, `projects`, `guide`, `project_profile`. Ugyanazt
+Eszközök: `locate`, `outline`, `method_body`, `find_callers`, `search`, `framework_view`, `trace`, `notes`, `projects`, `guide`, `project_profile`. Ugyanazt
 a tömör szöveget adják, mint a CLI, ugyanazzal a kimeneti korláttal; csak olvas, az utak a projekt-gyökéren belül
 maradnak, a lekérdezések nem használnak hálózatot (csak a lenti, naponta egyszeri frissítés-ellenőrzés). Kapcsolódáskor a szerver rövid használati útmutatót küld a kliensnek angolul
 (melyik eszköz mire, hogyan keresd a hívókat, hogyan olvasd a kimenetet); a Claude Code ezt az agent

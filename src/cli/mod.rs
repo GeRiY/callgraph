@@ -11,6 +11,7 @@ pub mod signatures;
 mod stats_args;
 pub mod strict;
 mod telemetry_args;
+mod trace_args;
 mod uses_args;
 
 pub use args::{CliArgs, HookAction, NO_GITIGNORE_FLAG, NoteAction, take_no_gitignore};
@@ -123,6 +124,11 @@ pub fn build_command(args: CliArgs) -> Result<Box<dyn Command>> {
         } => Ok(Box::new(commands::UsesCommand::new(
             package,
             calls,
+            project,
+            crate::skill::SkillHome::from_env(),
+        ))),
+        CliArgs::Trace { target, project } => Ok(Box::new(commands::TraceCommand::new(
+            target,
             project,
             crate::skill::SkillHome::from_env(),
         ))),

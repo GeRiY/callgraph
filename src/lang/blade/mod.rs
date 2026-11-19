@@ -23,7 +23,7 @@ use crate::error::Result;
 use crate::lang::{Analysis, Language, LanguageFrontend, LanguageRole};
 
 pub use build::BLOCK_KIND;
-pub(crate) use view::{normalize, view_name};
+pub(crate) use view::{component_class, normalize, view_name};
 
 /// A `.blade.php` fájlok nyelve. A kiterjesztése a PHP-é (`php`), ezért a registry külön, a fájlnév végére
 /// (`.blade.php`) illeszt, és a PHP elé teszi.
@@ -79,11 +79,26 @@ impl LanguageFrontend for BladeFrontend {
 /// Egy nézet-hivatkozás a sablonban (a keresztreferenciához: „ki használja ezt a nézetet”).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ViewRef {
-    /// A hivatkozott nézet pontozott neve (`layouts.app`, `components.alert`).
+    /// A hivatkozott nézet pontozott neve (`layouts.app`, `components.alert`); üres: futásidejű cél
+    /// (`<x-dynamic-component>`).
     pub view: String,
     pub line: u32,
     /// `@extends`, `@include`, `@each`, `@component`, `<x-…>`.
     pub how: &'static str,
+}
+
+/// The directive uses in the template (`@datetime($x)`, `@admin`) with their lines: every `@name`, so the caller
+/// keeps the ones a provider registered (`Blade::directive`); Alpine's `@click` and the built-ins are just names no
+/// provider registers.
+pub(crate) fn directive_uses(text: &str) -> Vec<(String, u32)> {
+    let lines = crate::core::LineIndex::new(text);
+    scan::scan(text)
+        .into_iter()
+        .filter_map(|item| match item {
+            scan::Item::Directive { name, start, .. } => Some((name, lines.line_of(start))),
+            _ => None,
+        })
+        .collect()
 }
 
 /// A sablon nézet-hivatkozásai (a `@extends` / `@include*` / `@each` / `@component` / `<x-…>` célja).
@@ -132,8 +147,14 @@ pub(crate) fn view_refs(text: &str) -> Vec<ViewRef> {
                 close: false,
                 ..
             } if name.starts_with("x-") && !name.starts_with("x-slot") && !name.contains("::") => {
+                // `<x-dynamic-component :component="$x">`: the target is a run-time value (empty `view`)
+                let view = if name == "x-dynamic-component" {
+                    String::new()
+                } else {
+                    format!("components.{}", &name[2..])
+                };
                 out.push(ViewRef {
-                    view: format!("components.{}", &name[2..]),
+                    view,
                     line: lines.line_of(start),
                     how: "<x-…>",
                 });

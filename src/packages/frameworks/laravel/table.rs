@@ -7,6 +7,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use super::super::inertia::RenderSite;
 use super::Laravel;
 use super::routes::{Action, Route, short_class};
+use crate::core::diag::Diagnostics;
+use crate::i18n::Lang;
 
 /// A `middleware` nézet egy middleware-jénél legfeljebb ennyi route-ot sorol (a többi `+N`).
 const MAX_LISTED: usize = 3;
@@ -37,6 +39,39 @@ impl Laravel {
             })
             .map(route_line)
             .collect()
+    }
+
+    /// The footer of the `routes` view: what the table could not take in, for the route files in scope. Route names
+    /// built at run time (`->name($n)`) are missing from the table; a `routes/` file nothing loads is ignored by
+    /// Laravel too.
+    pub(crate) fn route_footer(&self, files: &[String], lang: Lang) -> Vec<String> {
+        if files.is_empty() {
+            return Vec::new();
+        }
+        let mut diagnostics = Diagnostics::default();
+        for (file, line) in &self.table.dynamic_names {
+            diagnostics.push(
+                "routes-dynamic-name",
+                (
+                    "route name built at run time, the table may miss routes",
+                    "futásidőben épített route-név, a táblából route hiányozhat",
+                ),
+                file,
+                *line,
+            );
+        }
+        for file in &self.table.unloaded {
+            diagnostics.push(
+                "routes-unloaded",
+                (
+                    "route file never loaded (no withRouting / require), its routes are ignored",
+                    "a route-fájl sehonnan nincs betöltve, a route-jai nem élnek",
+                ),
+                file,
+                1,
+            );
+        }
+        diagnostics.footer(files, lang)
     }
 
     /// A `middleware` nézet route-oszlopa: middleware-enként a route-ok száma és az első néhány (`GET /uri`).

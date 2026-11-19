@@ -185,6 +185,16 @@ pub(crate) struct FrameworkViewParams {
     pub full: bool,
 }
 
+// `trace`: egy route / controller-akció / oldal feladat-szelete.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, JsonSchema)]
+pub(crate) struct TraceParams {
+    /// `route::password.reset`, `route:GET:/events/{event}`, a URI, `EventController::show` or `Pages/Events/Show.vue`.
+    pub target: String,
+    /// Registered project alias; default: the server's working directory.
+    #[serde(default)]
+    pub project: Option<String>,
+}
+
 // `guide`: az alap-útmutató, vagy egy téma (referencia-fájl).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, JsonSchema)]
 pub(crate) struct GuideParams {

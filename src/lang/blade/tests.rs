@@ -299,3 +299,40 @@ fn registry_picks_blade_before_php() {
         .unwrap();
     assert_eq!(php.id(), "php");
 }
+
+#[test]
+fn a_dynamic_component_has_no_view_and_directive_uses_are_listed() {
+    let refs = view_refs("<x-dynamic-component :component=\"$w\" />\n<x-card />\n");
+    let list: Vec<(String, u32)> = refs.iter().map(|r| (r.view.clone(), r.line)).collect();
+    assert_eq!(
+        list,
+        [(String::new(), 1), ("components.card".to_owned(), 2)]
+    );
+    let uses = directive_uses("<p>@datetime($at)</p>\n<b @click=\"x\">@lang('a.b')</b>\n");
+    let names: Vec<(&str, u32)> = uses.iter().map(|(n, l)| (n.as_str(), *l)).collect();
+    assert_eq!(names, [("datetime", 1), ("click", 2), ("lang", 2)]);
+}
+
+#[test]
+fn vite_entries_are_import_edges() {
+    let graph = analyze(
+        "resources/views/layouts/app.blade.php",
+        "<head>@vite(['resources/css/app.css', 'resources/js/app.ts'])</head>\n@vite('resources/js/admin.ts')\n@vite($dynamic)\n",
+    );
+    let edges: Vec<(&str, &str, &str)> = graph
+        .calls
+        .iter()
+        .filter(|c| c.kind == "import")
+        .map(|c| (c.target.as_str(), c.category.as_str(), c.kind.as_str()))
+        .collect();
+    assert_eq!(
+        edges,
+        [
+            ("resources/css/app.css", "module_use", "import"),
+            ("resources/js/app.ts", "module_use", "import"),
+            ("resources/js/admin.ts", "module_use", "import")
+        ]
+    );
+    // the plain `@vite` marker call stays
+    assert!(graph.calls.iter().any(|c| c.target == "@vite"));
+}

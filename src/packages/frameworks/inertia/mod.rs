@@ -289,6 +289,11 @@ impl Inertia {
         self.pages.page_name(&self.rel(file)?)
     }
 
+    /// Every page file in its short form (`Pages/Board.vue`), sorted.
+    pub(crate) fn page_shorts(&self) -> Vec<String> {
+        self.files.iter().map(|rel| self.pages.short(rel)).collect()
+    }
+
     /// Oldal-fájl-e (a page-gyökér alatt, ismert kiterjesztéssel).
     pub(crate) fn is_page(&self, file: &str) -> bool {
         self.page_name(file).is_some()

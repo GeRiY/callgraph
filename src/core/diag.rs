@@ -22,6 +22,8 @@ pub struct Diagnostics {
 
 /// Egy láblécsor legfeljebb ennyi helyet sorol fel, a többi `+N`.
 const MAX_SITES: usize = 3;
+/// A footer lists at most this many reason codes, the rest is one `+N` line.
+const MAX_LINES: usize = 3;
 
 impl Diagnostics {
     /// Egy kihagyás felvétele.
@@ -54,7 +56,7 @@ impl Diagnostics {
         let mut codes: Vec<&'static str> = self.items.iter().map(|d| d.code).collect();
         codes.sort_unstable();
         codes.dedup();
-        codes
+        let mut lines: Vec<String> = codes
             .into_iter()
             .filter_map(|code| {
                 let mut group: Vec<&Diagnostic> = self
@@ -87,7 +89,13 @@ impl Diagnostics {
                     sites.join(", ")
                 ))
             })
-            .collect()
+            .collect();
+        if lines.len() > MAX_LINES {
+            let rest = lines.len() - MAX_LINES;
+            lines.truncate(MAX_LINES);
+            lines.push(format!("+{rest}"));
+        }
+        lines
     }
 }
 
@@ -116,6 +124,17 @@ mod tests {
         assert_eq!(scoped, ["? 1 kihagyva: nincs controller-akció (b.vue L9)"]);
         d.clear();
         assert!(d.footer(&[], Lang::En).is_empty());
+    }
+
+    #[test]
+    fn footer_caps_the_reason_codes() {
+        let mut d = Diagnostics::default();
+        for code in ["a", "b", "c", "d", "e"] {
+            d.push(code, WHY, "a.vue", 1);
+        }
+        let out = d.footer(&[], Lang::En);
+        assert_eq!(out.len(), MAX_LINES + 1);
+        assert_eq!(out.last().map(String::as_str), Some("+2"));
     }
 
     #[test]

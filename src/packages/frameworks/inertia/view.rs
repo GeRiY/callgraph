@@ -7,6 +7,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::{Inertia, RenderSite};
+use crate::core::diag::Diagnostics;
 use crate::i18n::Lang;
 
 /// A nem renderelt oldalak sorában legfeljebb ennyi név.
@@ -35,6 +36,20 @@ impl Inertia {
         if let Some(line) = self.unrendered_line(lang) {
             lines.push(line);
         }
+        // renders with a computed page name cannot be bound to a page file
+        let mut diagnostics = Diagnostics::default();
+        for (file, line) in self.dynamic.iter().filter(|(file, _)| in_scope(file)) {
+            diagnostics.push(
+                "inertia-dynamic",
+                (
+                    "page name is not a literal, the render is not bound to a page",
+                    "az oldal neve nem literál, a render nincs oldalhoz kötve",
+                ),
+                file,
+                *line,
+            );
+        }
+        lines.extend(diagnostics.footer(&[], lang));
         lines
     }
 

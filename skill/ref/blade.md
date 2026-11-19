@@ -19,5 +19,10 @@ Branches: `@if` / `@unless` / `@isset` / `@auth` / `@can` / `@env` / `@switch` �
 Laravel links: the outline of a Blade file shows `rendered by:` (the class and method calling `view('…')`, `View::make`,
 `Route::view`, `->view()` / `->markdown()`) and `used by:` (other templates via `@extends` / `@include` / `<x-…>`);
 `--grep layouts/app.blade.php` (or `layouts.app`) lists the views using a layout, `--depth` follows them;
-`--format views` on a Blade file lists its view usage. Not covered: custom `Blade::directive` bodies, `@verbatim`, `{{-- --}}`,
-dynamic view names (`@include($view)`), `<x-dynamic-component>`, package-namespaced views (`mail::x`); a missing target file still resolves to a path.
+`--format views` on a Blade file lists its view usage.
+Header lines of a Blade outline: `⚠ missing view: partials.gone (@include L4), components.ghost (<x-…> L8)` (static name, no such
+template / class; package-namespaced `mail::x` and projects without own components are never flagged), `? <x-dynamic-component>, target is a
+run-time value: L9`, and `directives: @datetime → app/Providers/AppServiceProvider.php L12` (a `Blade::directive` / `Blade::if` registration
+linked to the use; the provider's outline lists `blade directives:` with the views using each). `@vite(['resources/js/app.ts', …])`
+entries are `import` edges to the existing files (`--grep resources/js/app.ts` finds the template). Not covered: custom directive bodies,
+`@verbatim`, `{{-- --}}`, dynamic view names (`@include($view)`); Alpine (`x-data`, `@click`) is not analysed.

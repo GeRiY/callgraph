@@ -140,6 +140,85 @@ impl WebRoutes {
     }
 }
 
+impl WebRoutes {
+    /// The chain for one target (`trace`): the server routes (`GET /api/chats`, a path, or a handler name) with the
+    /// client calls that reach them, and the client routes (name, path or component). Empty: nothing matches.
+    pub(crate) fn trace_lines(&self, target: &str) -> Vec<String> {
+        let target = target.trim();
+        let target = target.strip_prefix("route:").unwrap_or(target);
+        let spaced = target.replacen(':', " ", 1);
+        let mut lines = Vec::new();
+        for route in &self.client {
+            let hit = route.name.as_deref() == Some(target)
+                || route.path == target
+                || route
+                    .target
+                    .as_deref()
+                    .is_some_and(|t| t == target || t.ends_with(target));
+            if hit {
+                lines.push(format!(
+                    "{}  {}:{}",
+                    client_line(route),
+                    route.file,
+                    route.line
+                ));
+            }
+        }
+        // `GET /api/chats` (or a bare `/api/chats`) also reaches a regex route that matches the path
+        let (want_method, want_path) = match spaced.split_once(' ') {
+            Some((method, path)) if path.starts_with('/') => (Some(method), path),
+            _ => (None, target),
+        };
+        for route in &self.server {
+            let named = format!("{} {}", route.method, route.path);
+            let matcher = route_matcher(route);
+            let regex_hit = route.regex
+                && want_path.starts_with('/')
+                && want_method.is_none_or(|m| m.eq_ignore_ascii_case(&route.method))
+                && matcher.as_ref().is_some_and(|re| re.is_match(want_path));
+            let hit = named == spaced
+                || route.path == target
+                || regex_hit
+                || route.handler == target
+                || route.handler.ends_with(&format!("::{target}"));
+            if !hit {
+                continue;
+            }
+            let callers: Vec<&UrlUse> = matcher
+                .as_ref()
+                .map(|re| {
+                    self.urls
+                        .iter()
+                        .filter(|url| url_matches(route, re, url))
+                        .collect()
+                })
+                .unwrap_or_default();
+            lines.push(format!(
+                "{}  {}:{}",
+                server_line(route, &callers),
+                route.file,
+                route.line
+            ));
+        }
+        capped(lines, MAX_WARNINGS)
+    }
+
+    /// Every target `trace_lines` understands (for the "did you mean" hint).
+    pub(crate) fn trace_candidates(&self) -> Vec<String> {
+        let mut out: Vec<String> = Vec::new();
+        for route in &self.client {
+            out.extend(route.name.clone());
+            out.push(route.path.clone());
+        }
+        for route in &self.server {
+            out.push(format!("{} {}", route.method, route.path));
+        }
+        out.sort();
+        out.dedup();
+        out
+    }
+}
+
 fn capped(mut lines: Vec<String>, max: usize) -> Vec<String> {
     if lines.len() > max {
         let rest = lines.len() - max;

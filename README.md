@@ -235,6 +235,7 @@ registering; without it, the current directory is the root.
 | Task | Command |
 |---|---|
 | Where do I start with this task? | `callgraph.sh locate <term>... [--all]` |
+| The whole chain of a route / page (route, middleware, action, rules, models, page + props; ≤ 30 lines) | `callgraph.sh trace <route::name\|Ctrl::method\|/uri\|Pages/X.vue>` |
 | Outline of a file / directory | `callgraph.sh <file\|dir>` |
 | One method only | `callgraph.sh <file>::<method>` (several selectors allowed) |
 | Method source, line-numbered | `callgraph.sh <file>::<method> --body` |
@@ -373,7 +374,7 @@ Step-by-step setup per client (Claude Code, Claude Desktop, Cursor, VS Code): [c
 
 Besides the Claude Code skill (unchanged, fully supported), the same binary is also an
 [MCP](https://modelcontextprotocol.io) server on stdio, so any MCP client can use it: `callgraph mcp`.
-Tools: `locate`, `outline`, `method_body`, `find_callers`, `search`, `framework_view`, `notes`, `projects`, `guide`, `project_profile`. They return
+Tools: `locate`, `outline`, `method_body`, `find_callers`, `search`, `framework_view`, `trace`, `notes`, `projects`, `guide`, `project_profile`. They return
 the same compact text as the CLI, with the same output cap; read-only, paths are confined to the project root, and
 queries never use the network (only the once-a-day update check below does).
 On connect the server sends the client a short usage guide in your language (which tool to use when, how to find

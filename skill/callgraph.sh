@@ -10,6 +10,7 @@
 # forwarded to `callgraph locate`).
 # `callgraph.sh profile [--project alias] [--full]` prints the project profile (forwarded to `callgraph profile`).
 # `callgraph.sh uses <package> [--calls] [--project alias]` shows where the code uses a dependency (forwarded to `callgraph uses`).
+# `callgraph.sh trace <target> [--project alias]` prints the task slice of a route / controller action / page (forwarded to `callgraph trace`).
 # `callgraph.sh deps [--project alias]` lists probably unused / missing / dev-only dependencies (forwarded to `callgraph deps`).
 # `callgraph.sh stats [--days N]` shows the local usage stats (forwarded to `callgraph stats`; nothing is sent anywhere).
 # `callgraph.sh --version` (or `-V`, `version`) prints the binary's version and platform, and the binary's path.
@@ -73,6 +74,13 @@ if [[ "${1:-}" == --project && "${3:-}" == uses ]]; then
     run_callgraph uses --project "$2" "${@:4}"
 fi
 if [[ "${1:-}" == uses ]]; then
+    run_callgraph "$@"
+fi
+# feladat-szelet: `callgraph.sh [--project alias] trace <cél>` → `callgraph trace …` (route → controller → szabályok → modellek → oldal)
+if [[ "${1:-}" == --project && "${3:-}" == trace ]]; then
+    run_callgraph trace --project "$2" "${@:4}"
+fi
+if [[ "${1:-}" == trace ]]; then
     run_callgraph "$@"
 fi
 # függőség-vizsgálat: `callgraph.sh [--project alias] deps` → `callgraph deps …` (fölösleges / hiányzó / csak dev)

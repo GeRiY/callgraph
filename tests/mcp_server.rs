@@ -134,7 +134,8 @@ fn initialize_list_and_call_outline() {
             "package_usage",
             "project_profile",
             "projects",
-            "search"
+            "search",
+            "trace"
         ]
     );
     // minden eszköz csak olvas: a négy annotáció explicit (katalógusok, pl. az OpenAI-é, enélkül elutasítják)
@@ -726,10 +727,10 @@ fn generate_tool_appears_only_when_enabled() {
         s.response(2)["result"]["tools"].as_array().unwrap().clone()
     };
 
-    // alapból: nincs `generate` (a meglévő tizenkét eszköz marad)
+    // alapból: nincs `generate` (a meglévő tizenhárom eszköz marad)
     let mut off = Session::start_in(&dir);
     let tools = list(&mut off);
-    assert_eq!(tools.len(), 12);
+    assert_eq!(tools.len(), 13);
     assert!(
         tools
             .iter()
@@ -739,7 +740,7 @@ fn generate_tool_appears_only_when_enabled() {
 
     let mut on = Session::start_with(&dir, &[("CALLGRAPH_GENERATE", std::ffi::OsStr::new("1"))]);
     let tools = list(&mut on);
-    assert_eq!(tools.len(), 15);
+    assert_eq!(tools.len(), 16);
     let rename = tools.iter().find(|t| t["name"] == "rename").unwrap();
     assert_eq!(
         rename["annotations"]["readOnlyHint"],

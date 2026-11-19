@@ -13,6 +13,7 @@ use super::profile_args::{LayerArgs, parse_profile};
 use super::rename_args::parse_rename;
 use super::stats_args::parse_stats;
 use super::telemetry_args::{TelemetryAction, parse_telemetry};
+use super::trace_args::parse_trace;
 use super::uses_args::{parse_deps, parse_uses};
 
 fn usage() -> &'static str {
@@ -198,6 +199,12 @@ pub enum CliArgs {
         calls: bool,
         project: Option<String>,
     },
+    /// `trace <cél>`: a feladat-szelet egy route-ra, controller-akcióra vagy oldalra (egy tömör lánc); `project`:
+    /// alias vagy gyökér-út.
+    Trace {
+        target: String,
+        project: Option<String>,
+    },
     /// `deps`: fölösleges, hiányzó és csak dev függőségek; `project`: alias vagy gyökér-út.
     Deps { project: Option<String> },
     /// `hook post-edit|install|uninstall|status`; `settings`: a Claude Code `settings.json` helye (alapból
@@ -307,6 +314,9 @@ impl CliArgs {
         }
         if args.first().is_some_and(|a| a == "uses") {
             return parse_uses(&args[1..]);
+        }
+        if args.first().is_some_and(|a| a == "trace") {
+            return parse_trace(&args[1..]);
         }
         if args.first().is_some_and(|a| a == "deps") {
             return parse_deps(&args[1..]);

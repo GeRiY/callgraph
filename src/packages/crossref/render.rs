@@ -116,9 +116,7 @@ impl CrossRef {
     pub(crate) fn header(&self, file: &str, lang: Lang) -> Option<String> {
         let rel = self.rel(file)?;
         let mut lines = Vec::new();
-        if let Some(views) = &self.views
-            && rel.ends_with(".blade.php")
-        {
+        if let Some(views) = &self.views {
             lines.extend(views.lines(&rel, lang));
         }
         if let Some(report) = self

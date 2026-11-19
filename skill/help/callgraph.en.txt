@@ -101,6 +101,7 @@ Project profile (architecture, layers and patterns from folder / file names, che
                                                 counted too); a role in both PHP and JS: controller (php) / controller (js);
                                                 --packages: every direct composer / npm dependency (installed, declared)
   bash ~/.claude/skills/callgraph/callgraph.sh uses <package> [--calls] [--project alias]   where the code uses a dependency (guzzle, @vueuse/core): per API symbol the count, first file, +N; (type) = import without a call; --calls: every call line per file
+  bash ~/.claude/skills/callgraph/callgraph.sh trace <target> [--project alias]   task slice in <= 30 lines: route -> middleware -> controller action -> FormRequest rules -> models -> Inertia page + props -> child components; target: route::name, route:GET:/uri, a URI, Controller::method, Pages/X.vue (JS projects: GET /api/x with its client callers); unknown target: closest names
   bash ~/.claude/skills/callgraph/callgraph.sh deps [--project alias]   probably unused / missing / dev-only composer / npm dependencies (one line each; .callgraphignore: deps-ignore <name>)
   Laravel / Inertia project views (run on the project root, e.g. `. --format ziggy`; outlines also get the short links):
     --format ziggy     unknown route('x') names (JS / Vue / PHP), never-loaded route files; outline: route::x → POST /x · Ctrl@m

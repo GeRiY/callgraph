@@ -50,11 +50,13 @@ bash <skill>/callgraph.sh locate route::events.show "Szervező további esemény
 
 ## Recipes — task → call sequence
 
-Four typical tasks and the calls that answer them (an empty or wrong result comes with a hint: `no call target matches …`,
+Typical tasks and the calls that answer them (an empty or wrong result comes with a hint: `no call target matches …`,
 `Did you mean: …` — follow it instead of retrying blindly):
 
 - **Fix a bug / change behaviour:** `locate <the names in the task>` → the outline of the top file
   (`callgraph.sh <file>`) → `callgraph.sh <file>::<method> --body` for just the method you need.
+- **Work on a route / page (Laravel, Inertia, Vue, JS server routes):** `callgraph.sh trace route::events.show` first (also
+  `Ctrl::method`, a URI, `Pages/X.vue`): the whole chain in <= 30 lines (route, middleware, action, rules, models, page + props).
 - **"Who calls this / what does it affect if I change it":** `callgraph.sh <dir> --grep '(^|::|\.|->)name$' --depth 2`
   (the name pattern catches every call) → `callgraph.sh <caller file>::<caller method> --body`.
 - **Unfamiliar project:** `callgraph.sh profile` (architecture, layers) → `locate <terms>` → the outline of the files it

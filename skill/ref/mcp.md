@@ -31,4 +31,4 @@ Output is capped at 400 lines (directory → summary, file → method index, sea
 `method` or `pattern` first; `full: true` only when justified.
 <!-- /mcp -->
 CLI equivalents: `locate` = `bash $CG locate <term>…`, `outline` = `bash $CG <path>` (`method` = `<path>::name`), `method_body` = `::name --body`,
-`find_callers` = `--grep`, `search` = `--strings` / `--const`, `framework_view` = `--format <view>`, `notes` = `--notes`.
+`find_callers` = `--grep`, `search` = `--strings` / `--const`, `framework_view` = `--format <view>`, `trace` = `bash $CG trace <target>`, `notes` = `--notes`.

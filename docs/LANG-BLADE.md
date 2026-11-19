@@ -39,11 +39,22 @@ megjelennek.
 - **Nézet-hivatkozás fájlra**: a `view_use` hívás `resolved`-je a fájl útja, így `--grep layouts/app.blade.php` (vagy
   `layouts.app`) a layout-ot használó nézeteket adja, és a `--depth` követi őket.
 - **`--format views`** a Blade-fájlnál a nézet-használatot (`@extends`, `@include`, `<x-…>`) listázza.
+- **Hiányzó cél** (`crossref/views.rs`): a Blade-outline fejlécében `⚠ missing view: partials.gone (@include L4), components.ghost
+  (<x-…> L8)` — csak statikus névre; a csomag-névterű (`mail::x`) nézet soha, és a `<x-…>` csak akkor, ha a projektnek van saját
+  komponense (`components/` sablon vagy `app/View/Components`); az `index` sablon és az osztály is találat.
+  `<x-dynamic-component>`: `? <x-dynamic-component>, target is a run-time value: L9` (nem hiányzó, csak futásidejű).
+- **Egyedi direktíva**: a `Blade::directive('név', …)` / `Blade::if('név', …)` regisztrációt a provider outline-ja listázza
+  (`blade directives: @datetime L12 → page`), a sablon fejléce a használt, regisztrált direktívát linkeli
+  (`directives: @datetime → app/Providers/AppServiceProvider.php L12`); a nem regisztrált `@név` (Alpine `@click`) nem szerepel.
+- **`@vite([...])`**: minden literál belépő `import` / `module_use` él a meglévő fájlra (mint a HTML `<script src>`), így a
+  `--grep resources/js/app.ts` a sablont is megtalálja.
 
 ## Korlátok
 - A direktívák ismert körét ismeri; egyedi (`Blade::directive`) direktíva törzse nem elemződik.
 - A `@verbatim` blokk, a `{{-- --}}` komment és az `@{{ }}` escape kimarad.
 - A `{{ $x or 'y' }}` típusú, nem érvényes PHP-kifejezés kimarad (a többi kifejezés érintetlen).
-- Egy `@include` / `<x-…>` célja nem létező fájl is feloldódik útra (a hiányát az outline nem jelzi).
+- Egy `@include` / `<x-…>` célja nem létező fájl is feloldódik útra; a hiányát az outline fejléce jelzi (lásd fent).
 - A dinamikus nézet-név (`@include($view)`), a `<x-dynamic-component>` és a csomag-névterű (`mail::x`) nézet nem
-  oldódik fel fájlra.
+  oldódik fel fájlra (és nem is hiányzó).
+- Az Alpine-kifejezések (`x-data`, `@click`) nincsenek elemezve (a JS-elemző a `.vue` sablonra van bekötve, a Blade
+  attribútumra nem); a `@click` nem direktíva-használat.

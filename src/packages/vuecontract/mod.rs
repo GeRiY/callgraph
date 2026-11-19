@@ -25,6 +25,7 @@ use std::sync::Arc;
 use rayon::prelude::*;
 
 use crate::analysis::Analyzer;
+use crate::core::diag::Diagnostics;
 use crate::io::FileWalker;
 use crate::lang::js::{Sfc, TemplateFacts, template_facts};
 use crate::query::QueryResult;
@@ -83,6 +84,8 @@ pub(crate) struct VueContract {
     /// Component uses of the queried files that were bound to a `.vue` child.
     checked: usize,
     findings: Vec<Finding>,
+    /// The uses that could not be checked (footer of the view).
+    diagnostics: Diagnostics,
 }
 
 impl VueContract {
@@ -118,6 +121,21 @@ impl Project {
         for comp in self.comps.iter().filter(|c| scope.contains(&c.rel)) {
             for usage in &comp.facts.uses {
                 let Some((child, auto)) = self.bind(comp, &usage.tag) else {
+                    let pas = pascal(&usage.tag);
+                    let imported_vue = comp.imports.iter().any(|(alias, display)| {
+                        (alias == &usage.tag || *alias == pas) && display.ends_with(".vue")
+                    });
+                    if imported_vue {
+                        out.diagnostics.push(
+                            "props-child",
+                            (
+                                "child component file not found or ambiguous",
+                                "a gyerek-komponens fájlja nem található vagy nem egyértelmű",
+                            ),
+                            &comp.rel,
+                            usage.line,
+                        );
+                    }
                     continue;
                 };
                 out.checked += 1;
@@ -138,7 +156,17 @@ impl Project {
                     .chain(&usage.models)
                     .map(|name| camelize(name))
                     .collect();
-                if !usage.dynamic {
+                if usage.dynamic {
+                    out.diagnostics.push(
+                        "props-spread",
+                        (
+                            "v-bind object: required props not checked",
+                            "v-bind objektum: a kötelező props nincs ellenőrizve",
+                        ),
+                        &comp.rel,
+                        usage.line,
+                    );
+                } else {
                     for prop in child.props.iter().filter(|p| p.required) {
                         if !passed.contains(&prop.name) {
                             push(Kind::MissingProp, &prop.name);

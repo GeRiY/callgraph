@@ -18,6 +18,7 @@ mod routes;
 mod rules;
 mod schema;
 mod table;
+mod trace;
 mod view;
 
 #[cfg(test)]
@@ -41,7 +42,7 @@ use crate::model::{Call, FileGraph};
 use crate::packages::Packages;
 pub(crate) use models::extends_model_base;
 use parts::{FormContracts, ModelCatalog, RouteRefs, RouteTable};
-use routes::{Action, Route};
+pub(crate) use routes::{Action, Route, short_class};
 
 /// A framework neve a `FRAMEWORKS` regiszterben (`laravel/framework`): ez kapcsolja be a stratégiát.
 pub(crate) const NAME: &str = "laravel";

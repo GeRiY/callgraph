@@ -443,7 +443,10 @@ fn returned_object(function: &str) -> Option<&str> {
 }
 
 /// A `composer.json` `autoload` / `autoload-dev` PSR-4 leképezése: (előtag `\\`-rel a végén, mappa `/` nélkül).
-fn composer_psr4(root: &std::path::Path, files: &dyn ProjectFiles) -> Vec<(String, String)> {
+pub(super) fn composer_psr4(
+    root: &std::path::Path,
+    files: &dyn ProjectFiles,
+) -> Vec<(String, String)> {
     let Some(text) = files.read(&root.join("composer.json")) else {
         return Vec::new();
     };
@@ -740,7 +743,7 @@ impl Laravel {
 
     /// Egy osztály lehetséges forrás-útjai a gyökérhez relatívan, a keresés sorrendjében: a gráfokból gyűjtött
     /// térkép, majd a PSR-4 (`App\X\Y` → `app/X/Y.php`).
-    fn class_rels(&self, class: &str, classes: &HashMap<String, String>) -> Vec<String> {
+    pub(super) fn class_rels(&self, class: &str, classes: &HashMap<String, String>) -> Vec<String> {
         let mapped = classes.get(class).cloned();
         let psr4 = class
             .strip_prefix("App\\")

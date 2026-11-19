@@ -104,6 +104,24 @@ pub(crate) fn component_file(name: &str, from: &str) -> Option<String> {
     })
 }
 
+/// The class file of an `x-` component view name (`components.forms.input` → `app/View/Components/Forms/Input.php`).
+pub(crate) fn component_class(view: &str) -> Option<String> {
+    let name = view.strip_prefix("components.")?;
+    Some(format!(
+        "app/View/Components/{}.php",
+        name.split('.').map(studly).collect::<Vec<_>>().join("/")
+    ))
+}
+
+/// A `@vite([...])` entry as the project-relative path of the JS / CSS file, when the file exists on disk (the
+/// entries are relative to the project root, like `resources/js/app.ts`); `None`: the root is unknown or the file is
+/// missing.
+pub(crate) fn vite_entry(entry: &str, from: &str) -> Option<String> {
+    let entry = entry.trim().trim_start_matches('/');
+    let root = project_root(from);
+    exists(root.as_deref(), entry).then(|| entry.to_owned())
+}
+
 /// A `<livewire:név>` osztálya a gyökérhez relatívan, ha a lemezen megtalálható (`app/Livewire/Név.php`, régebben
 /// `app/Http/Livewire/Név.php`); különben `None`.
 pub(crate) fn livewire_file(name: &str, from: &str) -> Option<String> {
@@ -143,6 +161,19 @@ mod tests {
         );
         assert_eq!(view_file("mail::message"), None);
         assert_eq!(normalize("a/b"), "a.b");
+    }
+
+    #[test]
+    fn component_views_have_a_class_file() {
+        assert_eq!(
+            component_class("components.forms.input").as_deref(),
+            Some("app/View/Components/Forms/Input.php")
+        );
+        assert_eq!(component_class("layouts.app"), None);
+        assert_eq!(
+            vite_entry("resources/js/app.ts", "/nope/resources/views/a.blade.php"),
+            None
+        );
     }
 
     #[test]
