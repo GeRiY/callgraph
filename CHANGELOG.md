@@ -48,6 +48,40 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 - **HTML entry files link to their scripts and stylesheets:** `<script src>` and `<link rel="stylesheet" href>` show
   as `import /src/main.ts` lines and count as imports, so `--grep src/main.ts` finds `index.html`. External URLs are
   ignored.
+- **React function components show their props in the outline:** a component lists them as
+  `props (4): title*, size, onSave*, children` (`*` = required). They are read from the first parameter
+  (destructuring with defaults and `...rest`), its TS type (inline, local or imported `interface` / `type`,
+  `extends`, `A & B`), `FC<Props>`, `memo(…)` / `forwardRef<El, Props>(…)`, `X.propTypes` (`.isRequired`) and
+  `X.defaultProps`. A project hook (`function useCart()` that runs a React hook) is marked `[hook]` and its callers
+  link to it; `createContext`, `<X.Provider>` / `<X.Consumer>` and `useContext(X)` share one key
+  `react::context:<file>::X`, so `--grep` finds the provider and every consumer.
+- **`--format props` checks React JSX uses too:** it lists `⚠ missing required prop 'onSave'  src/pages/Home.tsx
+  L19 <Card>` and `⚠ unknown prop 'colour'`. It is conservative: a `{...spread}` skips the "missing" check, a
+  `...rest`, an `HTMLAttributes`-extending, union or unresolved props type skips the "unknown" check, and `key`,
+  `ref`, `children`, `className`, `style`, `data-*` and `aria-*` are never unknown. Only components bound statically
+  (same file or a direct import of a project file) are checked.
+- **`--format routes` reads react-router:** `<Routes><Route path element /></Routes>` trees (nested, `index`) and
+  `createBrowserRouter([…])` / `createHashRouter` / `useRoutes([…])` arrays (`element`, `Component`, `lazy`,
+  `children`) are listed, and a literal `<Link to>` / `<NavLink>` / `<Navigate>` / `navigate('/x')` path that no
+  route matches is flagged `⚠ unknown route path '/x'` (`:param` and `*` match). No warning without a route table or
+  with a non-literal path.
+- **Inertia pages written in React:** in an `@inertiajs/react` project `Inertia::render('Events/Show', …)` resolves to
+  `Pages/Events/Show.tsx` (or `.jsx`), the page props are those of its default-exported component, so
+  `--format inertia` flags required props the controller never passes, and `trace` reaches the page and the
+  components it imports.
+- **`gen react:` writes React components, `gen hook:` custom hooks:**
+  `react:Card>props(title:str,size?:'sm'|'md'='md')+ref:count:int=0+fn:inc():void{…}+jsx>div.card>h1{{ title }}` with
+  `--write src/components/Card.tsx` writes a function component: a typed props interface in `.tsx`, plain JS with
+  JSDoc in `.jsx`, `useState` for `ref:`, an `onSave` callback prop for `emits(save:int)`, `useEffect` for
+  `on:mounted{…}` and Inertia `useForm` for `form(a,b)`. Semicolons, indent and default vs named export follow the
+  project's components. `--into src/Card.tsx` adds props, state, handlers and elements to an existing component;
+  `--replace` is not available for `.tsx` / `.jsx` and says so. `hook:useCart>ref:items:list<Item>=[]+fn:add(…){…}`
+  with `--write src/hooks/useCart.ts` writes a hook module. The MCP `generate` tool accepts both forms.
+- **The `laravel:` preset writes React pages in Inertia + React projects:** with `@inertiajs/react` it writes the
+  `Index`, `Create`, `Edit` and `Show` pages (for example `Pages/Fees/Create.tsx`) as `.tsx` or `.jsx`, using the
+  project's own input, label, error and button components (found by name and props, or set in `.callgraph/gen.toml`
+  `[components]`). Translation calls are added only when existing pages already use a translation hook such as
+  `useTranslation()`.
 - **More views say what they skipped:** like `--format forms`, the `routes`, `inertia` and `props` views end with a
   line per reason, such as a route name built at run time, a page name that is not a literal or a `v-bind` object
   (`? 2 skipped: <reason> (a.vue L3, b.vue L9, +N)`), instead of silently leaving the item out.
@@ -63,6 +97,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
   `@click="a(); b++"` are read, optional-chain calls (`a?.b()`) are found and dynamic calls (`handlers[name]()`) are
   marked. `v-for` items and slot props are local names, so `item.open()` is no longer listed as a call. An expression
   that cannot be parsed falls back to the previous name-based reading.
+- **`useContext(X)` points to the context, not to React:** it is now an edge to `react::context:<file>::X` instead
+  of `react::useContext`. The cache format changed again; existing caches are rebuilt automatically.
 
 ## [1.1.1] — 2026-11-18
 

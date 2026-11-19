@@ -53,6 +53,43 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 - **A HTML belépőfájlok a szkriptjeikre és stíluslapjaikra hivatkoznak:** a `<script src>` és a
   `<link rel="stylesheet" href>` `import /src/main.ts` sorként jelenik meg és importnak számít, így a
   `--grep src/main.ts` megtalálja az `index.html`-t. A külső URL-eket figyelmen kívül hagyja.
+- **A React függvény-komponensek props-ai megjelennek az outline-ban:** a komponens alatt
+  `props (4): title*, size, onSave*, children` sor áll (`*` = kötelező). Az első paraméterből olvassa őket
+  (destrukturálás alapértékkel és `...rest`-tel), a TS-típusából (inline, helyi vagy importált `interface` / `type`,
+  `extends`, `A & B`), a `FC<Props>`, `memo(…)` / `forwardRef<El, Props>(…)` alakból, az `X.propTypes`
+  (`.isRequired`) és az `X.defaultProps` objektumból. A projekt saját hookja (React-hookot futtató
+  `function useCart()`) `[hook]` jelölést kap, és a hívói rá mutatnak; a `createContext`, a `<X.Provider>` /
+  `<X.Consumer>` és a `useContext(X)` egy kulcson osztozik (`react::context:<fájl>::X`), így a `--grep` a providert
+  és minden fogyasztót megtalál.
+- **A `--format props` a React JSX-használatokat is ellenőrzi:** listázza a
+  `⚠ missing required prop 'onSave'  src/pages/Home.tsx L19 <Card>` és a `⚠ unknown prop 'colour'` eseteket.
+  Óvatos: a `{...spread}` kikapcsolja a „hiányzó”, a `...rest`, a `HTMLAttributes`-t kiterjesztő, unió vagy fel nem
+  oldható props-típus az „ismeretlen” ellenőrzést, a `key`, `ref`, `children`, `className`, `style`, `data-*` és
+  `aria-*` pedig sosem ismeretlen. Csak a statikusan kötött komponenst nézi (ugyanabban a fájlban vagy egy
+  projektfájl közvetlen importjaként).
+- **A `--format routes` a react-routert is olvassa:** a `<Routes><Route path element /></Routes>` fákat (beágyazva,
+  `index`-szel) és a `createBrowserRouter([…])` / `createHashRouter` / `useRoutes([…])` tömböket (`element`,
+  `Component`, `lazy`, `children`) listázza, és a literális `<Link to>` / `<NavLink>` / `<Navigate>` /
+  `navigate('/x')` útvonalat, amelyre egy route sem illeszkedik, `⚠ unknown route path '/x'` jelzéssel látja el (a
+  `:param` és a `*` illeszkedik). Route-tábla nélkül vagy nem literális útvonalnál nincs figyelmeztetés.
+- **Reactban írt Inertia-oldalak:** `@inertiajs/react` projektben az `Inertia::render('Events/Show', …)` a
+  `Pages/Events/Show.tsx` (vagy `.jsx`) fájlra oldódik, az oldal props-ai az alapértelmezetten exportált komponens
+  props-ai, így a `--format inertia` jelzi a controller által soha át nem adott kötelező props-ot, a `trace` pedig
+  eljut az oldalig és az általa importált komponensekig.
+- **A `gen react:` React-komponenst, a `gen hook:` saját hookot ír:** a
+  `react:Card>props(title:str,size?:'sm'|'md'='md')+ref:count:int=0+fn:inc():void{…}+jsx>div.card>h1{{ title }}` a
+  `--write src/components/Card.tsx` mellett függvény-komponenst ír: `.tsx`-ben típusos props-interface-szel,
+  `.jsx`-ben sima JS-sel és JSDoc-kal; a `ref:` `useState`, az `emits(save:int)` `onSave` callback prop, az
+  `on:mounted{…}` `useEffect`, a `form(a,b)` Inertia `useForm` lesz. A pontosvessző, a behúzás és a default vagy
+  névvel exportálás a projekt komponenseit követi. A `--into src/Card.tsx` props-ot, állapotot, kezelőket és elemeket
+  ad egy meglévő komponenshez; a `--replace` `.tsx` / `.jsx` fájlra nem érhető el, és ezt egyértelmű hibával jelzi.
+  A `hook:useCart>ref:items:list<Item>=[]+fn:add(…){…}` a `--write src/hooks/useCart.ts` mellett hook-modult ír. Az
+  MCP `generate` eszköz mindkét alakot elfogadja.
+- **A `laravel:` preset Inertia + React projektben React-oldalakat ír:** `@inertiajs/react` mellett az `Index`, a
+  `Create`, az `Edit` és a `Show` oldalt (például `Pages/Fees/Create.tsx`) `.tsx` vagy `.jsx` fájlként írja meg, a
+  projekt saját input-, label-, hiba- és gombkomponenseivel (név és props alapján megtalálva, vagy a
+  `.callgraph/gen.toml` `[components]` szakaszában megadva). Fordítás-hívás csak akkor kerül bele, ha a meglévő
+  oldalak már használnak fordító hookot, például `useTranslation()`-t.
 - **Több nézet is megmondja, mit hagyott ki:** a `--format forms` mintájára a `routes`, az `inertia` és a `props`
   nézet is okonként egy sorral zárul, például futásidőben épített route-név, nem literál oldalnév vagy `v-bind`
   objektum esetén (`? 2 kihagyva: <ok> (a.vue L3, b.vue L9, +N)`), ahelyett hogy csendben kihagyná az elemet.
@@ -69,6 +106,8 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
   függvények), az inline kezelőket (`@click="a(); b++"`) is beolvassa, az optional chaining hívásokat (`a?.b()`)
   megtalálja, a dinamikus hívásokat (`handlers[name]()`) jelöli. A `v-for` elemei és a slot-propok helyi nevek, így
   az `item.open()` már nem jelenik meg hívásként. A nem parsolható kifejezésre a korábbi, név szerinti olvasás fut.
+- **A `useContext(X)` a contextre mutat, nem a Reactra:** mostantól a `react::context:<fájl>::X` kulcsra mutató él,
+  nem `react::useContext`. A cache formátuma ismét változott; a meglévő cache magától újraépül.
 
 ## [1.1.1] — 2026-11-18
 
