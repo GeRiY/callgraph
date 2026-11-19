@@ -8,6 +8,7 @@ mod crossref;
 mod forms;
 mod inertia;
 mod models;
+mod props;
 mod route_table;
 mod routes;
 mod rules;
@@ -139,6 +140,7 @@ pub(super) fn register(registry: &mut FormatterRegistry) {
     registry.register("models", Box::new(models::ModelsView));
     registry.register("i18n", Box::new(crossref::I18nView));
     registry.register("classes", Box::new(crossref::ClassesView));
+    registry.register("props", Box::new(props::PropsView));
 }
 
 /// `<ns><container|__top__>::<caller>` — a hívás helye.

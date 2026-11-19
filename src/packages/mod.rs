@@ -31,6 +31,7 @@ mod resolve;
 mod sources;
 mod stack;
 mod usage;
+pub(crate) mod vuecontract;
 pub(crate) mod webroutes;
 
 #[cfg(test)]
@@ -54,6 +55,7 @@ pub(crate) use project::ProjectPackages;
 pub(crate) use resolve::Attribution;
 pub(crate) use stack::Stack;
 pub(crate) use usage::UsageQuery;
+pub(crate) use vuecontract::VueContract;
 pub(crate) use webroutes::WebRoutes;
 
 #[cfg(test)]

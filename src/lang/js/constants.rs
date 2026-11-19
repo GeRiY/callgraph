@@ -66,6 +66,44 @@ impl JsPass for ConstantsPass {
         for call in macro_calls(program, "defineModel") {
             push_model(ctx, &container, call, out);
         }
+        // `defineExpose({ a, b })` / Options `expose: ['a']`: what a parent reaches through a template ref
+        let mut exposed = BTreeSet::new();
+        for call in macro_calls(program, "defineExpose") {
+            if let Some(Argument::ObjectExpression(obj)) = call.arguments.first() {
+                exposed.extend(object_keys(obj));
+            }
+        }
+        if !exposed.is_empty() {
+            let line = ctx.lines.line_of(
+                macro_calls(program, "defineExpose")
+                    .first()
+                    .map_or(0, |c| c.span.start as usize),
+            );
+            push_kind(&container, "expose", line, exposed, out);
+        }
+    }
+}
+
+/// `expose:<name>` constants: `defineExpose` keys.
+fn push_kind(
+    container: &str,
+    kind: &str,
+    line: u32,
+    names: BTreeSet<String>,
+    out: &mut JsAnalysis,
+) {
+    for name in names {
+        out.builder.constant(Constant {
+            js: true,
+            container: Some(container.to_string()),
+            kind: kind.into(),
+            name: format!("{kind}:{name}"),
+            line,
+            value: None,
+            visibility: None,
+            caller: None,
+            doc: None,
+        });
     }
 }
 
@@ -89,16 +127,21 @@ fn emit_names(expr: &Expression<'_>) -> BTreeSet<String> {
                 }
             }
         }
-        Expression::ObjectExpression(obj) => {
-            for p in &obj.properties {
-                if let ObjectPropertyKind::ObjectProperty(p) = p
-                    && let Some(k) = key_name(&p.key)
-                {
-                    names.insert(k.to_string());
-                }
-            }
-        }
+        Expression::ObjectExpression(obj) => names = object_keys(obj),
         _ => {}
+    }
+    names
+}
+
+/// The static keys (`a`, `'b'`) of an object literal; a shorthand `{ a }` counts.
+fn object_keys(obj: &ObjectExpression<'_>) -> BTreeSet<String> {
+    let mut names = BTreeSet::new();
+    for p in &obj.properties {
+        if let ObjectPropertyKind::ObjectProperty(p) = p
+            && let Some(k) = key_name(&p.key)
+        {
+            names.insert(k.to_string());
+        }
     }
     names
 }

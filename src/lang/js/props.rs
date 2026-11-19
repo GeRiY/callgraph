@@ -1,15 +1,28 @@
 //! `properties`: a Vue `props` (defineProps / Options `props:`), objektum-, tömb- és TS típus-literál alakkal.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use oxc_ast::ast::*;
 use oxc_span::{GetSpan, Span};
 
 use super::analysis::{JsAnalysis, JsPass, PassContext};
+use super::lines::LineIndex;
+use super::parse::{parse_program, source_type_for};
+use super::resolve::Resolver;
 use crate::model::Property;
 
 /// A `defineProps(...)` / `defineProps<T>()` és az Options API `props:` gyűjtője.
-pub struct PropsPass;
+pub struct PropsPass {
+    resolver: Arc<Resolver>,
+}
+
+impl PropsPass {
+    /// The resolver finds the files of imported prop types (`defineProps<ImportedProps>()`).
+    pub fn new(resolver: Arc<Resolver>) -> Self {
+        Self { resolver }
+    }
+}
 
 impl JsPass for PropsPass {
     fn run(&self, ctx: &PassContext<'_>, program: &Program<'_>, out: &mut JsAnalysis) {
@@ -35,6 +48,9 @@ impl JsPass for PropsPass {
                             program,
                             container: &container,
                             defaults: &defaults,
+                            resolver: &self.resolver,
+                            line: None,
+                            call_line: ctx.lines.line_of(call.span.start as usize),
                         };
                         scope.collect(ty, 0, out);
                     }
@@ -68,13 +84,21 @@ fn with_defaults(ctx: &PassContext<'_>, program: &Program<'_>) -> HashMap<String
 }
 
 /// A `defineProps<T>()` típus-paraméterének feloldása a fájlon belül (típus-literál, helyi `interface` / `type`,
-/// `extends`, `A & B`); importált típust nem követ.
+/// `extends`, `A & B`) és az importált típusé (relatív / alias-os import; a csomagból jövőt nem követi).
 struct TypeScope<'s, 'a, 'c> {
     ctx: &'s PassContext<'c>,
     program: &'s Program<'a>,
     container: &'s str,
     defaults: &'s HashMap<String, String>,
+    resolver: &'s Resolver,
+    /// Importált típusnál a `defineProps` sora (a tagok ide kerülnek); helyi típusnál `None`.
+    line: Option<u32>,
+    /// A `defineProps` hívás sora.
+    call_line: u32,
 }
+
+/// The biggest file read for an imported prop type.
+const MAX_TYPE_FILE: u64 = 1_500_000;
 
 impl TypeScope<'_, '_, '_> {
     fn collect(&self, ty: &TSType<'_>, depth: usize, out: &mut JsAnalysis) {
@@ -123,10 +147,80 @@ impl TypeScope<'_, '_, '_> {
                 _ => {}
             }
         }
+        self.imported(name, depth, out);
+    }
+
+    /// `import type { Props } from './types'`: the interface / type alias is read from the imported file (a local
+    /// relative or aliased import; the members are attributed to the `defineProps` line).
+    fn imported(&self, name: &str, depth: usize, out: &mut JsAnalysis) {
+        // circular imports
+        if depth > 5 {
+            return;
+        }
+        for stmt in &self.program.body {
+            let Statement::ImportDeclaration(decl) = stmt else {
+                continue;
+            };
+            for spec in decl.specifiers.iter().flatten() {
+                let (local, remote) = match spec {
+                    ImportDeclarationSpecifier::ImportSpecifier(s) => {
+                        (s.local.name.as_str(), s.imported.name().to_string())
+                    }
+                    ImportDeclarationSpecifier::ImportDefaultSpecifier(s) => {
+                        (s.local.name.as_str(), "default".to_string())
+                    }
+                    ImportDeclarationSpecifier::ImportNamespaceSpecifier(_) => continue,
+                };
+                if local != name || remote == "default" {
+                    continue;
+                }
+                let source = decl.source.value.display().to_string();
+                let Some(file) = self.resolver.resolve_file(&source, self.ctx.path) else {
+                    return;
+                };
+                if file.extension().is_some_and(|ext| ext == "vue")
+                    || std::fs::metadata(&file)
+                        .ok()
+                        .is_none_or(|m| m.len() > MAX_TYPE_FILE)
+                {
+                    return;
+                }
+                let Ok(text) = std::fs::read_to_string(&file) else {
+                    return;
+                };
+                let allocator = oxc_allocator::Allocator::default();
+                let parsed = parse_program(&allocator, &text, source_type_for(&file, None));
+                let lines = LineIndex::new(&text);
+                let ctx = PassContext {
+                    path: &file,
+                    source: &text,
+                    lines: &lines,
+                    setup: false,
+                };
+                let scope = TypeScope {
+                    ctx: &ctx,
+                    program: &parsed.program,
+                    container: self.container,
+                    defaults: self.defaults,
+                    resolver: self.resolver,
+                    line: Some(self.call_line),
+                    call_line: self.call_line,
+                };
+                scope.named(&remote, depth + 1, out);
+                return;
+            }
+        }
     }
 
     fn members(&self, members: &[TSSignature<'_>], out: &mut JsAnalysis) {
-        type_members(self.ctx, self.container, members, self.defaults, out);
+        type_members(
+            self.ctx,
+            self.container,
+            members,
+            self.defaults,
+            self.line,
+            out,
+        );
     }
 }
 
@@ -244,7 +338,15 @@ fn props_from(ctx: &PassContext<'_>, container: &str, expr: &Expression<'_>, out
                     && let Some(name) = key_name(&p.key)
                 {
                     let (ty, required) = object_prop_type(ctx.source, p);
-                    push(ctx, container, name, p.span.start, ty, required, None, out);
+                    push(
+                        container,
+                        name,
+                        ctx.lines.line_of(p.span.start as usize),
+                        ty,
+                        required,
+                        None,
+                        out,
+                    );
                 }
             }
         }
@@ -254,10 +356,9 @@ fn props_from(ctx: &PassContext<'_>, container: &str, expr: &Expression<'_>, out
                     && let Some(name) = s.value.as_str()
                 {
                     push(
-                        ctx,
                         container,
                         name,
-                        s.span.start,
+                        ctx.lines.line_of(s.span.start as usize),
                         "mixed".into(),
                         false,
                         None,
@@ -304,6 +405,7 @@ fn type_members(
     container: &str,
     members: &[TSSignature<'_>],
     defaults: &HashMap<String, String>,
+    line: Option<u32>,
     out: &mut JsAnalysis,
 ) {
     for m in members {
@@ -330,11 +432,12 @@ fn type_members(
             let ty = ty.unwrap_or_else(|| "mixed".into());
             // `withDefaults` alapérték: külön tárolva (`doc`), és a prop nem kötelező
             let default = defaults.get(name);
+            // a type imported from another file: its members sit on the `defineProps` line
+            let line = line.unwrap_or_else(|| ctx.lines.line_of(span.start as usize));
             push(
-                ctx,
                 container,
                 name,
-                span.start,
+                line,
                 ty,
                 !optional && default.is_none(),
                 default.cloned(),
@@ -347,10 +450,9 @@ fn type_members(
 /// A `default` a prop alapértéke (`withDefaults`); a `Property.default` mezőbe kerül.
 #[allow(clippy::too_many_arguments)]
 fn push(
-    ctx: &PassContext<'_>,
     container: &str,
     name: &str,
-    offset: u32,
+    line: u32,
     ty: String,
     readonly: bool,
     default: Option<String>,
@@ -360,7 +462,7 @@ fn push(
         js: true,
         container: Some(container.to_string()),
         name: name.to_string(),
-        line: ctx.lines.line_of(offset as usize),
+        line,
         type_hint: Some(ty),
         visibility: "public".into(),
         is_static: false,

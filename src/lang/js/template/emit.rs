@@ -29,6 +29,8 @@ pub struct TemplateOut {
 
 pub struct Emitter<'a> {
     pub container: &'a str,
+    /// This component's emit key prefix (`MessageActions.vue::emit:`; `vue::emit:` outside a `.vue` file).
+    pub emit_prefix: &'a str,
     pub methods: &'a HashSet<&'a str>,
     pub imports: &'a Imports,
     pub out: TemplateOut,
@@ -71,6 +73,11 @@ impl Emitter<'_> {
             call.resolved = imp.map(str::to_string);
             self.out.calls.push(call);
         }
+        // the child's emit key prefix (`CellMenu.vue::emit:`) when the tag is an imported `.vue` component
+        let comp = imp
+            .filter(|path| path.ends_with(".vue"))
+            .and_then(|path| path.rsplit('/').next())
+            .map(|file| format!("{file}::emit:"));
         for prop in &el.props {
             match prop {
                 Prop::Dir {
@@ -78,7 +85,7 @@ impl Emitter<'_> {
                     name,
                     arg,
                     exp,
-                } => self.directive(el, *line, name, arg, exp),
+                } => self.directive(el, comp.as_deref(), *line, name, arg, exp),
                 Prop::Attr {
                     line,
                     value: Some(v),
@@ -95,6 +102,7 @@ impl Emitter<'_> {
     fn directive(
         &mut self,
         el: &Element,
+        comp: Option<&str>,
         line: u32,
         name: &str,
         arg: &Option<String>,
@@ -106,9 +114,17 @@ impl Emitter<'_> {
             self.expr_strings(exp, line);
         }
         if name == "on"
-            && let Some(a) = arg.as_deref().filter(|a| !a.is_empty())
+            && let Some(a) = arg
+                .as_deref()
+                .filter(|a| !a.is_empty() && !a.starts_with('['))
         {
             self.string(line, format!("@{a}"));
+            // the parent's listener on a component is an edge to the child's emit key
+            if let Some(prefix) = comp.filter(|_| !is_native_event(a)) {
+                let mut call = self.call(line, "func_call", format!("@{a}"), "vue_emit");
+                call.resolved = Some(format!("{prefix}{}", camelize(a)));
+                self.out.calls.push(call);
+            }
         }
         if let (true, Some(exp)) = (name == "if" || name == "else-if", exp) {
             let cond = collapse(exp);
@@ -139,7 +155,7 @@ impl Emitter<'_> {
             let (category, prefix) = match head {
                 "$t" | "t" | "$tc" => ("i18n_helper", "i18n::"),
                 "route" => ("route_helper", "route::"),
-                "$emit" | "emit" => ("vue_emit", "vue::emit:"),
+                "$emit" | "emit" => ("vue_emit", self.emit_prefix),
                 _ => ("", ""),
             };
             if !category.is_empty() {
@@ -197,6 +213,55 @@ impl Emitter<'_> {
             value,
         });
     }
+}
+
+/// DOM events that fall through to the component's root element: `@click` on a component is rarely a custom emit, and
+/// an edge for each one would be noise.
+fn is_native_event(name: &str) -> bool {
+    const NATIVE: [&str; 24] = [
+        "click",
+        "dblclick",
+        "input",
+        "change",
+        "keydown",
+        "keyup",
+        "keypress",
+        "focus",
+        "blur",
+        "submit",
+        "mouseenter",
+        "mouseleave",
+        "mouseover",
+        "mouseout",
+        "mousedown",
+        "mouseup",
+        "contextmenu",
+        "scroll",
+        "wheel",
+        "touchstart",
+        "touchend",
+        "drop",
+        "paste",
+        "load",
+    ];
+    NATIVE.contains(&name)
+}
+
+/// `some-event` -> `someEvent` (Vue matches `@some-event` to `emit('someEvent')`); `update:model-value` too.
+fn camelize(name: &str) -> String {
+    let mut out = String::with_capacity(name.len());
+    let mut up = false;
+    for c in name.chars() {
+        if c == '-' {
+            up = true;
+        } else if up {
+            out.extend(c.to_uppercase());
+            up = false;
+        } else {
+            out.push(c);
+        }
+    }
+    out
 }
 
 fn is_ident(s: &str) -> bool {

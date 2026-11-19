@@ -1,9 +1,10 @@
 //! A top-level utasítások metódusai: függvény, `const x = fn`, wrapper, hook, osztály.
 
 use oxc_ast::ast::{
-    Argument, BindingPattern, ClassElement, Declaration, Expression, FormalParameter,
-    MethodDefinitionKind, ObjectExpression, ObjectPropertyKind, PropertyDefinition, PropertyKey,
-    Statement, TSAccessibility, TSTypeAnnotation, VariableDeclaration,
+    Argument, BindingPattern, CallExpression, ClassElement, Declaration, Expression,
+    FormalParameter, MethodDefinitionKind, ObjectExpression, ObjectPropertyKind,
+    PropertyDefinition, PropertyKey, Statement, TSAccessibility, TSTypeAnnotation,
+    VariableDeclaration,
 };
 use oxc_span::{GetSpan, Span};
 
@@ -29,6 +30,69 @@ fn is_hook(name: &str) -> bool {
         .and_then(|r| r.chars().next())
         .is_some_and(|c| c.is_ascii_uppercase())
         && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
+/// The keys of a store's `state`: `() => ({ a: 1 })`, `function () { return { a: 1 } }` or a plain object.
+fn state_keys(value: &Expression<'_>) -> Vec<(String, u32)> {
+    let object = |e: &Expression<'_>| -> Vec<(String, u32)> {
+        match e.without_parentheses() {
+            Expression::ObjectExpression(o) => o
+                .properties
+                .iter()
+                .filter_map(|p| match p {
+                    ObjectPropertyKind::ObjectProperty(p) => {
+                        key_name(&p.key).map(|k| (k, p.span.start))
+                    }
+                    _ => None,
+                })
+                .collect(),
+            _ => Vec::new(),
+        }
+    };
+    match FnRef::of_expr(value) {
+        Some(f) => {
+            let mut keys: Vec<(String, u32)> = f
+                .block()
+                .into_iter()
+                .flatten()
+                .flat_map(|s| match s {
+                    Statement::ExpressionStatement(e) => object(&e.expression),
+                    Statement::ReturnStatement(r) => {
+                        r.argument.as_ref().map(object).unwrap_or_default()
+                    }
+                    _ => Vec::new(),
+                })
+                .collect();
+            // `() => ({ a: 1 })`: the expression body
+            if let FnRef::Arrow(a) = f
+                && let Some(e) = a.body.as_expression()
+            {
+                keys.extend(object(e));
+            }
+            keys
+        }
+        None => object(value),
+    }
+}
+
+/// The names in the setup store's `return { a, b }`.
+fn returned_names(stmts: &[Statement<'_>]) -> std::collections::HashSet<String> {
+    stmts
+        .iter()
+        .filter_map(|s| match s {
+            Statement::ReturnStatement(r) => r.argument.as_ref(),
+            _ => None,
+        })
+        .filter_map(|e| match e.without_parentheses() {
+            Expression::ObjectExpression(o) => Some(o),
+            _ => None,
+        })
+        .flat_map(|o| o.properties.iter())
+        .filter_map(|p| match p {
+            ObjectPropertyKind::ObjectProperty(p) => key_name(&p.key),
+            _ => None,
+        })
+        .collect()
 }
 
 /// A kulcs neve (azonosító vagy string); más kulcs nem ad nevet.
@@ -90,10 +154,144 @@ impl Collector<'_> {
                     .and_then(FnRef::of_expr)
             {
                 self.add(&id.name, f, span, Opts::new(vis, &callee.name));
+            } else if let Expression::CallExpression(c) = init
+                && matches!(&c.callee, Expression::Identifier(callee) if callee.name == "defineStore")
+            {
+                self.store(&id.name, c, span);
             } else if let Expression::ObjectExpression(o) = init.without_parentheses() {
                 self.object_methods(&id.name, o, vis, 0);
             }
         }
+    }
+
+    /// A Pinia `defineStore('id', …)`: a store saját container (`store useChatStore`); options-stílusban az
+    /// `actions` / `getters` metódusok, a `state` kulcsai tulajdonságok; setup-stílusban a visszaadott függvények
+    /// az akciók, a visszaadott `computed`-ok getterek, a többi visszaadott név állapot.
+    fn store(&mut self, var: &str, call: &CallExpression<'_>, span: Span) {
+        let Some(def) = call
+            .arguments
+            .iter()
+            .filter_map(Argument::as_expression)
+            .map(Expression::without_parentheses)
+            .find(|e| matches!(e, Expression::ObjectExpression(_)) || FnRef::of_expr(e).is_some())
+        else {
+            return;
+        };
+        self.containers.push(Container {
+            kind: "store".into(),
+            name: var.to_string(),
+            line: self.line(span.start),
+            end_line: self.line(span.end),
+            is_abstract: Some(false),
+            is_final: Some(false),
+            extends: Some(Vec::new()),
+            implements: Some(Vec::new()),
+            traits: Some(Vec::new()),
+            doc: self.docs.doc_of(span.start),
+        });
+        let in_store = |kind: &'static str| Opts {
+            container: Some(var),
+            visibility: "public",
+            is_static: false,
+            kind,
+        };
+        if let Expression::ObjectExpression(o) = def {
+            for p in &o.properties {
+                let ObjectPropertyKind::ObjectProperty(p) = p else {
+                    continue;
+                };
+                match (key_name(&p.key).as_deref(), p.value.without_parentheses()) {
+                    (Some("state"), value) => {
+                        for (name, offset) in state_keys(value) {
+                            self.state_property(var, &name, offset);
+                        }
+                    }
+                    (
+                        Some(group @ ("actions" | "getters")),
+                        Expression::ObjectExpression(inner),
+                    ) => {
+                        let kind = if group == "actions" {
+                            "action"
+                        } else {
+                            "getter"
+                        };
+                        for q in &inner.properties {
+                            let ObjectPropertyKind::ObjectProperty(q) = q else {
+                                continue;
+                            };
+                            if let (Some(name), Some(f)) = (
+                                key_name(&q.key),
+                                FnRef::of_expr(q.value.without_parentheses()),
+                            ) {
+                                self.add(&name, f, q.span, in_store(kind));
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        } else if let Some(f) = FnRef::of_expr(def)
+            && let Some(stmts) = f.block()
+        {
+            let returned = returned_names(stmts);
+            for s in stmts {
+                match s {
+                    Statement::FunctionDeclaration(func) => {
+                        if let Some(id) = func
+                            .id
+                            .as_ref()
+                            .filter(|i| returned.contains(i.name.as_str()))
+                        {
+                            self.add(&id.name, FnRef::Func(func), func.span, in_store("action"));
+                        }
+                    }
+                    Statement::VariableDeclaration(decl) => {
+                        for d in &decl.declarations {
+                            let (Some(id), Some(init)) =
+                                (d.id.get_binding_identifier(), d.init.as_ref())
+                            else {
+                                continue;
+                            };
+                            if !returned.contains(id.name.as_str()) {
+                                continue;
+                            }
+                            let init = init.without_parentheses();
+                            if let Some(f) = FnRef::of_expr(init) {
+                                self.add(&id.name, f, d.span, in_store("action"));
+                            } else if let Expression::CallExpression(c) = init
+                                && matches!(&c.callee, Expression::Identifier(i) if i.name == "computed")
+                                && let Some(f) = c
+                                    .arguments
+                                    .first()
+                                    .and_then(Argument::as_expression)
+                                    .and_then(FnRef::of_expr)
+                            {
+                                self.add(&id.name, f, d.span, in_store("getter"));
+                            } else {
+                                self.state_property(var, &id.name, d.span.start);
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    /// A store állapot-kulcsa tulajdonságként (`state`).
+    fn state_property(&mut self, store: &str, name: &str, offset: u32) {
+        self.properties.push(Property {
+            container: Some(store.to_owned()),
+            name: name.to_owned(),
+            line: self.line(offset),
+            type_hint: Some("state".into()),
+            visibility: "public".into(),
+            is_static: false,
+            readonly: false,
+            doc: None,
+            default: None,
+            js: false,
+        });
     }
 
     /// Objektum-literál függvény-értékű kulcsai (`fetch() {}`, `save: () => …`, `load: function () {}`)

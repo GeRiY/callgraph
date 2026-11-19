@@ -1,7 +1,7 @@
 callgraph.sh — vékony burok az callgraph (Rust) fölött; tömör, token-hatékony PHP / JS / TS / Vue fájl-kontextus agentek számára,
 (a PHP-t, a .vue/.js/.ts fájlokat és a CSS/SCSS/JSON/MD/HTML-t az callgraph elemzi, egy sémában;
  Vue-n: props, emits (emit:<név>), template (komponensek, eseménykezelők), setup, hookok;
- kereshető kulcsok: route::<név>, i18n::<kulcs>, vue::emit:<név>, <fájl>::<export>)
+ kereshető kulcsok: route::<név>, i18n::<kulcs>, <Komp>.vue::emit:<név>, vue::provide:<kulcs>, <fájl>::<export>)
 a fájl beolvasása NÉLKÜL (metódusok + hívás-gráf, kategorizálva).
 
 Használat:
@@ -110,6 +110,7 @@ Projekt-profil (architektúra, rétegek és minták a mappa- / fájlnevekből, a
   Fájltípusok közti nézetek (bármely projekt; mappára vagy fájlra; a nyelvfájl és a stíluslap outline-ja is kap egy összegző sort):
     --format i18n      nyelvenként hiányzó / nem használt fordítási kulcsok, $t('a.b') / __('x') hiányzó kulccsal; lang/en.json::board.title: hol használják a kulcsot
     --format classes   stíluslap-osztályok: mely sablonok használják, sehol nem használt osztályok (engedékeny: a dinamikus osztálynevet és a Tailwind-utility-t sosem jelzi)
+    --format props     Vue-komponensek: amit a szülő átad, és amit a gyerek deklarál (hiányzó kötelező prop, ismeretlen prop, ismeretlen slot; engedékeny: a v-model-t, a $attrs-t és a szabványos HTML-attribútumot sosem jelzi)
   bash ~/.claude/skills/callgraph/callgraph.sh <mappa> --layer service         csak az adott réteg fájljai (név,név...;
                                                 egy ökoszisztéma: controller:php, controller:js, …:swift, …:rust)
   bash ~/.claude/skills/callgraph/callgraph.sh <mappa> --layers                summary rétegenként, [szerep] a FILE sorokon

@@ -45,6 +45,7 @@ pub(crate) enum FrameworkView {
     Models,
     I18n,
     Classes,
+    Props,
 }
 
 // `outline`: egy fájl / mappa szerkezete vagy egy metódus hívás-gráfja.
@@ -474,6 +475,7 @@ impl FrameworkView {
             Self::Models => "models",
             Self::I18n => "i18n",
             Self::Classes => "classes",
+            Self::Props => "props",
         }
     }
 }

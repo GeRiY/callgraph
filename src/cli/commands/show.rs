@@ -182,6 +182,7 @@ impl Command for ShowCommand {
                     | "models"
                     | "i18n"
                     | "classes"
+                    | "props"
             )
             && self.lines.is_none()
             && self.strings.is_none()

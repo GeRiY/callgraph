@@ -39,7 +39,7 @@ impl JsFrontend {
             .with_pass(Box::new(ClassContainerPass))
             .with_pass(Box::new(super::container_doc::ContainerDocPass))
             .with_pass(Box::new(super::methods::MethodsPass))
-            .with_pass(Box::new(super::props::PropsPass))
+            .with_pass(Box::new(super::props::PropsPass::new(resolver.clone())))
             .with_pass(Box::new(super::constants::ConstantsPass))
             .with_pass(Box::new(super::strings::StringsPass))
             .with_pass(Box::new(super::comments::CommentsPass))
@@ -492,6 +492,111 @@ export default { props: { title: { type: String, required: true }, n: Number } }
             "{:?}",
             a.graph.parse_errors
         );
+    }
+
+    #[test]
+    fn emit_keys_are_component_scoped_and_parent_listeners_are_edges() {
+        let child = run(
+            "/p/Child.vue",
+            "<script setup>\nconst emit = defineEmits(['save'])\nfunction go() { emit('save') }\n</script>\n<template><button @click=\"$emit('close')\" /><slot name=\"foot\" /><slot /></template>\n",
+        );
+        let keys: Vec<String> = child
+            .graph
+            .calls
+            .iter()
+            .filter(|c| c.category == "vue_emit")
+            .filter_map(|c| c.resolved.clone())
+            .collect();
+        assert!(
+            keys.contains(&"Child.vue::emit:save".to_string())
+                && keys.contains(&"Child.vue::emit:close".to_string()),
+            "{keys:?}"
+        );
+        let slots: Vec<&str> = child
+            .graph
+            .constants
+            .iter()
+            .filter(|c| c.kind == "slot")
+            .map(|c| c.name.as_str())
+            .collect();
+        assert_eq!(slots, ["slot:foot", "slot:default"]);
+        let parent = run(
+            "/p/Parent.vue",
+            "<script setup>\nimport Child from './Child.vue'\n</script>\n<template><Child @save=\"x\" @some-thing=\"y\" @click=\"z\" @[dyn]=\"w\" /></template>\n",
+        );
+        let listened: Vec<&str> = parent
+            .graph
+            .calls
+            .iter()
+            .filter(|c| c.category == "vue_emit")
+            .filter_map(|c| c.resolved.as_deref())
+            .collect();
+        assert_eq!(
+            listened,
+            ["Child.vue::emit:save", "Child.vue::emit:someThing"]
+        );
+    }
+
+    #[test]
+    fn define_expose_keys_are_constants() {
+        let a = run(
+            "/p/Box.vue",
+            "<script setup>\nfunction open() {}\nfunction close() {}\ndefineExpose({ open, close })\n</script>\n",
+        );
+        let names: Vec<&str> = a
+            .graph
+            .constants
+            .iter()
+            .filter(|c| c.kind == "expose")
+            .map(|c| c.name.as_str())
+            .collect();
+        assert_eq!(names, ["expose:close", "expose:open"]);
+    }
+
+    #[test]
+    fn pinia_stores_are_containers_with_actions_getters_and_state() {
+        let options = run(
+            "/p/chat.ts",
+            "import { defineStore } from 'pinia'\nexport const useChatStore = defineStore('chat', {\n  state: () => ({ items: [], draft: '' }),\n  getters: { count: (s) => s.items.length },\n  actions: { send(t) { this.items.push(t) }, clear() { this.items = [] } },\n})\n",
+        );
+        assert!(
+            options
+                .graph
+                .containers
+                .iter()
+                .any(|c| c.kind == "store" && c.name == "useChatStore")
+        );
+        let methods: Vec<(&str, &str)> = options
+            .graph
+            .methods
+            .iter()
+            .filter(|m| m.container.as_deref() == Some("useChatStore"))
+            .map(|m| (m.name.as_str(), m.kind.as_deref().unwrap_or("")))
+            .collect();
+        assert_eq!(
+            methods,
+            [("count", "getter"), ("send", "action"), ("clear", "action")]
+        );
+        let state: Vec<&str> = options
+            .graph
+            .properties
+            .iter()
+            .filter(|p| p.container.as_deref() == Some("useChatStore"))
+            .map(|p| p.name.as_str())
+            .collect();
+        assert_eq!(state, ["items", "draft"]);
+        let setup = run(
+            "/p/cart.ts",
+            "import { defineStore } from 'pinia'\nimport { ref, computed } from 'vue'\nexport const useCartStore = defineStore('cart', () => {\n  const lines = ref([])\n  const total = computed(() => lines.value.length)\n  function add(l) { lines.value.push(l) }\n  function hidden() {}\n  return { lines, total, add }\n})\n",
+        );
+        let methods: Vec<&str> = setup
+            .graph
+            .methods
+            .iter()
+            .filter(|m| m.container.as_deref() == Some("useCartStore"))
+            .map(|m| m.name.as_str())
+            .collect();
+        assert_eq!(methods, ["total", "add"]);
     }
 
     #[test]

@@ -73,10 +73,12 @@ pub(super) fn constants(
         |kind: &str| -> Vec<&Constant> { all.iter().copied().filter(|x| x.kind == kind).collect() };
     let emits = of_kind("emit");
     let models = of_kind("model");
+    let slots = of_kind("slot");
+    let exposes = of_kind("expose");
     let rest: Vec<&Constant> = all
         .iter()
         .copied()
-        .filter(|x| x.kind != "emit" && x.kind != "model")
+        .filter(|x| !matches!(x.kind.as_str(), "emit" | "model" | "slot" | "expose"))
         .collect();
     if !rest.is_empty() {
         let items: Vec<String> = rest
@@ -115,6 +117,15 @@ pub(super) fn constants(
             .map(|x| x.name.strip_prefix("emit:").unwrap_or(&x.name))
             .collect();
         writeln!(s, "  emits ({}): {}", names.len(), names.join(", ")).unwrap();
+    }
+    for (label, list, prefix) in [("slots", &slots, "slot:"), ("exposes", &exposes, "expose:")] {
+        if !list.is_empty() {
+            let names: Vec<&str> = list
+                .iter()
+                .map(|x| x.name.strip_prefix(prefix).unwrap_or(&x.name))
+                .collect();
+            writeln!(s, "  {label} ({}): {}", names.len(), names.join(", ")).unwrap();
+        }
     }
     if !models.is_empty() {
         let items: Vec<String> = models

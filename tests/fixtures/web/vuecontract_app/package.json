@@ -1,0 +1,11 @@
+{
+  "name": "vuecontract-app",
+  "private": true,
+  "dependencies": {
+    "pinia": "^2.1.0",
+    "vue": "^3.4.0"
+  },
+  "devDependencies": {
+    "unplugin-vue-components": "^0.27.0"
+  }
+}

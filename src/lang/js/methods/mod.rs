@@ -47,6 +47,12 @@ impl JsPass for MethodsPass {
         for method in std::mem::take(&mut c.methods) {
             out.builder.method(method);
         }
+        // the Pinia stores are containers of their own (class containers come from `ClassContainerPass`)
+        for container in std::mem::take(&mut c.containers) {
+            if container.kind == "store" {
+                out.builder.container(container);
+            }
+        }
         // az osztálymezők (a `locate` property-definícióként is megtalálja őket)
         for property in std::mem::take(&mut c.properties) {
             out.builder.property(property);

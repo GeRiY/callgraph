@@ -303,6 +303,7 @@ bash ~/.claude/skills/callgraph/callgraph.sh locate route::events.show "Szervez�
 | `stats` | kategória-statisztika |
 | `mermaid` / `dot` | öröklési és hívási élek diagramként |
 | `json` / `jsonl` | a nyers gráf |
+| `props` | Vue: amit a szülő átad, és amit a gyerek deklarál (hiányzó kötelező prop, ismeretlen prop, ismeretlen slot) |
 | `routes` `middleware` `validation` `jobs` `events` `providers` `magic` `di` `views` | framework-nézetek (mappára futtasd) |
 
 A nagy eredmények korlátosak (400 sor fölött a mappás outline summary-ra, az egyfájlos metódus-indexre vált);

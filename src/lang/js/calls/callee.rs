@@ -153,6 +153,8 @@ pub struct Scope {
 pub enum Root<'b> {
     Ident(&'b str),
     This,
+    /// `useChatStore().action()`: a call of a `use…Store` function (a Pinia store accessor).
+    StoreCall(&'b str),
     Other,
 }
 
@@ -200,6 +202,17 @@ pub fn member_root<'a, 'b>(mut e: &'b Expression<'a>) -> (Root<'b>, Vec<String>)
             Expression::ThisExpression(_) => {
                 parts.reverse();
                 return (Root::This, parts);
+            }
+            Expression::CallExpression(c)
+                if !parts.is_empty()
+                    && matches!(&c.callee, Expression::Identifier(i)
+                        if i.name.starts_with("use") && i.name.ends_with("Store")) =>
+            {
+                parts.reverse();
+                let Expression::Identifier(i) = &c.callee else {
+                    return (Root::Other, parts);
+                };
+                return (Root::StoreCall(i.name.as_str()), parts);
             }
             _ => {
                 parts.reverse();
@@ -336,6 +349,22 @@ impl Scope {
                     _ => Callee::new(&format!("this.{joined}"), this, None, "external_call", m),
                 }
             }
+            // `useChatStore().send()`: the same edge as `const chat = useChatStore(); chat.send()`
+            Root::StoreCall(nm) => match self.bindings.get(nm) {
+                Some(b) if b.resolved.contains("::") && !b.resolved.contains('(') => {
+                    let resolved = format!("{}().{joined}", b.resolved);
+                    let mut callee = Callee::new(
+                        &format!("{nm}().{joined}"),
+                        None,
+                        Some(resolved),
+                        b.category,
+                        m,
+                    );
+                    callee.from.clone_from(&b.from);
+                    callee
+                }
+                _ => Callee::new(&last, Some("<expr>"), None, "external_call", m),
+            },
             Root::Other => Callee::new(&last, Some("<expr>"), None, "external_call", m),
         }
     }

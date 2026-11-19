@@ -55,6 +55,10 @@ impl Fixture {
         Self::new("tailwind_app")
     }
 
+    fn vuecontract() -> Self {
+        Self::new("vuecontract_app")
+    }
+
     fn command(&self, args: &[&str], project_flag: bool) -> Command {
         let mut command = Command::new(env!("CARGO_BIN_EXE_callgraph"));
         command.args(args);
@@ -483,7 +487,6 @@ fn h17_computed_value_array_method_is_not_a_vue_api() {
 }
 
 #[test]
-#[ignore = "web-plan H18/F7: emit keys are global and the parent @listener is not an edge; enabled in phase 7"]
 fn h18_emit_key_is_component_scoped_and_wired_to_the_listener() {
     let out = Fixture::monorepo().run(&["show", "ui/src", "--grep", "CellMenu.vue::emit:remove$"]);
     assert!(
@@ -789,4 +792,151 @@ fn f8_monorepo_router_and_regex_helper_routes() {
         "{server}"
     );
     assert!(!server.contains("no server route"), "{server}");
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// F7: the Vue component contract (emit edges, props view, slots, provide / inject, Pinia, imported props types)
+
+#[test]
+fn f7_emit_key_has_the_emitter_and_the_parent_listener() {
+    let out =
+        Fixture::vuecontract().run(&["show", "src", "--grep", "MessageActions.vue::emit:purge$"]);
+    assert!(out.contains("MessageActions.vue"), "{out}");
+    assert!(out.contains("onSelect"), "{out}");
+    assert!(out.contains("ChatView.vue"), "{out}");
+    assert!(!out.contains("Panel.vue"), "{out}");
+}
+
+#[test]
+fn f7_props_view_flags_missing_required_and_unknown_props() {
+    let out = Fixture::vuecontract().run(&["show", "src", "--format", "props"]);
+    assert!(out.starts_with("props: "), "{out}");
+    assert!(
+        out.lines()
+            .next()
+            .unwrap()
+            .contains("component uses checked"),
+        "{out}"
+    );
+    let missing: Vec<&str> = out
+        .lines()
+        .filter(|l| l.contains("missing required prop 'title'"))
+        .collect();
+    assert_eq!(missing.len(), 1, "{out}");
+    assert!(
+        missing[0].contains("ChatView.vue L") && missing[0].ends_with("<MessageActions>"),
+        "{out}"
+    );
+    assert!(out.contains("unknown prop 'colr'"), "{out}");
+    assert!(out.contains("unknown prop 'cell-idx'"), "{out}");
+}
+
+#[test]
+fn f7_props_view_never_flags_fallthrough_attrs_models_or_unknown_child_props() {
+    let out = Fixture::vuecontract().run(&["show", "src", "--format", "props"]);
+    // kebab-case == camelCase, `v-model` / `v-model:x`, HTML attributes, `data-*` / `aria-*`
+    for quiet in [
+        "'cell-id'",
+        "'cellId'",
+        "modelValue",
+        "'open'",
+        "'label'",
+        "'id'",
+        "'class'",
+        "data-x",
+        "aria-label",
+        "'count'",
+    ] {
+        assert!(!out.contains(quiet), "{quiet}: {out}");
+    }
+    // the child reads `$attrs`, or its props type is imported: unknown attributes are not decidable
+    assert!(!out.contains("'zzz'"), "{out}");
+    // a `v-bind="obj"` parent can pass anything
+    assert_eq!(
+        out.matches("missing required prop 'tone'").count(),
+        0,
+        "{out}"
+    );
+}
+
+#[test]
+fn f7_props_view_reads_an_imported_props_type() {
+    let out = Fixture::vuecontract().run(&["show", "src", "--format", "props"]);
+    assert!(out.contains("missing required prop 'heading'"), "{out}");
+    assert!(out.contains("<ImportedCard>"), "{out}");
+    let outline = Fixture::vuecontract().run(&["show", "src/components/ImportedCard.vue"]);
+    assert!(
+        outline.contains("heading") && outline.contains("level"),
+        "{outline}"
+    );
+}
+
+#[test]
+fn f7_slots_the_child_does_not_offer_are_flagged() {
+    let out = Fixture::vuecontract().run(&["show", "src", "--format", "props"]);
+    assert!(out.contains("unknown slot 'header'"), "{out}");
+    assert!(out.contains("unknown slot 'foot'"), "{out}");
+    assert!(
+        !out.contains("slot 'head'") && !out.contains("slot 'footer'"),
+        "{out}"
+    );
+    let outline = Fixture::vuecontract().run(&["show", "src/components/MessageActions.vue"]);
+    assert!(outline.contains("slots (2): footer, default"), "{outline}");
+}
+
+#[test]
+fn f7_outline_shows_what_define_expose_offers() {
+    let outline = Fixture::vuecontract().run(&["show", "src/components/MessageActions.vue"]);
+    assert!(outline.contains("exposes (1): onSelect"), "{outline}");
+}
+
+#[test]
+fn f7_provide_and_inject_share_one_key() {
+    let fx = Fixture::vuecontract();
+    for key in ["vue::provide:ThemeKey$", "vue::provide:locale$"] {
+        let out = fx.run(&["show", "src", "--grep", key]);
+        assert!(
+            out.contains("Panel.vue") && out.contains("ChatView.vue"),
+            "{key}: {out}"
+        );
+    }
+}
+
+#[test]
+fn f7_pinia_stores_have_an_outline_and_actions_are_call_edges() {
+    let fx = Fixture::vuecontract();
+    let chat = fx.run(&["show", "src/stores/chat.ts"]);
+    for name in ["useChatStore", "send", "clear", "count", "items"] {
+        assert!(chat.contains(name), "{name}: {chat}");
+    }
+    let cart = fx.run(&["show", "src/stores/cart.ts"]);
+    for name in ["useCartStore", "add", "reset"] {
+        assert!(cart.contains(name), "{name}: {cart}");
+    }
+    let view = fx.run(&["show", "src/views/ChatView.vue"]);
+    for edge in [
+        "useChatStore().send",
+        "useChatStore().clear",
+        "useCartStore().add",
+    ] {
+        assert!(view.contains(edge), "{edge}: {view}");
+    }
+}
+
+#[test]
+fn f7_auto_imported_components_bind_only_with_the_plugin() {
+    let with = Fixture::vuecontract().run(&["show", "src", "--format", "props"]);
+    assert!(with.contains("missing required prop 'shine'"), "{with}");
+    assert!(with.contains("<Fancy> (auto)"), "{with}");
+    let fx = Fixture::vuecontract();
+    fs::write(
+        fx.0.join("package.json"),
+        "{ \"name\": \"vuecontract-app\", \"dependencies\": { \"vue\": \"^3.4.0\" } }\n",
+    )
+    .unwrap();
+    let without = fx.run(&["show", "src", "--format", "props"]);
+    assert!(
+        !without.contains("shine") && !without.contains("(auto)"),
+        "{without}"
+    );
 }

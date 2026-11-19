@@ -1,7 +1,7 @@
 callgraph.sh — thin wrapper over callgraph (Rust); compact, token-efficient PHP / JS / TS / Vue file context for agents,
 (callgraph parses PHP, .vue/.js/.ts files and CSS/SCSS/JSON/MD/HTML into one schema;
  on Vue: props, emits (emit:<name>), template (components, event handlers), setup, hooks;
- searchable keys: route::<name>, i18n::<key>, vue::emit:<name>, <file>::<export>)
+ searchable keys: route::<name>, i18n::<key>, <Comp>.vue::emit:<name>, vue::provide:<key>, <file>::<export>)
 WITHOUT reading the file (methods + call graph, categorized).
 
 Usage:
@@ -110,6 +110,7 @@ Project profile (architecture, layers and patterns from folder / file names, che
   Cross-file views (any project; on a folder or file; lang files and stylesheets also get a summary line in the outline):
     --format i18n      translation keys missing per locale / unused, $t('a.b') / __('x') with a missing key; lang/en.json::board.title: where one key is used
     --format classes   stylesheet classes: which templates use them, classes nothing uses (lenient: dynamic class names and Tailwind utilities are never reported)
+    --format props     Vue components: props a parent passes vs what the child declares (missing required, unknown, unknown slot; lenient: v-model, $attrs and standard HTML attributes are never reported)
   bash ~/.claude/skills/callgraph/callgraph.sh <dir> --layer service           only the files of that layer (name,name...;
                                                 one ecosystem: controller:php, controller:js, …:swift, …:rust)
   bash ~/.claude/skills/callgraph/callgraph.sh <dir> --layers                  summary grouped by layer, [role] on FILE lines

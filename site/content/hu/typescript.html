@@ -47,7 +47,7 @@ CG=~/.claude/skills/callgraph/callgraph.sh
 bash $CG --project myapp resources/js --grep 'useForm.js::submit'     # <fájl>::<export>, import-feloldással, @/ aliasszal
 bash $CG --project myapp resources/js --grep 'route::orders.show'     # route-használat
 bash $CG --project myapp resources/js --grep 'i18n::orders.title'     # fordítási kulcs helye
-bash $CG --project myapp resources/js --grep 'vue::emit:save'         # ki emitál 'save'-et
+bash $CG --project myapp resources/js --grep 'Card.vue::emit:save'    # ki emitál 'save'-et a Card.vue-ban, és a szülők figyelői
 bash $CG --project myapp resources/js --grep 'Atoms/AtomButton.vue'   # hol használják a komponenst
 bash $CG --project myapp resources/js --grep 'api.fetch'              # objektum-literál metódusa
 ```

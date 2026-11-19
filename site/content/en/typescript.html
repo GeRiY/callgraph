@@ -47,7 +47,7 @@ CG=~/.claude/skills/callgraph/callgraph.sh
 bash $CG --project myapp resources/js --grep 'useForm.js::submit'     # <file>::<export>, with import resolution and the @/ alias
 bash $CG --project myapp resources/js --grep 'route::orders.show'     # route usage
 bash $CG --project myapp resources/js --grep 'i18n::orders.title'     # where a translation key is used
-bash $CG --project myapp resources/js --grep 'vue::emit:save'         # who emits 'save'
+bash $CG --project myapp resources/js --grep 'Card.vue::emit:save'    # who emits 'save' in Card.vue, and the parents' listeners
 bash $CG --project myapp resources/js --grep 'Atoms/AtomButton.vue'   # where the component is used
 bash $CG --project myapp resources/js --grep 'api.fetch'              # object-literal method
 ```

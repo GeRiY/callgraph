@@ -131,7 +131,7 @@ fn parse_attr(
             Some(v) if name == "class" => Some(collapse_ws(&v)),
             other => other,
         };
-        Prop::Attr { line, value }
+        Prop::Attr { line, name, value }
     };
     (prop, next.max(start + 1))
 }
@@ -143,13 +143,14 @@ fn scan_until(b: &[u8], mut i: usize, limit: usize, stop: impl Fn(u8) -> bool) -
     i
 }
 
-/// Direktíva-argumentum: `[dinamikus]` vagy statikus (`.`/`=`/szakaszvég előtt).
+/// Direktíva-argumentum: `[dinamikus]` (a zárójelekkel) vagy statikus (`.`/`=`/szakaszvég előtt).
 fn scan_arg(src: &str, from: usize, limit: usize) -> (String, usize) {
     let b = src.as_bytes();
     if from < limit && b[from] == b'[' {
         let close = scan_until(b, from + 1, limit, |c| c == b']');
         let end = (close + 1).min(limit);
-        return (src[from + 1..close].to_string(), end);
+        // the brackets stay: they mark a dynamic argument (`:[key]`, `@[event]`)
+        return (src[from..end].to_string(), end);
     }
     let end = scan_until(b, from, limit, |c| {
         matches!(c, b'=' | b'.') || ends_section(c)

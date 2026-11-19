@@ -119,6 +119,49 @@ mod tests {
         );
     }
 
+    #[test]
+    fn emit_keys_are_scoped_to_the_vue_file() {
+        let c = calls_in(
+            "/p/Card.vue",
+            "<script setup>\nconst emit = defineEmits(['a'])\nfunction go() { emit('a') }\n</script>\n",
+        );
+        has(&c, ("go", "emit", "vue_emit", Some("Card.vue::emit:a")));
+        // outside a component the key stays global
+        let c = calls("const emit = defineEmits(['a']);\nfunction go() { emit('a'); }\n");
+        has(&c, ("go", "emit", "vue_emit", Some("vue::emit:a")));
+    }
+
+    #[test]
+    fn provide_and_inject_share_one_key() {
+        let c = calls(concat!(
+            "import { provide, inject } from 'vue';\n",
+            "const K = Symbol('k');\n",
+            "function f() { provide(K, 1); provide('s', 2); inject(K); inject('s'); inject(make()); }\n",
+        ));
+        has(&c, ("f", "provide", "vue_api", Some("vue::provide:K")));
+        has(&c, ("f", "provide", "vue_api", Some("vue::provide:s")));
+        has(&c, ("f", "inject", "vue_api", Some("vue::provide:K")));
+        has(&c, ("f", "inject", "vue_api", Some("vue::provide:s")));
+        has(&c, ("f", "inject", "vue_api", Some("vue::inject")));
+    }
+
+    #[test]
+    fn an_inline_store_call_is_the_same_edge_as_a_bound_one() {
+        let c = calls(concat!(
+            "import { useChatStore } from './chat';\n",
+            "function f() { const s = useChatStore(); s.send(); useChatStore().clear(); }\n",
+        ));
+        let resolved = |name: &str| {
+            c.iter()
+                .find(|x| x.1.ends_with(name))
+                .and_then(|x| x.3.clone())
+        };
+        let bound = resolved("send").unwrap();
+        let inline = resolved("clear").unwrap();
+        assert!(bound.ends_with("::useChatStore().send"), "{bound}");
+        assert_eq!(inline, bound.replace("send", "clear"));
+    }
+
     fn has(c: &[(String, String, String, Option<String>)], want: (&str, &str, &str, Option<&str>)) {
         assert!(
             c.iter()

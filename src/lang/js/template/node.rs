@@ -31,6 +31,7 @@ pub struct Element {
 pub enum Prop {
     Attr {
         line: u32,
+        name: String,
         value: Option<String>,
     },
     Dir {

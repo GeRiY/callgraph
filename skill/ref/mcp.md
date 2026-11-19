@@ -18,7 +18,7 @@ root: a registered alias (`project`, list: `projects`) or the server's working d
   docblock, `raw: true` gives the exact text.
 - `find_callers` `{pattern}`: who calls it (file, method, line range, call line); `path` narrows the scope, `depth`
   2–5 = impact analysis (callers of callers), `guess: true` adds name-only matches. JS / TS / Vue keys:
-  `useForm.js::submit` (export), `route::orders.show`, `i18n::orders.title`, `vue::emit:save`, `Atoms/AtomButton.vue`.
+  `useForm.js::submit` (export), `route::orders.show`, `i18n::orders.title`, `Card.vue::emit:save`, `Atoms/AtomButton.vue`.
 - `search` `{kind: strings | constants, pattern}`: where a string literal (error message, key) or a constant is.
 - `framework_view` `{view, path}`: `routes`, `middleware`, `validation`, `jobs`, `events`, `providers`, `magic`,
   `di`, `views` of a directory; Laravel + Inertia (project root): `ziggy`, `forms`, `models`, `inertia`; any project:

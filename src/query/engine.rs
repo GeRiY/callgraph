@@ -44,6 +44,8 @@ pub struct QueryResult {
     /// TS / JS route tables (`crate::packages::webroutes`): vue-router, Hono / Express route tables and the client
     /// URLs calling them; only the `routes` / `ziggy` view loads it, `None` = nothing found.
     pub(crate) web_routes: Option<std::sync::Arc<crate::packages::WebRoutes>>,
+    /// The Vue component contract (`crate::packages::vuecontract`): only the `props` view loads it.
+    pub(crate) vue_contract: Option<std::sync::Arc<crate::packages::VueContract>>,
 }
 
 /// Egy rokon típuson át illesztett hívás: sor + cél (a `resolved` / `target`), és a hívás típusának rövid neve.
@@ -66,6 +68,7 @@ impl QueryResult {
             laravel: None,
             crossref: None,
             web_routes: None,
+            vue_contract: None,
         }
     }
 
@@ -332,6 +335,7 @@ impl QueryEngine {
             kept.laravel.clone_from(&row.laravel);
             kept.crossref.clone_from(&row.crossref);
             kept.web_routes.clone_from(&row.web_routes);
+            kept.vue_contract.clone_from(&row.vue_contract);
             if let Some((regex, matcher)) = &via {
                 kept.via = kept
                     .graph

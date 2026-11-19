@@ -178,14 +178,27 @@ impl<'s> Walker<'s> {
             && !s.value.is_empty()
         {
             let prefix = match r.category {
-                "vue_emit" => Some("vue::emit:"),
-                "i18n_helper" => Some("i18n::"),
-                "route_helper" => Some("route::"),
+                "vue_emit" => Some(crate::lang::js::emit_prefix(self.ctx.path)),
+                "i18n_helper" => Some("i18n::".to_string()),
+                "route_helper" => Some("route::".to_string()),
                 _ => None,
             };
             if let Some(p) = prefix {
                 resolved = Some(format!("{p}{}", s.value.display()));
             }
+        }
+        // `provide(key, v)` / `inject(key)`: one `vue::provide:<key>` edge for both sides (a string or the name of a
+        // `Symbol` / `InjectionKey` constant)
+        if matches!(resolved.as_deref(), Some("vue::provide" | "vue::inject"))
+            && let Some(key) = match args.first() {
+                Some(Argument::StringLiteral(s)) if !s.value.is_empty() => {
+                    Some(s.value.display().to_string())
+                }
+                Some(Argument::Identifier(id)) => Some(id.name.to_string()),
+                _ => None,
+            }
+        {
+            resolved = Some(format!("vue::provide:{key}"));
         }
         let args = (!args.is_empty()).then(|| args.iter().take(4).map(|a| self.src(a)).collect());
         self.calls.push(
