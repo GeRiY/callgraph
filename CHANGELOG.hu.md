@@ -6,6 +6,70 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ## [Unreleased]
 
+### Új
+
+- **`trace <cél>`: egy route vagy oldal teljes lánca egyetlen rövid válaszban:** a
+  `callgraph.sh trace route::events.show` legfeljebb 30 sorban kiírja a route-ot (ige, URI, név, fájl és sor), a
+  middleware-eket, a controller-akciót, a FormRequest- vagy inline szabályokat (`*` = kötelező), a modelleket a
+  táblájukkal, az Inertia-oldalt a controller által átadott props-szal, és az oldal által használt komponenseket. A
+  cél lehet route-név (`route::x`), `route:GET:/uri`, URI, `Controller::method` vagy `Pages/X.vue`. JS-projektben a
+  szerver-route a kliensoldali hívóival együtt jelenik meg (a regex-route-okat az út alapján illeszti). Ismeretlen
+  célra egy sort ad, legfeljebb 5 legközelebbi névvel. MCP-n ez az új `trace` eszköz.
+- **A `--format routes` a JS / TS route-táblákat is olvassa:** a vue-router táblák `/chats/:id →
+  src/pages/ChatPage.vue (chat)` alakban jelennek meg, a beágyazott `children` utakat összefűzve, a lusta `import()`
+  komponenseket feloldva, a `redirect /x` / `redirect name:x` átirányításokkal. A Hono, Express és itty
+  szerver-route-ok (`app.get('/x', h)`, az `app.route('/p', sub)` / `app.use('/p', router)` csatolás és a
+  `route("GET", /re/, handler)` segédfüggvény) az importokon át feloldott kezelővel, `←` után pedig azokkal a kliens
+  `fetch` / `axios.*` / `ofetch` / `new WebSocket` hívásokkal jelennek meg, amelyek metódusa és útja illeszkedik. A
+  `router.push({ name })`, `router.replace` vagy `<RouterLink :to="{ name }">` olyan route-neve, amelyet egy tábla sem
+  definiál, `⚠ unknown route name 'x'` jelzést kap; az ismert szerver-útvonal alá eső, de egyetlen szerver-route-ra
+  sem illeszkedő kliens-URL pedig `⚠ no server route: GET /api/x` jelzést.
+- **`--format props`: mit adnak át a szülők a Vue-komponenseknek:** mappára vagy fájlra futtatva listázza a
+  `⚠ missing required prop 'title'  Parent.vue L12 <Card>`, `⚠ unknown prop 'colr'` és `⚠ unknown slot 'foot'`
+  eseteket. Szándékosan engedékeny: a `v-model` / `v-model:x` átadásnak számít, a kebab-case egyenlő a camelCase-szel,
+  nincs „ismeretlen”, ha a gyerek `$attrs` / `useAttrs` / `inheritAttrs` / `mixins` elemet vagy importált, illetve
+  összetett props-típust használ, nincs „hiányzó”, ha a szülő `v-bind="obj"`-ot terít, és a szabványos
+  HTML-attribútumokat (`id`, `title`, `data-*`, `aria-*`, űrlap- és input-attribútumok, …) soha nem jelzi. Az
+  `unplugin-vue-components` mellett az import nélküli tag az egyetlen azonos nevű `.vue` fájlhoz kötődik, `(auto)`
+  jelöléssel.
+- **A Vue-komponens szerződésének több része látszik az outline-ban:** a `slots (N)` a `<slot>` kimeneteket, az
+  `exposes (N)` a `defineExpose` neveit sorolja; a `provide('x')` és az `inject('x')` egy kulcson osztozik, így a
+  `--grep 'vue::provide:theme'` mindkét oldalt mutatja; az importált interface-re vagy típusra hivatkozó
+  `defineProps<Props>()` props-ai is megjelennek. A Pinia `defineStore('id', …)` egy `store` blokk (az actionök és
+  getterek metódusok, a `state` kulcsai tulajdonságok; setup-store-nál a visszaadott függvények), és a
+  `useXStore().act()` vagy a `const s = useXStore(); s.act()` hívás rá mutat, a sablonban is.
+- **Tailwind 4 a stíluslapokban és a `--format classes` nézetben:** az `@utility` osztályok és a `@theme` tokenek
+  utility-jei (`--color-brand-500` → `bg-brand-500`, `text-brand-500`, …) definíciónak számítanak, az `@apply`
+  osztályai pedig használatnak. A nem létező tokenre épülő, használt osztályt jelzi, például
+  `theme: no such token text-brand-450 A.vue:9 (like text-brand-500, …)`; csak akkor, ha a projekt más `brand-…`
+  tokeneket definiál, a Tailwind saját neveinél és `@theme` nélküli projektben soha.
+- **Blade: hiányzó nézetek, egyedi direktívák és `@vite` belépők:** az outline fejléce jelzi azt az `@include`-ot vagy
+  `<x-…>`-et, amelynek nézete nem létezik (`⚠ missing view: partials.gone (@include L4)`; csak statikus névnél, a
+  csomag-nézetet, mint a `mail::x`, soha), futásidejű célként jelöli a `<x-dynamic-component>`-et, és a használt
+  `Blade::directive` / `Blade::if` direktívát a regisztrációjához köti
+  (`directives: @datetime → app/Providers/AppServiceProvider.php L12`; a provider outline-ja direktívánként
+  listázza az őket használó nézeteket). Az `@vite([...])` fájljai import-élek lesznek, így a
+  `--grep resources/js/app.ts` megtalálja a sablont.
+- **A HTML belépőfájlok a szkriptjeikre és stíluslapjaikra hivatkoznak:** a `<script src>` és a
+  `<link rel="stylesheet" href>` `import /src/main.ts` sorként jelenik meg és importnak számít, így a
+  `--grep src/main.ts` megtalálja az `index.html`-t. A külső URL-eket figyelmen kívül hagyja.
+- **Több nézet is megmondja, mit hagyott ki:** a `--format forms` mintájára a `routes`, az `inertia` és a `props`
+  nézet is okonként egy sorral zárul, például futásidőben épített route-név, nem literál oldalnév vagy `v-bind`
+  objektum esetén (`? 2 kihagyva: <ok> (a.vue L3, b.vue L9, +N)`), ahelyett hogy csendben kihagyná az elemet.
+
+### Változás
+
+- **A Vue emit-kulcsok a komponensükhöz tartoznak:** egy emit mostantól `Card.vue::emit:save`, nem `vue::emit:save`,
+  és a szülő `<Card>`-on lévő `@save="h"` / `v-on:save` figyelője ugyanerre a kulcsra mutató él, így a
+  `--grep 'Card.vue::emit:save'` az emittáló kódot és a figyelő szülőket is mutatja. A natív DOM-események és a
+  dinamikus `@[ev]` nem kapnak élt. A cache formátuma változott; a meglévő cache a következő futáskor magától
+  újraépül.
+- **A Vue-sablon kifejezéseit ugyanúgy elemzi, mint a scriptet:** a `{{ }}`, `:x`, `@x`, `v-if` és `v-model`
+  hívásai ugyanazt a kategóriát kapják, mint a `<script>`-ben (egy `const store = useX()` kötés, importok, beépített
+  függvények), az inline kezelőket (`@click="a(); b++"`) is beolvassa, az optional chaining hívásokat (`a?.b()`)
+  megtalálja, a dinamikus hívásokat (`handlers[name]()`) jelöli. A `v-for` elemei és a slot-propok helyi nevek, így
+  az `item.open()` már nem jelenik meg hívásként. A nem parsolható kifejezésre a korábbi, név szerinti olvasás fut.
+
 ## [1.1.1] — 2026-11-18
 
 ### Új

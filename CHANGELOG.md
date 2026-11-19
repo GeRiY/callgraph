@@ -5,6 +5,65 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+### Added
+
+- **`trace <target>`: the whole chain of a route or page in one short answer:** `callgraph.sh trace route::events.show`
+  prints, in at most 30 lines, the route (verb, URI, name, file and line), its middleware, the controller action, the
+  FormRequest or inline rules (`*` = required), the models with their tables, the Inertia page with the props the
+  controller passes, and the components the page uses. The target can be a route name (`route::x`), `route:GET:/uri`,
+  a URI, `Controller::method` or `Pages/X.vue`. In a JS project a server route is shown with its client callers
+  (regex routes are matched by path). An unknown target gives one line with up to 5 closest names. Over MCP it is the
+  new `trace` tool.
+- **`--format routes` reads JS / TS route tables:** vue-router tables print as `/chats/:id → src/pages/ChatPage.vue
+  (chat)`, with nested `children` paths joined, lazy `import()` components resolved and `redirect /x` /
+  `redirect name:x` shown. Hono, Express and itty server routes (`app.get('/x', h)`, `app.route('/p', sub)` /
+  `app.use('/p', router)` mounts, and a `route("GET", /re/, handler)` helper) print with their handler resolved
+  through the imports, and with `←` the client `fetch` / `axios.*` / `ofetch` / `new WebSocket` calls whose method and
+  path match. A route name used in `router.push({ name })`, `router.replace` or `<RouterLink :to="{ name }">` that no
+  table defines is flagged `⚠ unknown route name 'x'`; a client URL under a known server path that matches no server
+  route is flagged `⚠ no server route: GET /api/x`.
+- **`--format props`: check what parents pass to Vue components:** run on a folder or file, it lists
+  `⚠ missing required prop 'title'  Parent.vue L12 <Card>`, `⚠ unknown prop 'colr'` and `⚠ unknown slot 'foot'`. It
+  is lenient on purpose: `v-model` / `v-model:x` count as passed, kebab-case equals camelCase, nothing is "unknown"
+  when the child uses `$attrs` / `useAttrs` / `inheritAttrs` / `mixins` or an imported or composed props type, nothing
+  is "missing" when the parent spreads `v-bind="obj"`, and standard HTML attributes (`id`, `title`, `data-*`,
+  `aria-*`, form and input attributes, …) are never reported. With `unplugin-vue-components`, a tag without an import
+  is matched to the one `.vue` file of that name, marked `(auto)`.
+- **More of the Vue component contract in the outline:** `slots (N)` lists the `<slot>` outlets and `exposes (N)` the
+  `defineExpose` names; `provide('x')` and `inject('x')` share one key, so `--grep 'vue::provide:theme'` shows both
+  sides; `defineProps<Props>()` with an imported interface or type now lists its props. A Pinia `defineStore('id', …)`
+  is a `store` block (actions and getters as methods, `state` keys as properties; setup stores: the returned
+  functions), and `useXStore().act()` or `const s = useXStore(); s.act()` are calls to it, in the template too.
+- **Tailwind 4 in stylesheets and `--format classes`:** `@utility` classes and the utilities of `@theme` tokens
+  (`--color-brand-500` → `bg-brand-500`, `text-brand-500`, …) count as definitions, and the classes in `@apply` count
+  as used. A used class whose token does not exist is flagged, for example `theme: no such token text-brand-450
+  A.vue:9 (like text-brand-500, …)`; this is only reported when the project defines other `brand-…` tokens, never
+  for Tailwind's own names or projects without `@theme`.
+- **Blade: missing views, custom directives and `@vite` entries:** the outline header flags an `@include` or `<x-…>`
+  whose view does not exist (`⚠ missing view: partials.gone (@include L4)`; static names only, package views like
+  `mail::x` never), notes `<x-dynamic-component>` as a run-time target, and links a used `Blade::directive` /
+  `Blade::if` to its registration (`directives: @datetime → app/Providers/AppServiceProvider.php L12`; the
+  provider's outline lists the views using each). The files in `@vite([...])` become import edges, so
+  `--grep resources/js/app.ts` finds the template.
+- **HTML entry files link to their scripts and stylesheets:** `<script src>` and `<link rel="stylesheet" href>` show
+  as `import /src/main.ts` lines and count as imports, so `--grep src/main.ts` finds `index.html`. External URLs are
+  ignored.
+- **More views say what they skipped:** like `--format forms`, the `routes`, `inertia` and `props` views end with a
+  line per reason, such as a route name built at run time, a page name that is not a literal or a `v-bind` object
+  (`? 2 skipped: <reason> (a.vue L3, b.vue L9, +N)`), instead of silently leaving the item out.
+
+### Changed
+
+- **Vue emit keys belong to their component:** an emit is now `Card.vue::emit:save` instead of `vue::emit:save`, and
+  a parent's `@save="h"` / `v-on:save` on `<Card>` is an edge to the same key, so `--grep 'Card.vue::emit:save'` shows
+  both the emitting code and the parents listening to it. Native DOM events and dynamic `@[ev]` get no edge. The
+  cache format changed; existing caches are rebuilt automatically on the next run.
+- **Vue template expressions are analysed like the script:** calls in `{{ }}`, `:x`, `@x`, `v-if` and `v-model` get
+  the same categories as in `<script>` (a `const store = useX()` binding, imports, built-ins), inline handlers like
+  `@click="a(); b++"` are read, optional-chain calls (`a?.b()`) are found and dynamic calls (`handlers[name]()`) are
+  marked. `v-for` items and slot props are local names, so `item.open()` is no longer listed as a call. An expression
+  that cannot be parsed falls back to the previous name-based reading.
+
 ## [1.1.1] — 2026-11-18
 
 ### Added
