@@ -6,6 +6,13 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ## [Unreleased]
 
+## [1.2.1] — 2026-11-23
+
+### Javítás
+
+- **Az 1.2.0 tartalma most már letölthető:** az 1.2.0 nem jelent meg letölthető kiadásként, mert a Windows-buildje
+  elakadt. Az 1.2.1 az első kiadás, amely mindent tartalmaz, ami az 1.2.0 alatt szerepel; más nem változott.
+
 ## [1.2.0] — 2026-11-23
 
 ### Új
@@ -1272,7 +1279,8 @@ Első kiadás.
 - Beépített frissítés: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Előre fordított csomagok macOS-re (arm64, x86_64), Linuxra (x86_64, ARM64, statikus musl) és Windowsra.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v1.2.0...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v1.2.1...develop
+[1.2.1]: https://github.com/GeRiY/callgraph/releases/tag/v1.2.1
 [1.2.0]: https://github.com/GeRiY/callgraph/releases/tag/v1.2.0
 [1.1.1]: https://github.com/GeRiY/callgraph/releases/tag/v1.1.1
 [1.1.0]: https://github.com/GeRiY/callgraph/releases/tag/v1.1.0

@@ -5,6 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+## [1.2.1] — 2026-11-23
+
+### Fixed
+
+- **Everything from 1.2.0 is now available as a download:** 1.2.0 was not published because its Windows build
+  failed. 1.2.1 is the first release with everything listed under 1.2.0; nothing else changed.
+
 ## [1.2.0] — 2026-11-23
 
 ### Added
@@ -1185,7 +1192,8 @@ First release.
 - Built-in update: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Prebuilt packages for macOS (arm64, x86_64), Linux (x86_64, ARM64, static musl) and Windows.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v1.2.0...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v1.2.1...develop
+[1.2.1]: https://github.com/GeRiY/callgraph/releases/tag/v1.2.1
 [1.2.0]: https://github.com/GeRiY/callgraph/releases/tag/v1.2.0
 [1.1.1]: https://github.com/GeRiY/callgraph/releases/tag/v1.1.1
 [1.1.0]: https://github.com/GeRiY/callgraph/releases/tag/v1.1.0
