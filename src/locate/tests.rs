@@ -213,7 +213,8 @@ fn matcher_finds_every_kind_of_match() {
         method_callers,
         Some(Callers {
             count: 1,
-            sample: vec!["RefundController::store".into()]
+            sample: vec!["RefundController::store".into()],
+            guessed: 0,
         })
     );
 
@@ -997,6 +998,79 @@ fn caller_counts_stay_within_the_language_family() {
     assert_eq!(js.sample, ["Menu::pick"]);
     let on_php = counts.of(None, "setLocale", "app/Services/Locale.php");
     assert_eq!(on_php.count, 2, "{on_php:?}");
+}
+
+/// A route-akció (csak az útvonal hivatkozza) nem kap hívót a más osztályok azonos nevű metódusának hívásaiból:
+/// a `$this->index()` a saját osztályé, az ismeretlen fogadójú `$x->index()` csak találgatás.
+fn same_name_scenario() -> (FileGraph, FileGraph, FileGraph, FileGraph) {
+    let mut post = graph("app/Http/Controllers/PostController.php");
+    post.containers.push(container("PostController", 3, 20));
+    post.methods
+        .push(method(Some("PostController"), "index", 5, 9));
+    let mut a = graph("app/Http/Controllers/A.php");
+    a.containers.push(container("A", 3, 30));
+    a.methods.push(method(Some("A"), "index", 5, 9));
+    let mut this_call = call("A", "run", 12, "index");
+    this_call.on = Some("this".into());
+    a.calls.push(this_call);
+    let mut b = graph("app/Http/Controllers/B.php");
+    b.containers.push(container("B", 3, 30));
+    b.methods.push(method(Some("B"), "index", 5, 9));
+    let mut self_call = call("B", "run", 12, "index");
+    self_call.on = Some("self".into());
+    b.calls.push(self_call);
+    let mut page = graph("app/Page.php");
+    page.containers.push(container("Page", 3, 30));
+    page.calls.push(call("Page", "show", 8, "$x->index"));
+    (post, a, b, page)
+}
+
+#[test]
+fn same_named_methods_split_sure_and_guessed_callers() {
+    let (post, a, b, page) = same_name_scenario();
+    let counts = CallerCounts::build([&post, &a, &b, &page]);
+    let file = "app/Http/Controllers/PostController.php";
+    let route_action = counts.of(Some("PostController"), "index", file);
+    assert_eq!(route_action.count, 0, "{route_action:?}");
+    assert_eq!(route_action.guessed, 1, "{route_action:?}");
+    // az A saját `$this->index()` hívója biztos, a `$x->index()` csak találgatás
+    let own = counts.of(Some("A"), "index", "app/Http/Controllers/A.php");
+    assert_eq!(own.count, 1, "{own:?}");
+    assert_eq!(own.sample, ["A::run"]);
+    assert_eq!(own.guessed, 1, "{own:?}");
+}
+
+#[test]
+fn a_uniquely_named_method_called_on_an_unknown_receiver_stays_sure() {
+    let mut svc = graph("app/Services/RefundService.php");
+    svc.containers.push(container("RefundService", 3, 30));
+    svc.methods
+        .push(method(Some("RefundService"), "processRefund", 5, 9));
+    let mut page = graph("app/Page.php");
+    page.calls
+        .push(call("Page", "show", 8, "$x->processRefund"));
+    let counts = CallerCounts::build([&svc, &page]);
+    let found = counts.of(Some("RefundService"), "processRefund", &svc.file);
+    assert_eq!(found.count, 1, "{found:?}");
+    assert_eq!(found.guessed, 0, "{found:?}");
+}
+
+#[test]
+fn the_locate_line_shows_name_only_callers_marked() {
+    let (post, a, b, page) = same_name_scenario();
+    let terms = Term::parse_all(&["index"]);
+    let callers = CallerCounts::build([&post, &a, &b, &page]);
+    let matcher = Matcher::new(&terms, &callers);
+    let hits = matcher.file_hits("app/Http/Controllers/PostController.php", &post, true);
+    let lines: Vec<String> = group(&hits)
+        .iter()
+        .map(|reason| super::reasons::describe(reason, &terms))
+        .collect();
+    let expected = crate::t!("callers: 0 · +1? by name", "hívók: 0 · +1? csak névegyezés");
+    assert!(
+        lines.iter().any(|line| line.contains(expected)),
+        "{lines:?}"
+    );
 }
 
 fn raws(terms: &[Term]) -> Vec<&str> {

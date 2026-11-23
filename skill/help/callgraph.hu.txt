@@ -70,7 +70,8 @@ Honnan induljak a feladattal (egy hívás a feladat neveivel és fogalmaival):
   bash ~/.claude/skills/callgraph/callgraph.sh locate <kifejezés>... [--all] [--project alias]
                                                 rangsorolt fájlok a projekt-térképből (forrás olvasása nélkül), fájlonként
                                                 legfeljebb 3 indoklással: pontos definíció, fájlnév, név-részlet (camelCase /
-                                                snake_case / kebab-case, egyes / többes szám), string-literál, hívás; "hívók: N";
+                                                snake_case / kebab-case, egyes / többes szám), string-literál, hívás; "hívók: N"
+                                                ("+M?": csak névegyezés alapján);
                                                 az első 5 fájl, --all: minden egyező fájl; a "nincs találat: …" a meg nem
                                                 talált, a "túl általános" a 30-nál több fájlban egyező kifejezéseket sorolja;
                                                 a pontos definíciók / fájlnevek kerülnek előre

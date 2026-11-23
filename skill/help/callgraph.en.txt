@@ -70,7 +70,8 @@ Where to start with a task (one call with the names and domain terms of the task
   bash ~/.claude/skills/callgraph/callgraph.sh locate <term>... [--all] [--project alias]
                                                 ranked files from the project map (no source reading), each with up to
                                                 3 reasons: exact definition, file name, name part (camelCase / snake_case /
-                                                kebab-case, singular / plural), string literal, call; "callers: N";
+                                                kebab-case, singular / plural), string literal, call; "callers: N"
+                                                ("+M?": callers matched by name only);
                                                 top 5 files, --all: every matching file; "no match: …" lists the terms
                                                 not found, "too general" the ones matching more than 30 files;
                                                 exact definitions / file names rank first

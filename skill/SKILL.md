@@ -28,7 +28,7 @@ that; "where do I start with this task?" → `locate`; definitions, structure, c
 **The first call of a task:** give `locate` the names and domain terms of the task in ONE call: function, class,
 property and file names, columns, routes, translation keys, and for a non-English domain word its English code name too (e.g.
 visszatérítés → `refund`; a plain sentence works too, filler words are ignored). It answers from the project map without reading files: the top 5 files (`--all`: every
-match), each with its reasons (exact definition, file name, name part, string, call, `callers: N`). Continue on
+match), each with its reasons (exact definition, file name, name part, string, call, `callers: N`, `+M?` = name-only guesses). Continue on
 those files with the outline / `--body` / `--grep`.
 **Recipes:** bug fix = `locate` → `outline` of the top file → `--body` of the method. "Who calls it / what breaks" =
 the name pattern with `--grep` and `--depth` 2 → `--body` of the calling method. Unfamiliar project = `profile` →

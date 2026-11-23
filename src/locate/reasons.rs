@@ -150,6 +150,15 @@ pub(crate) fn describe(reason: &Reason, terms: &[Term]) -> String {
                     callers.sample.join(", "),
                     more
                 ));
+            } else if callers.guessed > 0 {
+                text.push_str(crate::t!("  callers: 0", "  hívók: 0"));
+            }
+            if callers.guessed > 0 {
+                text.push_str(&crate::tf!(
+                    " · +{}? by name",
+                    " · +{}? csak névegyezés",
+                    callers.guessed
+                ));
             }
             text
         }

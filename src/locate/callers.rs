@@ -30,18 +30,30 @@ fn family(file: &str) -> String {
     }
 }
 
+/// A `defined_in` kulcsa: nyelvcsalád + név, hogy egy Vue-komponens azonos nevű metódusa ne tegye
+/// találgatássá a PHP-hívást.
+fn defined_key(family: &str, name: &str) -> String {
+    format!("{family}\u{1}{name}")
+}
+
 /// A projekt hívásai a hívott név (kisbetűvel) szerint.
 pub(crate) struct CallerCounts {
     by_name: HashMap<String, Vec<Site>>,
     /// A projektben definiált típusok rövid neve kisbetűvel: ilyen fogadójú hívás csak a saját típusához számít.
     types: HashSet<String>,
+    /// Nyelvcsalád + metódus- / függvénynév (kisbetűvel, `defined_key`) → a definiáló típusok rövid neve: ha egy
+    /// névnek több gazdája van, az
+    /// ismeretlen fogadójú hívás csak találgatás.
+    defined_in: HashMap<String, HashSet<String>>,
 }
 
-/// Egy definíció hívói: a különböző hívó metódusok száma és az első kettő neve.
+/// Egy definíció hívói: a biztos hívó metódusok száma és az első kettő neve, valamint a csak névegyezés alapján
+/// sejtett hívók száma (`guessed`: ismeretlen fogadó, és más típus is definiálja ugyanezt a nevet).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct Callers {
     pub count: usize,
     pub sample: Vec<String>,
+    pub guessed: usize,
 }
 
 impl CallerCounts {
@@ -49,7 +61,23 @@ impl CallerCounts {
     pub(crate) fn build<'a>(graphs: impl IntoIterator<Item = &'a FileGraph>) -> Self {
         let mut by_name: HashMap<String, Vec<Site>> = HashMap::new();
         let mut types = HashSet::new();
+        let mut defined_in: HashMap<String, HashSet<String>> = HashMap::new();
         for graph in graphs {
+            for method in &graph.methods {
+                let Some(container) = &method.container else {
+                    continue;
+                };
+                let name = method.name.to_lowercase();
+                let (inner, bare) = split_member(&name);
+                let owner = inner.map_or_else(
+                    || short_name(&container.to_lowercase()).to_owned(),
+                    |o| short_name(o).to_owned(),
+                );
+                defined_in
+                    .entry(defined_key(&family(&graph.file), bare))
+                    .or_default()
+                    .insert(owner);
+            }
             types.extend(
                 graph
                     .containers
@@ -66,6 +94,23 @@ impl CallerCounts {
                 if name.is_empty() {
                     continue;
                 }
+                // `$this->x()` / `self::x()` / `static::x()`: a fogadó a hívás saját típusa (a `parent::` ismeretlen marad)
+                let own_type = || {
+                    let on = call.on.as_deref().map(str::to_lowercase);
+                    let this = matches!(
+                        on.as_deref().map(|o| o.trim_start_matches('$')),
+                        Some("this" | "self" | "static")
+                    );
+                    call.container
+                        .as_deref()
+                        .filter(|_| this)
+                        .map(|c| short_name(&c.to_lowercase()).to_owned())
+                };
+                let owner = match owner {
+                    Some(o) if matches!(short_name(o), "this" | "self" | "static") => own_type(),
+                    Some(o) => Some(short_name(o).to_owned()),
+                    None => own_type(),
+                };
                 let caller = match (&call.container, &call.caller) {
                     (Some(container), Some(caller)) => format!("{container}::{caller}"),
                     (None, Some(caller)) => caller.clone(),
@@ -78,13 +123,17 @@ impl CallerCounts {
                         .to_owned(),
                 };
                 by_name.entry(name.to_owned()).or_default().push(Site {
-                    owner: owner.map(|o| short_name(o).to_owned()),
+                    owner,
                     caller,
                     family: family(&graph.file),
                 });
             }
         }
-        Self { by_name, types }
+        Self {
+            by_name,
+            types,
+            defined_in,
+        }
     }
 
     /// A `container` típus `name` metódusának (vagy a `name` függvénynek) hívói. A JS objektum-literál metódusa
@@ -100,20 +149,35 @@ impl CallerCounts {
         let Some(sites) = self.by_name.get(bare) else {
             return Callers::default();
         };
-        let mut seen: Vec<&str> = Vec::new();
-        for site in sites {
-            let fits = site.family == own_family
-                && match (&site.owner, &owner) {
-                    (None, _) | (_, None) => true,
-                    (Some(called), Some(own)) => called == own || !self.types.contains(called),
-                };
-            if fits && !seen.contains(&site.caller.as_str()) {
-                seen.push(&site.caller);
+        let others = self
+            .defined_in
+            .get(&defined_key(&own_family, bare))
+            .is_some_and(|hosts| {
+                hosts
+                    .iter()
+                    .any(|host| owner.as_ref().is_none_or(|own| host != own))
+            });
+        let mut sure: Vec<&str> = Vec::new();
+        let mut guessed: Vec<&str> = Vec::new();
+        for site in sites.iter().filter(|site| site.family == own_family) {
+            let caller = site.caller.as_str();
+            let is_sure = match (&site.owner, &owner) {
+                (_, None) => true,
+                (Some(called), Some(own)) if called == own => true,
+                (Some(called), Some(_)) if self.types.contains(called) => continue,
+                // ismeretlen fogadó: csak akkor biztos, ha más típus nem definiálja ugyanezt a nevet
+                _ => !others,
+            };
+            let list = if is_sure { &mut sure } else { &mut guessed };
+            if !list.contains(&caller) {
+                list.push(caller);
             }
         }
+        guessed.retain(|caller| !sure.contains(caller));
         Callers {
-            count: seen.len(),
-            sample: seen.iter().take(2).map(|s| (*s).to_owned()).collect(),
+            count: sure.len(),
+            sample: sure.iter().take(2).map(|s| (*s).to_owned()).collect(),
+            guessed: guessed.len(),
         }
     }
 }

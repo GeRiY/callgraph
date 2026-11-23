@@ -117,7 +117,8 @@ fn best_kinds(hits: &[Hit]) -> HashMap<usize, Kind> {
     best
 }
 
-/// A korlátos előny: az ismétlés és a definíció hívói (a legtöbbet hívott egyező definícióé).
+/// A korlátos előny: az ismétlés és a definíció biztos hívói (a legtöbbet hívott egyező definícióé; a névegyezésből
+/// sejtett hívók nem számítanak).
 fn bonus(hits: &[Hit], distinct: usize) -> u64 {
     let repeats = (hits.len() as u64)
         .saturating_sub(distinct as u64)
