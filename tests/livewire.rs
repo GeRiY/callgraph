@@ -247,7 +247,10 @@ fn lw_outline_of_a_template_shows_its_class_calls_binds_and_findings() {
 #[test]
 fn lw_event_key_finds_the_dispatcher_and_the_listeners() {
     let fx = Fixture::sample();
-    let out = fx.run(&["show", "app", "--grep", "livewire::event:post-saved"]);
+    // Windows prints `\` as the path separator
+    let out = fx
+        .run(&["show", "app", "--grep", "livewire::event:post-saved"])
+        .replace('\\', "/");
     for file in [
         "app/Livewire/Counter.php",
         "app/Livewire/CreatePost.php",
@@ -257,12 +260,14 @@ fn lw_event_key_finds_the_dispatcher_and_the_listeners() {
         assert!(out.contains(file), "{file}: {out}");
     }
     // a template that dispatches: `wire:click="$dispatch('counter-reset')"`
-    let views = fx.run(&[
-        "show",
-        "resources",
-        "--grep",
-        "livewire::event:counter-reset",
-    ]);
+    let views = fx
+        .run(&[
+            "show",
+            "resources",
+            "--grep",
+            "livewire::event:counter-reset",
+        ])
+        .replace('\\', "/");
     assert!(views.contains("livewire/counter.blade.php"), "{views}");
 }
 

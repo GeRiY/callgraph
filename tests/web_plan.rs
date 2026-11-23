@@ -488,7 +488,10 @@ fn h17_computed_value_array_method_is_not_a_vue_api() {
 
 #[test]
 fn h18_emit_key_is_component_scoped_and_wired_to_the_listener() {
-    let out = Fixture::monorepo().run(&["show", "ui/src", "--grep", "CellMenu.vue::emit:remove$"]);
+    // Windows prints `\` as the path separator
+    let out = Fixture::monorepo()
+        .run(&["show", "ui/src", "--grep", "CellMenu.vue::emit:remove$"])
+        .replace('\\', "/");
     assert!(
         out.contains("FILE  ui/src/components/CellMenu.vue"),
         "{out}"
