@@ -1,7 +1,7 @@
-// Google Tag Manager (which holds the GA4 tag) loads only after explicit consent; nothing is sent to Google before "Accept".
+// Google Tag Manager (GTM-WLRXFLQS) and GA4 (G-RWKNN2CG2V) load only after explicit consent; nothing is sent to Google before "Accept".
 // The choice is stored in localStorage ("cg-consent" = "granted" | "denied"); the footer link reopens the banner.
 (function () {
-  var GTM = "GTM-WLRXFLQS", KEY = "cg-consent";
+  var GTM = "GTM-WLRXFLQS", GA4 = "G-RWKNN2CG2V", KEY = "cg-consent";
   var hu = (document.documentElement.lang || "").slice(0, 2) === "hu";
   var T = hu ? {
     title: "Segíts jobbá tenni a callgraph-ot",
@@ -24,6 +24,11 @@
     window.dataLayer.push({ "gtm.start": new Date().getTime(), event: "gtm.js" });
     var s = document.createElement("script"); s.async = true;
     s.src = "https://www.googletagmanager.com/gtm.js?id=" + GTM; document.head.appendChild(s);
+    // GA4 directly as well (the GTM container should then NOT hold a GA4 tag for the same ID, or visits count twice)
+    var g = document.createElement("script"); g.async = true;
+    g.src = "https://www.googletagmanager.com/gtag/js?id=" + GA4; document.head.appendChild(g);
+    gtag("js", new Date());
+    gtag("config", GA4, { allow_google_signals: false, allow_ad_personalization_signals: false });
   }
   function clearGa() {
     document.cookie.split(";").forEach(function (c) {
