@@ -6,6 +6,12 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ## [Unreleased]
 
+### Javítás
+
+- **A `locate` nem mutat hamis hívókat:** a `hívók: N` csak azokat számolja, amelyek biztosan ezt a metódust hívják
+  (a `$this` / `self` / `static` a hívó saját osztálya). A csak névre egyező hívások, ha más osztályban is van ilyen
+  nevű metódus, külön `+M?` jelölést kapnak (`hívók: 0 · +1? csak névegyezés`), és nem hozzák előrébb a fájlt.
+
 ## [1.2.1] — 2026-11-23
 
 ### Javítás

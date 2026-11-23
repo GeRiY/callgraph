@@ -5,6 +5,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+### Fixed
+
+- **`locate` no longer shows false callers:** `callers: N` counts only code that certainly calls this method
+  (`$this` / `self` / `static` mean the caller's own class). Calls that match only by name while another class has
+  the same method are shown apart as `+M?` (`callers: 0 · +1? by name`) and no longer move the file up the ranking.
+
 ## [1.2.1] — 2026-11-23
 
 ### Fixed
