@@ -235,7 +235,10 @@ fn fi_trace_of_a_resource_by_slug_class_and_model() {
 
 #[test]
 fn fi_resource_key_finds_the_resource_from_the_model_side() {
-    let out = Fixture::sample().run(&["show", "app", "--grep", "filament::resource:Post"]);
+    // Windows prints `\` as the path separator
+    let out = Fixture::sample()
+        .run(&["show", "app", "--grep", "filament::resource:Post"])
+        .replace('\\', "/");
     assert!(
         out.contains("app/Filament/Resources/PostResource.php"),
         "{out}"
