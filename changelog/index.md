@@ -8,6 +8,14 @@ Every release with its date, newest first: what was added, changed and fixed. Do
 
 [Install the latest version](https://callgraph.eu/#install)[Latest release on GitHub](https://github.com/GeRiY/callgraph/releases/latest)
 
+## v1.2.2 — 2026-11-23
+
+[Release notes and downloads on GitHub](https://github.com/GeRiY/callgraph/releases/tag/v1.2.2)
+
+### Fixed
+
+- **`locate` no longer shows false callers:** `callers: N` counts only code that certainly calls this method (`$this` / `self` / `static` mean the caller's own class). Calls that match only by name while another class has the same method are shown apart as `+M?` (`callers: 0 · +1? by name`) and no longer move the file up the ranking.
+
 ## v1.2.1 — 2026-11-23
 
 [Release notes and downloads on GitHub](https://github.com/GeRiY/callgraph/releases/tag/v1.2.1)

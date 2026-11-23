@@ -9,6 +9,15 @@
   <author><name>Gergő Makra</name></author>
   <icon>https://callgraph.eu/assets/favicon.svg</icon>
   <entry>
+    <title>callgraph v1.2.2</title>
+    <link rel="alternate" type="text/html" href="https://callgraph.eu/changelog/#v1.2.2"/>
+    <link rel="related" type="text/html" href="https://github.com/GeRiY/callgraph/releases/tag/v1.2.2"/>
+    <id>https://github.com/GeRiY/callgraph/releases/tag/v1.2.2</id>
+    <updated>2026-11-23T00:00:00Z</updated>
+    <published>2026-11-23T00:00:00Z</published>
+    <content type="html">&lt;h3&gt;Fixed&lt;/h3&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;&lt;code&gt;locate&lt;/code&gt; no longer shows false callers:&lt;/b&gt; &lt;code&gt;callers: N&lt;/code&gt; counts only code that certainly calls this method (&lt;code&gt;$this&lt;/code&gt; / &lt;code&gt;self&lt;/code&gt; / &lt;code&gt;static&lt;/code&gt; mean the caller&#x27;s own class). Calls that match only by name while another class has the same method are shown apart as &lt;code&gt;+M?&lt;/code&gt; (&lt;code&gt;callers: 0 · +1? by name&lt;/code&gt;) and no longer move the file up the ranking.&lt;/li&gt;&lt;/ul&gt;</content>
+  </entry>
+  <entry>
     <title>callgraph v1.2.1</title>
     <link rel="alternate" type="text/html" href="https://callgraph.eu/changelog/#v1.2.1"/>
     <link rel="related" type="text/html" href="https://github.com/GeRiY/callgraph/releases/tag/v1.2.1"/>

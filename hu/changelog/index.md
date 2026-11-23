@@ -8,6 +8,14 @@ Minden kiadás dátummal, a legújabb elöl: mi új, mi változott és mi javult
 
 [A legújabb verzió telepítése](https://callgraph.eu/hu/#install)[Legfrissebb kiadás a GitHubon](https://github.com/GeRiY/callgraph/releases/latest)
 
+## v1.2.2 — 2026-11-23
+
+[Kiadási jegyzet és letöltések a GitHubon](https://github.com/GeRiY/callgraph/releases/tag/v1.2.2)
+
+### Javítás
+
+- **A `locate` nem mutat hamis hívókat:** a `hívók: N` csak azokat számolja, amelyek biztosan ezt a metódust hívják (a `$this` / `self` / `static` a hívó saját osztálya). A csak névre egyező hívások, ha más osztályban is van ilyen nevű metódus, külön `+M?` jelölést kapnak (`hívók: 0 · +1? csak névegyezés`), és nem hozzák előrébb a fájlt.
+
 ## v1.2.1 — 2026-11-23
 
 [Kiadási jegyzet és letöltések a GitHubon](https://github.com/GeRiY/callgraph/releases/tag/v1.2.1)
