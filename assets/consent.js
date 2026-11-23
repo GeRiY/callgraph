@@ -1,7 +1,7 @@
 // Google Tag Manager (which holds the GA4 tag) loads only after explicit consent; nothing is sent to Google before "Accept".
 // The choice is stored in localStorage ("cg-consent" = "granted" | "denied"); the footer link reopens the banner.
 (function () {
-  var GTM = "GTM-PK6Z5DDZ", KEY = "cg-consent";
+  var GTM = "GTM-WLRXFLQS", KEY = "cg-consent";
   var hu = (document.documentElement.lang || "").slice(0, 2) === "hu";
   var T = hu ? {
     title: "Segíts jobbá tenni a callgraph-ot",
