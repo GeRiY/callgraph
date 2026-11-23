@@ -6,6 +6,8 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ## [Unreleased]
 
+## [1.2.0] — 2026-11-23
+
 ### Új
 
 - **`trace <cél>`: egy route vagy oldal teljes lánca egyetlen rövid válaszban:** a
@@ -1270,7 +1272,8 @@ Első kiadás.
 - Beépített frissítés: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Előre fordított csomagok macOS-re (arm64, x86_64), Linuxra (x86_64, ARM64, statikus musl) és Windowsra.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v1.1.1...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v1.2.0...develop
+[1.2.0]: https://github.com/GeRiY/callgraph/releases/tag/v1.2.0
 [1.1.1]: https://github.com/GeRiY/callgraph/releases/tag/v1.1.1
 [1.1.0]: https://github.com/GeRiY/callgraph/releases/tag/v1.1.0
 [1.0.2]: https://github.com/GeRiY/callgraph/releases/tag/v1.0.2
