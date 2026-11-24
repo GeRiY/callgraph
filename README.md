@@ -23,6 +23,8 @@
 
 [![callgraph MCP server](https://mcprush.com/badge/callgraph-mcp/card.svg)](https://mcprush.com/to/callgraph-mcp?ref=badge)
 
+[![GeRiY/callgraph MCP server](https://glama.ai/mcp/servers/GeRiY/callgraph/badges/score.svg)](https://glama.ai/mcp/servers/GeRiY/callgraph)
+
 </div>
 
 <p align="center">
