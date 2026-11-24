@@ -6,6 +6,31 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ## [Unreleased]
 
+### Új
+
+- **A telepítő egy mondatos callgraph-szabályt ír a Claude Code-nak:** a `bash install.sh` mostantól megkérdezi,
+  hogy kiírja-e a `.claude/rules/callgraph.md` fájlt: egyetlen mondatot, amely szerint az agent a kódban a
+  `callgraph.sh locate` paranccsal (utána az outline-nal és a `--body`-val) navigáljon, ne Greppel / Readdel.
+  Projekt-telepítésnél a `<projekt>/.claude/rules/`, felhasználói telepítésnél a `~/.claude/rules/` mappába kerül. A
+  `--rules` kérdés nélkül kiírja (terminál nélküli futtatáskor is ez az alap), a `--no-rules` kihagyja. A meglévő,
+  eltérő fájlról előbb `callgraph.md.bak` mentés készül; az azonos tartalmúhoz nem nyúl. Kikapcsolás: töröld a
+  fájlt. A README az MCP-felhasználóknak a megfelelő `CLAUDE.md`-sorokat is megmutatja.
+- **Több mód a metódusok kiválasztására:** a `fájl::Osztály.metódus` és a `fájl::Osztály::metódus` az adott osztály
+  metódusát választja, a `fájl::a,b,c` pedig egyszerre több metódust (ugyanaz, mint a `fájl::a ::b ::c`).
+
+### Változás
+
+- **A skill és az MCP-szövegek sokkal rövidebbek, és megmondják, mikor kell a callgraph:** a `SKILL.md` leírása
+  szerint az első Grep / Read előtt kell használni, ha a feladat arra kérdez, melyik fájlt vagy függvényt kell
+  módosítani, hol van megvalósítva valami, vagy ki mit hív; utána egy rövid első-lépés recept jön (`locate` a feladat
+  neveivel → a legelső fájl outline-ja → egy metódus `--body`-ja → `--grep` a hívókra). Az MCP-szerver csatlakozáskor
+  küldött útmutatója és az eszközleírások ugyanerre a néhány sorra rövidültek.
+- **A `--body` betartja a 400 soros kimenet-korlátot:** a hosszabb törzs-kimenetből metódusonként az első sorok
+  maradnak (minden `== …` fejléc megmarad), a végén pedig figyelmeztetés jelzi, hogy sávhoz `--lines A-B`, a teljes
+  kimenethez `--full` kell.
+- **Az outline a modul-szintű kódot így is nevezi:** a `__module__` bejegyzés metódusnév helyett `module-level code
+  L…-…` alakban jelenik meg; ha a `--body`-ja levágódik, a figyelmeztetés a `--lines A-B` kapcsolót javasolja.
+
 ## [1.2.2] — 2026-11-23
 
 ### Javítás
