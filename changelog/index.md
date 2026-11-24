@@ -8,6 +8,24 @@ Every release with its date, newest first: what was added, changed and fixed. Do
 
 [Install the latest version](https://callgraph.eu/#install)[Latest release on GitHub](https://github.com/GeRiY/callgraph/releases/latest)
 
+## v1.3.0 — 2026-11-24
+
+[Release notes and downloads on GitHub](https://github.com/GeRiY/callgraph/releases/tag/v1.3.0)
+
+### Added
+
+- **The installer writes a one-sentence callgraph rule for Claude Code:** `bash install.sh` now asks whether to write `.claude/rules/callgraph.md`, a single sentence telling the agent to navigate code with `callgraph.sh locate` (then the outline and `--body`) instead of Grep / Read. A project install writes it to `<project>/.claude/rules/`, a user install to `~/.claude/rules/`. `--rules` writes it without asking (also the default when not run in a terminal), `--no-rules` skips it. An existing, different file is saved as `callgraph.md.bak` first; an identical one is left alone. Turn it off by deleting the file. The README also shows the equivalent `CLAUDE.md` lines for MCP users.
+
+- **More ways to pick methods:** `file::Class.method` and `file::Class::method` select the method of that class, and `file::a,b,c` selects several methods at once (the same as `file::a ::b ::c`).
+
+### Changed
+
+- **The skill and the MCP texts are much shorter and say when to use callgraph:** the `SKILL.md` description now says to use it before the first Grep / Read in a task that asks which file or function to change, where something is implemented or who calls what, followed by a short first-move recipe (`locate` with the task's names → outline of the top file → `--body` of one method → `--grep` for the callers). The instructions the MCP server sends on connect and the tool descriptions are trimmed to the same few lines.
+
+- **`--body` respects the 400-line output limit:** a longer body output keeps the first lines of each method (every `== …` header stays) and ends with a warning that points to `--lines A-B` for a range and `--full` for everything.
+
+- **Module-level code is labelled as such in the outline:** the `__module__` entry is shown as `module-level code L…-…` instead of a method name; when its `--body` is cut, the warning suggests `--lines A-B`.
+
 ## v1.2.2 — 2026-11-23
 
 [Release notes and downloads on GitHub](https://github.com/GeRiY/callgraph/releases/tag/v1.2.2)

@@ -5,9 +5,18 @@
   <link rel="self" type="application/atom+xml" href="https://callgraph.eu/changelog/feed.xml"/>
   <link rel="alternate" type="text/html" href="https://callgraph.eu/changelog/"/>
   <id>https://callgraph.eu/changelog/</id>
-  <updated>2026-11-23T00:00:00Z</updated>
+  <updated>2026-11-24T00:00:00Z</updated>
   <author><name>Gergő Makra</name></author>
   <icon>https://callgraph.eu/assets/favicon.svg</icon>
+  <entry>
+    <title>callgraph v1.3.0</title>
+    <link rel="alternate" type="text/html" href="https://callgraph.eu/changelog/#v1.3.0"/>
+    <link rel="related" type="text/html" href="https://github.com/GeRiY/callgraph/releases/tag/v1.3.0"/>
+    <id>https://github.com/GeRiY/callgraph/releases/tag/v1.3.0</id>
+    <updated>2026-11-24T00:00:00Z</updated>
+    <published>2026-11-24T00:00:00Z</published>
+    <content type="html">&lt;h3&gt;Added&lt;/h3&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;The installer writes a one-sentence callgraph rule for Claude Code:&lt;/b&gt; &lt;code&gt;bash install.sh&lt;/code&gt; now asks whether to write &lt;code&gt;.claude/rules/callgraph.md&lt;/code&gt;, a single sentence telling the agent to navigate code with &lt;code&gt;callgraph.sh locate&lt;/code&gt; (then the outline and &lt;code&gt;--body&lt;/code&gt;) instead of Grep / Read. A project install writes it to &lt;code&gt;&amp;lt;project&amp;gt;/.claude/rules/&lt;/code&gt;, a user install to &lt;code&gt;~/.claude/rules/&lt;/code&gt;. &lt;code&gt;--rules&lt;/code&gt; writes it without asking (also the default when not run in a terminal), &lt;code&gt;--no-rules&lt;/code&gt; skips it. An existing, different file is saved as &lt;code&gt;callgraph.md.bak&lt;/code&gt; first; an identical one is left alone. Turn it off by deleting the file. The README also shows the equivalent &lt;code&gt;CLAUDE.md&lt;/code&gt; lines for MCP users.&lt;/li&gt;&lt;li&gt;&lt;b&gt;More ways to pick methods:&lt;/b&gt; &lt;code&gt;file::Class.method&lt;/code&gt; and &lt;code&gt;file::Class::method&lt;/code&gt; select the method of that class, and &lt;code&gt;file::a,b,c&lt;/code&gt; selects several methods at once (the same as &lt;code&gt;file::a ::b ::c&lt;/code&gt;).&lt;/li&gt;&lt;/ul&gt;&lt;h3&gt;Changed&lt;/h3&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;The skill and the MCP texts are much shorter and say when to use callgraph:&lt;/b&gt; the &lt;code&gt;SKILL.md&lt;/code&gt; description now says to use it before the first Grep / Read in a task that asks which file or function to change, where something is implemented or who calls what, followed by a short first-move recipe (&lt;code&gt;locate&lt;/code&gt; with the task&#x27;s names → outline of the top file → &lt;code&gt;--body&lt;/code&gt; of one method → &lt;code&gt;--grep&lt;/code&gt; for the callers). The instructions the MCP server sends on connect and the tool descriptions are trimmed to the same few lines.&lt;/li&gt;&lt;li&gt;&lt;b&gt;&lt;code&gt;--body&lt;/code&gt; respects the 400-line output limit:&lt;/b&gt; a longer body output keeps the first lines of each method (every &lt;code&gt;== …&lt;/code&gt; header stays) and ends with a warning that points to &lt;code&gt;--lines A-B&lt;/code&gt; for a range and &lt;code&gt;--full&lt;/code&gt; for everything.&lt;/li&gt;&lt;li&gt;&lt;b&gt;Module-level code is labelled as such in the outline:&lt;/b&gt; the &lt;code&gt;__module__&lt;/code&gt; entry is shown as &lt;code&gt;module-level code L…-…&lt;/code&gt; instead of a method name; when its &lt;code&gt;--body&lt;/code&gt; is cut, the warning suggests &lt;code&gt;--lines A-B&lt;/code&gt;.&lt;/li&gt;&lt;/ul&gt;</content>
+  </entry>
   <entry>
     <title>callgraph v1.2.2</title>
     <link rel="alternate" type="text/html" href="https://callgraph.eu/changelog/#v1.2.2"/>
