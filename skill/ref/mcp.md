@@ -5,6 +5,12 @@
 ## MCP server (`callgraph mcp`)
 
 <!-- mcp:tools -->
+Tools (paths relative to the project root; `project` = a registered alias, list: `projects`):
+- `locate` `{terms}` (`all: true`: every match); `outline` `{path}` (`method`, `format`: `api` / `flow` / `summary`); `method_body` `{path, method}` (a name or a list; `doc: true`, `raw: true`); `find_callers` `{pattern}` (`depth` 2–5, `guess: true`).
+- Also: `search` `{kind: strings | constants, pattern}`, `framework_view` `{view, path}`, `trace`, `notes`, `next`, `guide` (`topic`: language / reference files).
+<!-- /mcp -->
+Tool details (the long form of the list above):
+
 callgraph (`callgraph mcp`): AST-based, token-efficient code map (PHP / Blade, Rust, JS / TS / Vue, Swift, Kotlin, Python, Go, SCSS); the CLI's
 queries as read-only tools, with the same output. Use it before reading a code file. Paths are relative to the project
 root: a registered alias (`project`, list: `projects`) or the server's working directory. Typical flow: `locate`
@@ -29,6 +35,6 @@ root: a registered alias (`project`, list: `projects`) or the server's working d
   fits your task; otherwise ignore the line.
 Output is capped at 400 lines (directory → summary, file → method index, search → 1 line per match): narrow `path`,
 `method` or `pattern` first; `full: true` only when justified.
-<!-- /mcp -->
+
 CLI equivalents: `locate` = `bash $CG locate <term>…`, `outline` = `bash $CG <path>` (`method` = `<path>::name`), `method_body` = `::name --body`,
 `find_callers` = `--grep`, `search` = `--strings` / `--const`, `framework_view` = `--format <view>`, `trace` = `bash $CG trace <target>`, `notes` = `--notes`.

@@ -267,6 +267,8 @@ impl QueryEngine {
                 continue;
             }
             let methods = methods.map(|names| {
+                // `Osztály.metódus` / `Osztály::metódus` → a metódus neve, ha az adott tárolóban van ilyen
+                let names: Vec<String> = names.iter().map(|n| qualified_to_method(&graph, n)).collect();
                 // névegyezés: egy név több metódusra is illeszkedhet (Rust: több impl, PHP/Swift: túlterhelés),
                 // ezért a hiányt név szerint nézzük, nem darabszámra
                 // pontos név; ha nincs ilyen, a pont nélküli név az objektum-literál metódusára is illeszkedik
@@ -502,6 +504,35 @@ pub(crate) fn strip_verbatim(path: &str) -> &str {
     match path.strip_prefix(r"\\?\") {
         Some(rest) if rest.as_bytes().get(1) == Some(&b':') => rest,
         _ => path,
+    }
+}
+
+/// `Osztály.metódus` / `Osztály::metódus` választó: ha nincs ilyen nevű metódus, de a `metódus` az `Osztály`
+/// tárolóban megvan, a sima metódusnév (különben változatlan, a szokásos hibaág dönt).
+fn qualified_to_method(graph: &crate::model::FileGraph, name: &str) -> String {
+    if graph.methods.iter().any(|m| m.name == name) {
+        return name.to_owned();
+    }
+    let Some((class, method)) = name.rsplit_once("::").or_else(|| name.rsplit_once('.')) else {
+        return name.to_owned();
+    };
+    let class_last = class.rsplit(['.', ':', '\\']).next().unwrap_or(class);
+    let hit = graph.methods.iter().any(|m| {
+        (m.name == method
+            || m.name
+                .rsplit_once('.')
+                .is_some_and(|(_, last)| last == method))
+            && m.container.as_deref().is_some_and(|c| {
+                c == class
+                    || c.rsplit(['.', ':', '\\'])
+                        .next()
+                        .is_some_and(|last| last == class_last)
+            })
+    });
+    if hit {
+        method.to_owned()
+    } else {
+        name.to_owned()
     }
 }
 

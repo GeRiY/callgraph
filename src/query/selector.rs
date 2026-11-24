@@ -58,10 +58,13 @@ impl SelectorSet {
             } else {
                 PathBuf::from(file)
             };
-            items.push(Selector {
-                file,
-                method: Some(method.to_owned()),
-            });
+            // `fájl::a,b,c` ≡ `fájl::a ::b ::c`
+            for part in method.split(',').map(str::trim).filter(|m| !m.is_empty()) {
+                items.push(Selector {
+                    file: file.clone(),
+                    method: Some(part.to_owned()),
+                });
+            }
         }
         Ok(Self { items, selected })
     }
@@ -109,6 +112,24 @@ mod tests {
             set.methods_for(std::path::Path::new("src/A.php")),
             Some(vec!["alpha", "beta"])
         );
+    }
+
+    #[test]
+    fn a_comma_list_equals_repeated_short_selectors() {
+        let set = parse(&["a.py::one,two, three", "::four"]).unwrap();
+        let methods: Vec<&str> = set
+            .items
+            .iter()
+            .filter_map(|s| s.method.as_deref())
+            .collect();
+        assert_eq!(methods, ["one", "two", "three", "four"]);
+        assert!(
+            set.items
+                .iter()
+                .all(|s| s.file == std::path::Path::new("a.py"))
+        );
+        let set = parse(&["a.py::Class::method"]).unwrap();
+        assert_eq!(set.items[0].method.as_deref(), Some("Class::method"));
     }
 
     #[test]

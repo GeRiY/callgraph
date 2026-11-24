@@ -385,6 +385,19 @@ maradnak, a lekérdezések nem használnak hálózatot (csak a lenti, naponta eg
 utasításai közé teszi. A `guide` eszköz az alap skill-útmutatót adja (a `topic` paraméterrel egy-egy nyelvi / témafájlt). A skill-útmutató csak angolul létezik. Mindkettő a `SKILL.md` forrásából készül, így
 mindig egyezik vele.
 
+A Claude Code az MCP-eszközöket késleltetve tölti be (csak a nevüket látja), ezért alapból előbb a Grep / Read-hez nyúl.
+Tedd be ezt a projekt `CLAUDE.md`-jébe, hogy előbb a callgraph-ot használja (a szöveg angolul marad, a modell így követi
+a legjobban):
+
+```markdown
+# Code navigation
+Use the callgraph tools instead of Grep / Read: `locate` with all names from the task, then `outline` of the top
+files; `method_body` only for the one or two methods you must read, never for a whole module. Grep only for exact
+text; Read only for a known line range.
+```
+
+(A skill telepítője ugyanezt a szabályt magától kiírja a `.claude/rules/callgraph.md` fájlba.)
+
 A telepítő a Claude Code-ban regisztrálni is tudja: a `bash install.sh` rákérdez (ha a `claude` parancs elérhető), a
 `bash install.sh --mcp` kérdés nélkül megcsinálja, a `--no-mcp` kihagyja. Eltávolítás:
 `claude mcp remove -s user callgraph`. Kézzel:

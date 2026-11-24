@@ -113,7 +113,7 @@ impl CallgraphServer {
             idempotent_hint = true,
             open_world_hint = false
         ),
-        description = "Where to start with a task: the task's names and domain terms in ONE call → a ranked file list from the project map (no file reading; top 5, `all: true` = all), each with reasons (exact definition, file name, name part, string literal, call, `callers: N`). Example: {\"terms\": [\"RefundController\", \"refund\", \"payment_status\"]}. Prefer code names; a plain sentence also works (filler words are ignored); translate non-English domain words (visszatérítés → refund); one call with all terms. Use `locate` to find WHERE to start; once you know the file use `outline`; string literal / constant: `search`; other exact text (log message, config value): Grep."
+        description = "START HERE for any task: pass every name and domain term from the task in ONE call (function, class and file names, error messages; a plain sentence works too; translate non-English domain words, e.g. visszatérítés → refund) → the top 5 files, ranked, each with reasons (exact definition, file name, name part, string literal, call, `callers: N`). Replaces a chain of Grep calls; no file is read. Example: {\"terms\": [\"RefundController\", \"refund\", \"payment_status\"]}. `all: true` = every match. Next: `outline` of the top file. Exact text (log message, config value): Grep."
     )]
     async fn locate(&self, Parameters(p): Parameters<LocateParams>) -> CallToolResult {
         self.execute(CommandKind::Locate, ShowQuery::locate(p))
@@ -127,7 +127,7 @@ impl CallgraphServer {
             idempotent_hint = true,
             open_world_hint = false
         ),
-        description = "Structure of a code file or directory without reading it: classes/components, methods with line ranges, calls by category. With `method`: that method's callees, each classified (internal_helper, model_use, orm_relation, framework_use, external_call…) — no separate callees tool; who calls it: `find_callers`. Start here once you know the file (else `locate`); routes / events / validation: `framework_view`. Example: {\"path\": \"app/Order.php\", \"method\": \"cancel\"}. Pitfall: the method goes in `method`, not `path::method`; on a large directory use `format: summary` or a subdirectory."
+        description = "What a file (or directory) contains, without reading it: classes / components, methods with line ranges, calls by category. Use after `locate`, instead of Read. `method` = that one method's callees, each classified (internal_helper, model_use, orm_relation, framework_use, external_call…); who calls it: `find_callers`; routes / events / validation: `framework_view`. Example: {\"path\": \"app/Order.php\", \"method\": \"cancel\"}. Pitfall: the method goes in `method`, not `path::method`; a large directory: `format: summary` or a subdirectory."
     )]
     async fn outline(&self, Parameters(p): Parameters<OutlineParams>) -> CallToolResult {
         self.execute(CommandKind::Outline, ShowQuery::outline(p))
@@ -141,7 +141,7 @@ impl CallgraphServer {
             idempotent_hint = true,
             open_world_hint = false
         ),
-        description = "Line-numbered source of methods/functions, compact: docblock and blank lines dropped, comments in the body kept (line numbers stay exact; the header notes an omitted docblock; `doc: true` adds it, `raw: true` = exact text, e.g. before editing). Use after `outline` instead of reading the whole file. Example: {\"path\": \"app/Order.php\", \"method\": [\"cancel\", \"refund\"]}."
+        description = "Line-numbered source of one or more methods / functions (compact: docblock and blank lines dropped, comments kept, numbers exact). Use instead of Read when you need the logic of a specific method; ask for the one or two you must read, never for a whole module. `doc: true` adds the docblock, `raw: true` = exact text (e.g. before editing). Example: {\"path\": \"app/Order.php\", \"method\": [\"cancel\", \"refund\"]}."
     )]
     async fn method_body(&self, Parameters(p): Parameters<MethodBodyParams>) -> CallToolResult {
         self.execute(CommandKind::MethodBody, ShowQuery::method_body(p))
@@ -155,7 +155,7 @@ impl CallgraphServer {
             idempotent_hint = true,
             open_world_hint = false
         ),
-        description = "Who calls it: each caller's file, method, line range and call line (`L25 │ code`); paths relative to the `root:` line. A plain word (`cancel`) matches the whole name (`x.cancel`, `T::cancel`), not `cancelAll`; regex chars, `.` or `::` keep regex substring matching (`.*cancel.*` = substring). Name regex `(^|::|\\.|->)cancel$`: every call, also with an unknown/inherited receiver. `Order::cancel` = only calls resolved to that type (`via <Type>` = through interface/parent/trait), so it can miss callers; `?::name` = name-only match. `depth` 2–5 = impact analysis (callers of callers), `compact: true` = file-grouped names + lines, no code; `guess` adds name-only matches (?). Example: {\"pattern\": \"(^|::|\\\\.|->)cancel$\", \"path\": \"app\"}."
+        description = "Who calls it / what breaks if it changes. Pattern `(^|::|\\.|->)name$` = every call of the name (also with an unknown / inherited receiver): use it first. Result: each caller's file, method, line range and the call line (`L25 │ code`); paths relative to the `root:` line. A plain word (`cancel`) matches the whole name (`x.cancel`, `T::cancel`), not `cancelAll`; `.*cancel.*` = substring. `Order::cancel` = only calls resolved to that type (`via <Type>` = through interface / parent / trait), so it can miss callers; `?::name` = name-only match. `depth` 2–5 = callers of callers (impact analysis), `compact: true` = file-grouped names + lines, no code; `guess` adds name-only matches (?). Example: {\"pattern\": \"(^|::|\\\\.|->)cancel$\", \"path\": \"app\"}."
     )]
     async fn find_callers(&self, Parameters(p): Parameters<FindCallersParams>) -> CallToolResult {
         self.execute(CommandKind::FindCallers, ShowQuery::find_callers(p))

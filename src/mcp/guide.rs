@@ -196,8 +196,9 @@ mod tests {
     fn instructions_are_compact_and_complete() {
         let text = instructions();
         let lines = text.lines().count();
-        assert!((25..=70).contains(&lines), "{lines} lines");
-        assert!(text.len() <= 6500, "{} bytes", text.len());
+        assert!((8..=30).contains(&lines), "{lines} lines");
+        // a rövid útmutató minden körben a kontextusban van: tartsd 2,5 kB alatt
+        assert!(text.len() <= 2500, "{} bytes", text.len());
         for item in [
             "`(^|::|\\.|->)",
             "`root: ",
@@ -223,32 +224,21 @@ mod tests {
     }
 
     #[test]
-    fn start_section_carries_the_recipes_with_mcp_names() {
+    fn start_section_carries_the_first_move_with_mcp_names() {
         let text = instructions();
-        let marker = "**Recipes:**";
-        let recipes = text
-            .lines()
-            .skip_while(|line| !line.starts_with(marker))
-            .take(3)
-            .collect::<Vec<_>>()
-            .join("\n");
-        assert!(recipes.starts_with(marker), "no recipes\n{text}");
-        // a négy recept eszköz-nevei (bug fix, hívók, ismeretlen projekt, szöveg / konstans)
-        for tool in [
-            "`locate`",
-            "`outline`",
-            "`method_body`",
-            "`find_callers`",
-            "`depth`",
-            "`project_profile`",
-            "`search` (strings)",
-            "`search` (constants)",
-        ] {
-            assert!(recipes.contains(tool), "{tool}\n{recipes}");
+        let start = text.lines().next().unwrap_or_default();
+        // az első lépés: locate → outline → method_body → find_callers, MCP-nevekkel, CLI-kapcsoló nélkül
+        let mut at = 0;
+        for tool in ["`locate`", "outline", "`method_body`", "`find_callers`"] {
+            let found = start[at..].find(tool);
+            assert!(found.is_some(), "{tool} in order\n{start}");
+            at += found.unwrap_or(0);
         }
-        assert!(!recipes.contains("--"), "CLI flag left\n{recipes}");
-        assert!(!recipes.contains("bash "), "shell command left");
-        assert!(recipes.contains("Grep"), "exact text goes to Grep");
+        assert!(start.contains("INSTEAD of Grep / Read"), "{start}");
+        assert!(start.contains("Grep only for exact text"), "{start}");
+        assert!(start.contains("Read only for a line range"), "{start}");
+        assert!(!start.contains("--"), "CLI flag left\n{start}");
+        assert!(!start.contains("bash "), "shell command left");
     }
 
     #[test]

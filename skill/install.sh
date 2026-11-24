@@ -5,17 +5,21 @@
 # Használat:  bash install.sh [--hooks|--no-hooks] [--session-hook|--no-session-hook] [--mcp|--no-mcp]
 #   --hooks: a Claude Code-hook (háttér-frissítés fájl-írás után) kérdés nélkül; --no-hooks: kérdés nélkül kihagyja.
 #   --session-hook: a SessionStart hook (ajánlott beállítások, frissítés-értesítés) kérdés nélkül; --no-session-hook: kihagyja.
+#   --rules: a callgraph-first szabály (.claude/rules/callgraph.md) kérdés nélkül (nem interaktívan ez az alap); --no-rules: kihagyja.
 #   --mcp: az MCP-szerver (`callgraph mcp`) regisztrálása a Claude Code-ban kérdés nélkül; --no-mcp: kihagyja.
 set -euo pipefail
 HOOKS=""
 SESSION_HOOK=""
 MCP=""
+RULES=""
 for arg in "$@"; do
     case "$arg" in
         --hooks) HOOKS=yes ;;
         --no-hooks) HOOKS=no ;;
         --session-hook) SESSION_HOOK=yes ;;
         --no-session-hook) SESSION_HOOK=no ;;
+        --rules) RULES=yes ;;
+        --no-rules) RULES=no ;;
         --mcp) MCP=yes ;;
         --no-mcp) MCP=no ;;
     esac
@@ -135,6 +139,59 @@ if [[ -n "$RPG" ]]; then
     fi
     msg "MCP for Claude Desktop / Cursor / VS Code: $MCP_DOCS (binary: $mcp_bin)" \
         "MCP Claude Desktophoz / Cursorhoz / VS Code-hoz: $MCP_DOCS (bináris: $mcp_bin)"
+fi
+# Callgraph-first szabály: egy mondat a Claude Code utasítás-csatornájában (.claude/rules/callgraph.md) — enélkül a modell
+# a Grep / Read szokásához ragaszkodik, a skill leírását nem követi. Projekt-telepítés (<projekt>/.claude/skills/callgraph)
+# → <projekt>/.claude/rules/callgraph.md, a szabályban a projekt-relatív úttal; felhasználói telepítés (~/.claude/skills/
+# callgraph) → ~/.claude/rules/callgraph.md, a szabályban a ~/.claude/… úttal. Idempotens: azonos tartalomhoz nem nyúl;
+# eltérő meglévő fájlról előbb callgraph.md.bak készül. Máshová telepített skillnél kihagyja (az út nem volna érvényes).
+install_rule() {
+    local template="$DIR/extras/rules/callgraph.md" claude_dir skills_dir target rule_path tmp
+    [[ -f "$template" ]] || return 0
+    skills_dir="$(cd "$DIR/.." && pwd)"
+    claude_dir="$(cd "$DIR/../.." && pwd)"
+    if [[ "$(basename "$DIR")" != callgraph || "$(basename "$skills_dir")" != skills || "$(basename "$claude_dir")" != .claude ]]; then
+        msg "Rule skipped: the skill is not in a .claude/skills/callgraph folder — add the rule by hand: $template" \
+            "Szabály kihagyva: a skill nem egy .claude/skills/callgraph mappában van — add hozzá kézzel: $template"
+        return 0
+    fi
+    target="$claude_dir/rules/callgraph.md"
+    rule_path=".claude/skills/callgraph/callgraph.sh"
+    if [[ "$claude_dir" == "$HOME/.claude" ]]; then
+        rule_path="~/.claude/skills/callgraph/callgraph.sh"
+    fi
+    tmp="$(mktemp)"
+    sed "s#\.claude/skills/callgraph/callgraph\.sh#$rule_path#" "$template" > "$tmp"
+    if [[ -f "$target" ]] && cmp -s "$tmp" "$target"; then
+        rm -f "$tmp"
+        msg "✓ Rule already in place: $target" "✓ A szabály már a helyén van: $target"
+        return 0
+    fi
+    mkdir -p "$claude_dir/rules"
+    if [[ -f "$target" ]]; then
+        cp "$target" "$target.bak"
+        msg "  The existing $target differs — saved as $target.bak" \
+            "  A meglévő $target eltér — mentve: $target.bak"
+    fi
+    cp "$tmp" "$target"
+    rm -f "$tmp"
+    msg "✓ Rule written: $target (remove the file to turn it off)" \
+        "✓ Szabály kiírva: $target (kikapcsolás: töröld a fájlt)"
+}
+want_rules="$RULES"
+if [[ -z "$want_rules" && -t 0 && -t 1 ]]; then
+    if [[ "$(ui_lang)" == hu ]]; then
+        printf 'Egy mondatos szabály a Claude Code-nak (.claude/rules/callgraph.md): kódkereséshez a callgraph, ne Grep / Read? [I/n] '
+    else
+        printf 'Write a one-sentence rule for Claude Code (.claude/rules/callgraph.md): use callgraph, not Grep / Read, to navigate code? [Y/n] '
+    fi
+    read -r answer || answer=""
+    case "$answer" in [nN]*) want_rules=no ;; *) want_rules=yes ;; esac
+fi
+if [[ "$want_rules" == no ]]; then
+    msg "Rule skipped — add later: bash install.sh --rules" "Szabály kihagyva — később: bash install.sh --rules"
+else
+    install_rule
 fi
 # a helyi statisztika beküldése (opt-in): csak interaktív terminálban és még döntés nélkül kérdez (Igen / Most nem /
 # Soha); a döntést és a terminál-vizsgálatot a bináris végzi (nem interaktívan, CI-ban semmit nem tesz)

@@ -324,6 +324,17 @@ pub(super) fn method_line(s: &mut String, m: &Method) {
         writeln!(s, "  {indent}{hashes} {}  L{}-{end}", m.name, m.line).unwrap();
         return;
     }
+    // a modul-szintű pszeudo-metódus nem hívható cél: rövid címke, `()` nélkül (a hívásai megmaradnak a gráfban)
+    if m.name == "__module__" {
+        writeln!(
+            s,
+            "  module-level code  L{}-{}",
+            m.line,
+            m.end_line.unwrap_or(m.line)
+        )
+        .unwrap();
+        return;
+    }
     // `--signatures`: a hívható tagnál `name(params): ret` a `name()` helyett (ha nincs adat, ugyanaz marad)
     let label = if crate::cli::signatures::enabled() && !parens(m).is_empty() {
         super::signature::signature(m)

@@ -125,7 +125,9 @@ impl Command for ShowCommand {
         // `--grep … --body`: a talált hívó metódusok forrása (a szűrt sorok a hívókat tartják meg);
         // találat nélkül a `--grep` szokásos „nincs találat” kimenete marad
         if self.grep.is_some() && self.body && self.depth <= 1 && !rows.is_empty() {
-            let mut text = FormatterRegistry::format_body(&rows, self.body_mode);
+            let mut text = OutputLimit::from_env(self.full)
+                .with_value(self.limit)
+                .body(FormatterRegistry::format_body(&rows, self.body_mode));
             let trailer = parse_trailer(&engine, &rows, &text, true);
             text.push_str(&trailer);
             write!(out, "{}", engine.relativize(&text))?;
@@ -290,7 +292,10 @@ impl ShowCommand {
 
     fn render(&self, rows: &[crate::query::QueryResult]) -> Result<String> {
         if self.body {
-            return Ok(FormatterRegistry::format_body(rows, self.body_mode));
+            let text = FormatterRegistry::format_body(rows, self.body_mode);
+            return Ok(OutputLimit::from_env(self.full)
+                .with_value(self.limit)
+                .body(text));
         }
         if let Some(value) = &self.lines {
             let Some((start, end)) = value.split_once('-') else {

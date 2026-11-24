@@ -385,6 +385,18 @@ On connect the server sends the client a short usage guide in your language (whi
 callers, how to read the output); Claude Code puts it into the agent's instructions. The `guide` tool returns the core
 skill manual (or one topic file with `topic`). Both come from the same source as `SKILL.md`, so they always match.
 
+Claude Code defers MCP tools (it lists only their names), so by default it keeps reaching for Grep / Read first. Add this
+to your project's `CLAUDE.md` so it uses callgraph first:
+
+```markdown
+# Code navigation
+Use the callgraph tools instead of Grep / Read: `locate` with all names from the task, then `outline` of the top
+files; `method_body` only for the one or two methods you must read, never for a whole module. Grep only for exact
+text; Read only for a known line range.
+```
+
+(The skill install writes the equivalent rule to `.claude/rules/callgraph.md` for you.)
+
 The installer can register it for Claude Code for you: `bash install.sh` asks (if the `claude` command is available),
 `bash install.sh --mcp` does it without asking, `--no-mcp` skips it. Remove it with
 `claude mcp remove -s user callgraph`. By hand:
