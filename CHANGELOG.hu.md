@@ -6,6 +6,8 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ## [Unreleased]
 
+## [1.3.0] — 2026-11-24
+
 ### Új
 
 - **A telepítő egy mondatos callgraph-szabályt ír a Claude Code-nak:** a `bash install.sh` mostantól megkérdezi,
@@ -1312,7 +1314,8 @@ Első kiadás.
 - Beépített frissítés: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Előre fordított csomagok macOS-re (arm64, x86_64), Linuxra (x86_64, ARM64, statikus musl) és Windowsra.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v1.2.2...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v1.3.0...develop
+[1.3.0]: https://github.com/GeRiY/callgraph/releases/tag/v1.3.0
 [1.2.2]: https://github.com/GeRiY/callgraph/releases/tag/v1.2.2
 [1.2.1]: https://github.com/GeRiY/callgraph/releases/tag/v1.2.1
 [1.2.0]: https://github.com/GeRiY/callgraph/releases/tag/v1.2.0

@@ -5,6 +5,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+## [1.3.0] — 2026-11-24
+
 ### Added
 
 - **The installer writes a one-sentence callgraph rule for Claude Code:** `bash install.sh` now asks whether to write
@@ -1223,7 +1225,8 @@ First release.
 - Built-in update: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Prebuilt packages for macOS (arm64, x86_64), Linux (x86_64, ARM64, static musl) and Windows.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v1.2.2...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v1.3.0...develop
+[1.3.0]: https://github.com/GeRiY/callgraph/releases/tag/v1.3.0
 [1.2.2]: https://github.com/GeRiY/callgraph/releases/tag/v1.2.2
 [1.2.1]: https://github.com/GeRiY/callgraph/releases/tag/v1.2.1
 [1.2.0]: https://github.com/GeRiY/callgraph/releases/tag/v1.2.0
