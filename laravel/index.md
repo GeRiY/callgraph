@@ -1,4 +1,4 @@
-> In Laravel + Inertia (Vue) projects callgraph links route() calls to controllers, checks forms against validation, summarises models and tables and finds Inertia pages — in the outline, without reading files.
+> In Laravel + Inertia (Vue) projects callgraph links route() calls to controllers, checks forms against validation and finds Inertia pages.
 
 Source: https://callgraph.eu/laravel/
 

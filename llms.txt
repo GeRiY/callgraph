@@ -28,6 +28,7 @@ claude mcp add -s user callgraph -- ~/.claude/skills/callgraph/bin/$(uname -s | 
 - [Go](https://callgraph.eu/go/index.md): Map Go code: structs, interfaces, receiver methods, generics, signatures with several return values, categorized calls, Gin / Echo / Chi / gRPC / GORM detection.
 - [locate](https://callgraph.eu/locate/index.md): callgraph locate takes the names and terms of a task in one call and ranks the few files worth opening first, each with the reason. When to use grep.
 - [Project profile](https://callgraph.eu/profile/index.md): callgraph profile describes an unfamiliar project in about 15 lines: architecture, layers and folders, patterns, call direction. Plus --layer filters.
+- [Save tokens](https://callgraph.eu/tokens/index.md): Why Claude Code burns tokens on Grep and whole-file reads, and how a call graph code map finds the right method in a few lines.
 - [Changelog](https://callgraph.eu/changelog/index.md): Every callgraph release with its date: what was added, changed and fixed, in plain language. Also as an Atom feed; downloads on GitHub releases.
 
 ## Optional

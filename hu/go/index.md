@@ -1,4 +1,4 @@
-> Go-térkép: structok, interfészek, receiveres metódusok, generikusok, több visszatérési értékű szignatúrák, kategorizált hívások, Gin / Echo / Chi / gRPC / GORM felismerés.
+> Go-térkép: structok, interfészek, receiveres metódusok, generikusok, szignatúrák, kategorizált hívások, Gin / Echo / Chi / gRPC / GORM felismerés.
 
 Source: https://callgraph.eu/hu/go/
 

@@ -1,4 +1,4 @@
-> Write PHP, Vue, JS / TS modules, HTML pages and whole Laravel features from a short expression, in the project's style — syntax-checked, backed up, undoable. Rename routes, classes and methods across the project.
+> Write PHP, Vue and JS / TS modules, pages and Laravel features from a short expression in your project's style. Rename routes and classes project-wide.
 
 Source: https://callgraph.eu/gen/
 

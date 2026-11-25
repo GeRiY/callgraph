@@ -1,4 +1,4 @@
-> Map Go code: structs, interfaces, receiver methods, generics, signatures with several return values, categorized calls, Gin / Echo / Chi / gRPC / GORM detection.
+> Map Go code: structs, interfaces, receiver methods, generics, signatures, categorized calls, Gin / Echo / Chi / gRPC / GORM detection.
 
 Source: https://callgraph.eu/go/
 

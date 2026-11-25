@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Reduce Claude Code token usage — callgraph</title>
+<meta name="description" content="Why Claude Code burns tokens on Grep and whole-file reads, and how a call graph code map finds the right method in a few lines. Free, MIT.">
+<link rel="canonical" href="https://callgraph.eu/tokens/">
+<link rel="alternate" hreflang="en" href="https://callgraph.eu/tokens/">
+<link rel="alternate" hreflang="hu" href="https://callgraph.eu/hu/tokens/">
+<link rel="alternate" hreflang="x-default" href="https://callgraph.eu/tokens/">
+<meta name="author" content="Gergő Makra">
+<meta name="robots" content="index,follow">
+<meta name="theme-color" content="#0c152a">
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/style.css">
+<script>document.documentElement.className += ' js';</script>
+<link rel="alternate" type="text/markdown" href="/tokens/index.md" title="Markdown version of this page">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="callgraph">
+<meta property="og:title" content="Reduce Claude Code token usage — callgraph">
+<meta property="og:description" content="Why Claude Code burns tokens on Grep and whole-file reads, and how a call graph code map finds the right method in a few lines. Free, MIT.">
+<meta property="og:url" content="https://callgraph.eu/tokens/">
+<meta property="og:image" content="https://callgraph.eu/assets/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="callgraph terminal output: class outline with line ranges and categorized calls">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="hu_HU">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Reduce Claude Code token usage — callgraph">
+<meta name="twitter:description" content="Why Claude Code burns tokens on Grep and whole-file reads, and how a call graph code map finds the right method in a few lines. Free, MIT.">
+<meta name="twitter:image" content="https://callgraph.eu/assets/og-image.png">
+<script type="application/ld+json">
+{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://callgraph.eu/"}, {"@type": "ListItem", "position": 2, "name": "Save tokens", "item": "https://callgraph.eu/tokens/"}]}
+</script>
+<script type="application/ld+json">
+{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does callgraph change my code?", "acceptedAnswer": {"@type": "Answer", "text": "No. It only reads your project and answers questions about it: where something is, what it calls and who calls it. Nothing is written to your source files."}}, {"@type": "Question", "name": "Do I have to change how I prompt Claude Code?", "acceptedAnswer": {"@type": "Answer", "text": "No. After install.sh writes the one-sentence rule file, Claude Code reaches for callgraph on its own when a task starts. You can still ask for it by name."}}, {"@type": "Question", "name": "Does it work with Cursor, Codex and VS Code?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Run callgraph as a local MCP server and any MCP client gets the same tools: locate, outline, method bodies and callers."}}, {"@type": "Question", "name": "Which languages are supported?", "acceptedAnswer": {"@type": "Answer", "text": "PHP, JavaScript / TypeScript, Vue, React, Rust, Swift, Python, Go and Kotlin, plus the structure of CSS, JSON, Markdown and HTML files."}}]}
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="wrap">
+<header class="top">
+  <a class="brand" href="/"><img src="/assets/favicon.svg" alt="" width="32" height="32">callgraph</a>
+  <nav class="links" aria-label="Main">
+    <details class="menu"><summary class="current">Usage</summary><div class="menu-list"><a href="/#usage">All commands</a><a href="/locate/">locate</a><a href="/profile/">Profile</a><a href="/laravel/">Laravel &amp; Inertia</a><a href="/gen/">Generator</a><a href="/tokens/" aria-current="page">Save tokens</a></div></details>
+    <details class="menu"><summary>Languages</summary><div class="menu-list"><a href="/php/">PHP</a><a href="/rust/">Rust</a><a href="/typescript/">TS / Vue</a><a href="/swift/">Swift</a><a href="/python/">Python</a><a href="/go/">Go</a><a href="/#languages">All languages</a></div></details>
+    <a href="/mcp/">MCP</a>
+    <a href="/changelog/">Changelog</a>
+    <a href="https://github.com/GeRiY/callgraph">GitHub</a>
+    <a class="lang" href="/hu/python/" hreflang="hu" lang="hu">Magyar</a>
+  </nav>
+</header>
+<main id="main">
+<nav class="crumbs" aria-label="Breadcrumb"><ol><li><a href="/">Home</a></li><li aria-current="page">Save tokens</li></ol></nav>
+<section class="hero page" aria-labelledby="title">
+  <div>
+    <h1 id="title">Reduce Claude Code token usage</h1>
+    <p class="lead">Most of the tokens a coding agent spends are not spent on writing code. They go to finding it:
+      Grep hits, whole files read to check one function, the same file read again ten minutes later.
+      callgraph is a free call graph and code map that lets Claude Code open only the lines it needs.</p>
+    <div class="cta">
+      <a class="btn primary" href="/#install">Install</a>
+      <a class="btn" href="/mcp/">Use it over MCP</a>
+    </div>
+  </div>
+</section>
+
+<section id="why" aria-labelledby="h-why">
+  <h2 id="h-why">Why an agent burns tokens on navigation</h2>
+  <ul>
+    <li><b>Grep returns every hit.</b> A common name matches dozens of lines in files that have nothing to do with the task, and each line is paid for.</li>
+    <li><b>Whole files get read.</b> To check one method the agent opens the entire file, often a thousand lines, and most of it is never used.</li>
+    <li><b>The same code is read again.</b> After a long session or a context reset the agent has forgotten what it saw and reads it a second time.</li>
+    <li><b>Guessing costs a round trip.</b> A wrong file means a wasted read, and then another guess.</li>
+  </ul>
+  <p>All of this is context the model has to carry for the rest of the session, so the cost keeps growing after the search is over.</p>
+</section>
+
+<section id="how" aria-labelledby="h-how">
+  <h2 id="h-how">How callgraph replaces that</h2>
+  <p>callgraph parses your code into an AST index once and answers four questions, each in a few lines.</p>
+  <ol>
+    <li><b>Where do I start?</b> <code>locate</code> takes the names from the task and ranks the few files worth opening, with the reason for each.</li>
+    <li><b>What is in this file?</b> The outline lists classes and methods with their line ranges and what each one calls.</li>
+    <li><b>Show me one method.</b> <code>file::method --body</code> prints just that method, with line numbers.</li>
+    <li><b>Who calls it?</b> <code>--grep</code> finds the callers, so you see what a change would touch.</li>
+  </ol>
+<pre class="code"><code>CG=~/.claude/skills/callgraph/callgraph.sh
+bash $CG locate refund --project shop                          # 1. which files matter
+bash $CG --project shop app/Services/RefundService.php         # 2. outline with line ranges
+bash $CG --project shop app/Services/RefundService.php::processRefund --body   # 3. one method
+bash $CG --project shop app --grep '(^|::|\.|-&gt;)processRefund$'                # 4. callers</code></pre>
+  <p class="label">Output of steps 1 and 2 (shortened)</p>
+<pre class="code out"><code>locate: 1 terms · 6 matches in 3 files · start here ↓
+1. app/Services/RefundService.php  ★★★
+   processRefund()  L6-19  callers: 2  ← "refund" (exact method)
+2. app/Http/Controllers/RefundController.php  ★★
+   store()  L14-22  calls RefundService::processRefund
+
+FILE  app/Services/RefundService.php
+class RefundService  L5-41
+  processRefund()  L6-19
+  notifyCustomer()  L21-30
+  logRefund()  L32-40</code></pre>
+  <p>The agent reads about a dozen lines to find the file, then a method of fifteen lines instead of a file of four hundred.
+    The same flow works for PHP, JavaScript / TypeScript, Vue, React, Rust, Swift, Python, Go and Kotlin.
+    <a href="/locate/">More about locate</a>.</p>
+</section>
+
+<section id="setup" aria-labelledby="h-setup">
+  <h2 id="h-setup">Set it up in three steps</h2>
+  <ol>
+    <li><b>Download and install.</b> Run the one-line installer from the <a href="/#install">home page</a>. It unpacks the Claude Code skill and one binary; only <code>bash</code> is required.</li>
+    <li><b>Run the installer script.</b> <code>bash ~/.claude/skills/callgraph/install.sh</code> registers your project and writes a one-sentence rule file, <code>.claude/rules/callgraph.md</code>, so Claude Code uses callgraph on its own.</li>
+    <li><b>Or use the MCP server.</b> If you prefer tools over a skill, register <code>callgraph mcp</code> and the same queries appear as tools. See <a href="/mcp/">MCP server setup</a>.</li>
+  </ol>
+<pre class="code"><code>bash ~/.claude/skills/callgraph/install.sh</code></pre>
+  <p>Then restart Claude Code and give it a normal task. There is nothing to configure per prompt.</p>
+</section>
+
+<section id="clients" aria-labelledby="h-clients">
+  <h2 id="h-clients">Cursor, Codex and VS Code too</h2>
+  <p>The skill is for Claude Code. Every other agent uses the MCP server: the same <code>locate</code>, outline, method-body and
+    caller tools, running locally on your machine. Setup for Claude Desktop, Cursor, VS Code and Codex is on the
+    <a href="/mcp/">MCP page</a>. The code never leaves your computer.</p>
+</section>
+
+<section id="faq" aria-labelledby="h-faq">
+  <h2 id="h-faq">Questions</h2>
+  <details><summary>Does callgraph change my code?</summary><p>No. It only reads your project and answers questions about it: where something is, what it calls and who calls it. Nothing is written to your source files.</p></details>
+  <details><summary>Do I have to change how I prompt Claude Code?</summary><p>No. After <code>install.sh</code> writes the one-sentence rule file, Claude Code reaches for callgraph on its own when a task starts. You can still ask for it by name.</p></details>
+  <details><summary>Does it work with Cursor, Codex and VS Code?</summary><p>Yes. Run callgraph as a local MCP server and any MCP client gets the same tools: locate, outline, method bodies and callers.</p></details>
+  <details><summary>Which languages are supported?</summary><p>PHP, JavaScript / TypeScript, Vue, React, Rust, Swift, Python, Go and Kotlin, plus the structure of CSS, JSON, Markdown and HTML files.</p></details>
+</section>
+
+<section id="related" aria-labelledby="h-related">
+  <h2 id="h-related">Related</h2>
+  <div class="grid">
+    <a class="card" href="/locate/"><h3>locate</h3><p>Ranked files to start a task with.</p></a>
+    <a class="card" href="/mcp/"><h3>MCP server</h3><p>The same queries in any MCP client.</p></a>
+    <a class="card" href="/profile/"><h3>Project profile</h3><p>How an unfamiliar project is built, in about 15 lines.</p></a>
+    <a class="card" href="/#install"><h3>Install</h3><p>One line for macOS, Linux and Windows.</p></a>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <nav class="foot" aria-label="Pages"><a href="/">Home</a> · <a href="/mcp/">MCP</a> · <a href="/php/">PHP</a> · <a href="/rust/">Rust</a> · <a href="/typescript/">TypeScript / Vue</a> · <a href="/swift/">Swift</a> · <a href="/python/">Python</a> · <a href="/go/">Go</a> · <a href="/locate/">locate</a> · <a href="/profile/">Profile</a> · <a href="/laravel/">Laravel &amp; Inertia</a> · <a href="/gen/">Generator</a> · <a href="/tokens/">Save tokens</a> · <a href="/changelog/">Changelog</a></nav>
+  <div>callgraph · made by <a href="https://www.linkedin.com/in/gergomakra/" rel="author me">Gergő Makra</a> · MIT license · <a href="https://github.com/GeRiY/callgraph">GitHub</a> · <a href="https://github.com/GeRiY/callgraph/releases/latest">Releases</a> · <a href="/hu/python/" hreflang="hu" lang="hu">Magyar</a></div>
+  <div class="sub" id="privacy">Privacy: our own page counter uses no cookies — page views are counted per day (page, referring site, download clicks), no IP address, no identifiers. Google Analytics 4 (Google Ireland Ltd., data processor) runs only if you accept it: it sets cookies, IP addresses are not stored, data is kept for 2 months; <a href="#" data-consent>cookie settings</a>. The callgraph tool sends one anonymous count a day (version, platform, three yes/no flags; no ID, no IP stored; off: CALLGRAPH_COUNT=0 or DO_NOT_TRACK=1). Controller: Makra Gergő, mgeri1993@gmail.com.</div>
+</footer>
+</div>
+<script>
+// nyelv-menü: kívül kattintásra / Escape-re bezárul (JS nélkül is működik)
+document.addEventListener('click', function (e) {
+  document.querySelectorAll('details.menu[open]').forEach(function (d) { if (!d.contains(e.target)) d.open = false; });
+});
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape') return;
+  document.querySelectorAll('details.menu[open]').forEach(function (d) { d.open = false; d.querySelector('summary').focus(); });
+});
+</script>
+<script>
+(function(){try{var u="https://telemetry.callgraph.eu/hit",r="";
+try{var h=new URL(document.referrer).hostname;if(h&&h.indexOf("callgraph.eu")<0)r=h.toLowerCase()}catch(e){}
+try{var q=new URLSearchParams(location.search),t=q.get("ref")||q.get("utm_source");if(t)r=t.toLowerCase().replace(/[^a-z0-9.-]/g,"").slice(0,64)}catch(e){}
+function s(e){var d=JSON.stringify({p:location.pathname.toLowerCase().slice(0,80),r:r,e:e});
+if(navigator.sendBeacon)navigator.sendBeacon(u,d);else fetch(u,{method:"POST",body:d,keepalive:true,mode:"no-cors"})}
+s("view");document.addEventListener("click",function(ev){var a=ev.target.closest&&ev.target.closest("a");
+if(a&&/github\.com\/GeRiY\/callgraph\/releases/.test(a.href))s("download")})}catch(e){}})();
+</script>
+<script>
+// másoló gomb a parancs- és konfig-blokkokon (JS nélkül a blokk ugyanúgy olvasható)
+if (navigator.clipboard) document.querySelectorAll('pre.code:not(.out)').forEach(function (pre) {
+  var wrap = document.createElement('div'); wrap.className = 'copywrap';
+  pre.parentNode.insertBefore(wrap, pre); wrap.appendChild(pre);
+  var b = document.createElement('button'); b.type = 'button'; b.className = 'copy';
+  b.textContent = "Copy"; b.setAttribute('aria-label', "Copy code to clipboard"); wrap.appendChild(b);
+  b.addEventListener('click', function () {
+    navigator.clipboard.writeText(pre.innerText.replace(/\n$/, '')).then(function () {
+      b.textContent = "Copied"; setTimeout(function () { b.textContent = "Copy"; }, 1600);
+    });
+  });
+});
+</script>
+<script src="/assets/consent.js" defer></script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-> Show AI agents a file's structure, call graph and callers without reading it. PHP, JS/TS, Vue, Rust, Swift, Python, Go. Free, MIT, one binary: CLI or MCP server.
+> A call graph and code map for Claude Code and other AI coding agents: find files, methods and callers without reading whole files. Saves tokens. Free, MIT.
 
 Source: https://callgraph.eu/
 
@@ -6,7 +6,7 @@ Source: https://callgraph.eu/
 
 # Understand code without reading it.
 
-**callgraph** is a token-efficient code map for AI coding agents. It shows the structure, a categorized call graph, single method bodies, *“who calls this?”* and impact analysis — in a few dozen lines instead of whole files.
+**callgraph** is a token-efficient code map for AI coding agents. It shows the structure, a categorized call graph, single method bodies, *“who calls this?”* and impact analysis — in a few dozen lines instead of whole files. As a call graph generator for Claude Code and other AI coding agents, it helps them find the right code and [save tokens](https://callgraph.eu/tokens/).
 
 [Install in one line](https://callgraph.eu/#install) [Download v1.3.0](https://github.com/GeRiY/callgraph/releases/latest) [View on GitHub](https://github.com/GeRiY/callgraph)
 

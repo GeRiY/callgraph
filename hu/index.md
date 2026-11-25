@@ -1,4 +1,4 @@
-> Szerkezet, hívás-gráf és hívók AI agenteknek a fájl beolvasása nélkül. PHP, JS/TS, Vue, Rust, Swift, Python, Go. Ingyenes, MIT, egy bináris: CLI vagy MCP-szerver.
+> Call graph és kód-térkép Claude Code-hoz és más AI kódoló agentekhez: fájlok, metódusok, hívók fájlolvasás nélkül, kevesebb token. Ingyenes, MIT.
 
 Source: https://callgraph.eu/hu/
 
@@ -6,7 +6,7 @@ Source: https://callgraph.eu/hu/
 
 # Értsd meg a kódot, olvasás nélkül.
 
-A **callgraph** token-hatékony kód-térkép AI kódoló agenteknek. Megmutatja a szerkezetet, a kategorizált hívás-gráfot, egy-egy metódus törzsét, hogy *„ki hívja?”*, és a hatáselemzést — pár tucat sorban, a teljes fájlok helyett.
+A **callgraph** token-hatékony kód-térkép AI kódoló agenteknek. Megmutatja a szerkezetet, a kategorizált hívás-gráfot, egy-egy metódus törzsét, hogy *„ki hívja?”*, és a hatáselemzést — pár tucat sorban, a teljes fájlok helyett. Call graph generátorként a Claude Code-nak és más AI kódoló agenteknek segít megtalálni a megfelelő kódot, és [tokent spórolni](https://callgraph.eu/hu/tokens/).
 
 [Telepítés egy sorral](https://callgraph.eu/hu/#install) [Letöltés: v1.3.0](https://github.com/GeRiY/callgraph/releases/latest) [Megnézem a GitHubon](https://github.com/GeRiY/callgraph)
 

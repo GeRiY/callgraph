@@ -1,4 +1,4 @@
-> Python-térkép: osztályok ősökkel és dekorátorokkal, függvények és metódusok, szignatúrák, importok, kategorizált hívások, Django / Flask / FastAPI felismerés.
+> Python-térkép: osztályok ősökkel és dekorátorokkal, függvények, szignatúrák, importok, kategorizált hívások, Django / Flask / FastAPI felismerés.
 
 Source: https://callgraph.eu/hu/python/
 

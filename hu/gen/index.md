@@ -1,4 +1,4 @@
-> PHP, Vue, JS / TS modul, HTML-oldal és teljes Laravel-funkció egy rövid kifejezésből, a projekt stílusában — szintaxis-ellenőrizve, mentéssel, visszavonhatóan. Route, osztály és metódus átnevezése az egész projektben.
+> PHP, Vue, JS / TS modul, oldal és Laravel-funkció egy rövid kifejezésből, a projekt stílusában. Route és osztály átnevezése az egész projektben.
 
 Source: https://callgraph.eu/hu/gen/
 

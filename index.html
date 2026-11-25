@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>callgraph — Code map for AI coding agents</title>
-<meta name="description" content="Show AI agents a file&#x27;s structure, call graph and callers without reading it. PHP, JS/TS, Vue, Rust, Swift, Python, Go. Free, MIT, one binary: CLI or MCP server.">
+<title>callgraph: call graph & code map for AI coding agents</title>
+<meta name="description" content="A call graph and code map for Claude Code and other AI coding agents: find files, methods and callers without reading whole files. Saves tokens. Free, MIT.">
 <meta name="keywords" content="callgraph, call graph, code map, AI coding agent, Claude Code skill, MCP server, token efficient, static analysis, AST, PHP, Laravel, JavaScript, TypeScript, Vue, Rust, Swift, SwiftUI, Python, Go, impact analysis, who calls this">
 <link rel="canonical" href="https://callgraph.eu/">
 <link rel="alternate" hreflang="en" href="https://callgraph.eu/">
@@ -20,8 +20,8 @@
 <link rel="alternate" type="application/atom+xml" href="/changelog/feed.xml" title="callgraph releases">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="callgraph">
-<meta property="og:title" content="callgraph — Code map for AI coding agents">
-<meta property="og:description" content="Show AI agents a file&#x27;s structure, call graph and callers without reading it. PHP, JS/TS, Vue, Rust, Swift, Python, Go. Free, MIT, one binary: CLI or MCP server.">
+<meta property="og:title" content="callgraph: call graph & code map for AI coding agents">
+<meta property="og:description" content="A call graph and code map for Claude Code and other AI coding agents: find files, methods and callers without reading whole files. Saves tokens. Free, MIT.">
 <meta property="og:url" content="https://callgraph.eu/">
 <meta property="og:image" content="https://callgraph.eu/assets/og-image.png">
 <meta property="og:image:width" content="1200">
@@ -30,8 +30,8 @@
 <meta property="og:locale" content="en_US">
 <meta property="og:locale:alternate" content="hu_HU">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="callgraph — Code map for AI coding agents">
-<meta name="twitter:description" content="Show AI agents a file&#x27;s structure, call graph and callers without reading it. PHP, JS/TS, Vue, Rust, Swift, Python, Go. Free, MIT, one binary: CLI or MCP server.">
+<meta name="twitter:title" content="callgraph: call graph & code map for AI coding agents">
+<meta name="twitter:description" content="A call graph and code map for Claude Code and other AI coding agents: find files, methods and callers without reading whole files. Saves tokens. Free, MIT.">
 <meta name="twitter:image" content="https://callgraph.eu/assets/og-image.png">
 <script type="application/ld+json">
 {"@context": "https://schema.org", "@graph": [{"@type": "Organization", "@id": "https://callgraph.eu/#org", "name": "callgraph", "url": "https://callgraph.eu/", "logo": "https://callgraph.eu/assets/og-image.png", "sameAs": ["https://github.com/GeRiY/callgraph"]}, {"@type": "WebSite", "@id": "https://callgraph.eu/#website", "name": "callgraph", "url": "https://callgraph.eu/", "inLanguage": "en", "publisher": {"@id": "https://callgraph.eu/#org"}}]}
@@ -55,7 +55,7 @@
 <header class="top">
   <a class="brand" href="/" aria-current="page"><img src="/assets/favicon.svg" alt="" width="32" height="32">callgraph</a>
   <nav class="links" aria-label="Main">
-    <details class="menu"><summary>Usage</summary><div class="menu-list"><a href="/#usage">All commands</a><a href="/locate/">locate</a><a href="/profile/">Profile</a><a href="/laravel/">Laravel &amp; Inertia</a><a href="/gen/">Generator</a></div></details>
+    <details class="menu"><summary>Usage</summary><div class="menu-list"><a href="/#usage">All commands</a><a href="/locate/">locate</a><a href="/profile/">Profile</a><a href="/laravel/">Laravel &amp; Inertia</a><a href="/gen/">Generator</a><a href="/tokens/">Save tokens</a></div></details>
     <details class="menu"><summary>Languages</summary><div class="menu-list"><a href="/php/">PHP</a><a href="/rust/">Rust</a><a href="/typescript/">TS / Vue</a><a href="/swift/">Swift</a><a href="/python/">Python</a><a href="/go/">Go</a><a href="/#languages">All languages</a></div></details>
     <a href="/mcp/">MCP</a>
     <a href="/changelog/">Changelog</a>
@@ -70,7 +70,8 @@
     <h1 id="title">Understand code without reading it.</h1>
     <p class="lead"><b>callgraph</b> is a token-efficient code map for AI coding agents. It shows the structure,
       a categorized call graph, single method bodies, <i>“who calls this?”</i> and impact analysis —
-      in a few dozen lines instead of whole files.</p>
+      in a few dozen lines instead of whole files. As a call graph generator for Claude Code and other AI coding agents,
+      it helps them find the right code and <a href="/tokens/">save tokens</a>.</p>
     <div class="cta">
       <a class="btn primary" href="#install">Install in one line</a>
       <a class="btn" href="https://github.com/GeRiY/callgraph/releases/latest">Download v1.3.0</a>
@@ -345,7 +346,7 @@ callgraph.sh set-lang hu        # Hungarian output (back: set-lang en)</code></p
 </main>
 
 <footer>
-  <nav class="foot" aria-label="Pages"><a href="/">Home</a> · <a href="/mcp/">MCP</a> · <a href="/php/">PHP</a> · <a href="/rust/">Rust</a> · <a href="/typescript/">TypeScript / Vue</a> · <a href="/swift/">Swift</a> · <a href="/python/">Python</a> · <a href="/go/">Go</a> · <a href="/locate/">locate</a> · <a href="/profile/">Profile</a> · <a href="/laravel/">Laravel &amp; Inertia</a> · <a href="/gen/">Generator</a> · <a href="/changelog/">Changelog</a></nav>
+  <nav class="foot" aria-label="Pages"><a href="/">Home</a> · <a href="/mcp/">MCP</a> · <a href="/php/">PHP</a> · <a href="/rust/">Rust</a> · <a href="/typescript/">TypeScript / Vue</a> · <a href="/swift/">Swift</a> · <a href="/python/">Python</a> · <a href="/go/">Go</a> · <a href="/locate/">locate</a> · <a href="/profile/">Profile</a> · <a href="/laravel/">Laravel &amp; Inertia</a> · <a href="/gen/">Generator</a> · <a href="/tokens/">Save tokens</a> · <a href="/changelog/">Changelog</a></nav>
   <div>callgraph · made by <a href="https://www.linkedin.com/in/gergomakra/" rel="author me">Gergő Makra</a> · MIT license · <a href="https://github.com/GeRiY/callgraph">GitHub</a> · <a href="https://github.com/GeRiY/callgraph/releases/latest">Releases</a> · <a href="/hu/" hreflang="hu" lang="hu">Magyar</a></div>
   <div class="sub" id="privacy">Privacy: our own page counter uses no cookies — page views are counted per day (page, referring site, download clicks), no IP address, no identifiers. Google Analytics 4 (Google Ireland Ltd., data processor) runs only if you accept it: it sets cookies, IP addresses are not stored, data is kept for 2 months; <a href="#" data-consent>cookie settings</a>. The callgraph tool sends one anonymous count a day (version, platform, three yes/no flags; no ID, no IP stored; off: CALLGRAPH_COUNT=0 or DO_NOT_TRACK=1). Controller: Makra Gergő, mgeri1993@gmail.com.</div>
 </footer>

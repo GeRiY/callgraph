@@ -28,6 +28,7 @@ claude mcp add -s user callgraph -- ~/.claude/skills/callgraph/bin/$(uname -s | 
 - [Go](https://callgraph.eu/hu/go/index.md): Go-térkép: structok, interfészek, receiveres metódusok, generikusok, több visszatérési értékű szignatúrák, kategorizált hívások, Gin / Echo / Chi / gRPC / GORM felismerés.
 - [locate](https://callgraph.eu/hu/locate/index.md): A callgraph locate egy hívásban kapja a feladat neveit és fogalmait, és rangsorolja a először megnyitandó fájlokat, indoklással. Mikor jobb a grep.
 - [Projekt-profil](https://callgraph.eu/hu/profile/index.md): A callgraph profile kb. 15 sorban leírja az ismeretlen projektet: architektúra, rétegek és mappák, minták, hívásirány. Hozzá a --layer szűrők.
+- [Tokenspórolás](https://callgraph.eu/hu/tokens/index.md): Miért fogyaszt sok tokent a Claude Code Grep-pel és teljes fájlok olvasásával, és hogyan talál meg egy metódust pár sorban a call graph kód-térkép.
 - [Változásnapló](https://callgraph.eu/hu/changelog/index.md): Minden callgraph-kiadás dátummal: mi új, mi változott és mi javult, közérthetően. Atom-feed is van; a letöltések a GitHub kiadási oldalán.
 
 ## További

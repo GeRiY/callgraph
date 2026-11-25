@@ -1,4 +1,4 @@
-> Laravel + Inertia (Vue) projektekben a callgraph a route() hívásokat a controllerhez köti, az űrlapokat a validációval veti össze, összefoglalja a modelleket és táblákat, és megtalálja az Inertia-oldalakat — az outline-ban, fájlolvasás nélkül.
+> Laravel + Inertia projektekben a callgraph a route() hívásokat a controllerhez köti, az űrlapokat a validációval veti össze, és megtalálja az oldalakat.
 
 Source: https://callgraph.eu/hu/laravel/
 
