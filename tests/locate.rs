@@ -154,8 +154,13 @@ fn the_best_starting_file_comes_first_with_its_reasons() {
     );
     assert!(out.contains("class RefundController  L6-16"), "{out}");
     assert!(out.contains("(exact class)"), "{out}");
-    assert!(out.contains("processRefund()  L6-9  callers: "), "{out}");
+    assert!(
+        out.contains("RefundService::processRefund()  L6-9  callers: "),
+        "{out}"
+    );
     assert!(out.contains("(exact method)"), "{out}");
+    // a metódus-sor a tárolóval minősítve (PHP: `::`)
+    assert!(!out.contains("\n   processRefund()"), "{out}");
     assert!(
         out.contains("file name  ← \"checkout.vue\" (file name)"),
         "{out}"

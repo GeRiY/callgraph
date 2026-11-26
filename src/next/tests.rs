@@ -42,7 +42,7 @@ fn kinds(found: &[Suggestion]) -> Vec<SuggestionKind> {
 const LOCATE: &str = "root: /p
 locate: 2 terms · 3 matches in 2 files · start here ↓
 1. app/OrderService.php  ★★★
-   refund()  L10-40  callers: 2 (A::b, C::d)  ← \"refund\" (exact method)
+   OrderService::refund()  L10-40  callers: 2 (A::b, C::d)  ← \"refund\" (exact method)
 2. app/Other.php  ★
    x()  L3  calls refund  ← \"refund\" (call)
 ";

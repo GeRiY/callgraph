@@ -44,6 +44,8 @@ pub(crate) enum Symbol {
         /// Hívható-e (a `name()` jelölés): a stíluslap-szabály, a címsor, a JSON-kulcs nem az.
         callable: bool,
         callers: Callers,
+        /// A tároló és a név közti elválasztó a fájl nyelvén: `::` (PHP, Rust) vagy `.`.
+        sep: &'static str,
     },
     Constant {
         name: String,
@@ -315,16 +317,26 @@ impl<'a> Matcher<'a> {
             self.name_hits(&c.name, None, symbol, hits);
         }
         for m in &graph.methods {
-            let symbol = || Symbol::Method {
-                container: m.container.clone(),
-                name: m.name.clone(),
-                line: m.line,
-                end: m.end_line.unwrap_or(m.line),
-                callable: !crate::query::format::parens(m).is_empty(),
-                callers: self
-                    .callers
-                    .of(m.container.as_deref(), &m.name, &graph.file),
-            };
+            let symbol =
+                || Symbol::Method {
+                    container: m.container.clone(),
+                    name: m.name.clone(),
+                    line: m.line,
+                    end: m.end_line.unwrap_or(m.line),
+                    callable: !crate::query::format::parens(m).is_empty(),
+                    callers: self
+                        .callers
+                        .of(m.container.as_deref(), &m.name, &graph.file),
+                    // only a real class / struct / trait container qualifies the row (a Python module-level
+                    // function's container is the module itself): an empty separator means "print it bare"
+                    sep: if graph.containers.iter().any(|c| {
+                        c.kind != "module" && m.container.as_deref() == Some(c.name.as_str())
+                    }) {
+                        container_sep(&graph.file)
+                    } else {
+                        ""
+                    },
+                };
             self.name_hits(&m.name, m.container.as_deref(), symbol, hits);
         }
         for k in &graph.constants {
@@ -522,4 +534,13 @@ fn is_route_file(rel: &str) -> bool {
 /// A szóközök (sortörés, tab, több szóköz) egy szóközre cserélve.
 fn collapse_spaces(text: &str) -> String {
     crate::core::text::collapse_ws(text)
+}
+
+/// A `Tároló<sep>metódus` elválasztója a fájl kiterjesztése szerint: PHP és Rust `::`, a többi nyelv `.`.
+pub(crate) fn container_sep(path: &str) -> &'static str {
+    let ext = path.rsplit_once('.').map_or("", |(_, ext)| ext);
+    match ext.to_ascii_lowercase().as_str() {
+        "php" | "rs" => "::",
+        _ => ".",
+    }
 }

@@ -38,3 +38,15 @@ Output is capped at 400 lines (directory → summary, file → method index, sea
 
 CLI equivalents: `locate` = `bash $CG locate <term>…`, `outline` = `bash $CG <path>` (`method` = `<path>::name`), `method_body` = `::name --body`,
 `find_callers` = `--grep`, `search` = `--strings` / `--const`, `framework_view` = `--format <view>`, `trace` = `bash $CG trace <target>`, `notes` = `--notes`.
+
+## Wiring clients (`callgraph setup`)
+
+`callgraph setup [--client claude,cursor,codex,vscode,windsurf] [--project <dir> | --user] [--dry-run] [--uninstall] [--yes]`
+writes, per client, the MCP entry (`<this binary> mcp`) and a short use-callgraph-first rule; no `--client` = the clients
+found. Default scope: the project (cwd, or `--project <dir>`); `--user` = user-level files (Codex and Windsurf MCP config is
+always user-level). Files: Claude Code `.mcp.json` + `.claude/rules/callgraph.md`; Cursor `.cursor/mcp.json` +
+`.cursor/rules/callgraph.mdc`; VS Code `.vscode/mcp.json` + `.github/copilot-instructions.md`; Codex `~/.codex/config.toml` +
+`AGENTS.md`; Windsurf `~/.codeium/windsurf/mcp_config.json` + `AGENTS.md`. `AGENTS.md` / instruction files get a
+`<!-- callgraph:start -->` … `<!-- callgraph:end -->` block (only that block is touched). Existing config is merged, changed
+files get a `.bak`, a second run changes nothing, `--dry-run` writes nothing (prints files and snippets), `--uninstall` removes
+only what setup wrote. Restart the client afterwards.

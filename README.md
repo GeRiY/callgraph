@@ -203,6 +203,15 @@ clears the download quarantine flag. Step-by-step guide (Hungarian): [`skill/TEL
 
 The only runtime requirement is `bash`.
 
+**Other agents (Cursor, Codex CLI, VS Code, Windsurf) or MCP only:** one command wires callgraph into them:
+
+```bash
+callgraph setup            # run in your project; wires the clients it finds there / on this machine
+callgraph setup --dry-run  # shows which files it would change and the snippet, writes nothing
+```
+
+See [Use with other AI tools (MCP)](#use-with-other-ai-tools-mcp).
+
 ### Updating
 
 ```bash
@@ -264,7 +273,7 @@ locate: 5 terms · 14 matches in 6 files · start here ↓
    class RefundController  L6-16  ← "RefundController", "refund" (exact class)
    store()  L14  calls RefundService::processRefund  ← "processRefund" (call)
 2. app/Services/RefundService.php  ★★
-   processRefund()  L6-9  callers: 2 (RefundController::store, RefundJob::handle)  ← "processRefund", "refund" (exact method)
+   RefundService::processRefund()  L6-9  callers: 2 (RefundController::store, RefundJob::handle)  ← "processRefund", "refund" (exact method)
 …
 ```
 
@@ -373,6 +382,22 @@ CALLGRAPH_LANG=hu bash ~/.claude/skills/callgraph/callgraph.sh app/Models/Order.
 ### Use with other AI tools (MCP)
 
 Step-by-step setup per client (Claude Code, Claude Desktop, Cursor, VS Code): [callgraph.eu/mcp](https://callgraph.eu/mcp/).
+
+**One command:** `callgraph setup [--client <list>] [--project <dir> | --user] [--dry-run] [--uninstall] [--yes]`
+detects Claude Code, Cursor, Codex CLI, VS Code and Windsurf (`--client claude,cursor,codex,vscode,windsurf` overrides)
+and, per client, writes the MCP entry (`<this binary> mcp`) plus a short "use callgraph first" rule:
+
+| Client | MCP entry | Rule |
+|---|---|---|
+| Claude Code | `.mcp.json` (`--user`: `~/.claude.json`) | `.claude/rules/callgraph.md` |
+| Cursor | `.cursor/mcp.json` (`--user`: `~/.cursor/mcp.json`) | `.cursor/rules/callgraph.mdc` (`alwaysApply: true`) |
+| VS Code | `.vscode/mcp.json` (`--user`: the user profile `mcp.json`) | `.github/copilot-instructions.md` block |
+| Codex CLI | `~/.codex/config.toml` (`[mcp_servers.callgraph]`) | `AGENTS.md` block |
+| Windsurf | `~/.codeium/windsurf/mcp_config.json` | `AGENTS.md` block |
+
+Existing config is merged, never replaced; every changed file gets a `.bak` copy; a second run changes nothing;
+`--uninstall` removes only what setup wrote. The project files contain the path of this machine's binary, so add them
+to `.gitignore` unless every teammate has callgraph at the same path. Restart the client afterwards.
 
 Besides the Claude Code skill (unchanged, fully supported), the same binary is also an
 [MCP](https://modelcontextprotocol.io) server on stdio, so any MCP client can use it: `callgraph mcp`.

@@ -159,6 +159,8 @@ Előre-frissítés (git pull vagy sok szerkesztés után, hogy a következő lek
   Az MCP-szerver regisztrálása a Claude Code-ban: bash ~/.claude/skills/callgraph/install.sh --mcp (interaktív
   futásnál rákérdez; eltávolítás: claude mcp remove -s user callgraph). A szerver rövid használati útmutatót küld a
   kliensnek (melyik eszköz mire, hogyan olvasd a kimenetet); a guide eszköze a teljes SKILL.md-t adja.
+  Bekötés Claude Code-ba, Cursorba, Codex CLI-be, VS Code-ba, Windsurfbe (MCP-bejegyzés + „előbb a callgraph” szabály):
+  callgraph setup [--client claude,cursor,codex,vscode,windsurf] [--project <mappa> | --user] [--dry-run] [--uninstall]
 
 Nyelv (a terminál-kimenet és a súgó nyelve: en = angol, alapértelmezett; hu = magyar):
   bash ~/.claude/skills/callgraph/callgraph.sh set-lang                 az aktuális nyelv és a forrása

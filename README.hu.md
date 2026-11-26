@@ -203,6 +203,15 @@ a letöltés karantén-jelzőjét is leveszi. Lépésenkénti útmutató: [`skil
 
 Futtatáshoz csak `bash` kell.
 
+**Más ágensek (Cursor, Codex CLI, VS Code, Windsurf) vagy csak MCP:** egy paranccsal bekötheted őket:
+
+```bash
+callgraph setup            # a projektedben futtasd; beköti a talált klienseket
+callgraph setup --dry-run  # megmutatja, mely fájlokat módosítaná és a részletet, nem ír
+```
+
+Részletek: [Más AI-eszközökkel (MCP)](#más-ai-eszközökkel-mcp).
+
 ### Frissítés
 
 ```bash
@@ -264,7 +273,7 @@ locate: 5 kifejezés · 14 találat 6 fájlban · innen indulj ↓
    class RefundController  L6-16  ← "RefundController", "refund" (pontos class)
    store()  L14  hívja: RefundService::processRefund  ← "processRefund" (hívás)
 2. app/Services/RefundService.php  ★★
-   processRefund()  L6-9  hívók: 2 (RefundController::store, RefundJob::handle)  ← "processRefund", "refund" (pontos metódus)
+   RefundService::processRefund()  L6-9  hívók: 2 (RefundController::store, RefundJob::handle)  ← "processRefund", "refund" (pontos metódus)
 …
 ```
 
@@ -373,6 +382,23 @@ CALLGRAPH_LANG=hu bash ~/.claude/skills/callgraph/callgraph.sh app/Models/Order.
 ### Más AI-eszközökkel (MCP)
 
 Lépésről lépésre, kliensenként (Claude Code, Claude Desktop, Cursor, VS Code): [callgraph.eu/hu/mcp](https://callgraph.eu/hu/mcp/).
+
+**Egy paranccsal:** `callgraph setup [--client <lista>] [--project <mappa> | --user] [--dry-run] [--uninstall] [--yes]`
+megkeresi a Claude Code-ot, Cursort, Codex CLI-t, VS Code-ot és Windsurföt (`--client claude,cursor,codex,vscode,windsurf`
+felülírja), és kliensenként kiírja az MCP-bejegyzést (`<ez a bináris> mcp`) és egy rövid „előbb a callgraph” szabályt:
+
+| Kliens | MCP-bejegyzés | Szabály |
+|---|---|---|
+| Claude Code | `.mcp.json` (`--user`: `~/.claude.json`) | `.claude/rules/callgraph.md` |
+| Cursor | `.cursor/mcp.json` (`--user`: `~/.cursor/mcp.json`) | `.cursor/rules/callgraph.mdc` (`alwaysApply: true`) |
+| VS Code | `.vscode/mcp.json` (`--user`: a felhasználói profil `mcp.json`-ja) | `.github/copilot-instructions.md` blokk |
+| Codex CLI | `~/.codex/config.toml` (`[mcp_servers.callgraph]`) | `AGENTS.md` blokk |
+| Windsurf | `~/.codeium/windsurf/mcp_config.json` | `AGENTS.md` blokk |
+
+A meglévő beállítást egyesíti, soha nem cseréli le; minden módosított fájlról `.bak` másolat készül; a második futás
+nem változtat semmit; az `--uninstall` csak a setup bejegyzéseit veszi ki. A projekt-fájlok ennek a gépnek a binárisútját
+tartalmazzák, ezért tedd `.gitignore`-ba, hacsak a csapat minden tagjánál nincs ugyanazon az úton a callgraph. Utána
+indítsd újra a klienst.
 
 A Claude Code-skill mellett (változatlan, teljes értékűen támogatott) ugyanaz a bináris
 [MCP](https://modelcontextprotocol.io)-szerver is stdio-n, így bármely MCP-kliens használhatja: `callgraph mcp`.

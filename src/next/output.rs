@@ -34,6 +34,8 @@ pub(crate) fn method_line(line: &str) -> Option<MethodLine> {
 /// Egy (behúzás nélküli) locate-indoklás metódusneve: `név()  L…`.
 pub(crate) fn method_name(line: &str) -> Option<String> {
     let (name, _) = line.split_once("()  L")?;
+    // a tároló-előtag (`Osztály::név` / `Osztály.név`) nélkül
+    let name = name.rsplit([':', '.']).next().unwrap_or(name);
     is_identifier(name).then(|| name.to_owned())
 }
 

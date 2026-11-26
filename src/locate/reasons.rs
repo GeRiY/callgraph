@@ -128,14 +128,24 @@ pub(crate) fn describe(reason: &Reason, terms: &[Term]) -> String {
             end,
         } => format!("{kind} {name}  L{line}-{end}"),
         Symbol::Method {
+            container,
             name,
             line,
             end,
             callable,
             callers,
-            ..
+            sep,
         } => {
             let parens = if *callable { "()" } else { "" };
+            // a belső tároló rövid neve (nem FQCN): `Osztály::metódus()`; szabad függvény névtelen marad
+            let owner = container
+                .as_deref()
+                .map(|c| c.rsplit(['\\', '.', ':']).next().unwrap_or(c))
+                .filter(|c| !c.is_empty() && !c.starts_with("__"));
+            let name = match owner {
+                Some(owner) if *callable && !sep.is_empty() => format!("{owner}{sep}{name}"),
+                _ => name.clone(),
+            };
             let mut text = format!("{name}{parens}  L{line}-{end}");
             if callers.count > 0 {
                 let more = if callers.count > callers.sample.len() {

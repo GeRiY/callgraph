@@ -258,11 +258,79 @@ pub enum CliArgs {
         /// `--allow <mappa>` (ismételhető): további gyökerek, amelyek alatti utakat az MCP-őr elfogad.
         allow: Vec<String>,
     },
+    /// `setup [--client <lista>] [--project <mappa> | --user] [--dry-run] [--uninstall] [--yes]`: callgraph bekötése az
+    /// AI-kliensekbe (`crate::setup`); `clients` üres: észlelés.
+    Setup {
+        clients: Vec<crate::setup::Client>,
+        project: Option<PathBuf>,
+        user: bool,
+        dry_run: bool,
+        uninstall: bool,
+    },
     /// Skill-parancs (`project`, `feedback`, `wrap`, `error`, `set-lang`, `self-update`) nyers argumentumokkal.
     Skill { command: String, args: Vec<String> },
 }
 
 impl CliArgs {
+    /// `setup [--client <lista>] [--project <mappa> | --user] [--dry-run] [--uninstall] [--yes]`.
+    fn parse_setup(args: &[String]) -> Result<Self> {
+        let usage = || {
+            CallgraphError::Usage(
+                crate::t!(
+                    "callgraph setup [--client claude,cursor,codex,vscode,windsurf] [--project <dir> | --user] [--dry-run] [--uninstall] [--yes]  (writes the MCP server entry and a use-callgraph-first rule for each client; default: the clients found, project scope; --dry-run writes nothing; --uninstall removes only what setup wrote; never asks, --yes is accepted for scripts)",
+                    "callgraph setup [--client claude,cursor,codex,vscode,windsurf] [--project <mappa> | --user] [--dry-run] [--uninstall] [--yes]  (kliensenként kiírja az MCP-szerver bejegyzést és egy callgraph-először szabályt; alapból a megtalált kliensek, projekt-hatókör; --dry-run nem ír; --uninstall csak a setup bejegyzéseit veszi ki; nem kérdez, a --yes szkriptekhez elfogadott)"
+                )
+                .into(),
+            )
+        };
+        let (mut clients, mut project, mut user, mut dry_run, mut uninstall) =
+            (Vec::new(), None, false, false, false);
+        let mut rest = args.iter();
+        while let Some(arg) = rest.next() {
+            let (flag, inline) = match arg.split_once('=') {
+                Some((f, v)) if f.starts_with("--") => (f, Some(v.to_owned())),
+                _ => (arg.as_str(), None),
+            };
+            match flag {
+                "--client" | "--project" => {
+                    let value = inline.or_else(|| rest.next().cloned()).ok_or_else(usage)?;
+                    if flag == "--project" {
+                        project = Some(PathBuf::from(value));
+                    } else {
+                        for name in value.split(',').filter(|n| !n.trim().is_empty()) {
+                            if name.trim().eq_ignore_ascii_case("all") {
+                                clients.extend(crate::setup::Client::ALL);
+                            } else {
+                                clients.push(crate::setup::Client::parse(name).ok_or_else(usage)?);
+                            }
+                        }
+                    }
+                }
+                "--user" if inline.is_none() => user = true,
+                "--dry-run" if inline.is_none() => dry_run = true,
+                "--uninstall" if inline.is_none() => uninstall = true,
+                "--yes" | "-y" if inline.is_none() => {}
+                _ => return Err(usage()),
+            }
+        }
+        if user && project.is_some() {
+            return Err(usage());
+        }
+        let mut seen = Vec::new();
+        clients.retain(|c| {
+            let new = !seen.contains(c);
+            seen.push(*c);
+            new
+        });
+        Ok(Self::Setup {
+            clients,
+            project,
+            user,
+            dry_run,
+            uninstall,
+        })
+    }
+
     /// `mcp [--auto-update] [--allow <mappa>]…` (a `--allow=<mappa>` alak is jó).
     fn parse_mcp(args: &[String]) -> Result<Self> {
         let usage = || {
@@ -301,6 +369,9 @@ impl CliArgs {
         }
         if args.first().is_some_and(|a| a == "mcp") {
             return Self::parse_mcp(&args[1..]);
+        }
+        if args.first().is_some_and(|a| a == "setup") {
+            return Self::parse_setup(&args[1..]);
         }
         if args.first().is_some_and(|a| a == "prune") {
             return Self::parse_prune(&args[1..]);
@@ -1241,6 +1312,26 @@ mod tests {
                 allow: vec!["../android".to_owned(), "/tmp/x".to_owned()]
             }
         );
+        assert_eq!(
+            parse(&["setup", "--client", "claude,cursor", "--dry-run", "--user"]).unwrap(),
+            CliArgs::Setup {
+                clients: vec![crate::setup::Client::Claude, crate::setup::Client::Cursor],
+                project: None,
+                user: true,
+                dry_run: true,
+                uninstall: false
+            }
+        );
+        assert!(matches!(
+            parse(&["setup", "--project=/p", "--uninstall", "--yes"]).unwrap(),
+            CliArgs::Setup {
+                uninstall: true,
+                ..
+            }
+        ));
+        assert!(parse(&["setup", "--client", "nope"]).is_err());
+        assert!(parse(&["setup", "--user", "--project", "/p"]).is_err());
+        assert!(parse(&["setup", "x"]).is_err());
         assert!(parse(&["mcp", "--allow"]).is_err());
         assert!(parse(&["mcp", "x"]).is_err());
         assert!(parse(&["mcp", "--auto-update", "x"]).is_err());

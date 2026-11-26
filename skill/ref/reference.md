@@ -147,6 +147,7 @@ routes, translation keys, and for a non-English domain word its English code nam
 a plain sentence works too, filler words are ignored). It answers from the project map without reading files: the top 5
 files (`--all`: every match), each with its reasons (exact definition, file name, name part, string, call, `callers: N`,
 `+M?` = name-only guesses).
+A method row names its class: `RefundService::processRefund()  L6-9` (PHP, Rust) or `Cart.checkout()  L15-18` (Python, JS / TS, Go, Swift, Kotlin); free functions stay bare.
 
 A quoted phrase with spaces (`"Szervező további eseményei"`) is ONE term, matched as a whole against string literals (UI
 labels, translations), never split into words; `route::events.show` finds the route definition (`->name('events.show')`

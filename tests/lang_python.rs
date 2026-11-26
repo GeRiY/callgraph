@@ -182,6 +182,15 @@ fn locate_indexes_python_names() {
     );
 }
 
+#[test]
+fn locate_qualifies_python_methods_with_a_dot_and_leaves_functions_bare() {
+    let project = Project::new();
+    let out = project.run(&["locate", "checkout", "compute_total"]);
+    assert!(out.contains("Cart.checkout()  L"), "{out}");
+    assert!(!out.contains("Cart::checkout()  L"), "{out}");
+    assert!(out.contains("  compute_total()  L"), "{out}");
+}
+
 const SCRIPT: &str = "import os\n\nclass Box:\n    def open(self):\n        return 1\n\n    def close(self):\n        return 2\n\n\ndef lone():\n    return 3\n\n\nprint(os.getcwd())\nprint(1)\nprint(2)\nprint(3)\nprint(4)\nprint(5)\n";
 
 #[test]

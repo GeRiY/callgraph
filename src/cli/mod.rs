@@ -190,6 +190,21 @@ pub fn build_command(args: CliArgs) -> Result<Box<dyn Command>> {
                 .with_vendor(with_vendor)
                 .with_packages(packages),
         )),
+        CliArgs::Setup {
+            clients,
+            project,
+            user,
+            dry_run,
+            uninstall,
+        } => Ok(Box::new(commands::SetupCommand::new(
+            crate::setup::Options {
+                clients,
+                project,
+                user,
+                dry_run,
+                uninstall,
+            },
+        ))),
         CliArgs::Mcp { auto_update, allow } => Ok(Box::new(commands::McpCommand::new(
             crate::skill::SkillHome::from_env(),
             auto_update,
