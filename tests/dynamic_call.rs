@@ -237,30 +237,27 @@ fn dynamic_in_json(project: &Project, path: &str) -> Vec<serde_json::Value> {
 fn php_outline_lists_dynamic_call_last_in_the_method() {
     let project = Project::new();
     let out = project.run(&["show", "src/Builder.php"]);
-    assert!(
-        out.contains("    dynamic_call      $this->$joinMethod"),
-        "{out}"
-    );
+    assert!(out.contains("    dynamic_call $this->$joinMethod"), "{out}");
     // a kategória-lista végén: a név szerint előbb álló `dynamic_call` mégis az `internal_helper` után jön
     let apply = &out[out.find("apply(").expect("apply method")..];
     let helper = apply.find("internal_helper").expect("internal_helper line");
     let dynamic = apply.find("dynamic_call").expect("dynamic_call line");
     assert!(helper < dynamic, "{apply}");
-    assert!(out.contains("dynamic_call      app($abstract)"), "{out}");
+    assert!(out.contains("dynamic_call app($abstract)"), "{out}");
 }
 
 #[test]
 fn ts_and_python_outlines_list_dynamic_calls() {
     let project = Project::new();
     let ts = project.run(&["show", "web/app.ts"]);
-    assert!(ts.contains("dynamic_call      actions[action]"), "{ts}");
+    assert!(ts.contains("dynamic_call actions[action]"), "{ts}");
     assert!(
-        ts.contains("dynamic_call      import(`./locale/${name}.js`)"),
+        ts.contains("dynamic_call import(`./locale/${name}.js`)"),
         "{ts}"
     );
     let py = project.run(&["show", "lib/plugin.py"]);
-    assert!(py.contains("dynamic_call      getattr(self, name)"), "{py}");
-    assert!(py.contains("dynamic_call      globals()[name]"), "{py}");
+    assert!(py.contains("dynamic_call getattr(self, name)"), "{py}");
+    assert!(py.contains("dynamic_call globals()[name]"), "{py}");
 }
 
 #[test]

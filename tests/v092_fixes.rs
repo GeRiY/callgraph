@@ -252,8 +252,6 @@ fn single_level_shows_the_dynamic_callers_footer() {
         assert!(out.contains("Runner"), "{out}");
         assert_eq!(out.matches(&line).count(), 1, "{args:?}: {out}");
         assert!(!out.contains("name-only matches skipped"), "{out}");
-        // a lábléc a záró tipp előtt áll
-        assert!(out.find(&line) < out.rfind("💡"), "{out}");
     }
     // ugyanaz a szöveg a mélyebb útvonalon
     let deep = project.show(&[".", "--grep", "Worker::target", "--depth", "2"]);

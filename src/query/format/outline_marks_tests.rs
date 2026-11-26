@@ -107,14 +107,11 @@ fn wire_inject_nav_show_the_kind_as_the_column() {
     ])];
     let text = plain(&rows);
     assert!(
-        text.contains("    wire              RealtimeSocket::onFrame\n"),
+        text.contains("    wire RealtimeSocket::onFrame\n"),
         "{text}"
     );
-    assert!(text.contains("    inject            Store\n"), "{text}");
-    assert!(
-        text.contains("    nav               DetailView\n"),
-        "{text}"
-    );
+    assert!(text.contains("    inject Store\n"), "{text}");
+    assert!(text.contains("    nav DetailView\n"), "{text}");
 }
 
 #[test]
@@ -166,7 +163,7 @@ fn go_resolved_targets_are_shown_short_in_the_outline() {
         "Command",
     ));
     let text = plain(&[QueryResult::new(b.build(), None)]);
-    assert!(text.contains("internal_helper   Flags\n"), "{text}");
-    assert!(text.contains("external_call     Other::Name\n"), "{text}");
+    assert!(text.contains("internal_helper Flags\n"), "{text}");
+    assert!(text.contains("external_call Other::Name\n"), "{text}");
     assert!(!text.contains("cobra\\"), "{text}");
 }

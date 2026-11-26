@@ -95,6 +95,16 @@ file named directly with such an extension is refused with the reason), any othe
 relative to its folder (`public/build`, `/storage/`, `!keep.js`). `--no-gitignore` (any command) or
 `CALLGRAPH_GITIGNORE=0` (MCP server, hook) turns the `.gitignore` files off; `.callgraphignore` still applies.
 
+## Install flags: optional hint hook
+
+`bash <skill>/install.sh --nudge-hook` adds a non-blocking `PreToolUse` hook (matcher `Grep|Read|Bash`, command
+`callgraph hook pre-nudge`) to `.claude/settings.json` (skill in `<project>/.claude/skills`) or `~/.claude/settings.json`
+(user install). Default off (`--no-nudge-hook` skips the prompt); `--remove-nudge-hook` or `callgraph hook uninstall-nudge` removes
+only this entry (`callgraph hook uninstall` removes all callgraph hooks). Existing settings and hooks stay, `settings.json.bak`
+is written first, no duplicates. When the agent greps (Grep, or Bash `grep` / `rg`) for a code identifier or reads a
+whole source file (4 KB or more, no offset / limit) in a project with a callgraph index, the hook adds one line
+(`additionalContext`) pointing to `locate` / the outline; once per pattern per session; never blocks, always exits 0.
+
 ## Limits
 
 <!-- mcp:limits -->

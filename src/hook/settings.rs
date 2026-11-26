@@ -36,6 +36,13 @@ pub(crate) const POST_EDIT: HookSpec = HookSpec {
     marker: "hook post-edit",
 };
 
+/// A Grep / Read / Bash előtti, nem blokkoló tipp (opt-in): `locate` a keresés helyett.
+pub(crate) const PRE_NUDGE: HookSpec = HookSpec {
+    event: "PreToolUse",
+    matcher: "Grep|Read|Bash",
+    marker: "hook pre-nudge",
+};
+
 /// A session-indítási hook (ajánlott beállítások és frissítés-értesítés; csak új sessionnél).
 pub(crate) const SESSION_START: HookSpec = HookSpec {
     event: "SessionStart",

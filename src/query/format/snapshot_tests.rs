@@ -8,7 +8,7 @@ use crate::i18n::Lang;
 use crate::lang::LanguageRegistry;
 use crate::query::QueryResult;
 
-/// Az outline törzse a `FILE` sor és a záró 💡 sor nélkül.
+/// Az outline törzse a `FILE` sor nélkül.
 fn body(path: &str, text: &str) -> String {
     let language = LanguageRegistry::with_defaults();
     let file = SourceFile::new(path, text.as_bytes().to_vec(), None);
@@ -21,14 +21,13 @@ fn body(path: &str, text: &str) -> String {
         .in_lang(Lang::En)
         .render_with("outline", &rows, None, None)
         .unwrap();
-    let start = out.find("\n\n").map_or(0, |i| i + 2);
-    let end = out.rfind("\n---\n").unwrap_or(out.len());
-    out[start..end].to_owned()
+    let start = out.find('\n').map_or(0, |i| i + 1);
+    out[start..].to_owned()
 }
 
-/// Egy hívás-kategória sora a metódus alatt (`    {kategória:<18}{lista}`).
+/// Egy hívás-kategória sora a metódus alatt (`    {kategória} {lista}`).
 fn calls(category: &str, list: &str) -> String {
-    format!("    {category:<18}{list}\n")
+    format!("    {category} {list}\n")
 }
 
 #[test]

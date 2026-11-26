@@ -48,25 +48,23 @@ just as well from any terminal or script.
 ```console
 $ callgraph.sh --project shop app/Models/Order.php
 FILE  /srv/shop/app/Models/Order.php  NS:App\Models
-
 class Order extends Illuminate\Database\Eloquent\Model  L7-23
   constants (1):
     STATUS_OPEN = 'open'
   properties (1):
     mixed $fillable
   saveTranslations()  L13-20
-    external_call     create, info
-    global_helper     logger
-    internal_helper   translations
+    external_call create, info
+    global_helper logger
+    internal_helper translations
   translations()  L22-22
-    orm_relation      hasMany
+    orm_relation hasMany
 ```
 
 ```console
 $ callgraph.sh --project shop app --grep saveTranslations --depth 2
 == level 1 — directly calls: /saveTranslations/
   /srv/shop/app/Models/Order.php  Caller::run()  L25-25
-
 == level 2 — calls the previous level
   (no more callers)
 ```
@@ -429,6 +427,14 @@ Optional Claude Code hook: `bash install.sh --hooks` (or `callgraph.sh hook inst
 edits in the background; it adds one entry to `~/.claude/settings.json`, keeps everything else and writes a
 `settings.json.bak` backup first. Remove it with `bash ~/.claude/skills/callgraph/callgraph.sh hook uninstall`.
 Details (Hungarian): [`docs/PROJECT-GRAPH.md`](docs/PROJECT-GRAPH.md).
+
+### Grep / Read hint (optional hook)
+
+`bash install.sh --nudge-hook` (default off; `--remove-nudge-hook` removes it) adds a Claude Code `PreToolUse` hook
+(`callgraph hook install-nudge`) to `.claude/settings.json` (project install) or `~/.claude/settings.json` (user
+install). When the agent greps for a code identifier or reads a whole source file in an indexed project, the hook adds
+one non-blocking line pointing to `locate` / the outline; it never blocks or fails a tool call. Existing settings are
+kept and a `settings.json.bak` backup is written first.
 
 ### Session-start check (optional hook)
 

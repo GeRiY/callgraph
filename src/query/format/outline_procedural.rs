@@ -4,7 +4,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 
-use super::selection::pad;
 use crate::i18n::Lang;
 use crate::query::QueryResult;
 use crate::query::snippet::{self, SourceLines};
@@ -26,18 +25,16 @@ pub(super) fn procedural(
             "(nincs class/interface/trait, és nincs hívás sem)\n",
         ));
         if let Some(keys) = keys {
-            s.push('\n');
             s.push_str(&keys);
         }
         return;
     }
     s.push_str(lang.pick(
-        "(procedural file — no class/interface/trait)\n\n",
-        "(procedurális fájl — nincs class/interface/trait)\n\n",
+        "(procedural file — no class/interface/trait)\n",
+        "(procedurális fájl — nincs class/interface/trait)\n",
     ));
     if let Some(keys) = keys {
         s.push_str(&keys);
-        s.push('\n');
     }
     let target = |c: &crate::model::Call| c.resolved.clone().unwrap_or_else(|| c.target.clone());
     // a csomaghoz rendelt külső hívások külön sorban, a csomag címkéjével (`guzzle: …`; csomagtérkép nélkül nincs)
@@ -57,9 +54,8 @@ pub(super) fn procedural(
             .as_deref()
             .map(|label| format!("{label}: "))
             .unwrap_or_default();
-        writeln!(s, "  {}{label}{}", pad(category, 18), list.join(", ")).unwrap();
+        writeln!(s, "  {category} {label}{}", list.join(", ")).unwrap();
     }
-    s.push('\n');
     let mut flows: Vec<_> = g
         .control_flow
         .iter()

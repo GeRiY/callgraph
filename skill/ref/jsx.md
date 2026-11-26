@@ -12,10 +12,10 @@ analysis, so the keys and switches in [js.md](js.md) apply too.
   (`src/Button.jsx::Button`); lowercase DOM tags are not listed.
 - Hooks are `composable_use` calls: `react::useState`, `react::useEffect`. A project hook (`function useCart()` /
   `const useCart = …`) that runs a React hook is marked `[hook]` in its own outline; its callers are
-  `composable_use  src/hooks/useCart.ts::useCart`.
+  `composable_use src/hooks/useCart.ts::useCart`.
 - Context: `createContext()`, `<XContext.Provider>`, `<XContext.Consumer>` and `useContext(XContext)` share one key
   `react::context:<defining file>::XContext`, so `--grep` finds the provider and every consumer.
-- Imports, calls (`module_use  src/api.js::fetchBeds`), `(ref)` edges and TS receiver types work as in JS / TS.
+- Imports, calls (`module_use src/api.js::fetchBeds`), `(ref)` edges and TS receiver types work as in JS / TS.
 
 Props come from the first parameter: destructuring (`size = 'md'` = optional, `...rest` = open), a TS type (inline,
 local or imported `interface` / `type`, `extends`, `A & B`, `PropsWithChildren<T>`), `FC<Props>` /

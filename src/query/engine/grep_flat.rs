@@ -22,8 +22,7 @@ pub(super) fn grep_flat(
 ) -> String {
     let text = grep_outline(rows, lang, source, Some(marks));
     if rows.is_empty() {
-        // Nincs találat: csak a záró tipp marad (nincs fejléc-elválasztó).
-        return text.trim_start_matches("\n---\n").to_owned();
+        return text;
     }
     let runs = row_runs(rows, layers);
     let text = if runs.is_empty() {
@@ -36,8 +35,8 @@ pub(super) fn grep_flat(
         return text;
     }
     let header = tf!(
-        "⚠ --grep outline would be {} lines — showing 1 line per call instead (file header, then caller  L<line>  ← target │ call line; the target is stated once when it is the same everywhere; identical lines merged, at most {} per caller). Narrow it down, or --full.\n\n",
-        "⚠ A --grep outline {} sor lenne — helyette hívásonként 1 sor (fájl-fejsor, alatta hívó  L<sor>  ← cél │ a hívás sora; ha a cél mindenhol ugyanaz, egyszer áll; az azonos sorok összevonva, hívónként legfeljebb {}). Szűkíts, vagy --full.\n\n",
+        "⚠ --grep outline would be {} lines — showing 1 line per call instead (file header, then caller  L<line>  ← target │ call line; the target is stated once when it is the same everywhere; identical lines merged, at most {} per caller). Narrow it down, or --full.\n",
+        "⚠ A --grep outline {} sor lenne — helyette hívásonként 1 sor (fájl-fejsor, alatta hívó  L<sor>  ← cél │ a hívás sora; ha a cél mindenhol ugyanaz, egyszer áll; az azonos sorok összevonva, hívónként legfeljebb {}). Szűkíts, vagy --full.\n",
         text.lines().count(),
         snippet::MAX_PER_METHOD
     );

@@ -87,7 +87,7 @@ impl Formatter for Strings {
                 .unwrap();
                 prev = Some(hit.file.as_str());
             }
-            writeln!(out, "  L{:<5} {:<48} {}", hit.line, hit.caller, hit.value).unwrap();
+            writeln!(out, "  L{} {} {}", hit.line, hit.caller, hit.value).unwrap();
         }
         out
     }

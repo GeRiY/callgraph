@@ -13,11 +13,12 @@ use std::path::PathBuf;
 
 use crate::cli::{Command, HookAction};
 use crate::error::Result;
+use crate::hook::pre_nudge;
 use crate::hook::session_start::{self as session, Commands, Facts, Item, State};
 use crate::hook::{
-    HOOK_EVENT, HOOK_MATCHER, POST_EDIT, SESSION_START, Settings, edited_file, hook_command,
-    hook_command_for, install, install_for, is_installed, is_installed_for, project_root_for,
-    uninstall_for,
+    HOOK_EVENT, HOOK_MATCHER, POST_EDIT, PRE_NUDGE, SESSION_START, Settings, edited_file,
+    hook_command, hook_command_for, install, install_for, is_installed, is_installed_for,
+    project_root_for, uninstall_for,
 };
 use crate::io::FileWalker;
 use crate::lang::LanguageRegistry;
@@ -147,15 +148,140 @@ impl HookCommand {
         Ok(())
     }
 
-    /// Mindkét saját hook kivétele, egy írással.
+    /// A `PreToolUse` tipp-hook felvétele (opt-in; idempotens, `.bak` mentéssel).
+    fn install_nudge(&self, out: &mut dyn Write) -> Result<()> {
+        let settings = self.settings();
+        let exe = std::env::current_exe()?;
+        let exe = exe.canonicalize().unwrap_or(exe);
+        let command = hook_command_for(&exe, &PRE_NUDGE);
+        let shown = settings.file().display();
+        match install_for(&settings.read()?, settings.file(), &command, &PRE_NUDGE)? {
+            None => writeln!(
+                out,
+                "{}",
+                crate::tf!(
+                    "nudge hook: already installed ({shown})",
+                    "tipp-hook: már telepítve ({shown})"
+                )
+            )?,
+            Some(text) => {
+                settings.write(&text)?;
+                writeln!(
+                    out,
+                    "{}",
+                    crate::tf!(
+                        "nudge hook: installed in {shown} (PreToolUse Grep|Read|Bash → non-blocking locate hint); remove: callgraph hook uninstall-nudge",
+                        "tipp-hook: telepítve ide: {shown} (PreToolUse Grep|Read|Bash → nem blokkoló locate-tipp); eltávolítás: callgraph hook uninstall-nudge"
+                    )
+                )?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Csak a tipp-hook kivétele.
+    fn uninstall_nudge(&self, out: &mut dyn Write) -> Result<()> {
+        let settings = self.settings();
+        let shown = settings.file().display();
+        match uninstall_for(&settings.read()?, settings.file(), &PRE_NUDGE)? {
+            None => writeln!(
+                out,
+                "{}",
+                crate::tf!(
+                    "nudge hook: not installed ({shown})",
+                    "tipp-hook: nincs telepítve ({shown})"
+                )
+            )?,
+            Some(text) => {
+                settings.write(&text)?;
+                writeln!(
+                    out,
+                    "{}",
+                    crate::tf!(
+                        "nudge hook: removed from {shown}",
+                        "tipp-hook: eltávolítva innen: {shown}"
+                    )
+                )?;
+            }
+        }
+        Ok(())
+    }
+
+    /// A `PreToolUse` hook: nem blokkoló tipp (`additionalContext`) kódazonosító-kereséshez / teljes fájl-olvasáshoz.
+    /// Mindig 0-val lép ki; hiba esetén semmit sem ír ki.
+    fn pre_nudge(&self, out: &mut dyn Write) {
+        let mut json = String::new();
+        if std::io::stdin().read_to_string(&mut json).is_err() {
+            return;
+        }
+        if let Some(text) = self.nudge_output(&json) {
+            let _ = writeln!(out, "{text}");
+        }
+    }
+
+    /// A hook kimenete a bemeneti JSON-ra (`None`: nincs tipp). Munkamenetenként egy minta egyszer.
+    pub(crate) fn nudge_output(&self, json: &str) -> Option<String> {
+        let registered: Vec<PathBuf> = ProjectRegistry::load(self.home.registry_file())
+            .map(|registry| registry.roots())
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|root| PathBuf::from(root).canonicalize().ok())
+            .collect();
+        let root_of = |dir: &std::path::Path| project_root_for(&dir.join("_"), &registered);
+        let registry = LanguageRegistry::with_defaults();
+        let big_code_file = |file: &std::path::Path| {
+            let big = std::fs::metadata(file)
+                .is_ok_and(|m| m.is_file() && m.len() >= pre_nudge::MIN_FILE_BYTES);
+            big && root_of(file.parent().unwrap_or(file)).is_some_and(|root| {
+                crate::graph::within_root(&root, file)
+                    .is_some_and(|f| FileWalker::for_registry(&registry).includes(&root, &f))
+            })
+        };
+        let nudge = pre_nudge::decide(
+            json,
+            &self.home.script("callgraph.sh"),
+            &|dir| root_of(dir).is_some(),
+            &big_code_file,
+        )?;
+        let session = serde_json::from_str::<serde_json::Value>(json)
+            .ok()
+            .and_then(|v| v.get("session_id")?.as_str().map(str::to_owned));
+        if let Some(id) = session.filter(|id| !id.is_empty()) {
+            let safe: String = id
+                .chars()
+                .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+                .take(64)
+                .collect();
+            let file = std::env::temp_dir().join(format!("callgraph-nudge-{safe}"));
+            let line = format!("{}\n", nudge.key.replace('\n', " "));
+            let seen = std::fs::read_to_string(&file).unwrap_or_default();
+            if seen.lines().any(|l| l == line.trim_end()) {
+                return None;
+            }
+            let mut handle = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&file)
+                .ok()?;
+            let _ = handle.write_all(line.as_bytes());
+        }
+        Some(pre_nudge::render(&nudge.context))
+    }
+
+    /// Minden saját hook kivétele, egy írással.
     fn uninstall(&self, out: &mut dyn Write) -> Result<()> {
         let settings = self.settings();
         let shown = settings.file().display();
         let text = settings.read()?;
-        let after_edit = uninstall_for(&text, settings.file(), &POST_EDIT)?;
-        let base = after_edit.clone().unwrap_or_else(|| text.clone());
-        let after_session = uninstall_for(&base, settings.file(), &SESSION_START)?;
-        let result = after_session.or(after_edit);
+        let mut current = text.clone();
+        let mut changed = false;
+        for spec in [&POST_EDIT, &SESSION_START, &PRE_NUDGE] {
+            if let Some(next) = uninstall_for(&current, settings.file(), spec)? {
+                current = next;
+                changed = true;
+            }
+        }
+        let result = changed.then_some(current);
         match result {
             None => writeln!(
                 out,
@@ -204,6 +330,18 @@ impl HookCommand {
             crate::tf!(
                 "session hook: not installed ({shown}); add: callgraph hook install-session",
                 "session-hook: nincs telepítve ({shown}); telepítés: callgraph hook install-session"
+            )
+        };
+        writeln!(out, "{line}")?;
+        let line = if is_installed_for(&text, settings.file(), &PRE_NUDGE)? {
+            crate::tf!(
+                "nudge hook: installed ({shown})",
+                "tipp-hook: telepítve ({shown})"
+            )
+        } else {
+            crate::tf!(
+                "nudge hook: not installed ({shown}); optional: callgraph hook install-nudge",
+                "tipp-hook: nincs telepítve ({shown}); opcionális: callgraph hook install-nudge"
             )
         };
         writeln!(out, "{line}")?;
@@ -386,6 +524,9 @@ impl Command for HookCommand {
             HookAction::Status => self.status(out)?,
             HookAction::SessionStart => self.session_start(out)?,
             HookAction::InstallSession => self.install_session(out)?,
+            HookAction::PreNudge => self.pre_nudge(out),
+            HookAction::InstallNudge => self.install_nudge(out)?,
+            HookAction::UninstallNudge => self.uninstall_nudge(out)?,
             HookAction::Never(ref item) => self.never(item, out)?,
             HookAction::Reset(ref item) => self.reset(item.as_deref(), out)?,
         }

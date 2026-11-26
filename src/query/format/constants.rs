@@ -89,7 +89,7 @@ impl Formatter for Constants {
             )
             .unwrap();
             for (line, caller, value) in lines {
-                writeln!(out, "  L{line:<5} {caller:<49}{value}").unwrap();
+                writeln!(out, "  L{line} {caller} {value}").unwrap();
             }
         }
         if !found {

@@ -87,9 +87,9 @@ fn outline_shows_swiftui_component() {
         "@State String $newTitle",
         "@EnvironmentObject AppSettings $settings",
         "  body()  L11-32",
-        "    swiftui_view      Button, HStack, List, NavigationStack, TextField, VStack",
-        "    component_use     TodoRow",
-        "    internal_helper   addTodo",
+        "    swiftui_view Button, HStack, List, NavigationStack, TextField, VStack",
+        "    component_use TodoRow",
+        "    internal_helper addTodo",
         "💬 [TODO] TODO: validate the title length before adding",
     ] {
         assert!(text.contains(expected), "missing {expected:?} in:\n{text}");

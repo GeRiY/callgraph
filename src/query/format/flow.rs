@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use std::fmt::Write as _;
 
 use super::Formatter;
-use super::selection::{pad, selected};
+use super::selection::selected;
 use crate::query::QueryResult;
 
 const EMPTY_EN: &str = "(no if/match/switch branches in the selected part — for the body: --format outline, then a targeted Read)\n";
@@ -28,7 +28,6 @@ impl Formatter for Flow {
             )
             .unwrap();
             out.push_str(&super::parse_error_lines(&graph, lang));
-            out.push('\n');
             for cf in &graph.control_flow {
                 writeln!(
                     out,
@@ -62,10 +61,9 @@ impl Formatter for Flow {
                     for (category, mut targets) in groups {
                         targets.sort_unstable();
                         targets.dedup();
-                        writeln!(out, "    {}{}", pad(category, 18), targets.join(", ")).unwrap();
+                        writeln!(out, "    {category} {}", targets.join(", ")).unwrap();
                     }
                 }
-                out.push('\n');
             }
         }
         // A callgraph a kimenet végi üres sorokat levágja ($(cat)), és egy sortöréssel zár.

@@ -127,7 +127,7 @@ fn grep_without_a_match_explains_the_pattern_and_suggests_the_next_step() {
     // az azonosítóból kinyert név szerinti minta, és a hasonló nevű metódus
     assert!(out.contains("by name only: '(^|::|/.|->)find$'"), "{out}");
     assert!(out.contains("did you mean: User::find"), "{out}");
-    // a generikus „törzs-logika” tipp ilyenkor nem jelenhet meg
+    // a generikus „törzs-logika” tipp sosem jelenik meg
     assert!(!out.contains(GENERIC_TIP_EN), "{out}");
     assert!(!out.contains("FILE  "), "{out}");
 
@@ -185,7 +185,7 @@ fn grep_with_a_match_has_no_recovery_hint() {
         let out = project.same_with_and_without_graph(&["show", "app", "--grep", pattern], "en");
         assert!(out.contains("FILE  "), "{out}");
         assert!(out.contains("UserController"), "{out}");
-        assert!(out.contains(GENERIC_TIP_EN), "{out}");
+        assert!(!out.contains(GENERIC_TIP_EN), "{out}");
         for hint in [
             "ℹ",
             "no call target matches",
@@ -196,7 +196,8 @@ fn grep_with_a_match_has_no_recovery_hint() {
         }
     }
     let hu = project.ok(&["show", "app", "--grep", "User::find"], "hu");
-    assert!(hu.contains(GENERIC_TIP_HU), "{hu}");
+    assert!(!hu.contains(GENERIC_TIP_HU), "{hu}");
+    assert!(!hu.contains("💡"), "{hu}");
     assert!(!hu.contains("esetleg erre gondoltál"), "{hu}");
 }
 

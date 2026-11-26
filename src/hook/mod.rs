@@ -5,11 +5,13 @@
 //!   így a következő lekérdezés nem elemez;
 //! - a `SessionStart` hook (`callgraph hook session-start`): az ajánlott, de kikapcsolt beállítások és a
 //!   frissítés-értesítés a session elején (`session_start`).
+//! - a `PreToolUse` hook (`callgraph hook pre-nudge`, opt-in): Grep / Read előtt nem blokkoló tipp a `locate`-ra.
 //!
 //! A `~/.claude/settings.json` szerkesztése (`hook install|install-session|uninstall|status`) is itt van: a többi
 //! beállítást és hookot megtartja, idempotens.
 
 mod payload;
+pub(crate) mod pre_nudge;
 pub(crate) mod session_start;
 mod settings;
 
@@ -22,6 +24,6 @@ pub(crate) use payload::{edited_file, project_root_for};
 #[cfg(test)]
 pub(crate) use settings::uninstall;
 pub(crate) use settings::{
-    HOOK_EVENT, HOOK_MATCHER, POST_EDIT, SESSION_START, Settings, hook_command, hook_command_for,
-    install, install_for, is_installed, is_installed_for, uninstall_for,
+    HOOK_EVENT, HOOK_MATCHER, POST_EDIT, PRE_NUDGE, SESSION_START, Settings, hook_command,
+    hook_command_for, install, install_for, is_installed, is_installed_for, uninstall_for,
 };

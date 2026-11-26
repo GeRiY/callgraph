@@ -48,25 +48,23 @@ vagy szkriptből is ugyanígy használható.
 ```console
 $ callgraph.sh --project shop app/Models/Order.php
 FILE  /srv/shop/app/Models/Order.php  NS:App\Models
-
 class Order extends Illuminate\Database\Eloquent\Model  L7-23
   constants (1):
     STATUS_OPEN = 'open'
   properties (1):
     mixed $fillable
   saveTranslations()  L13-20
-    external_call     create, info
-    global_helper     logger
-    internal_helper   translations
+    external_call create, info
+    global_helper logger
+    internal_helper translations
   translations()  L22-22
-    orm_relation      hasMany
+    orm_relation hasMany
 ```
 
 ```console
 $ callgraph.sh --project shop app --grep saveTranslations --depth 2
 == 1. szint — közvetlenül hívja: /saveTranslations/
   /srv/shop/app/Models/Order.php  Caller::run()  L25-25
-
 == 2. szint — az előző szintet hívja
   (nincs további hívó)
 ```

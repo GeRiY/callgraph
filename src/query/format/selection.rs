@@ -39,16 +39,6 @@ pub(super) fn sanitize(text: &str) -> String {
         .collect()
 }
 
-/// A jq `if length < n then pad else + " "` mása.
-pub(super) fn pad(text: &str, width: usize) -> String {
-    let len = text.chars().count();
-    if len < width {
-        format!("{text}{}", " ".repeat(width - len))
-    } else {
-        format!("{text} ")
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -57,11 +47,5 @@ mod tests {
     fn sanitize_replaces_every_non_alphanumeric_char() {
         assert_eq!(sanitize("App\\Models\\User::find"), "App_Models_User__find");
         assert_eq!(sanitize("árvíz-1"), "_rv_z_1");
-    }
-
-    #[test]
-    fn pad_follows_jq_prelude() {
-        assert_eq!(pad("abc", 5), "abc  ");
-        assert_eq!(pad("abcde", 5), "abcde ");
     }
 }

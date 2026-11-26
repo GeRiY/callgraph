@@ -44,14 +44,11 @@ fn api_labels_follow_the_language() {
     assert!(en.contains("  public constants (1):\n"), "{en}");
     assert!(en.contains("  public properties (1):\n"), "{en}");
     assert!(en.contains("  public API (1):\n"), "{en}");
-    assert!(
-        en.ends_with("For the call graph: --format outline.\n"),
-        "{en}"
-    );
+    assert!(!en.contains("💡") && !en.contains("---"), "{en}");
     assert!(hu.contains("  publikus konstansok (1):\n"), "{hu}");
     assert!(hu.contains("  publikus property-k (1):\n"), "{hu}");
     assert!(hu.contains("  publikus felület (1):\n"), "{hu}");
-    assert!(hu.ends_with("Hívás-gráfhoz: --format outline.\n"), "{hu}");
+    assert!(!hu.contains("💡") && !hu.contains("---"), "{hu}");
 }
 
 #[test]

@@ -60,8 +60,8 @@ fn refresh_usage() -> &'static str {
 
 fn hook_usage() -> &'static str {
     crate::t!(
-        "callgraph hook install|install-session|uninstall|status [--settings <file>]  (Claude Code hooks: PostToolUse background refresh after Edit / Write / MultiEdit; SessionStart recommended settings and update notice; default settings: ~/.claude/settings.json) | callgraph hook post-edit|session-start  (run by the hooks) | callgraph hook never hook|mcp|telemetry  (stop recommending it) | callgraph hook reset [item]  (recommend again)",
-        "callgraph hook install|install-session|uninstall|status [--settings <fájl>]  (Claude Code-hookok: PostToolUse háttér-frissítés Edit / Write / MultiEdit után; SessionStart ajánlott beállítások és frissítés-értesítés; alapértelmezett beállítások: ~/.claude/settings.json) | callgraph hook post-edit|session-start  (a hookok futtatják) | callgraph hook never hook|mcp|telemetry  (többé ne ajánlja) | callgraph hook reset [tétel]  (újra ajánlja)"
+        "callgraph hook install|install-session|install-nudge|uninstall-nudge|uninstall|status [--settings <file>]  (Claude Code hooks: PostToolUse background refresh after Edit / Write / MultiEdit; SessionStart recommended settings and update notice; install-nudge = opt-in PreToolUse hint Grep/Read to locate; default settings: ~/.claude/settings.json) | callgraph hook post-edit|session-start|pre-nudge  (run by the hooks) | callgraph hook never hook|mcp|telemetry  (stop recommending it) | callgraph hook reset [item]  (recommend again)",
+        "callgraph hook install|install-session|install-nudge|uninstall-nudge|uninstall|status [--settings <fájl>]  (Claude Code-hookok: PostToolUse háttér-frissítés Edit / Write / MultiEdit után; SessionStart ajánlott beállítások és frissítés-értesítés; install-nudge = opt-in PreToolUse tipp Grep/Read helyett locate; alapértelmezett beállítások: ~/.claude/settings.json) | callgraph hook post-edit|session-start|pre-nudge  (a hookok futtatják) | callgraph hook never hook|mcp|telemetry  (többé ne ajánlja) | callgraph hook reset [tétel]  (újra ajánlja)"
     )
 }
 
@@ -98,6 +98,12 @@ pub enum HookAction {
     SessionStart,
     /// A `SessionStart` hook felvétele a `settings.json`-ba.
     InstallSession,
+    /// A `PreToolUse` tipp-hook maga: Grep / Read előtt nem blokkoló `locate`-tipp.
+    PreNudge,
+    /// A tipp-hook felvétele a `settings.json`-ba.
+    InstallNudge,
+    /// Csak a tipp-hook eltávolítása.
+    UninstallNudge,
     /// Egy ajánlás végleges elhallgattatása (`hook never hook|mcp|telemetry`).
     Never(String),
     /// Az ajánlások állapotának visszaállítása (egy tételé, vagy tétel nélkül mindegyiké).
@@ -698,6 +704,9 @@ impl CliArgs {
                         "status" => HookAction::Status,
                         "session-start" => HookAction::SessionStart,
                         "install-session" => HookAction::InstallSession,
+                        "pre-nudge" => HookAction::PreNudge,
+                        "install-nudge" => HookAction::InstallNudge,
+                        "uninstall-nudge" => HookAction::UninstallNudge,
                         _ => return Err(usage()),
                     });
                 }

@@ -358,7 +358,6 @@ pub(super) fn render_depth(view: DepthView<'_>) -> String {
         if dynamic > 0 {
             output.push_str(&dynamic_footer(dynamic));
         }
-        output.push('\n');
     }
     let total = output.lines().count();
     if !full && total > max {

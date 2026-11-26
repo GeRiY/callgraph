@@ -241,7 +241,7 @@ fn rewritten_rows(index: &CallerIndex, pattern: &str, direct: &[CallerRow]) -> V
         .collect()
 }
 
-/// A bekötött closure-t meghívó metódusok szakasza (`== via stored closure`), a záró tipp (`---` + `💡`) elé
+/// A bekötött closure-t meghívó metódusok szakasza (`== via stored closure`) a kimenet végére
 /// szúrva; bekötés nélkül a kimenet változatlan.
 fn with_wired(
     mut base: String,
@@ -291,18 +291,7 @@ fn with_wired(
             )
         );
     }
-    match base.rfind("\n---\n💡") {
-        Some(at) => {
-            let mut out = base[..at].to_owned();
-            if !out.ends_with('\n') {
-                out.push('\n');
-            }
-            out.push_str(&add);
-            out.push_str(&base[at..]);
-            out
-        }
-        None => format!("{base}{add}"),
-    }
+    format!("{base}{add}")
 }
 
 /// A `--depth` 1. szintjének üzenete, ha nincs hívó: létezik-e a cél (a minta a teljes katalógusban), és mire hasonlít.
@@ -574,22 +563,6 @@ fn render_single(view: SingleView<'_>) -> String {
             guessed
         };
     }
-    // a lábléc-sorok és a `?` szakasz a záró tipp (`---` + `💡 …`) elé kerülnek
-    let add = if guessed.is_empty() {
-        footer
-    } else {
-        format!("\n{guessed}")
-    };
-    match base.rfind("\n---\n💡") {
-        Some(at) if !add.is_empty() => {
-            let mut out = base[..at].to_owned();
-            if !out.ends_with('\n') {
-                out.push('\n');
-            }
-            out.push_str(&add);
-            out.push_str(&base[at..]);
-            out
-        }
-        _ => format!("{base}{add}"),
-    }
+    let add = if guessed.is_empty() { footer } else { guessed };
+    format!("{base}{add}")
 }

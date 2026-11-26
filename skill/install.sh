@@ -6,12 +6,15 @@
 #   --hooks: a Claude Code-hook (háttér-frissítés fájl-írás után) kérdés nélkül; --no-hooks: kérdés nélkül kihagyja.
 #   --session-hook: a SessionStart hook (ajánlott beállítások, frissítés-értesítés) kérdés nélkül; --no-session-hook: kihagyja.
 #   --rules: a callgraph-first szabály (.claude/rules/callgraph.md) kérdés nélkül (nem interaktívan ez az alap); --no-rules: kihagyja.
+#   --nudge-hook: a PreToolUse tipp-hook (Grep / Read / Bash-grep előtt nem blokkoló `locate`-tipp) kérdés nélkül; --no-nudge-hook: kihagyja
+#     (alapból KI, interaktívan alapértelmezett nem); --remove-nudge-hook: csak ezt a hookot veszi ki a settings.json-ból.
 #   --mcp: az MCP-szerver (`callgraph mcp`) regisztrálása a Claude Code-ban kérdés nélkül; --no-mcp: kihagyja.
 set -euo pipefail
 HOOKS=""
 SESSION_HOOK=""
 MCP=""
 RULES=""
+NUDGE=""
 for arg in "$@"; do
     case "$arg" in
         --hooks) HOOKS=yes ;;
@@ -20,6 +23,9 @@ for arg in "$@"; do
         --no-session-hook) SESSION_HOOK=no ;;
         --rules) RULES=yes ;;
         --no-rules) RULES=no ;;
+        --nudge-hook) NUDGE=yes ;;
+        --no-nudge-hook) NUDGE=no ;;
+        --remove-nudge-hook) NUDGE=remove ;;
         --mcp) MCP=yes ;;
         --no-mcp) MCP=no ;;
     esac
@@ -192,6 +198,42 @@ if [[ "$want_rules" == no ]]; then
     msg "Rule skipped — add later: bash install.sh --rules" "Szabály kihagyva — később: bash install.sh --rules"
 else
     install_rule
+fi
+# Opt-in PreToolUse tipp-hook (`callgraph hook pre-nudge`): Grep / Read / Bash-grep előtt egy nem blokkoló sor a
+# `locate`-ról (additionalContext). A settings.json-t a bináris szerkeszti (a többi beállítás és hook marad, előtte
+# settings.json.bak, nincs duplikátum — nem kell hozzá python / jq). Projekt-telepítés → <projekt>/.claude/settings.json,
+# felhasználói telepítés → ~/.claude/settings.json (mint a szabálynál). Alapból KI; interaktívan alapértelmezett nem.
+nudge_settings() {
+    local skills_dir claude_dir
+    skills_dir="$(cd "$DIR/.." && pwd)"
+    claude_dir="$(cd "$DIR/../.." && pwd)"
+    if [[ "$(basename "$DIR")" == callgraph && "$(basename "$skills_dir")" == skills && "$(basename "$claude_dir")" == .claude ]]; then
+        echo "$claude_dir/settings.json"
+    else
+        echo "$HOME/.claude/settings.json"
+    fi
+}
+if [[ -n "$RPG" ]]; then
+    want_nudge="$NUDGE"
+    if [[ -z "$want_nudge" && -t 0 && -t 1 ]]; then
+        if [[ "$(ui_lang)" == hu ]]; then
+            printf 'Opcionális Claude Code-hook: Grep / Read előtt rövid, nem blokkoló tipp a callgraph locate-ra (settings.json)? [i/N] '
+        else
+            printf 'Optional Claude Code hook: a short, non-blocking hint toward callgraph locate before Grep / Read (settings.json)? [y/N] '
+        fi
+        read -r answer || answer=""
+        case "$answer" in [yYiI]*) want_nudge=yes ;; *) want_nudge=no ;; esac
+    fi
+    nudge_file="$(nudge_settings)"
+    case "$want_nudge" in
+        yes)
+            "./$RPG" hook install-nudge --settings "$nudge_file" || msg "⚠ The nudge hook was not installed (see above)." "⚠ A tipp-hook nem települt (lásd fent)." ;;
+        remove)
+            "./$RPG" hook uninstall-nudge --settings "$nudge_file" || msg "⚠ The nudge hook was not removed (see above)." "⚠ A tipp-hook nem lett eltávolítva (lásd fent)." ;;
+        *)
+            msg "Nudge hook skipped — add later: bash install.sh --nudge-hook (remove: bash install.sh --remove-nudge-hook)" \
+                "Tipp-hook kihagyva — később: bash install.sh --nudge-hook (eltávolítás: bash install.sh --remove-nudge-hook)" ;;
+    esac
 fi
 # a helyi statisztika beküldése (opt-in): csak interaktív terminálban és még döntés nélkül kérdez (Igen / Most nem /
 # Soha); a döntést és a terminál-vizsgálatot a bináris végzi (nem interaktívan, CI-ban semmit nem tesz)

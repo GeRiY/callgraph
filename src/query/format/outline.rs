@@ -43,22 +43,13 @@ fn render(
     marks: Option<&NoteMarks>,
     compact: bool,
 ) -> String {
-    let mut text = rows
-        .iter()
+    // the `FILE` header delimits the files: no separator, no closing tip
+    rows.iter()
         .map(|row| outline(row, lang, source, marks, compact))
         .collect::<Vec<_>>()
-        .join("\n---\n");
-    text.push_str(closing_tip(lang));
-    text
+        .concat()
 }
 
-/// A CLI-s outline záró 💡 sora (a sortartomány-jelölés magyarázata); az MCP-n elmarad (az útmutató egyszer elmondja).
-pub(crate) fn closing_tip(lang: Lang) -> &'static str {
-    lang.pick(
-        "\n---\n💡 for the body logic (conditions, string literals, exact order): Read the L<n>-<m> line range above (offset=<n>, limit=<m-n+1>) — not the whole file.\n",
-        "\n---\n💡 a törzs-logikához (feltételek, string-literálok, pontos sorrend): Read a fenti L<n>-<m> sortartományra (offset=<n>, limit=<m-n+1>) — ne a teljes fájlt.\n",
-    )
-}
 /// Ennyi teszt-függvény fölött a csupa tesztes konténer tagjai egy `N tests` sorba vonódnak.
 const COLLAPSE_TESTS: usize = 3;
 
@@ -101,7 +92,6 @@ fn outline(
     // jegyzetek (PILOT): fájl-jegyzetek, és a nem listázott (konténer nélküli) függvényeiké
     crate::notes::file_lines(&mut s, &row.notes);
     crate::notes::unlisted_lines(&mut s, &row.notes, g);
-    writeln!(s).unwrap();
     if g.containers.is_empty() {
         super::outline_procedural::procedural(row, &mut s, lang, source);
         return s;
@@ -111,10 +101,7 @@ fn outline(
         .containers
         .iter()
         .filter(|c| !super::outline_members::is_props_duplicate(g, c));
-    for (i, c) in visible.enumerate() {
-        if i > 0 {
-            s.push('\n');
-        }
+    for c in visible {
         let extends = c
             .extends
             .as_ref()
@@ -231,8 +218,8 @@ fn outline(
                         )
                     });
                 match target {
-                    Some(target) => writeln!(s, "    {category:<18}{list} → {target}"),
-                    None => writeln!(s, "    {category:<18}{list}"),
+                    Some(target) => writeln!(s, "    {category} {list} → {target}"),
+                    None => writeln!(s, "    {category} {list}"),
                 }
                 .unwrap();
             }
@@ -449,7 +436,7 @@ pub(super) fn categories(row: &QueryResult, m: &Method, lang: Lang) -> Vec<(Stri
         // a HTML belépő-import sora már a metódus-sor (`import /src/main.ts`)
         .filter(|c| c.kind != crate::lang::html::IMPORT_KIND)
     {
-        // wire / inject / nav: a hívás-fajta a kategória-oszlopban (`wire   RealtimeSocket::onFrame`)
+        // wire / inject / nav: a hívás-fajta a kategória-oszlopban (`wire RealtimeSocket::onFrame`)
         let column = if matches!(c.kind.as_str(), "wire" | "inject" | "nav") {
             c.kind.clone()
         } else if c.kind == "const_fetch" && c.category == "external_call" {

@@ -26,11 +26,10 @@ impl Formatter for Api {
             )
             .unwrap();
             out.push_str(&super::parse_error_lines(&row.graph, lang));
-            out.push('\n');
             if row.graph.containers.is_empty() {
                 out.push_str(lang.pick(
-                    "(procedural file — no class/interface/trait; --format outline shows the top-level calls)\n\n",
-                    "(procedurális fájl — nincs class/interface/trait; --format outline mutatja a top-level hívásokat)\n\n",
+                    "(procedural file — no class/interface/trait; --format outline shows the top-level calls)\n",
+                    "(procedurális fájl — nincs class/interface/trait; --format outline mutatja a top-level hívásokat)\n",
                 ));
                 let mut groups = std::collections::BTreeMap::<String, Vec<String>>::new();
                 for call in row
@@ -49,19 +48,14 @@ impl Formatter for Api {
                 for (category, mut targets) in groups {
                     targets.sort();
                     targets.dedup();
-                    writeln!(out, "  {category:<18}{}", targets.join(", ")).unwrap();
+                    writeln!(out, "  {category} {}", targets.join(", ")).unwrap();
                 }
-                out.push_str("---\n");
                 continue;
             }
             for container in &row.graph.containers {
                 write_container(&mut out, row, container, lang);
             }
         }
-        out.push_str(lang.pick(
-            "💡 for the method bodies' logic: Read from the L<n> line above — not the whole file. For the call graph: --format outline.\n",
-            "💡 a metódusok törzs-logikájához: Read a fenti L<n> sortól — ne a teljes fájlt. Hívás-gráfhoz: --format outline.\n",
-        ));
         out
     }
 }
@@ -90,7 +84,6 @@ fn write_container(
     if let Some(doc) = &container.doc {
         writeln!(out, "  {doc}").unwrap();
     }
-    out.push('\n');
     let constants: Vec<_> = row
         .graph
         .constants
@@ -120,7 +113,6 @@ fn write_container(
             )
             .unwrap();
         }
-        out.push('\n');
     }
     let properties: Vec<_> = row
         .graph
@@ -150,7 +142,6 @@ fn write_container(
             )
             .unwrap();
         }
-        out.push('\n');
     }
     write_vue_contract(out, row, container);
     let mut methods: Vec<_> = row
@@ -191,7 +182,6 @@ fn write_container(
             }
         }
     }
-    out.push_str("---\n");
 }
 
 /// A Vue-komponens szerződése: a `props:` (név, ismert típus, kötelező), az `emits:` és a `model:` lista; a JS-prop / emit
@@ -224,7 +214,6 @@ fn write_vue_contract(out: &mut String, row: &QueryResult, container: &crate::mo
             )
             .unwrap();
         }
-        out.push('\n');
     }
     let emits: Vec<_> = row
         .graph
@@ -239,7 +228,6 @@ fn write_vue_contract(out: &mut String, row: &QueryResult, container: &crate::mo
         for c in emits {
             writeln!(out, "    {}", c.name.trim_start_matches("emit:")).unwrap();
         }
-        out.push('\n');
     }
     let models: Vec<_> = row
         .graph
@@ -260,7 +248,6 @@ fn write_vue_contract(out: &mut String, row: &QueryResult, container: &crate::mo
             )
             .unwrap();
         }
-        out.push('\n');
     }
 }
 
