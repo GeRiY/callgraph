@@ -148,7 +148,8 @@ fn pattern_of(symbol: &Touched) -> Option<String> {
     let name = regex::escape(&symbol.name);
     match (symbol.kind, &symbol.container) {
         (Kind::File, _) => None,
-        (Kind::Class, _) => Some(format!(r"(^|\W){name}$")),
+        // case-sensitive: the struct `Callers` is not the function `callers`
+        (Kind::Class, _) => Some(format!(r"(?-i)(^|\W){name}$")),
         // a constructor is reached through the class itself (`new X`, `X(…)`)
         (Kind::Method, Some(class))
             if matches!(symbol.name.as_str(), "__construct" | "__init__") =>
@@ -158,7 +159,7 @@ fn pattern_of(symbol: &Touched) -> Option<String> {
         }
         (Kind::Method, Some(class)) => {
             let class = regex::escape(class);
-            Some(format!(r"(^|\W){class}::{name}$"))
+            Some(format!(r"(?-i)(^|\W){class}::{name}$"))
         }
         (Kind::Method, None) => Some(format!(r"(^|::|\.|->|\\){name}$")),
     }
@@ -196,7 +197,11 @@ fn sort_rows(
             level: row.level,
             uncertain: row.guessed,
         };
-        let list = if crate::locate::rank::is_test_path(&entry.file) {
+        let in_test_module = entry
+            .container
+            .as_deref()
+            .is_some_and(|c| c == "tests" || c.starts_with("tests_") || c.ends_with("_tests"));
+        let list = if crate::locate::rank::is_test_path(&entry.file) || in_test_module {
             &mut tests
         } else {
             &mut callers
@@ -261,9 +266,12 @@ fn analyse(
                     let index = graph.caller_index();
                     let mut rows = index.callers(&pattern, depth).unwrap_or_default();
                     // a method call whose receiver type is unknown: a name-only match, shown with `?`
+                    // a name-only match is a fallback: only when no certain caller (and no route entry) was found,
+                    // so a common name (`build`, `store`, `of`) does not flood a method that has real callers
                     if touched.kind == Kind::Method
                         && touched.container.is_some()
                         && !touched.name.starts_with("__")
+                        && rows.is_empty()
                     {
                         let seen: std::collections::HashSet<(String, u32)> =
                             rows.iter().map(|r| (r.file.clone(), r.line)).collect();
@@ -422,7 +430,7 @@ mod tests {
         let method = symbol(Kind::Method, Some("Order"), "cancel");
         assert_eq!(
             pattern_of(&method).as_deref(),
-            Some(r"(^|\W)Order::cancel$")
+            Some(r"(?-i)(^|\W)Order::cancel$")
         );
         let function = symbol(Kind::Method, None, "run");
         assert_eq!(
@@ -430,7 +438,7 @@ mod tests {
             Some(r"(^|::|\.|->|\\)run$")
         );
         let class = symbol(Kind::Class, None, "Order");
-        assert_eq!(pattern_of(&class).as_deref(), Some(r"(^|\W)Order$"));
+        assert_eq!(pattern_of(&class).as_deref(), Some(r"(?-i)(^|\W)Order$"));
         let ctor = symbol(Kind::Method, Some("Order"), "__construct");
         assert_eq!(
             pattern_of(&ctor).as_deref(),

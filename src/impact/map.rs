@@ -130,6 +130,11 @@ fn spans_of(graph: &FileGraph) -> Vec<Span> {
         });
     }
     for container in &graph.containers {
+        // a module / file container (Rust `mod`, Python module, file-level namespace) is not a type: the lines
+        // in it that are outside every function are file-level code, searching callers by its name is noise
+        if container.kind == "module" {
+            continue;
+        }
         spans.push(Span {
             kind: Kind::Class,
             container: None,
