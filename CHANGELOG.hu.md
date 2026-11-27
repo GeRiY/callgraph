@@ -6,6 +6,8 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ## [Unreleased]
 
+## [1.4.0] — 2026-11-27
+
 ### Új
 
 - **`impact`: mire hat a módosításod, egyetlen hívással:** a `callgraph impact` a git diffet olvassa (alapból: munkafa
@@ -1349,7 +1351,8 @@ Első kiadás.
 - Beépített frissítés: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Előre fordított csomagok macOS-re (arm64, x86_64), Linuxra (x86_64, ARM64, statikus musl) és Windowsra.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v1.3.0...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v1.4.0...develop
+[1.4.0]: https://github.com/GeRiY/callgraph/releases/tag/v1.4.0
 [1.3.0]: https://github.com/GeRiY/callgraph/releases/tag/v1.3.0
 [1.2.2]: https://github.com/GeRiY/callgraph/releases/tag/v1.2.2
 [1.2.1]: https://github.com/GeRiY/callgraph/releases/tag/v1.2.1
