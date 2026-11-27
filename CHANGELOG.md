@@ -5,6 +5,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+## [1.4.1] — 2026-11-27
+
 ### Added
 
 - **`gen --help`:** `callgraph gen --help` (or `-h`) prints the generator syntax and examples instead of an error.
@@ -1275,7 +1277,8 @@ First release.
 - Built-in update: `callgraph --version`, `callgraph.sh update [--check|--force]`.
 - Prebuilt packages for macOS (arm64, x86_64), Linux (x86_64, ARM64, static musl) and Windows.
 
-[Unreleased]: https://github.com/GeRiY/callgraph/compare/v1.4.0...develop
+[Unreleased]: https://github.com/GeRiY/callgraph/compare/v1.4.1...develop
+[1.4.1]: https://github.com/GeRiY/callgraph/releases/tag/v1.4.1
 [1.4.0]: https://github.com/GeRiY/callgraph/releases/tag/v1.4.0
 [1.3.0]: https://github.com/GeRiY/callgraph/releases/tag/v1.3.0
 [1.2.2]: https://github.com/GeRiY/callgraph/releases/tag/v1.2.2
