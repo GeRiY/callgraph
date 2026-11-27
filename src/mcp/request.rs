@@ -4,8 +4,8 @@
 
 use super::guard::ProjectRoot;
 use super::params::{
-    FindCallersParams, FrameworkViewParams, LocateParams, MethodBodyParams, NotesParams,
-    OutlineParams, SearchKind, SearchParams, TraceParams,
+    FindCallersParams, FrameworkViewParams, ImpactParams, LocateParams, MethodBodyParams,
+    NotesParams, OutlineParams, SearchKind, SearchParams, TraceParams,
 };
 
 /// A `find_callers` megengedett mélysége.
@@ -20,6 +20,8 @@ enum Subcommand {
     Locate,
     /// `trace`: a cél egy route / controller-akció / oldal neve, nem út.
     Trace,
+    /// `impact`: a git diff módosult szimbólumai; nincs cél-út.
+    Impact,
 }
 
 /// Egy `show`- (vagy `locate`-) hívás leírása, a gyökér feloldása előtt.
@@ -194,6 +196,40 @@ impl ShowQuery {
         Ok(query)
     }
 
+    /// `impact`: `--staged` or `--diff <range>` (none = the working tree), `--depth <n>`; never reads stdin (`--diff -`
+    /// is refused: the server's stdin is the protocol).
+    pub(crate) fn impact(p: ImpactParams) -> Result<Self, String> {
+        let mut query = Self::new(p.project, String::new(), false);
+        query.command = Subcommand::Impact;
+        if p.staged {
+            query.flags.push("--staged".into());
+        } else if let Some(range) = p
+            .diff
+            .map(|d| d.trim().to_owned())
+            .filter(|d| !d.is_empty())
+        {
+            if range.starts_with('-') {
+                return Err(crate::t!(
+                    "'diff' needs a revision range such as main...HEAD or HEAD~3.",
+                    "A 'diff' revízió-tartományt vár, pl. main...HEAD vagy HEAD~3."
+                )
+                .into());
+            }
+            query = query.flag("--diff", range);
+        }
+        if let Some(depth) = p.depth {
+            if !(1..=crate::impact::MAX_DEPTH).contains(&usize::from(depth)) {
+                return Err(crate::tf!(
+                    "'depth' must be between 1 and {} (got: {depth}).",
+                    "A 'depth' 1 és {} között lehet (kaptam: {depth}).",
+                    crate::impact::MAX_DEPTH
+                ));
+            }
+            query = query.flag("--depth", depth.to_string());
+        }
+        Ok(query)
+    }
+
     /// A cél (fájl vagy mappa) a gyökérhez képest, ahogy a kérésben állt (a `locate`-nél üres). Csak a memóriában
     /// élő `locate`-követés használja (`stats::McpStats`), nem tárolódik.
     pub(crate) fn path(&self) -> &str {
@@ -232,6 +268,7 @@ impl ShowQuery {
                 Subcommand::Show => "show",
                 Subcommand::Locate => "locate",
                 Subcommand::Trace => "trace",
+                Subcommand::Impact => "impact",
             }
             .to_owned(),
             "--project".to_owned(),
@@ -246,7 +283,10 @@ impl ShowQuery {
     /// A `show` argumentumai (`show` és `--project`/`--label` nélkül): kapcsolók, majd a gyökéren belülre
     /// ellenőrzött cél(ok). A `locate`-nél csak a kapcsolók és a kifejezések.
     pub(crate) fn to_args(&self, root: &ProjectRoot) -> Result<Vec<String>, String> {
-        if matches!(self.command, Subcommand::Locate | Subcommand::Trace) {
+        if matches!(
+            self.command,
+            Subcommand::Locate | Subcommand::Trace | Subcommand::Impact
+        ) {
             return Ok(self.flags.clone());
         }
         let target = root.resolve(&self.path)?;
@@ -554,6 +594,46 @@ mod tests {
         })
         .unwrap();
         assert_eq!(locate.symbol(), None);
+    }
+
+    #[test]
+    fn impact_maps_the_range_staged_and_depth() {
+        let head = ShowQuery::impact(ImpactParams::default()).unwrap();
+        assert_eq!(head.head(&root())[0], "impact");
+        assert!(!head.head(&root()).contains(&"--label".to_owned()));
+        assert_eq!(head.to_args(&root()).unwrap(), Vec::<String>::new());
+        let range = ShowQuery::impact(ImpactParams {
+            diff: Some(" main...HEAD ".into()),
+            depth: Some(2),
+            ..ImpactParams::default()
+        })
+        .unwrap();
+        assert_eq!(
+            range.to_args(&root()).unwrap(),
+            s(&["--diff", "main...HEAD", "--depth", "2"])
+        );
+        let staged = ShowQuery::impact(ImpactParams {
+            diff: Some("main".into()),
+            staged: true,
+            ..ImpactParams::default()
+        })
+        .unwrap();
+        assert_eq!(staged.to_args(&root()).unwrap(), s(&["--staged"]));
+        for bad in ["-", "--output=x"] {
+            let q = ShowQuery::impact(ImpactParams {
+                diff: Some(bad.into()),
+                ..ImpactParams::default()
+            });
+            assert!(q.is_err(), "{bad}");
+        }
+        for depth in [0, 4] {
+            let q = ShowQuery::impact(ImpactParams {
+                depth: Some(depth),
+                ..ImpactParams::default()
+            });
+            assert!(q.is_err(), "{depth}");
+        }
+        assert_eq!(head.symbol(), None);
     }
 
     #[test]

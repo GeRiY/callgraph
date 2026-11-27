@@ -11,6 +11,7 @@
 # `callgraph.sh profile [--project alias] [--full]` prints the project profile (forwarded to `callgraph profile`).
 # `callgraph.sh uses <package> [--calls] [--project alias]` shows where the code uses a dependency (forwarded to `callgraph uses`).
 # `callgraph.sh trace <target> [--project alias]` prints the task slice of a route / controller action / page (forwarded to `callgraph trace`).
+# `callgraph.sh impact [--diff [<range>|-]] [--staged] [--depth N] [--project alias] [--compact]` lists the changed symbols of the git diff with their callers, routes, pages and tests (forwarded to `callgraph impact`).
 # `callgraph.sh deps [--project alias]` lists probably unused / missing / dev-only dependencies (forwarded to `callgraph deps`).
 # `callgraph.sh stats [--days N]` shows the local usage stats (forwarded to `callgraph stats`; nothing is sent anywhere).
 # `callgraph.sh --version` (or `-V`, `version`) prints the binary's version and platform, and the binary's path.
@@ -81,6 +82,13 @@ if [[ "${1:-}" == --project && "${3:-}" == trace ]]; then
     run_callgraph trace --project "$2" "${@:4}"
 fi
 if [[ "${1:-}" == trace ]]; then
+    run_callgraph "$@"
+fi
+# változtatás hatása: `callgraph.sh [--project alias] impact [--diff [<tartomány>|-]] [--staged] [--depth N]` → `callgraph impact …`
+if [[ "${1:-}" == --project && "${3:-}" == impact ]]; then
+    run_callgraph impact --project "$2" "${@:4}"
+fi
+if [[ "${1:-}" == impact ]]; then
     run_callgraph "$@"
 fi
 # függőség-vizsgálat: `callgraph.sh [--project alias] deps` → `callgraph deps …` (fölösleges / hiányzó / csak dev)

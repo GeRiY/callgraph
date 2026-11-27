@@ -34,6 +34,7 @@ bash $CG <file> --format flow                 # if / match branches with line ra
 bash $CG <dir> --format summary               # one line per file
 bash $CG profile                              # unfamiliar project: architecture, layers, folders (~15 lines)
 bash $CG trace route::events.show             # a route / controller action / page: the whole chain in <= 30 lines
+bash $CG impact                               # after editing: the changed symbols of the git diff, their callers, routes, pages and tests
 ```
 
 ## Reading the output

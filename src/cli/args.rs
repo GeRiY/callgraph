@@ -8,6 +8,7 @@ use crate::lang::LanguageRegistry;
 use crate::query::format::BodyMode;
 
 use super::generate_args::{parse_gen, parse_undo};
+use super::impact_args::parse_impact;
 use super::next_args::parse_next;
 use super::profile_args::{LayerArgs, parse_profile};
 use super::rename_args::parse_rename;
@@ -211,6 +212,16 @@ pub enum CliArgs {
         target: String,
         project: Option<String>,
     },
+    /// `impact [--diff [<tartomány>|-]] [--staged] [--depth N] [--compact] [--format json]`: mit érint a jelenlegi
+    /// változtatás (`crate::impact`); `project`: alias vagy gyökér-út.
+    Impact {
+        source: crate::impact::DiffSource,
+        depth: usize,
+        project: Option<String>,
+        compact: bool,
+        json: bool,
+        full: bool,
+    },
     /// `deps`: fölösleges, hiányzó és csak dev függőségek; `project`: alias vagy gyökér-út.
     Deps { project: Option<String> },
     /// `hook post-edit|install|uninstall|status`; `settings`: a Claude Code `settings.json` helye (alapból
@@ -396,6 +407,9 @@ impl CliArgs {
         }
         if args.first().is_some_and(|a| a == "trace") {
             return parse_trace(&args[1..]);
+        }
+        if args.first().is_some_and(|a| a == "impact") {
+            return parse_impact(&args[1..]);
         }
         if args.first().is_some_and(|a| a == "deps") {
             return parse_deps(&args[1..]);

@@ -182,6 +182,7 @@ pub(crate) fn classify(args: &[String], client: Option<&str>) -> Option<(Command
         "next" => CommandKind::Next,
         "uses" => CommandKind::PackageUsage,
         "trace" => CommandKind::FrameworkView,
+        "impact" => CommandKind::FindCallers,
         _ => CommandKind::Other,
     };
     Some((command, client))

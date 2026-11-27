@@ -165,11 +165,50 @@ An empty or wrong result comes with a hint (`no call target matches …`, `Did y
   `callgraph.sh <file>::<method> --body` for just the method you need.
 - **Work on a route / page (Laravel, Inertia, Vue, JS server routes):** `callgraph.sh trace route::events.show` first (also
   `Ctrl::method`, a URI, `Pages/X.vue`): the whole chain in <= 30 lines (route, middleware, action, rules, models, page + props).
+- **"What does my current change affect":** `callgraph.sh impact` after editing (the git diff → changed symbols, callers, routes, pages, tests to run).
 - **"Who calls this / what does it affect if I change it":** `callgraph.sh <dir> --grep '(^|::|\.|->)name$' --depth 2`
   (the name pattern catches every call) → `callgraph.sh <caller file>::<caller method> --body`.
 - **Unfamiliar project:** `callgraph.sh profile` (architecture, layers) → `locate <terms>` → the outline of the files it lists → `--body`.
 - **"Where is this text / constant":** `--strings <fragment>` (UI text, messages; a case-insensitive substring) or `--const <name>`;
   for an exact text, or in plain-text files, use Grep.
+
+## Impact of a change (`impact`)
+
+`bash $CG impact [--diff [<range>|-]] [--staged] [--depth 1-3] [--project <alias|dir>] [--compact] [--format json] [--full]`
+answers "what did I touch and what depends on it" in one call. Input: `git diff HEAD -U0` run in the project root
+(working tree + index vs HEAD, plus untracked files as new files); `--staged` = the index only; `--diff main...HEAD` or
+`--diff HEAD~3` = a range; `--diff -` reads a unified diff from stdin (no git needed). No git / not a repository / a
+refused range: one error line, exit code 2. Changed lines map to the innermost symbol (method / function, else class,
+else `file-level code`) through the index's line ranges; a pure deletion maps to the symbol around the gap
+(`lines removed near L96`). Only files callgraph analyses are mapped; the rest is one line (`also changed: 3 other files
+(README.md, …)`), deleted code files are listed as `deleted:` (the old symbols are gone from the index).
+
+Per symbol: `callers:` = the `--grep` caller search restricted to the container (`Type::name`; a plain function: every
+call of the name), `--depth 2|3` adds `depth 2:` / `depth 3:` lines (callers of callers); `?` after a line = name-only
+match (receiver type unknown). `tests:` = callers in test files (`tests/…`, `*Test.php`, `*.spec.ts`, `test_*.py` …) as
+`file::method`: that is what to run. Framework links the index knows: for a changed controller method the routes
+(`route DELETE /organizations/{organization} (organizations.destroy)`), the Inertia pages it renders (`page X/Y`), the
+FormRequest and validated fields (`rules StoreRequest: title*, note`; `*` = required) and `callers: none in code (route
+entry)` when only the route file reaches it; for a changed Inertia page file where it is rendered and its routes.
+Not covered: Livewire / Filament / Blade links, Vue props / emits contracts, tests that reach the code only through an HTTP
+route (`$this->delete('/x')`), calls the index cannot resolve (dynamic calls), and the old symbols of deleted code.
+
+```
+root: /abs/project
+impact: 2 changed symbols in 2 files · 2 callers · 1 route · tests: 1 file
+app/Http/Controllers/OrganizationsController.php
+  OrganizationsController::destroy()  L94-99  (changed L96)
+    route DELETE /organizations/{organization} (organizations.destroy)
+    callers: none in code (route entry)
+    tests: tests/Feature/OrganizationsTest.php::test_can_delete_organization
+app/Models/Organization.php
+  Organization::contacts()  L20-23  (changed L22)
+    callers: OrganizationsController::edit L71 · ContactsController::index L20?
+```
+
+`--compact` = one line per changed symbol with counts; `--format json` = the structured object (`summary`, `files[].symbols[]` with
+`callers`, `tests`, `routes`, `pages`, `rules`). Above 400 lines the text becomes the compact form (`--full` lifts the cap).
+MCP: the `impact` tool (`diff`, `staged`, `depth`, `project`).
 
 ## Quick commands
 

@@ -245,6 +245,7 @@ registering; without it, the current directory is the root.
 |---|---|
 | Where do I start with this task? | `callgraph.sh locate <term>... [--all]` |
 | The whole chain of a route / page / Livewire component (route, middleware, action, rules, models, page + props; ≤ 30 lines) | `callgraph.sh trace <route::name\|Ctrl::method\|/uri\|Pages/X.vue\|livewire:x\|filament:posts>` |
+| What does my current change affect? (changed symbols of the git diff, their callers, routes, pages, tests to run) | `callgraph.sh impact [--staged\|--diff main...HEAD] [--depth 2] [--compact]` |
 | Outline of a file / directory | `callgraph.sh <file\|dir>` |
 | One method only | `callgraph.sh <file>::<method>` (several selectors allowed) |
 | Method source, line-numbered | `callgraph.sh <file>::<method> --body` |
@@ -253,6 +254,28 @@ registering; without it, the current directory is the root.
 | Impact analysis | `callgraph.sh <dir> --grep <pattern> --depth N [--guess]` |
 | String literal / constant usages | `callgraph.sh <dir> --strings <pattern>` · `--const <pattern>` |
 | Filter by call category | `callgraph.sh <dir> --category model_use,orm_relation` |
+
+### What does my change affect: `impact`
+
+After editing, one call lists the changed symbols of the git diff (working tree + index vs HEAD; `--staged`;
+`--diff main...HEAD`; `--diff -` reads a unified diff from stdin) with their callers, the routes / Inertia pages / FormRequest
+rules of a changed controller method, and the tests that call them (`?` = name-only match):
+
+```
+$ callgraph.sh impact --depth 2
+root: /work/shop
+impact: 2 changed symbols in 2 files · 2 callers · 1 route · tests: 1 file
+app/Http/Controllers/OrganizationsController.php
+  OrganizationsController::destroy()  L94-99  (changed L96)
+    route DELETE /organizations/{organization} (organizations.destroy)
+    callers: none in code (route entry)
+    tests: tests/Feature/OrganizationsTest.php::test_can_delete_organization
+app/Models/Organization.php
+  Organization::contacts()  L20-23  (changed L22)
+    callers: OrganizationsController::edit L71 · ContactsController::index L20?
+```
+
+`--compact` is one line per symbol, `--format json` a structured object; MCP: the `impact` tool.
 
 ### Where to start: `locate`
 
@@ -401,7 +424,7 @@ to `.gitignore` unless every teammate has callgraph at the same path. Restart th
 
 Besides the Claude Code skill (unchanged, fully supported), the same binary is also an
 [MCP](https://modelcontextprotocol.io) server on stdio, so any MCP client can use it: `callgraph mcp`.
-Tools: `locate`, `outline`, `method_body`, `find_callers`, `search`, `framework_view`, `trace`, `notes`, `projects`, `guide`, `project_profile`. They return
+Tools: `locate`, `outline`, `method_body`, `find_callers`, `search`, `framework_view`, `trace`, `impact`, `notes`, `projects`, `guide`, `project_profile`. They return
 the same compact text as the CLI, with the same output cap; read-only, paths are confined to the project root, and
 queries never use the network (only the once-a-day update check below does).
 On connect the server sends the client a short usage guide in your language (which tool to use when, how to find

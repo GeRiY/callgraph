@@ -4,6 +4,7 @@ mod args;
 mod command;
 pub mod commands;
 mod generate_args;
+mod impact_args;
 mod next_args;
 mod profile_args;
 mod rename_args;
@@ -129,6 +130,24 @@ pub fn build_command(args: CliArgs) -> Result<Box<dyn Command>> {
         ))),
         CliArgs::Trace { target, project } => Ok(Box::new(commands::TraceCommand::new(
             target,
+            project,
+            crate::skill::SkillHome::from_env(),
+        ))),
+        CliArgs::Impact {
+            source,
+            depth,
+            project,
+            compact,
+            json,
+            full,
+        } => Ok(Box::new(commands::ImpactCommand::new(
+            crate::impact::Request {
+                source,
+                depth,
+                compact,
+                json,
+                full,
+            },
             project,
             crate::skill::SkillHome::from_env(),
         ))),

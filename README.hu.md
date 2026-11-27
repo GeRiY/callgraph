@@ -245,6 +245,7 @@ relatív) regisztráció nélkül is működik; nélküle az aktuális mappa a g
 |---|---|
 | Honnan induljak ezzel a feladattal? | `callgraph.sh locate <kifejezés>... [--all]` |
 | Egy route / oldal / Livewire-komponens teljes lánca (route, middleware, akció, szabályok, modellek, oldal + props; ≤ 30 sor) | `callgraph.sh trace <route::név\|Ctrl::metódus\|/uri\|Pages/X.vue\|livewire:x\|filament:posts>` |
+| Mit érint a jelenlegi változtatásom? (a git diff módosult szimbólumai, hívóik, route-ok, oldalak, futtatandó tesztek) | `callgraph.sh impact [--staged\|--diff main...HEAD] [--depth 2] [--compact]` |
 | Fájl / mappa outline-ja | `callgraph.sh <fájl\|mappa>` |
 | Csak egy metódus | `callgraph.sh <fájl>::<metódus>` (több szelektor is mehet) |
 | Metódus forrása sorszámozva | `callgraph.sh <fájl>::<metódus> --body` |
@@ -253,6 +254,28 @@ relatív) regisztráció nélkül is működik; nélküle az aktuális mappa a g
 | Hatáselemzés | `callgraph.sh <mappa> --grep <minta> --depth N [--guess]` |
 | String-literál / konstans helye | `callgraph.sh <mappa> --strings <minta>` · `--const <minta>` |
 | Szűrés hívás-kategóriára | `callgraph.sh <mappa> --category model_use,orm_relation` |
+
+### Mit érint a változtatásom: `impact`
+
+Szerkesztés után egyetlen hívás kilistázza a git diff módosult szimbólumait (munkafa + index a HEAD-hez képest; `--staged`;
+`--diff main...HEAD`; a `--diff -` az stdin-ről olvas unified diffet) a hívóikkal, a módosult controller-metódus route-jaival /
+Inertia-oldalaival / FormRequest-szabályaival és a hívó tesztekkel (`?` = csak név szerinti egyezés):
+
+```
+$ callgraph.sh impact --depth 2
+root: /work/shop
+impact: 2 changed symbols in 2 files · 2 callers · 1 route · tests: 1 file
+app/Http/Controllers/OrganizationsController.php
+  OrganizationsController::destroy()  L94-99  (changed L96)
+    route DELETE /organizations/{organization} (organizations.destroy)
+    callers: none in code (route entry)
+    tests: tests/Feature/OrganizationsTest.php::test_can_delete_organization
+app/Models/Organization.php
+  Organization::contacts()  L20-23  (changed L22)
+    callers: OrganizationsController::edit L71 · ContactsController::index L20?
+```
+
+`--compact`: szimbólumonként egy sor, `--format json`: strukturált objektum; MCP: az `impact` eszköz.
 
 ### Honnan induljak: `locate`
 
@@ -402,7 +425,7 @@ indítsd újra a klienst.
 
 A Claude Code-skill mellett (változatlan, teljes értékűen támogatott) ugyanaz a bináris
 [MCP](https://modelcontextprotocol.io)-szerver is stdio-n, így bármely MCP-kliens használhatja: `callgraph mcp`.
-Eszközök: `locate`, `outline`, `method_body`, `find_callers`, `search`, `framework_view`, `trace`, `notes`, `projects`, `guide`, `project_profile`. Ugyanazt
+Eszközök: `locate`, `outline`, `method_body`, `find_callers`, `search`, `framework_view`, `trace`, `impact`, `notes`, `projects`, `guide`, `project_profile`. Ugyanazt
 a tömör szöveget adják, mint a CLI, ugyanazzal a kimeneti korláttal; csak olvas, az utak a projekt-gyökéren belül
 maradnak, a lekérdezések nem használnak hálózatot (csak a lenti, naponta egyszeri frissítés-ellenőrzés). Kapcsolódáskor a szerver rövid használati útmutatót küld a kliensnek angolul
 (melyik eszköz mire, hogyan keresd a hívókat, hogyan olvasd a kimenetet); a Claude Code ezt az agent

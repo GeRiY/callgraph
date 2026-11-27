@@ -7,7 +7,7 @@
 <!-- mcp:tools -->
 Tools (paths relative to the project root; `project` = a registered alias, list: `projects`):
 - `locate` `{terms}` (`all: true`: every match); `outline` `{path}` (`method`, `format`: `api` / `flow` / `summary`); `method_body` `{path, method}` (a name or a list; `doc: true`, `raw: true`); `find_callers` `{pattern}` (`depth` 2–5, `guess: true`).
-- Also: `search` `{kind: strings | constants, pattern}`, `framework_view` `{view, path}`, `trace`, `notes`, `next`, `guide` (`topic`: language / reference files).
+- Also: `search` `{kind: strings | constants, pattern}`, `framework_view` `{view, path}`, `trace`, `impact` `{diff?, staged?}`, `notes`, `next`, `guide` (`topic`: language / reference files).
 <!-- /mcp -->
 Tool details (the long form of the list above):
 
@@ -29,6 +29,7 @@ root: a registered alias (`project`, list: `projects`) or the server's working d
 - `framework_view` `{view, path}`: `routes`, `middleware`, `validation`, `jobs`, `events`, `providers`, `magic`,
   `di`, `views` of a directory; Laravel + Inertia (project root): `ziggy`, `forms`, `models`, `inertia`; any project:
   `i18n` (translation keys ↔ `$t()` / `__()`), `classes` (CSS classes ↔ templates).
+- `impact` `{diff?, staged?, depth?}`: what the current change affects: the git diff (working tree vs HEAD; `staged: true`; `diff`: `main...HEAD`, `HEAD~3`) as changed symbols with their callers (`depth` 1–3, `?` = name-only), routes / pages / FormRequest rules of a changed controller method, and the tests that call them. Call it after editing.
 - `notes`: notes left on files / methods (`📝`, read-only). `guide`: the core manual (CLI examples); `topic` (`php`, `blade`, `js`, `vue`, `css`, `rust`, `swift`, `kotlin`, `python`, `go`, `gen`, `mcp`, `reference`) returns one reference file.
 - `next` `{result_id, choice}`: when the server runs with `callgraph mcp --next`, some results end with
   `↪ r7 possible next: [1] … [2] …` (read-only navigation); run one by number (`choice: 1` or `[1, 3]`), only if it
@@ -37,7 +38,7 @@ Output is capped at 400 lines (directory → summary, file → method index, sea
 `method` or `pattern` first; `full: true` only when justified.
 
 CLI equivalents: `locate` = `bash $CG locate <term>…`, `outline` = `bash $CG <path>` (`method` = `<path>::name`), `method_body` = `::name --body`,
-`find_callers` = `--grep`, `search` = `--strings` / `--const`, `framework_view` = `--format <view>`, `trace` = `bash $CG trace <target>`, `notes` = `--notes`.
+`find_callers` = `--grep`, `search` = `--strings` / `--const`, `framework_view` = `--format <view>`, `trace` = `bash $CG trace <target>`, `impact` = `bash $CG impact`, `notes` = `--notes`.
 
 ## Wiring clients (`callgraph setup`)
 

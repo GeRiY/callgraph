@@ -9,6 +9,7 @@ pub mod generate;
 pub mod graph;
 pub mod hook;
 pub mod i18n;
+pub mod impact;
 pub mod index;
 pub mod io;
 pub mod lang;

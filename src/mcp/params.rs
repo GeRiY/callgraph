@@ -197,6 +197,23 @@ pub(crate) struct TraceParams {
     pub project: Option<String>,
 }
 
+// `impact`: a git diff módosult szimbólumai a hívóikkal.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, JsonSchema)]
+pub(crate) struct ImpactParams {
+    /// Revision range, e.g. `main...HEAD` or `HEAD~3`; default: working tree + index vs HEAD.
+    #[serde(default)]
+    pub diff: Option<String>,
+    /// Only the staged changes (the index vs HEAD).
+    #[serde(default)]
+    pub staged: bool,
+    /// Caller levels 1 (default) to 3.
+    #[serde(default)]
+    pub depth: Option<u8>,
+    /// Registered project alias; default: the server's working directory.
+    #[serde(default)]
+    pub project: Option<String>,
+}
+
 // `guide`: az alap-útmutató, vagy egy téma (referencia-fájl).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, JsonSchema)]
 pub(crate) struct GuideParams {
@@ -539,6 +556,22 @@ mod tests {
         assert!(calls.calls);
         assert_eq!(calls.project.as_deref(), Some("shop"));
         assert!(serde_json::from_value::<PackageUsageParams>(serde_json::json!({})).is_err());
+    }
+
+    #[test]
+    fn impact_params_are_all_optional() {
+        let none: ImpactParams = serde_json::from_value(serde_json::json!({})).unwrap();
+        assert!(
+            none.diff.is_none() && !none.staged && none.depth.is_none() && none.project.is_none()
+        );
+        let some: ImpactParams = serde_json::from_value(
+            serde_json::json!({"diff": "main...HEAD", "depth": 2, "project": "shop"}),
+        )
+        .unwrap();
+        assert_eq!(some.diff.as_deref(), Some("main...HEAD"));
+        assert_eq!(some.depth, Some(2));
+        let schema = serde_json::to_string(&schemars::schema_for!(ImpactParams)).unwrap();
+        assert!(!schema.contains("módosult"), "{schema}");
     }
 
     #[test]

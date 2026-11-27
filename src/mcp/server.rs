@@ -14,9 +14,9 @@ use rmcp::model::{CallToolResult, ContentBlock, Implementation, ServerCapabiliti
 use rmcp::{ServerHandler, tool, tool_handler, tool_router};
 
 use super::params::{
-    FindCallersParams, FrameworkViewParams, GenerateParams, GuideParams, LocateParams,
-    MethodBodyParams, NextParams, NotesParams, OutlineParams, PackageUsageParams, ProfileParams,
-    RenameParams, SearchParams, TraceParams, UndoParams,
+    FindCallersParams, FrameworkViewParams, GenerateParams, GuideParams, ImpactParams,
+    LocateParams, MethodBodyParams, NextParams, NotesParams, OutlineParams, PackageUsageParams,
+    ProfileParams, RenameParams, SearchParams, TraceParams, UndoParams,
 };
 use super::request::ShowQuery;
 use super::runner::QueryRunner;
@@ -204,6 +204,20 @@ impl CallgraphServer {
     )]
     async fn trace(&self, Parameters(p): Parameters<TraceParams>) -> CallToolResult {
         self.execute(CommandKind::FrameworkView, ShowQuery::trace(p))
+            .await
+    }
+
+    #[tool(
+        annotations(
+            read_only_hint = true,
+            destructive_hint = false,
+            idempotent_hint = true,
+            open_world_hint = false
+        ),
+        description = "What does my change affect? The git diff (default: working tree vs HEAD; `staged: true`; `diff`: `main...HEAD`, `HEAD~3`) → changed symbols with callers (`depth` 1–3, `?` = name-only), routes / pages / FormRequest of a changed controller method, and tests that call them. Call it after editing. Example: {\"diff\": \"main...HEAD\"}."
+    )]
+    async fn impact(&self, Parameters(p): Parameters<ImpactParams>) -> CallToolResult {
+        self.execute(CommandKind::FindCallers, ShowQuery::impact(p))
             .await
     }
 
