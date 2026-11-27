@@ -9,6 +9,15 @@
   <author><name>Gergő Makra</name></author>
   <icon>https://callgraph.eu/assets/favicon.svg</icon>
   <entry>
+    <title>callgraph v1.4.1</title>
+    <link rel="alternate" type="text/html" href="https://callgraph.eu/changelog/#v1.4.1"/>
+    <link rel="related" type="text/html" href="https://github.com/GeRiY/callgraph/releases/tag/v1.4.1"/>
+    <id>https://github.com/GeRiY/callgraph/releases/tag/v1.4.1</id>
+    <updated>2026-11-27T00:00:00Z</updated>
+    <published>2026-11-27T00:00:00Z</published>
+    <content type="html">&lt;h3&gt;Added&lt;/h3&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;&lt;code&gt;gen --help&lt;/code&gt;:&lt;/b&gt; &lt;code&gt;callgraph gen --help&lt;/code&gt; (or &lt;code&gt;-h&lt;/code&gt;) prints the generator syntax and examples instead of an error.&lt;/li&gt;&lt;/ul&gt;&lt;h3&gt;Changed&lt;/h3&gt;&lt;ul&gt;&lt;li&gt;&lt;b&gt;&lt;code&gt;gen&lt;/code&gt; no longer imports an ambiguous short class name:&lt;/b&gt; when a short type name such as &lt;code&gt;Response&lt;/code&gt; matches several classes in the project, it is not imported silently any more. A warning lists the candidates and how to write the full name; a &lt;code&gt;use&lt;/code&gt; already in the target file wins, and a fully qualified type (&lt;code&gt;:\Illuminate\Http\Response&lt;/code&gt;) imports exactly that class.&lt;/li&gt;&lt;li&gt;&lt;b&gt;Vue &lt;code&gt;--format api&lt;/code&gt; shows prop defaults:&lt;/b&gt; &lt;code&gt;size: String = &#x27;md&#x27;&lt;/code&gt; is now printed for &lt;code&gt;defineProps({ x: { default } })&lt;/code&gt;, Options API props and Vue 3.5 destructured defaults (&lt;code&gt;withDefaults&lt;/code&gt; was already shown).&lt;/li&gt;&lt;li&gt;&lt;b&gt;A method selection with some missing names keeps the found ones:&lt;/b&gt; for &lt;code&gt;file::a,b,c&lt;/code&gt; (also &lt;code&gt;--body&lt;/code&gt; and the MCP &lt;code&gt;method_body&lt;/code&gt; tool), the methods that exist are printed followed by one warning line for the missing names (exit code 0). If none exist, the error is unchanged.&lt;/li&gt;&lt;/ul&gt;</content>
+  </entry>
+  <entry>
     <title>callgraph v1.4.0</title>
     <link rel="alternate" type="text/html" href="https://callgraph.eu/changelog/#v1.4.0"/>
     <link rel="related" type="text/html" href="https://github.com/GeRiY/callgraph/releases/tag/v1.4.0"/>

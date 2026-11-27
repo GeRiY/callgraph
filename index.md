@@ -2,13 +2,13 @@
 
 Source: https://callgraph.eu/
 
-[v1.4.0 — what's new →](https://callgraph.eu/changelog/)
+[v1.4.1 — what's new →](https://callgraph.eu/changelog/)
 
 # Understand code without reading it.
 
 **callgraph** is a token-efficient code map for AI coding agents. It shows the structure, a categorized call graph, single method bodies, *“who calls this?”* and impact analysis — in a few dozen lines instead of whole files. As a call graph generator for Claude Code and other AI coding agents, it helps them find the right code and [save tokens](https://callgraph.eu/tokens/).
 
-[Install in one line](https://callgraph.eu/#install) [Download v1.4.0](https://github.com/GeRiY/callgraph/releases/latest) [View on GitHub](https://github.com/GeRiY/callgraph)
+[Install in one line](https://callgraph.eu/#install) [Download v1.4.1](https://github.com/GeRiY/callgraph/releases/latest) [View on GitHub](https://github.com/GeRiY/callgraph)
 
 ```
 $ callgraph.sh --project shop app/Models/Order.php
