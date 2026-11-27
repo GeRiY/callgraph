@@ -41,7 +41,7 @@ pub use deps::DepsCommand;
 pub use error::ErrorCommand;
 pub use feedback::FeedbackCommand;
 pub use generate::{GenerateCommand, UndoCommand};
-pub use help::HelpCommand;
+pub use help::{GenHelpCommand, HelpCommand};
 pub use hook::HookCommand;
 pub use impact::ImpactCommand;
 pub use lang::LangCommand;

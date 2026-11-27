@@ -103,6 +103,9 @@ fn parse_line(text: &str) -> Result<usize> {
 
 /// `gen '<kifejezés>' [kapcsolók]`.
 pub(crate) fn parse_gen(args: &[String]) -> Result<CliArgs> {
+    if args.iter().any(|a| matches!(a.as_str(), "--help" | "-h")) {
+        return Ok(CliArgs::GenHelp);
+    }
     let (mut dry, mut project) = (false, None);
     let (mut write, mut into, mut after, mut replace, mut expect) = (None, None, None, None, None);
     let (mut diff, mut upsert, mut before, mut at) = (false, false, None, None);

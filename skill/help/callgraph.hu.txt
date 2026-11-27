@@ -204,6 +204,7 @@ Kódgenerátor (fájlt ír; az MCP `generate`, `rename` és `undo` eszköz alapb
       ctor(-Client $http, -int $n=3) promoted, $prop:Típus=1, K=1; törzs nélkül: // TODO (void) / throw LogicException (típusos) /
       yield from [] (Generator, iterable, iter<T>); ns:App\X, use:Foo\Bar,Baz\Qux as Q
       típusok: int float bool str bytes void mixed list<T> map<K,V> opt<T> vagy ?T iter<T> A|B, vagy natív PHP-nevek (list/map -> array + docblock)
+      az osztálynevek importja a projektből jön; ha a rövid név több osztályt jelöl (pl. Response), NEM importálja: figyelmeztetés sorolja a jelölteket, a teljes névvel (:\Illuminate\Http\Response vagy :Illuminate\Http\Response) pontosan azt importálja; a célfájl meglévő `use` sora előnyt élvez
     Példák:
       gen 'c!:PaymentGateway<BaseGateway>[Chargeable] > ctor(-Client $http, -int $retries=3) + +charge(Order $order):Receipt + -sign(array $p):string' --write app/Services/PaymentGateway.php
       gen '+refund(Order $o):void{ $this->http->post($o->id); }' --into app/Services/PaymentGateway.php::PaymentGateway --after charge

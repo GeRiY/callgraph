@@ -289,6 +289,68 @@ const props = withDefaults(defineProps<Props>(), { size: 3 })
         assert_eq!(default("label"), None);
     }
 
+    fn default_of(a: &Analysis, n: &str) -> Option<String> {
+        a.graph
+            .properties
+            .iter()
+            .find(|p| p.name == n && p.js)
+            .and_then(|p| p.default.clone())
+    }
+
+    #[test]
+    fn runtime_props_object_shows_defaults() {
+        let a = run(
+            "/p/Btn.vue",
+            "<script setup>
+defineProps({ size: { type: String, default: 'md' }, disabled: { type: Boolean, default: false }, items: { type: Array, default: () => [] }, plain: String })
+</script>
+",
+        );
+        assert_eq!(default_of(&a, "size").as_deref(), Some("'md'"));
+        assert_eq!(default_of(&a, "disabled").as_deref(), Some("false"));
+        assert_eq!(default_of(&a, "items").as_deref(), Some("() => []"));
+        assert_eq!(default_of(&a, "plain"), None);
+    }
+
+    #[test]
+    fn options_api_props_show_defaults() {
+        let a = run(
+            "/p/Btn.vue",
+            "<script>
+export default { props: { size: { type: String, default: 'md' } } }
+</script>
+",
+        );
+        assert_eq!(default_of(&a, "size").as_deref(), Some("'md'"));
+    }
+
+    #[test]
+    fn with_defaults_multiple_values() {
+        let a = run(
+            "/p/Btn.vue",
+            "<script setup lang=\"ts\">
+const props = withDefaults(defineProps<{ size?: string; disabled?: boolean }>(), { size: 'md', disabled: false })
+</script>
+",
+        );
+        assert_eq!(default_of(&a, "size").as_deref(), Some("'md'"));
+        assert_eq!(default_of(&a, "disabled").as_deref(), Some("false"));
+    }
+
+    #[test]
+    fn reactive_destructure_defaults_are_shown() {
+        let a = run(
+            "/p/Btn.vue",
+            "<script setup lang=\"ts\">
+const { size = 'md', disabled = false, label } = defineProps<{ size?: string; disabled?: boolean; label: string }>()
+</script>
+",
+        );
+        assert_eq!(default_of(&a, "size").as_deref(), Some("'md'"));
+        assert_eq!(default_of(&a, "disabled").as_deref(), Some("false"));
+        assert_eq!(default_of(&a, "label"), None);
+    }
+
     #[test]
     fn define_model_and_type_only_emits_are_recorded_with_lines() {
         let a = run(

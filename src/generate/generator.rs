@@ -16,7 +16,7 @@ use super::fs::Env;
 use super::parser;
 use super::project::{Psr4, detect_strict_types};
 use super::report;
-use super::resolve::{PhpScan, ResolverChain};
+use super::resolve::{PhpScan, Resolution, ResolverChain};
 use super::target;
 use crate::model::{Container, FileGraph};
 
@@ -133,7 +133,27 @@ pub struct GenRequest {
     pub target: Target,
 }
 
-/// A parancs kimenete: az egy-egy soros jelentés (`--dry`-nál a kód) és a feloldatlan nevek.
+/// A figyelmeztetés előtagja az `Output::unresolved`-ban (a többi elem feloldatlan rövid név).
+pub const WARNING_MARK: &str = "⚠ ";
+
+/// A nem egyértelmű név figyelmeztetése: nem importáljuk, a jelöltek felsorolva, és hogyan lehet választani.
+fn ambiguity_warning(name: &str, found: &[String]) -> String {
+    let first = found.first().map_or("", String::as_str);
+    format!(
+        "{WARNING_MARK}{}",
+        crate::tf!(
+            "{}: {} classes with this name — not imported. Write the full name (\\{}) or one of: {}",
+            "{}: {} azonos nevű osztály — nem importáltam. Írd ki a teljes nevet (\\{}) vagy válassz: {}",
+            name,
+            found.len(),
+            first,
+            found.join(" · ")
+        )
+    )
+}
+
+/// A parancs kimenete: az egy-egy soros jelentés (`--dry`-nál a kód), a feloldatlan nevek és a figyelmeztetések
+/// (`WARNING_MARK`-kal kezdődő elemek az `unresolved`-ban).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Output {
     pub lines: Vec<String>,
@@ -145,8 +165,17 @@ impl Output {
     pub fn render(&self) -> String {
         let mut text = self.lines.join("\n");
         text.push('\n');
-        if !self.unresolved.is_empty() {
-            text.push_str(&format!("unresolved: {}\n", self.unresolved.join(", ")));
+        let (warnings, names): (Vec<&String>, Vec<&String>) = self
+            .unresolved
+            .iter()
+            .partition(|u| u.starts_with(WARNING_MARK));
+        if !names.is_empty() {
+            let names: Vec<&str> = names.iter().map(|n| n.as_str()).collect();
+            text.push_str(&format!("unresolved: {}\n", names.join(", ")));
+        }
+        for warning in warnings {
+            text.push_str(warning);
+            text.push('\n');
         }
         text
     }
@@ -198,7 +227,8 @@ impl<'a, E: Emitter> Generator<'a, E> {
 
     /// A kérés végrehajtása.
     pub fn run(&self, request: &GenRequest) -> GenResult<Output> {
-        let program = parser::parse(&request.expr)?;
+        let mut program = parser::parse(&request.expr)?;
+        program.import_qualified_types();
         if let Some(raw) = &program.raw {
             return self.run_raw(&program, raw, request);
         }
@@ -509,14 +539,15 @@ impl<'a, E: Emitter> Generator<'a, E> {
             if explicit.iter().any(|(alias, _)| alias == name) {
                 continue;
             }
-            match chain.resolve(name) {
-                Some(fqcn) => {
+            match chain.resolve_all(name) {
+                Resolution::One(fqcn) => {
                     let ns = fqcn.rsplit_once('\\').map_or("", |(ns, _)| ns);
                     if ns != home {
                         imports.push((fqcn, None));
                     }
                 }
-                None => unresolved.push(name.clone()),
+                Resolution::Ambiguous(found) => unresolved.push(ambiguity_warning(name, &found)),
+                Resolution::Unknown => unresolved.push(name.clone()),
             }
         }
         (imports, unresolved)

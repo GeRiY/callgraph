@@ -147,6 +147,8 @@ pub struct QueryEngine {
     /// A lekérdezés során beolvasott, szintaktikai hibás fájlok (gyökérhez relatív út, az első hiba sora), a
     /// beolvasás sorrendjében — a szűrés (`--grep`) előtt gyűjtve, a kimenet záró `⚠` sorához (`parse_issues`).
     parse_issues: std::sync::Mutex<Vec<(String, u32)>>,
+    /// Warning lines (`⚠ …`) of a partly satisfied method selection: some requested methods are missing, others found.
+    warnings: std::sync::Mutex<Vec<String>>,
     /// A `--grep` nulla találatánál: a lekérdezett hatókör nevei (definíciók, hívás-célok) a „erre gondoltál”
     /// javaslathoz; találatnál üres marad (`query_filtered` tölti, `grep_text` veszi ki).
     scope_catalog: std::sync::Mutex<Option<Catalog>>,
@@ -177,6 +179,7 @@ impl QueryEngine {
             layers: None,
             compact: false,
             parse_issues: std::sync::Mutex::new(Vec::new()),
+            warnings: std::sync::Mutex::new(Vec::new()),
             scope_catalog: std::sync::Mutex::new(None),
         }
     }
@@ -278,7 +281,46 @@ impl QueryEngine {
                     name == n || (!exact(n) && !n.contains('.') && name.rsplit_once('.').is_some_and(|(_, last)| last == n))
                 };
                 let found = graph.methods.iter().filter(|m| names.iter().any(|n| matches(n, &m.name))).map(|m| m.name.clone()).collect::<Vec<_>>();
-                if let Some(missing) = names.iter().find(|n| !found.iter().any(|f| matches(n, f))) {
+                let missing_all: Vec<&String> = names.iter().filter(|n| !found.iter().any(|f| matches(n, f))).collect();
+                // part of the selection found: the bodies are printed and the missing names become one warning line
+                if !found.is_empty() && !missing_all.is_empty() {
+                    let mut seen = std::collections::BTreeSet::new();
+                    let real: Vec<&str> = graph.methods.iter().map(|m| m.name.as_str()).filter(|name| seen.insert(*name)).collect();
+                    let mut suggestions: Vec<String> = Vec::new();
+                    for missing in &missing_all {
+                        let pairs = real.iter().flat_map(|name| {
+                            let last = name.rsplit_once('.').map_or(*name, |(_, last)| last);
+                            [(*name, *name), (last, *name)]
+                        });
+                        for s in hint::closest(missing, pairs, hint::MAX_SUGGESTIONS) {
+                            // a name the caller already got the body of is no suggestion
+                            if !suggestions.contains(&s) && !found.contains(&s) {
+                                suggestions.push(s);
+                            }
+                        }
+                    }
+                    suggestions.truncate(hint::MAX_SUGGESTIONS);
+                    let list = missing_all.iter().map(|n| n.as_str()).collect::<Vec<_>>().join(", ");
+                    let did = if suggestions.is_empty() {
+                        String::new()
+                    } else {
+                        tf!(
+                            " — did you mean: {}",
+                            " — esetleg erre gondoltál: {}",
+                            suggestions.join(", ")
+                        )
+                    };
+                    let line = tf!(
+                        "⚠ no such method: {} (in {}){}",
+                        "⚠ nincs ilyen metódus: {} (itt: {}){}",
+                        list,
+                        file.display(),
+                        did
+                    );
+                    self.warnings.lock().unwrap_or_else(std::sync::PoisonError::into_inner).push(line);
+                    return Ok(found);
+                }
+                if let Some(missing) = missing_all.first().copied() {
                     let message = tf!(
                         "No such method: {}::{} (see --format outline for the file's full list)",
                         "Nincs ilyen metódus: {}::{} (lásd: --format outline a fájl teljes listájához)",

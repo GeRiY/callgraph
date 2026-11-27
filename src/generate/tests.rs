@@ -1819,3 +1819,138 @@ fn an_empty_raw_block_deletes_a_range_with_replace_only() {
     let err = run(&fs, &clock, &request("php{}", false, into_web(Place::End)));
     assert!(err.is_err());
 }
+
+// ---- nem egyértelmű rövid nevek ----
+
+/// A projekt, amelyben a `Response` három csomagból is importálva van (és nincs saját osztály).
+fn project_with_three_responses() -> MemFs {
+    let fs = project();
+    for (i, fqcn) in [
+        "Inertia\\Response",
+        "Illuminate\\Http\\Response",
+        "Symfony\\Component\\HttpFoundation\\Response",
+    ]
+    .iter()
+    .enumerate()
+    {
+        fs.put(
+            &format!("app/R{i}.php"),
+            &format!("<?php\n\nnamespace App;\n\nuse {fqcn};\n\nclass R{i} {{}}\n"),
+        );
+    }
+    fs
+}
+
+fn write_dry(fs: &MemFs, expr: &str) -> Output {
+    let clock = FixedClock(Cell::new(T0));
+    run(
+        fs,
+        &clock,
+        &request(
+            expr,
+            true,
+            Target::Write {
+                file: "app/Http/Ctl.php".into(),
+            },
+        ),
+    )
+    .unwrap()
+}
+
+#[test]
+fn a_unique_short_name_is_imported() {
+    let out = write_dry(&project(), "c:Ctl > +f():Receipt");
+    let text = out.lines.join("\n");
+    assert!(text.contains("use App\\Dto\\Receipt;"), "{text}");
+    assert!(out.unresolved.is_empty(), "{:?}", out.unresolved);
+}
+
+#[test]
+fn an_ambiguous_short_name_is_not_imported_and_warns_with_the_candidates() {
+    let out = write_dry(&project_with_three_responses(), "c:Ctl > +f():Response");
+    let text = out.lines.join("\n");
+    assert!(!text.contains("use "), "{text}");
+    assert!(text.contains("function f(): Response"), "{text}");
+    assert_eq!(
+        out.unresolved,
+        [
+            "⚠ Response: 3 classes with this name — not imported. Write the full name (\\Illuminate\\Http\\Response) or one of: Illuminate\\Http\\Response · Inertia\\Response · Symfony\\Component\\HttpFoundation\\Response"
+        ]
+    );
+    assert!(out.render().contains("not imported"), "{}", out.render());
+    // the preview (no target) warns too
+    let clock = FixedClock(Cell::new(T0));
+    let preview = run(
+        &project_with_three_responses(),
+        &clock,
+        &request("+f():Response", true, Target::Preview),
+    )
+    .unwrap();
+    assert_eq!(preview.unresolved.len(), 1);
+}
+
+#[test]
+fn mixed_is_never_imported() {
+    let out = write_dry(&project_with_three_responses(), "c:Ctl > +f():mixed");
+    assert!(!out.lines.join("\n").contains("use "));
+    assert!(out.unresolved.is_empty(), "{:?}", out.unresolved);
+}
+
+#[test]
+fn the_files_existing_use_resolves_an_ambiguous_name() {
+    let fs = project_with_three_responses();
+    fs.put(
+        "app/Services/Ctl.php",
+        "<?php\n\nnamespace App\\Services;\n\nuse Illuminate\\Http\\Response;\n\nclass Ctl\n{\n}\n",
+    );
+    let clock = FixedClock(Cell::new(T0));
+    let out = run(
+        &fs,
+        &clock,
+        &request(
+            "+f():Response",
+            true,
+            Target::Into {
+                file: "app/Services/Ctl.php".into(),
+                class: None,
+                place: Place::End,
+                upsert: false,
+                expect: None,
+            },
+        ),
+    )
+    .unwrap();
+    assert!(out.unresolved.is_empty(), "{:?}", out.unresolved);
+    let text = out.lines.join("\n");
+    assert!(!text.contains("Inertia"), "{text}");
+    assert!(!text.contains("Symfony"), "{text}");
+}
+
+#[test]
+fn a_fully_qualified_type_imports_exactly_that_class() {
+    for spec in [
+        "c:Ctl > +f():\\Illuminate\\Http\\Response",
+        "c:Ctl > +f():Illuminate\\Http\\Response",
+        "c:Ctl > +f(Illuminate\\Http\\Response $r):void",
+    ] {
+        let out = write_dry(&project_with_three_responses(), spec);
+        let text = out.lines.join("\n");
+        assert!(
+            text.contains("use Illuminate\\Http\\Response;"),
+            "{spec}: {text}"
+        );
+        assert!(!text.contains("Inertia"), "{spec}: {text}");
+        assert!(out.unresolved.is_empty(), "{spec}: {:?}", out.unresolved);
+    }
+}
+
+#[test]
+fn the_projects_own_single_class_wins_over_imported_vendor_classes() {
+    let fs = project_with_three_responses();
+    fs.put(
+        "app/Http/Response.php",
+        "<?php\n\nnamespace App\\Http;\n\nclass Response {}\n",
+    );
+    let out = write_dry(&fs, "c:Ctl > +f():Response");
+    assert!(out.unresolved.is_empty(), "{:?}", out.unresolved);
+}

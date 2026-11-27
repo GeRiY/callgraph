@@ -281,3 +281,50 @@ fn the_wrapper_forwards_every_subcommand_the_help_advertises() {
         }
     }
 }
+
+#[test]
+fn gen_help_prints_the_generator_usage_and_exits_zero() {
+    for flag in ["--help", "-h"] {
+        for args in [vec!["gen", flag], vec!["gen", "c:A", flag]] {
+            let out = Command::new(env!("CARGO_BIN_EXE_callgraph"))
+                .args(&args)
+                .env("CALLGRAPH_LANG", "en")
+                .output()
+                .expect("callgraph runs");
+            assert!(out.status.success(), "{args:?}: {}", stderr(&out));
+            let help = stdout(&out);
+            assert!(help.contains("Code generator"), "{help}");
+            assert!(help.contains("callgraph gen '<expr>'"), "{help}");
+            assert!(help.contains("Examples:"), "{help}");
+            assert!(!help.contains("callgraph rename route"), "{help}");
+        }
+    }
+}
+
+#[test]
+fn an_ambiguous_type_is_not_imported_and_warns() {
+    let p = TempProject::new();
+    for (i, fqcn) in ["Inertia\\Response", "Illuminate\\Http\\Response"]
+        .iter()
+        .enumerate()
+    {
+        fs::write(
+            p.root.join(format!("app/R{i}.php")),
+            format!("<?php\n\nnamespace App;\n\nuse {fqcn};\n\nclass R{i} {{}}\n"),
+        )
+        .unwrap();
+    }
+    let out = p.run(&["gen", "c:Ctl > +f():Response", "--dry"]);
+    assert!(out.status.success(), "{}", stderr(&out));
+    let text = stdout(&out);
+    assert!(!text.contains("\nuse "), "{text}");
+    assert!(
+        text.contains("Response: 2 classes with this name - not imported")
+            || text.contains("Response: 2 classes with this name — not imported"),
+        "{text}"
+    );
+    let out = p.run(&["gen", "c:Ctl > +f():\\Illuminate\\Http\\Response", "--dry"]);
+    let text = stdout(&out);
+    assert!(text.contains("use Illuminate\\Http\\Response;"), "{text}");
+    assert!(!text.contains("not imported"), "{text}");
+}

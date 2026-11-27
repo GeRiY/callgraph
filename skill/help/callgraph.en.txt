@@ -201,6 +201,7 @@ Code generator (writes files; the MCP `generate`, `rename` and `undo` tools are 
       ctor(-Client $http, -int $n=3) promoted, $prop:Type=1, K=1; no body: // TODO (void) / throw LogicException (typed) /
       yield from [] (Generator, iterable, iter<T>); ns:App\X, use:Foo\Bar,Baz\Qux as Q
       types: int float bool str bytes void mixed list<T> map<K,V> opt<T> or ?T iter<T> A|B, or native PHP names (list/map -> array + docblock)
+      class names are imported from the project; a short name that exists as several classes (e.g. Response) is NOT imported: a warning lists the candidates, write the full name (:\Illuminate\Http\Response or :Illuminate\Http\Response) to import exactly that; a `use` already in the target file wins
     Examples:
       gen 'c!:PaymentGateway<BaseGateway>[Chargeable] > ctor(-Client $http, -int $retries=3) + +charge(Order $order):Receipt + -sign(array $p):string' --write app/Services/PaymentGateway.php
       gen '+refund(Order $o):void{ $this->http->post($o->id); }' --into app/Services/PaymentGateway.php::PaymentGateway --after charge

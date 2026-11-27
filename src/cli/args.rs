@@ -262,6 +262,8 @@ pub enum CliArgs {
     Version,
     /// `--help` / `-h` / `help`: a teljes súgó.
     Help,
+    /// `gen --help` / `gen -h`: a generátor súgó-szakasza.
+    GenHelp,
     /// `mcp [--auto-update] [--allow <mappa>]…`: MCP-szerver stdio-n; `--auto-update`: indításkor naponta egyszer
     /// frissít; `--allow`: a projekt-gyökéren kívüli, engedélyezett mappa (alapból az őr szigorú).
     Mcp {

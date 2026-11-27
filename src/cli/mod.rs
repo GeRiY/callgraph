@@ -195,6 +195,7 @@ pub fn build_command(args: CliArgs) -> Result<Box<dyn Command>> {
         ))),
         CliArgs::Version => Ok(Box::new(commands::VersionCommand)),
         CliArgs::Help => Ok(Box::new(commands::HelpCommand)),
+        CliArgs::GenHelp => Ok(Box::new(commands::GenHelpCommand)),
         CliArgs::Stats { days, events } => Ok(Box::new(
             commands::StatsCommand::new(days, crate::skill::SkillHome::from_env())
                 .with_events(events),

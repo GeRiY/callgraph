@@ -50,3 +50,39 @@ fn bare_method_selector_finds_the_object_literal_method() {
     assert!(pick("store.ts::missing").is_err());
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn partly_missing_method_selection_keeps_the_found_ones_and_warns() {
+    let dir = std::env::temp_dir().join(format!("callgraph-partsel-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("a.ts"),
+        "export function alpha() {\n  return 1\n}\nexport function beta() {\n  return 2\n}\n",
+    )
+    .unwrap();
+    let engine = callgraph::query::QueryEngine::new(Some(&dir), None);
+    let parse = |sels: &[&str]| {
+        SelectorSet::parse(&sels.iter().map(PathBuf::from).collect::<Vec<_>>()).unwrap()
+    };
+    // one of three is missing: the two existing ones come back and a single warning line names the missing one
+    let rows = engine
+        .query(&parse(&["a.ts::alpha", "a.ts::gamma", "a.ts::beta"]))
+        .unwrap();
+    assert_eq!(rows[0].methods.clone().unwrap(), ["alpha", "beta"]);
+    let warnings = engine.warnings();
+    assert_eq!(warnings.len(), 1, "{warnings:?}");
+    assert!(
+        warnings[0].starts_with("⚠ no such method: gamma (in a.ts)")
+            || warnings[0].starts_with("⚠ nincs ilyen metódus: gamma"),
+        "{warnings:?}"
+    );
+    // nothing found: still an error, no warning
+    let engine = callgraph::query::QueryEngine::new(Some(&dir), None);
+    assert!(
+        engine
+            .query(&parse(&["a.ts::gamma", "a.ts::delta"]))
+            .is_err()
+    );
+    assert!(engine.warnings().is_empty());
+    let _ = std::fs::remove_dir_all(&dir);
+}

@@ -1,0 +1,52 @@
+# Linux-only check for work-in-progress branches (`check/**`): fmt + clippy + tests + a static linux-x86_64 binary as
+# an artifact. Keeps heavy builds off the development machine; the full 5-platform build stays in release.yml (develop).
+name: check
+
+on:
+  push:
+    branches: ["check/**"]
+  workflow_dispatch:
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    env:
+      TARGET: x86_64-unknown-linux-musl
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: check-x86_64-unknown-linux-musl
+      - name: musl-tools
+        run: |
+          for try in 1 2 3; do
+            sudo apt-get update -qq && sudo apt-get install -y -qq musl-tools && break
+            [ "$try" = 3 ] && exit 1
+            sleep 30
+          done
+          echo "CC_x86_64_unknown_linux_musl=musl-gcc" >> "$GITHUB_ENV"
+      - name: fmt
+        run: cargo fmt --check
+      - name: clippy
+        run: cargo clippy --all-targets --target "$TARGET" -- -D warnings
+      - name: test
+        run: cargo test --target "$TARGET"
+      - name: build (debug, static)
+        run: |
+          base="$(sed -n 's/^version *= *"\(.*\)"/\1/p' Cargo.toml | head -1)"
+          export CALLGRAPH_BUILD_VERSION="$base-check.${GITHUB_SHA::7}"
+          cargo build --locked --target "$TARGET"
+          mkdir -p out && cp "target/$TARGET/debug/callgraph" out/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: callgraph-linux-x86_64-check
+          path: out/callgraph
+          retention-days: 7

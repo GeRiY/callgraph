@@ -18,6 +18,14 @@ impl QueryEngine {
             .clone()
     }
 
+    /// The `⚠ no such method` lines of partly satisfied method selections (the found methods are still shown).
+    pub fn warnings(&self) -> Vec<String> {
+        self.warnings
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+    }
+
     /// Egy beolvasott fájl feljegyzése, ha szintaktikai hibás (egy fájl egyszer).
     pub(crate) fn note_parse_issue(&self, path: &Path, graph: &FileGraph) {
         let Some(issue) = crate::query::format::parse_issue(&self.root, path, graph) else {

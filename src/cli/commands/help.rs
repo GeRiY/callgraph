@@ -28,6 +28,33 @@ impl Command for HelpCommand {
     }
 }
 
+/// `callgraph gen --help` / `-h`: a súgó „Code generator” szakasza (a `rename` sora előtt véget ér).
+pub struct GenHelpCommand;
+
+impl GenHelpCommand {
+    pub fn text() -> String {
+        let full = HelpCommand::text();
+        let start = full
+            .find(crate::t!("\nCode generator (", "\nKódgenerátor ("))
+            .map_or(0, |i| i + 1);
+        let tail = &full[start..];
+        let end = tail
+            .find("callgraph rename route")
+            .and_then(|i| tail[..i].rfind('\n'))
+            .unwrap_or(tail.len());
+        let mut text = tail[..end].trim_end().to_owned();
+        text.push('\n');
+        text
+    }
+}
+
+impl Command for GenHelpCommand {
+    fn run(&self, out: &mut dyn Write, _err: &mut dyn Write) -> Result<i32> {
+        write!(out, "{}", Self::text())?;
+        Ok(0)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -39,5 +66,14 @@ mod tests {
         let s = String::from_utf8(out).unwrap();
         assert!(s.contains("callgraph locate <"), "{s}");
         assert!(!s.contains("callgraph.sh <"), "{s}");
+    }
+
+    #[test]
+    fn gen_help_is_only_the_generator_section() {
+        let s = GenHelpCommand::text();
+        assert!(s.contains("callgraph gen '"), "{s}");
+        assert!(s.contains("Examples") || s.contains("Példák"), "{s}");
+        assert!(!s.contains("callgraph rename route"), "{s}");
+        assert!(!s.contains("callgraph locate <"), "{s}");
     }
 }

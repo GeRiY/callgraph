@@ -371,20 +371,30 @@ fn parse_trailer(
     text: &str,
     grep: bool,
 ) -> String {
+    let warnings = engine.warnings();
+    let mut trailer = String::new();
+    if !warnings.is_empty() {
+        if !text.is_empty() && !text.ends_with('\n') {
+            trailer.push('\n');
+        }
+        for line in &warnings {
+            trailer.push_str(line);
+            trailer.push('\n');
+        }
+    }
     let issues = engine.parse_issues();
     if issues.is_empty() {
-        return String::new();
+        return trailer;
     }
     let lang = crate::i18n::lang();
     if let [row] = rows {
         let shown = crate::query::format::parse_error_lines(&row.graph, lang);
         let first = shown.lines().next().unwrap_or_default();
         if !grep && issues.len() == 1 && !first.is_empty() && text.contains(first) {
-            return String::new();
+            return trailer;
         }
     }
-    let mut trailer = String::new();
-    if !text.is_empty() && !text.ends_with('\n') {
+    if trailer.is_empty() && !text.is_empty() && !text.ends_with('\n') {
         trailer.push('\n');
     }
     trailer.push_str(&crate::query::format::parse_trailer(&issues, lang));

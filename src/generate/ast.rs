@@ -126,6 +126,20 @@ impl TypeRef {
         }
     }
 
+    /// Minden `Named` név átírása (a típusfában mindenhol).
+    pub fn rename_named(&mut self, f: &mut dyn FnMut(&str) -> String) {
+        match self {
+            Self::Named(n) => *n = f(n),
+            Self::List(t) | Self::Opt(t) | Self::Iter(t) => t.rename_named(f),
+            Self::Map(k, v) => {
+                k.rename_named(f);
+                v.rename_named(f);
+            }
+            Self::Union(items) => items.iter_mut().for_each(|t| t.rename_named(f)),
+            _ => {}
+        }
+    }
+
     /// Minden felhasználói / natív név a típusban (importálandó jelöltek a hívó szűrése után).
     pub fn names(&self, out: &mut Vec<String>) {
         match self {
@@ -265,6 +279,64 @@ pub struct UseImport {
 pub struct RawBlock {
     pub text: String,
     pub php: bool,
+}
+
+impl Program {
+    /// A minősített típusnevek (`\Illuminate\Http\Response` vagy `Illuminate\Http\Response`) importtá alakítása: a
+    /// típus rövid nevet kap, a teljes név pontosan egy `use` sor lesz. Ha a rövid név már másra foglalt (más import
+    /// vagy a most létrehozott típus neve), a típus `\Teljes\Név` marad, import nélkül. Az egyszegmensű `\Foo` változatlan.
+    pub fn import_qualified_types(&mut self) {
+        let mut taken: Vec<(String, String)> = self
+            .uses
+            .iter()
+            .map(|u| {
+                let short = u.fqcn.rsplit('\\').next().unwrap_or(&u.fqcn).to_owned();
+                (u.alias.clone().unwrap_or(short), u.fqcn.clone())
+            })
+            .collect();
+        let own: Vec<String> = self.decls.iter().map(|d| d.name.clone()).collect();
+        let mut added: Vec<UseImport> = Vec::new();
+        let mut rewrite = |name: &str| -> String {
+            let full = name.trim_start_matches('\\');
+            let Some((_, short)) = full.rsplit_once('\\') else {
+                return name.to_owned();
+            };
+            if own.iter().any(|o| o == short) {
+                return format!("\\{full}");
+            }
+            match taken.iter().find(|(alias, _)| alias == short) {
+                Some((_, fqcn)) if fqcn == full => short.to_owned(),
+                Some(_) => format!("\\{full}"),
+                None => {
+                    taken.push((short.to_owned(), full.to_owned()));
+                    added.push(UseImport {
+                        fqcn: full.to_owned(),
+                        alias: None,
+                    });
+                    short.to_owned()
+                }
+            }
+        };
+        let mut types: Vec<&mut TypeRef> = Vec::new();
+        for decl in &mut self.decls {
+            types.extend(decl.extends.iter_mut());
+            types.extend(decl.implements.iter_mut());
+            types.extend(decl.backing.iter_mut());
+            types.extend(decl.traits.iter_mut());
+            for member in &mut decl.members {
+                types.extend(member.ty.iter_mut());
+                types.extend(member.params.iter_mut().filter_map(|p| p.ty.as_mut()));
+            }
+        }
+        for member in &mut self.loose {
+            types.extend(member.ty.iter_mut());
+            types.extend(member.params.iter_mut().filter_map(|p| p.ty.as_mut()));
+        }
+        for ty in types {
+            ty.rename_named(&mut rewrite);
+        }
+        self.uses.extend(added);
+    }
 }
 
 /// Egy kifejezés eredménye.

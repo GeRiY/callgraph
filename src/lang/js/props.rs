@@ -36,7 +36,10 @@ impl JsPass for PropsPass {
                 }
             }
         }
-        let defaults = with_defaults(ctx, program);
+        let mut defaults = with_defaults(ctx, program);
+        for (name, value) in destructure_defaults(ctx, program) {
+            defaults.entry(name).or_insert(value);
+        }
         for call in macro_calls(program, "defineProps") {
             match call.arguments.first() {
                 Some(Argument::SpreadElement(_)) => {}
@@ -77,6 +80,37 @@ fn with_defaults(ctx: &PassContext<'_>, program: &Program<'_>) -> HashMap<String
                     src_of(ctx.source, p.value.span(), 30)
                 };
                 defaults.insert(name.to_string(), value);
+            }
+        }
+    }
+    defaults
+}
+
+/// Vue 3.5 reactive props destructure: `const { size = 'md' } = defineProps<…>()` -> prop name -> shortened default.
+fn destructure_defaults(ctx: &PassContext<'_>, program: &Program<'_>) -> HashMap<String, String> {
+    let mut defaults = HashMap::new();
+    for stmt in &program.body {
+        let Statement::VariableDeclaration(v) = stmt else {
+            continue;
+        };
+        for d in &v.declarations {
+            let (BindingPattern::ObjectPattern(o), Some(init)) = (&d.id, &d.init) else {
+                continue;
+            };
+            let mut found = Vec::new();
+            collect_calls(init, "defineProps", &mut found);
+            if found.is_empty() {
+                continue;
+            }
+            for p in &o.properties {
+                if p.computed {
+                    continue;
+                }
+                if let (Some(name), BindingPattern::AssignmentPattern(a)) =
+                    (key_name(&p.key), &p.value)
+                {
+                    defaults.insert(name.to_string(), src_of(ctx.source, a.right.span(), 40));
+                }
             }
         }
     }
@@ -337,14 +371,14 @@ fn props_from(ctx: &PassContext<'_>, container: &str, expr: &Expression<'_>, out
                 if let ObjectPropertyKind::ObjectProperty(p) = prop
                     && let Some(name) = key_name(&p.key)
                 {
-                    let (ty, required) = object_prop_type(ctx.source, p);
+                    let (ty, required, default) = object_prop_type(ctx.source, p);
                     push(
                         container,
                         name,
                         ctx.lines.line_of(p.span.start as usize),
                         ty,
                         required,
-                        None,
+                        default,
                         out,
                     );
                 }
@@ -372,14 +406,15 @@ fn props_from(ctx: &PassContext<'_>, container: &str, expr: &Expression<'_>, out
 }
 
 /// Objektum-alakú prop típusa (a `type` kulcs forrása vagy a rövid alak értéke) és a `required` jelző.
-fn object_prop_type(source: &str, p: &ObjectProperty<'_>) -> (String, bool) {
+fn object_prop_type(source: &str, p: &ObjectProperty<'_>) -> (String, bool, Option<String>) {
     if p.method {
-        return ("mixed".into(), false);
+        return ("mixed".into(), false, None);
     }
-    let (ty, required) = match &p.value {
+    let (ty, required, default) = match &p.value {
         Expression::ObjectExpression(o) => {
             let mut ty = String::new();
             let mut required = false;
+            let mut default = None;
             for q in &o.properties {
                 let ObjectPropertyKind::ObjectProperty(q) = q else {
                     continue;
@@ -389,14 +424,25 @@ fn object_prop_type(source: &str, p: &ObjectProperty<'_>) -> (String, bool) {
                     Some("required") => {
                         required = matches!(&q.value, Expression::BooleanLiteral(b) if b.value)
                     }
+                    Some("default") => {
+                        default = Some(if q.method {
+                            "fn".to_string()
+                        } else {
+                            src_of(source, q.value.span(), 40)
+                        })
+                    }
                     _ => {}
                 }
             }
-            (ty, required)
+            (ty, required, default)
         }
-        other => (src_of(source, other.span(), 40), false),
+        other => (src_of(source, other.span(), 40), false, None),
     };
-    (if ty.is_empty() { "mixed".into() } else { ty }, required)
+    (
+        if ty.is_empty() { "mixed".into() } else { ty },
+        required,
+        default,
+    )
 }
 
 /// TS típus-literál tagjai (`readonly` = nem opcionális).

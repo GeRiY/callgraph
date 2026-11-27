@@ -15,8 +15,28 @@ use super::project::{Psr4, relative};
 
 /// A lánc egy tagja.
 pub trait NameResolver {
-    /// A rövid névhez a teljes név, ha ez a tag tudja.
-    fn resolve(&self, short: &str) -> Option<String>;
+    /// A rövid névhez tartozó összes (különböző) teljes név, amit ez a tag ismer (általában 0 vagy 1).
+    fn candidates(&self, short: &str) -> Vec<String>;
+
+    /// A rövid névhez a teljes név, ha ez a tag tudja (több jelölt esetén az első).
+    fn resolve(&self, short: &str) -> Option<String> {
+        self.candidates(short).into_iter().next()
+    }
+}
+
+/// A rövid név feloldásának eredménye: egyértelmű, nem egyértelmű (több azonos nevű osztály) vagy ismeretlen.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Resolution {
+    One(String),
+    /// Legalább két különböző teljes név (rendezve).
+    Ambiguous(Vec<String>),
+    Unknown,
+}
+
+fn push_unique(out: &mut Vec<String>, fqcn: String) {
+    if !out.contains(&fqcn) {
+        out.push(fqcn);
+    }
 }
 
 /// 1. Explicit importok: `(alias, FQCN)` párok (a kifejezés `use:` sorai és a fájl meglévő importjai).
@@ -31,11 +51,12 @@ impl ExplicitUse {
 }
 
 impl NameResolver for ExplicitUse {
-    fn resolve(&self, short: &str) -> Option<String> {
-        self.entries
-            .iter()
-            .find(|(alias, _)| alias == short)
-            .map(|(_, fqcn)| fqcn.clone())
+    fn candidates(&self, short: &str) -> Vec<String> {
+        let mut out = Vec::new();
+        for (_, fqcn) in self.entries.iter().filter(|(alias, _)| alias == short) {
+            push_unique(&mut out, fqcn.clone());
+        }
+        out
     }
 }
 
@@ -91,30 +112,35 @@ impl<'a, 's> ProjectClasses<'a, 's> {
 }
 
 impl NameResolver for ProjectClasses<'_, '_> {
-    fn resolve(&self, short: &str) -> Option<String> {
+    fn candidates(&self, short: &str) -> Vec<String> {
+        let mut out = Vec::new();
         if self.psr4.is_empty() {
-            return None;
+            return out;
         }
         let wanted = format!("{short}.php");
-        self.scan
-            .files()
-            .find(|path| {
-                path.file_name()
-                    .is_some_and(|n| n.to_str() == Some(wanted.as_str()))
-            })
-            .and_then(|path| relative(self.scan.root, &path))
-            .and_then(|rel| self.psr4.fqcn_of(&rel))
+        let found = self.scan.files().filter(|path| {
+            path.file_name()
+                .is_some_and(|n| n.to_str() == Some(wanted.as_str()))
+        });
+        for path in found {
+            if let Some(fqcn) =
+                relative(self.scan.root, &path).and_then(|rel| self.psr4.fqcn_of(&rel))
+            {
+                push_unique(&mut out, fqcn);
+            }
+        }
+        out
     }
 }
 
 /// Hány fájlt néz át legfeljebb a 3. lépés.
 const USED_IMPORT_FILES: usize = 400;
 
-/// A 3. lépés állapota: hány fájlt olvasott már el, és az ezekből összegyűjtött `alias → FQCN` párok (az első nyer).
+/// A 3. lépés állapota: hány fájlt olvasott már el, és az ezekből összegyűjtött `alias → FQCN-ek` (előfordulási sorrendben).
 #[derive(Default)]
 struct UseIndex {
     next: usize,
-    uses: HashMap<String, String>,
+    uses: HashMap<String, Vec<String>>,
 }
 
 /// A lánc 3. lépése: a projektben már használt importok, az első olyan `use X\Név;` (vagy `use X\Y as Név;`) sor.
@@ -149,24 +175,23 @@ fn file_uses(text: &str) -> impl Iterator<Item = (String, String)> + '_ {
 }
 
 impl NameResolver for UsedImports<'_, '_> {
-    fn resolve(&self, short: &str) -> Option<String> {
+    /// Az összes különböző `use X\Név;` cél (a fájlokat egyszer olvassa, legfeljebb `USED_IMPORT_FILES`-t).
+    fn candidates(&self, short: &str) -> Vec<String> {
         let mut index = self.index.borrow_mut();
-        loop {
-            if let Some(found) = index.uses.get(short) {
-                return Some(found.clone());
-            }
-            if index.next >= USED_IMPORT_FILES {
-                return None;
-            }
-            let path = self.scan.walk.get(index.next)?;
+        while index.next < USED_IMPORT_FILES {
+            let Some(path) = self.scan.walk.get(index.next) else {
+                index.next = USED_IMPORT_FILES;
+                break;
+            };
             index.next += 1;
             let Some(text) = self.scan.read(&path) else {
                 continue;
             };
             for (alias, fqcn) in file_uses(&text) {
-                index.uses.entry(alias).or_insert(fqcn);
+                push_unique(index.uses.entry(alias).or_default(), fqcn);
             }
         }
+        index.uses.get(short).cloned().unwrap_or_default()
     }
 }
 
@@ -231,8 +256,12 @@ const GLOBALS: &[&str] = &[
 ];
 
 impl NameResolver for PhpGlobals {
-    fn resolve(&self, short: &str) -> Option<String> {
-        GLOBALS.contains(&short).then(|| short.to_owned())
+    fn candidates(&self, short: &str) -> Vec<String> {
+        if GLOBALS.contains(&short) {
+            vec![short.to_owned()]
+        } else {
+            Vec::new()
+        }
     }
 }
 
@@ -301,11 +330,13 @@ const LARAVEL: &[(&str, &str)] = &[
 ];
 
 impl NameResolver for LaravelNames {
-    fn resolve(&self, short: &str) -> Option<String> {
+    fn candidates(&self, short: &str) -> Vec<String> {
         LARAVEL
             .iter()
             .find(|(name, _)| *name == short)
             .map(|(_, fqcn)| (*fqcn).to_owned())
+            .into_iter()
+            .collect()
     }
 }
 
@@ -334,8 +365,26 @@ impl<'a> ResolverChain<'a> {
         Self { links }
     }
 
-    /// A teljes név, vagy `None` (feloldatlan).
+    /// A teljes név, vagy `None` (feloldatlan); több azonos nevű osztálynál az első.
     pub fn resolve(&self, short: &str) -> Option<String> {
         self.links.iter().find_map(|link| link.resolve(short))
+    }
+
+    /// A feloldás eredménye: a lánc első olyan tagja dönt, amelynek van jelöltje; ha az több különböző teljes nevet
+    /// ismer (pl. `Response`: Illuminate / Inertia / Symfony), az eredmény `Ambiguous` — nem választunk csendben.
+    /// A projekt saját osztálya (PSR-4) megelőzi a más fájlokból összegyűjtött importokat.
+    pub fn resolve_all(&self, short: &str) -> Resolution {
+        for link in &self.links {
+            let mut found = link.candidates(short);
+            match found.len() {
+                0 => {}
+                1 => return Resolution::One(found.remove(0)),
+                _ => {
+                    found.sort();
+                    return Resolution::Ambiguous(found);
+                }
+            }
+        }
+        Resolution::Unknown
     }
 }
