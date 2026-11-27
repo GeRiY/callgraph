@@ -6,6 +6,41 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ## [Unreleased]
 
+### Új
+
+- **`impact`: mire hat a módosításod, egyetlen hívással:** a `callgraph impact` a git diffet olvassa (alapból: munkafa
+  + index a HEAD-hez képest; `--staged`: csak az index; `--diff main...HEAD` vagy `--diff HEAD~3`: tartomány;
+  `--diff -`: unified diff az stdin-en), és kilistázza a módosult szimbólumokat a hívóikkal, az őket hívó tesztekkel,
+  módosult controller-metódusnál pedig a Laravel-route-jaikkal, Inertia-oldalaikkal és FormRequest-szabályaikkal. A
+  csak névre egyező hívók `?` jelölést kapnak, és csak azonos nyelven belül számítanak. A `--depth 1-3` a hívók
+  hívóit is követi, a `--compact` szimbólumonként egy sort ír, a `--format json` strukturált objektumot. Git nélkül
+  vagy repón kívül egyetlen hibasort ír (kilépési kód 2). MCP-n ez az új `impact` eszköz.
+- **`callgraph setup`: egy paranccsal beköti a callgraph-ot az AI-eszközeidbe:** felismeri a Claude Code-ot, a
+  Cursort, a VS Code-ot, a Codex CLI-t és a Windsurfot (a `--client claude,cursor,codex,vscode,windsurf` választja ki
+  őket), és kliensenként kiírja az MCP-bejegyzést meg egy rövid „először a callgraph-ot használd” szabályt: Claude Code
+  `.mcp.json` + `.claude/rules/callgraph.md`, Cursor `.cursor/mcp.json` + `.cursor/rules/callgraph.mdc`, VS Code
+  `.vscode/mcp.json` + egy blokk a `.github/copilot-instructions.md`-ben, Codex CLI `~/.codex/config.toml` + egy blokk
+  az `AGENTS.md`-ben, Windsurf a saját `mcp_config.json`-ja + egy blokk az `AGENTS.md`-ben. A `--project <mappa>` vagy
+  a `--user` dönti el, hová ír, a `--dry-run` írás nélkül megmutatja a fájlokat és a beírandó részt, az `--uninstall`
+  csak azt veszi ki, amit a setup írt. A konfiguráció többi bejegyzése megmarad, minden módosított fájlról előbb
+  `.bak` másolat készül, a második futtatás pedig már nem változtat semmit. Utána indítsd újra a klienst.
+- **Opcionális Grep / Read tipp a Claude Code-nak:** a `bash install.sh --nudge-hook` egy `PreToolUse` hookot vesz fel
+  (`callgraph hook install-nudge`). Indexelt projektben egy kódazonosítóra futó Grep, egy Bash-beli `grep` / `rg` vagy
+  egy teljes forrásfájl Readje előtt egy sort ad hozzá, amely a `locate`-ot, az outline-t vagy a `--body`-t javasolja;
+  az eszközhívást soha nem blokkolja és nem rontja el, ugyanazt a tippet pedig sessionönként legfeljebb egyszer adja.
+  Alapból ki van kapcsolva (a telepítő megkérdezi, alapértelmezés: nem); a `--no-nudge-hook` kihagyja, a
+  `--remove-nudge-hook` (vagy a `callgraph hook uninstall-nudge`) eltávolítja. A meglévő beállítások megmaradnak, és
+  előbb `settings.json.bak` mentés készül.
+
+### Változás
+
+- **Tömörebb szöveges kimenet:** az outline, a flow, az api, a strings, a constants és a grep kimenete végén nincsenek
+  többé tipp-sorok, és nincs benne `---` elválasztó, blokkon belüli üres sor és oszlopigazítás, így ugyanaz az
+  információ kevesebb sorban fér el. A `--format json` nem változott.
+- **A `locate` megmutatja a metódus osztályát:** a metódus-sorok a puszta metódusnév helyett
+  `RefundService::processRefund()` (PHP, Rust) vagy `Cart.checkout()` (többi nyelv) alakúak; a szabad függvények a
+  régi módon jelennek meg.
+
 ## [1.3.0] — 2026-11-24
 
 ### Új

@@ -5,6 +5,38 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+### Added
+
+- **`impact`: what your change affects, in one call:** `callgraph impact` reads the git diff (default: working tree +
+  index vs HEAD; `--staged`: the index only; `--diff main...HEAD` or `--diff HEAD~3`: a range; `--diff -`: a unified
+  diff on stdin) and lists the changed symbols with their callers, the tests that call them, and for a changed
+  controller method its Laravel routes, Inertia pages and FormRequest rules. Callers that match only by name are
+  marked `?` and are counted only in the same language. `--depth 1-3` follows callers of callers, `--compact` prints
+  one line per symbol, `--format json` a structured object. Without git or outside a repository it prints one error
+  line (exit code 2). Over MCP it is the new `impact` tool.
+- **`callgraph setup`: wire callgraph into your AI tools with one command:** it detects Claude Code, Cursor, VS Code,
+  Codex CLI and Windsurf (`--client claude,cursor,codex,vscode,windsurf` picks them) and writes, per client, the MCP
+  entry and a short "use callgraph first" rule: Claude Code `.mcp.json` + `.claude/rules/callgraph.md`, Cursor
+  `.cursor/mcp.json` + `.cursor/rules/callgraph.mdc`, VS Code `.vscode/mcp.json` + a block in
+  `.github/copilot-instructions.md`, Codex CLI `~/.codex/config.toml` + a block in `AGENTS.md`, Windsurf its
+  `mcp_config.json` + a block in `AGENTS.md`. `--project <dir>` or `--user` chooses where, `--dry-run` shows the files
+  and the snippet without writing, `--uninstall` removes only what setup wrote. Other entries in the config are kept,
+  every changed file gets a `.bak` copy first, and a second run changes nothing. Restart the client afterwards.
+- **Optional Grep / Read hint for Claude Code:** `bash install.sh --nudge-hook` adds a `PreToolUse` hook
+  (`callgraph hook install-nudge`). Before a Grep for a code identifier, a `grep` / `rg` in Bash, or a Read of a whole
+  source file in an indexed project, it adds one line suggesting `locate`, the outline or `--body`; it never blocks
+  or fails the tool call, and gives the same hint at most once per session. Off by default (the installer asks,
+  default no); `--no-nudge-hook` skips it, `--remove-nudge-hook` (or `callgraph hook uninstall-nudge`) removes it.
+  Existing settings are kept and a `settings.json.bak` backup is written first.
+
+### Changed
+
+- **Shorter text output:** outline, flow, api, strings, constants and grep output no longer end with tip lines and
+  have no `---` separators, no blank lines inside a block and no column padding, so the same information takes fewer
+  lines. `--format json` is unchanged.
+- **`locate` shows the class of a method:** method rows read `RefundService::processRefund()` (PHP, Rust) or
+  `Cart.checkout()` (other languages) instead of the bare method name; free functions are shown as before.
+
 ## [1.3.0] — 2026-11-24
 
 ### Added
