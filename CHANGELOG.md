@@ -5,6 +5,22 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions: [Sem
 
 ## [Unreleased]
 
+### Added
+
+- **`gen --help`:** `callgraph gen --help` (or `-h`) prints the generator syntax and examples instead of an error.
+
+### Changed
+
+- **`gen` no longer imports an ambiguous short class name:** when a short type name such as `Response` matches several
+  classes in the project, it is not imported silently any more. A warning lists the candidates and how to write the
+  full name; a `use` already in the target file wins, and a fully qualified type (`:\Illuminate\Http\Response`)
+  imports exactly that class.
+- **Vue `--format api` shows prop defaults:** `size: String = 'md'` is now printed for `defineProps({ x: { default } })`,
+  Options API props and Vue 3.5 destructured defaults (`withDefaults` was already shown).
+- **A method selection with some missing names keeps the found ones:** for `file::a,b,c` (also `--body` and the MCP
+  `method_body` tool), the methods that exist are printed followed by one warning line for the missing names (exit
+  code 0). If none exist, the error is unchanged.
+
 ## [1.4.0] — 2026-11-27
 
 ### Added

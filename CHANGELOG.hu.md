@@ -6,6 +6,23 @@ Angol változat: [CHANGELOG.md](CHANGELOG.md) — a kettő tartalma azonos.
 
 ## [Unreleased]
 
+### Új
+
+- **`gen --help`:** a `callgraph gen --help` (vagy `-h`) hibaüzenet helyett kiírja a generátor szintaxisát és példáit.
+
+### Változás
+
+- **A `gen` nem importál félreérthető rövid osztálynevet:** ha egy rövid típusnév, például a `Response`, több
+  osztályra is illik a projektben, már nem importálja csendben. Figyelmeztetés sorolja fel a jelölteket és azt, hogyan
+  kell kiírni a teljes nevet; a célfájlban már meglévő `use` az erősebb, a teljesen minősített típus
+  (`:\Illuminate\Http\Response`) pedig pontosan azt az osztályt importálja.
+- **A Vue `--format api` mutatja a prop-alapértékeket:** a `size: String = 'md'` most már megjelenik a
+  `defineProps({ x: { default } })`, az Options API propjai és a Vue 3.5 destrukturált alapértékei esetén is (a
+  `withDefaults` eddig is látszott).
+- **Részben hiányzó metódusválasztás megtartja a megtaláltakat:** a `file::a,b,c` esetén (így a `--body` és az MCP
+  `method_body` eszköz esetén is) a létező metódusok után egyetlen figyelmeztető sor jelzi a hiányzó neveket
+  (kilépési kód 0). Ha egyik sem létezik, a hibaüzenet változatlan.
+
 ## [1.4.0] — 2026-11-27
 
 ### Új
